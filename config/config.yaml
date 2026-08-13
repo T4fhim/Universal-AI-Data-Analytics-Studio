@@ -1,0 +1,23 @@
+theme: dark
+window:
+  width: 1600
+  height: 900
+recent_projects: []
+autosave:
+  enabled: true
+  interval_minutes: 5
+logging:
+  level: INFO
+  max_bytes: 5242880
+  backup_count: 5
+ai:
+  enabled: false
+  provider: null
+  api_key_env_var: null
+plugins:
+  enabled: true
+  search_paths: []
+forecasting:
+  default_horizon_periods: 30
+reports:
+  default_export_format: pdf
