@@ -70,6 +70,7 @@ DEFAULT_LOG_FILENAME: str = "application.log"
 DEFAULT_WINDOW_WIDTH: int = 1600
 DEFAULT_WINDOW_HEIGHT: int = 900
 
+
 # --------------------------------------------------------------------------
 # Theme defaults
 # --------------------------------------------------------------------------

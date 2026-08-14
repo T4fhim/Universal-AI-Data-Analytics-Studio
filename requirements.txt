@@ -47,3 +47,6 @@ pytest
 black
 isort
 mypy
+ruff==0.16.3
+
+bandit==1.9.4

@@ -22,25 +22,22 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (
-    QFileDialog,
-    QInputDialog,
-    QMainWindow,
-    QMessageBox,
-    QWidget,
-)
+from PySide6.QtWidgets import (QFileDialog, QInputDialog, QMainWindow,
+                               QMessageBox, QWidget)
 
 from src.core.bootstrap import BootstrapContext
-from src.core.constants import APP_NAME, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH
+from src.core.constants import (APP_NAME, DEFAULT_WINDOW_HEIGHT,
+                                DEFAULT_WINDOW_WIDTH)
 from src.core.exceptions import ApplicationError
 from src.core.logger import get_logger
 from src.readers.reader_registry import get_reader_for_path
 from src.services.project_service import ProjectService
 from src.services.settings_service import SettingsService
-from src.services.workspace_service import Dashboard, DashboardTile, Visualization, WorkspaceService
-from src.visualization.dashboard_renderer import render_dashboard
+from src.services.workspace_service import (Dashboard, DashboardTile,
+                                            Visualization, WorkspaceService)
 from src.ui.dialogs.about_dialog import AboutDialog
-from src.ui.dialogs.create_visualization_dialog import CreateVisualizationDialog
+from src.ui.dialogs.create_visualization_dialog import \
+    CreateVisualizationDialog
 from src.ui.dialogs.settings_dialog import SettingsDialog
 from src.ui.dock_manager import DockManager
 from src.ui.menu_bar import ApplicationMenuBar
@@ -48,6 +45,7 @@ from src.ui.status_bar import ApplicationStatusBar
 from src.ui.theme_manager import ThemeManager
 from src.ui.toolbar import ApplicationToolBar
 from src.ui.widgets.welcome_widget import WelcomeWidget
+from src.visualization.dashboard_renderer import render_dashboard
 
 _logger = get_logger(__name__)
 

@@ -30,16 +30,11 @@ from typing import Any
 
 import yaml
 
-from src.core.constants import (
-    AVAILABLE_THEMES,
-    CONFIG_FILE_PATH,
-    DEFAULT_LOG_FILE_BACKUP_COUNT,
-    DEFAULT_LOG_FILE_MAX_BYTES,
-    DEFAULT_LOG_LEVEL,
-    DEFAULT_THEME,
-    DEFAULT_WINDOW_HEIGHT,
-    DEFAULT_WINDOW_WIDTH,
-)
+from src.core.constants import (AVAILABLE_THEMES, CONFIG_FILE_PATH,
+                                DEFAULT_LOG_FILE_BACKUP_COUNT,
+                                DEFAULT_LOG_FILE_MAX_BYTES, DEFAULT_LOG_LEVEL,
+                                DEFAULT_THEME, DEFAULT_WINDOW_HEIGHT,
+                                DEFAULT_WINDOW_WIDTH)
 from src.core.exceptions import ConfigError
 
 # Bootstrap-time-only logger. Deliberately not src.core.logger.get_logger

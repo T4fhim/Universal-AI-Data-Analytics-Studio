@@ -5,8 +5,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from src.core.logger import get_logger
 from src.analysis.column_profile import ColumnProfile, profile_column
+from src.core.logger import get_logger
 from src.readers.type_inference import find_ambiguous_type_columns
 from src.services.workspace_service import Dataset
 

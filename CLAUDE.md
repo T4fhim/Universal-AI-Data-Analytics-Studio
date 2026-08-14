@@ -12,9 +12,9 @@ do not assume something described there already exists without checking `src/`.
 
 The project is being built **milestone by milestone** (see git history and module docstrings, e.g.
 "milestone 2b", "milestone 3a"). Each milestone is expected to be complete and integrated with everything
-before it — not a stub — but later milestones' functionality genuinely does not exist yet. Several `src/`
-subpackages are still empty directories awaiting their milestone: `database/`, `models/`, `plugins/`,
-`workers/`, `reports/`, `resources/`. Check whether a module actually exists before assuming it does.
+before it — not a stub — but later milestones' functionality genuinely does not exist yet. See
+[docs/ROADMAP.md](docs/ROADMAP.md#what-is-explicitly-not-built-yet) for the current list of empty/unbuilt
+`src/` subpackages. Check whether a module actually exists before assuming it does.
 
 ## Commands
 
@@ -45,30 +45,24 @@ mypy src/
 
 ## Architecture
 
+Full narrative detail — startup sequence, dependency container mechanics, the workspace model,
+configuration schema, and the exception hierarchy — lives in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). What follows here is only the actionable rules: the
+constraints that must be preserved whenever this code is touched, not the explanation of how it works.
+
 ### Startup sequence
-
-`main.py` → `Application.create()` ([src/core/app.py](src/core/app.py)) → `bootstrap()`
-([src/core/bootstrap.py](src/core/bootstrap.py)), which runs in a fixed order that must not be reordered:
-
-1. `AppConfig.load()` — reads `config/config.yaml` (self-healing: writes a default file if missing/empty).
-2. `configure_logging()` — must happen only after config is loaded, since logging settings come from it.
-3. Construct one `DependencyContainer` and register `AppConfig` and `ApplicationState` into it.
-4. Construct and register `SettingsService`, `ProjectService`, `WorkspaceService`.
 
 `config.py` deliberately does not import the project logger (it's a dependency of the logger, not a
 consumer of it) — it uses a bare `logging.getLogger` for its own bootstrap-time messages instead. Don't
-"fix" this into a `get_logger` call.
-
-`bootstrap()` returns a `BootstrapContext` (config, container, state). `Application.run()` is the only
-place a `QApplication` is constructed; it applies the theme via `ThemeManager`, builds `MainWindow`, and
-enters the Qt event loop.
+"fix" this into a `get_logger` call. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#application-startup-sequence) for the full startup sequence
+and why its order can't be changed.
 
 ### Dependency container
 
-[src/core/dependency_container.py](src/core/dependency_container.py) is a minimal service locator:
-`register(key, factory, singleton=True)` / `resolve(key)`. Keys are conventionally the service's type.
 Register new session-wide services in `bootstrap.py` alongside the existing ones rather than constructing
-them ad hoc inside UI code, so every consumer resolves the same instance.
+them ad hoc inside UI code, so every consumer resolves the same instance. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#dependency-container) for how the container itself works.
 
 ### The `Base*` extension-point pattern
 
@@ -95,45 +89,36 @@ as classes held in a registry, not objects), with inputs validated before real w
 When adding a new concrete implementation of any of these, follow the existing pattern in that package
 rather than inventing a new shape.
 
-### Workspace model (`src/services/workspace_service.py`)
+### Workspace model
 
-`WorkspaceService` is the session-scoped, in-memory registry of everything loaded or created during a run
-— it does not read files or build charts itself, only tracks what other layers produced:
+**Cleaning operations never mutate a `Dataset` in place** (see the `Base*` pattern above — this is the
+same rule, restated because it's the constraint most likely to be violated by accident when extending
+`WorkspaceService` itself). Closing a dataset or visualization does **not** cascade to things derived from
+it — orphaned references (a stale `parent_dataset_id`, a dashboard tile pointing at a closed
+visualization) are normal, expected state that dependent lookups handle gracefully, not corruption to
+guard against. Preserve this non-cascading behavior when extending `WorkspaceService`'s methods. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#workspace-model) for the full `Dataset`/`Visualization`/
+`Dashboard` model.
 
-- `Dataset` — wraps a `pandas.DataFrame` plus lineage (`parent_dataset_id`, `derivation_description`).
-  `row_count`/`column_count` are derived in `__post_init__`, never passed in, so they can't disagree with
-  the actual dataframe.
-- `Visualization` — references its `Dataset` by ID (not by holding the object), so closing a dataset
-  doesn't require walking every visualization to null out a reference.
-- `Dashboard` / `DashboardTile` — a grid arrangement referencing `Visualization`s by ID, same pattern.
+### Configuration
 
-Referential integrity is checked at *add* time (e.g. `add_visualization` rejects an unknown
-`dataset_id`), but closing a dataset/visualization does **not** cascade to things derived from it —
-orphaned references are treated as normal, expected state that dependent lookups (`get_lineage`,
-`get_dashboard_tiles`) handle gracefully rather than as corruption to guard against. Preserve this
-non-cascading behavior when extending these methods.
-
-### Configuration (`src/core/config.py` + `config/config.yaml`)
-
-`_default_config_dict()` is the single source of truth for the config shape; `validate_config_structure()`
-checks both a freshly loaded file and any write from `SettingsService`, so the two can never drift apart.
-`AppConfig` is a frozen dataclass — read config through its typed properties, not by indexing a raw dict.
 Adding a new config key means updating `_default_config_dict`, `_TOP_LEVEL_SCHEMA`/`_NESTED_SCHEMA`, and
-`AppConfig.from_dict` together.
+`AppConfig.from_dict` together — all three, every time, or the two can drift apart. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#configuration) for the full schema mechanics.
 
 ### Exceptions
 
-Every custom exception inherits from `ApplicationError` ([src/core/exceptions.py](src/core/exceptions.py)).
-Add a new subclass only when some caller genuinely needs to catch that specific failure mode — not as
-speculative coverage. `ReaderError`, `ServiceError`, `ConfigError`, `DependencyResolutionError`,
-`ApplicationStateError`, `BootstrapError` are the existing categories; reuse them where they fit before
-adding a new one.
+Add a new `ApplicationError` subclass only when some caller genuinely needs to catch that specific failure
+mode — not as speculative coverage. `ReaderError`, `ServiceError`, `ConfigError`,
+`DependencyResolutionError`, `ApplicationStateError`, `BootstrapError` are the existing categories; reuse
+them where they fit before adding a new one. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#exceptions) for the full hierarchy.
 
 ### Path resolution
 
-All fixed paths (`config/`, `logs/`, `projects/`) are anchored to the project root via
-`src/core/constants.py`'s `PROJECT_ROOT` (derived from that file's own location, not `Path.cwd()`), so
-behavior doesn't depend on the working directory the app is launched from.
+Fixed paths (`config/`, `logs/`, `projects/`) are anchored to the project root, not `Path.cwd()` — don't
+introduce a new path constant that depends on the working directory the app happens to be launched from.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#path-resolution) for how the anchoring works.
 
 ## Conventions to follow
 

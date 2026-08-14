@@ -12,7 +12,8 @@ thing while also wiring to a real service.
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QDialog, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (QDialog, QLabel, QPushButton, QVBoxLayout,
+                               QWidget)
 
 from src.core.constants import APP_NAME, APP_VERSION, ORGANIZATION_NAME
 from src.core.logger import get_logger

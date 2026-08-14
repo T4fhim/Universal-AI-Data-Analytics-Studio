@@ -32,15 +32,8 @@ configure existing yet would be UI for behavior that doesn't exist.
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QDialog,
-    QDialogButtonBox,
-    QFormLayout,
-    QSpinBox,
-    QWidget,
-)
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+                               QFormLayout, QSpinBox, QWidget)
 
 from src.core.constants import AVAILABLE_THEMES
 from src.core.logger import get_logger

@@ -16,16 +16,9 @@ types milestone 5a actually built.
 from __future__ import annotations
 
 import pandas as pd
-from PySide6.QtWidgets import (
-    QComboBox,
-    QDialog,
-    QDialogButtonBox,
-    QFormLayout,
-    QLineEdit,
-    QMessageBox,
-    QWidget,
-)
 from pptx import exc
+from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
+                               QFormLayout, QLineEdit, QMessageBox, QWidget)
 
 from src.core.exceptions import ApplicationError
 from src.core.logger import get_logger
