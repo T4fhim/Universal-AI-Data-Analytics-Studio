@@ -24,3 +24,50 @@ exclude = [
     "^build/",
     "^dist/",
 ]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+# Explicit rule-group selection, codifying exactly the categories this
+# repository's dry-run baseline (Work Item 3, step 1 — `ruff check
+# src/` with no config, no --fix) actually found triggering in this
+# codebase, rather than relying on "ruff's current defaults" as an
+# unpinned, version-dependent assumption that would silently drift on
+# the next ruff upgrade. Selected at rule-group granularity (not exact
+# individual codes) so a new occurrence of the same *kind* of issue
+# (e.g. a different pyflakes or pyupgrade code within an already-
+# observed family) is still caught, without importing unrelated
+# categories that were not observed triggering at all.
+select = [
+    "F",    # pyflakes — unused imports, redefined names, etc.
+    "UP",   # pyupgrade
+    "BLE",  # flake8-blind-except
+    "SIM",  # flake8-simplify
+    "ISC",  # flake8-implicit-str-concat
+    "RUF",  # ruff-specific rules
+]
+# RUF001 and RUF005 are excluded from the "RUF" group above, discovered
+# and reviewed during Work Item 3's step-6 delta check: RUF001 flags
+# ambiguous Unicode characters, which fires on the em-dashes this
+# codebase's own docstrings and comments deliberately and pervasively
+# use as a matter of established prose style (see CLAUDE.md's
+# conventions); RUF005 is a purely stylistic "prefer iterable unpacking
+# over list concatenation" suggestion with no correctness or security
+# implication. Neither was part of the step-1 dry-run baseline this
+# section is meant to codify, so both are held out rather than silently
+# adopted as a side effect of selecting the whole "RUF" group.
+ignore = ["RUF001", "RUF005"]
+# Ruff's "I" (isort) rule group is deliberately NOT selected here. This
+# project already has a committed [tool.isort] section (profile =
+# "black") as the tool of record for import sorting — see that section
+# above. Enabling ruff's own import-sorting rules as well would let
+# quality-check.ps1's automatic `ruff check --fix` (run on every
+# Edit/Write, per .claude/hooks/quality-check.ps1) and isort fight
+# over the same import block on successive runs. isort remains
+# authoritative for import order; ruff's selected groups above cover
+# everything else.
+
+[tool.bandit]
+exclude_dirs = [".venv", "tests"]

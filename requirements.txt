@@ -38,6 +38,9 @@ lightgbm
 catboost
 networkx
 duckdb
+anthropic
+openai
+google-genai
 python-dotenv
 rich
 joblib

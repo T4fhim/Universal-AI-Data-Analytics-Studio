@@ -16,11 +16,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from json import tool
 from typing import Any
 
-from src.ai.llm_provider import (BaseLLMProvider, PendingToolCall,
-                                 create_provider)
+from src.ai.llm_provider import BaseLLMProvider, PendingToolCall, create_provider
 from src.ai.tool_registry import get_anthropic_tool_schemas, get_tool_by_name
 from src.core.exceptions import ApplicationError, ServiceError
 from src.core.logger import get_logger
@@ -112,10 +110,14 @@ class AssistantService:
             turn, raw_response = self._provider.send(
                 self._history, _SYSTEM_PROMPT, tool_schemas
             )
-            self._history = self._provider.append_assistant_turn(self._history, raw_response)
+            self._history = self._provider.append_assistant_turn(
+                self._history, raw_response
+            )
 
             if not turn.tool_calls:
-                return AssistantTurnResult(reply_text=turn.text, new_datasets=new_datasets)
+                return AssistantTurnResult(
+                    reply_text=turn.text, new_datasets=new_datasets
+                )
 
             results: list[tuple[PendingToolCall, str]] = []
             for call in turn.tool_calls:

@@ -10,3 +10,10 @@ logs/
 .env
 .DS_Store
 Thumbs.db
+
+# Manually-exported chart HTML (e.g. figure.to_html() saved to disk for
+# ad hoc browser-vs-QWebEngineView comparison during a rendering-bug
+# investigation) — a debug/QA artifact, not project content. Added
+# after removing one such file (test_chart.html) that had been
+# committed to the repo root.
+test_chart*.html
