@@ -104,6 +104,11 @@ def _default_config_dict() -> dict[str, Any]:
         "plugins": {
             "enabled": True,
             "search_paths": [],
+            # Milestone 12: names the user has chosen to disable via
+            # the Plugins settings panel — plain plugin-manifest
+            # names, not paths, so a plugin stays disabled even if its
+            # directory moves within a search path.
+            "disabled_plugin_names": [],
         },
         "forecasting": {
             "default_horizon_periods": 30,
@@ -139,6 +144,11 @@ _NESTED_SCHEMA: dict[str, dict[str, type]] = {
         "active_provider_index": int,
         "rotation_enabled": bool,
         "expertise_level": str,
+    },
+    "plugins": {
+        "enabled": bool,
+        "search_paths": list,
+        "disabled_plugin_names": list,
     },
     "forecasting": {"default_horizon_periods": int},
     "reports": {"default_export_format": str},
@@ -206,6 +216,30 @@ def _migrate_legacy_ai_section(data: dict[str, Any]) -> None:
             "config.yaml's 'ai' section predates milestone 8's "
             "'expertise_level' key — defaulted it to 'beginner' in memory. "
             "Save settings once to persist this change."
+        )
+
+
+def _migrate_legacy_plugins_section(data: dict[str, Any]) -> None:
+    """Back-fill milestone 12's ``disabled_plugin_names`` key into an older ``plugins`` section, in place.
+
+    Same reasoning and shape as
+    :func:`_migrate_legacy_ai_section`'s ``expertise_level`` back-fill:
+    a ``config.yaml`` saved before this milestone has ``plugins.enabled``
+    and ``plugins.search_paths`` (both existed since milestone 1)
+    but predates ``disabled_plugin_names`` — without this, such a file
+    would fail :func:`validate_config_structure` on the very next
+    startup, breaking this module's self-healing promise.
+    """
+    plugins_section = data.get("plugins")
+    if not isinstance(plugins_section, dict):
+        return  # missing/malformed entirely; validation will catch it
+
+    if "disabled_plugin_names" not in plugins_section:
+        plugins_section["disabled_plugin_names"] = []
+        _bootstrap_logger.warning(
+            "config.yaml's 'plugins' section predates milestone 12's "
+            "'disabled_plugin_names' key — defaulted it to an empty list "
+            "in memory. Save settings once to persist this change."
         )
 
 
@@ -326,6 +360,7 @@ def load_config(path: Path = CONFIG_FILE_PATH) -> dict[str, Any]:
         return _write_default_config(path)
 
     _migrate_legacy_ai_section(loaded)
+    _migrate_legacy_plugins_section(loaded)
     validate_config_structure(loaded)
     return loaded
 
@@ -363,6 +398,7 @@ class AppConfig:
     ai_expertise_level: str
     plugins_enabled: bool
     plugin_search_paths: list[str]
+    plugin_disabled_names: list[str]
     forecasting_default_horizon_periods: int
     reports_default_export_format: str
 
@@ -394,6 +430,7 @@ class AppConfig:
             ai_expertise_level=data["ai"]["expertise_level"],
             plugins_enabled=data["plugins"]["enabled"],
             plugin_search_paths=list(data["plugins"]["search_paths"]),
+            plugin_disabled_names=list(data["plugins"]["disabled_plugin_names"]),
             forecasting_default_horizon_periods=data["forecasting"][
                 "default_horizon_periods"
             ],

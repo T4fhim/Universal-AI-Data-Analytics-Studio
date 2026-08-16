@@ -58,6 +58,7 @@ from PySide6.QtWidgets import (
 from src.core.constants import AVAILABLE_THEMES
 from src.core.expertise_level import ExpertiseLevel
 from src.core.logger import get_logger
+from src.plugins.plugin_manager import PluginManager
 from src.services.settings_service import SettingsService
 
 _logger = get_logger(__name__)
@@ -80,10 +81,14 @@ class SettingsDialog(QDialog):
     """
 
     def __init__(
-        self, settings_service: SettingsService, parent: QWidget | None = None
+        self,
+        settings_service: SettingsService,
+        parent: QWidget | None = None,
+        plugin_manager: PluginManager | None = None,
     ) -> None:
         super().__init__(parent)
         self._settings_service = settings_service
+        self._plugin_manager = plugin_manager
         self.setWindowTitle("Settings")
         self.setModal(True)
         self.setMinimumWidth(420)
@@ -93,6 +98,14 @@ class SettingsDialog(QDialog):
         tabs = QTabWidget(self)
         tabs.addTab(self._build_general_tab(), "General")
         tabs.addTab(self._build_ai_tab(), "AI")
+        # Milestone 12: only shown when a PluginManager was actually
+        # resolved and handed in — main_window.py always has one
+        # available (registered unconditionally in bootstrap.py), but
+        # this dialog is also constructed directly in tests without
+        # one, and a Plugins tab with nothing behind it would be
+        # actively misleading rather than merely empty.
+        if self._plugin_manager is not None:
+            tabs.addTab(self._build_plugins_tab(), "Plugins")
         outer_layout.addWidget(tabs)
 
         button_box = QDialogButtonBox(
@@ -220,6 +233,78 @@ class SettingsDialog(QDialog):
         layout.addLayout(buttons_row)
 
         return tab
+
+    def _build_plugins_tab(self) -> QWidget:
+        """List discovered plugins with load status/errors, and let each be enabled/disabled.
+
+        Reads from :attr:`_plugin_manager` (already loaded once during
+        :func:`~src.core.bootstrap.bootstrap`) rather than triggering a
+        fresh scan itself — opening the Settings dialog should show
+        what's actually running, not silently re-discover plugins as a
+        side effect of the user looking at a settings panel.
+        """
+        tab = QWidget(self)
+        layout = QVBoxLayout(tab)
+
+        self._plugin_list = QListWidget(tab)
+        self._refresh_plugin_list()
+        layout.addWidget(self._plugin_list)
+
+        buttons_row = QHBoxLayout()
+        toggle_button = QPushButton("Enable/Disable Selected", tab)
+        toggle_button.clicked.connect(self._on_toggle_plugin)
+        buttons_row.addWidget(toggle_button)
+        layout.addLayout(buttons_row)
+
+        return tab
+
+    def _refresh_plugin_list(self) -> None:
+        self._plugin_list.clear()
+        assert self._plugin_manager is not None  # guarded by the caller
+        plugins = self._plugin_manager.list_plugins()
+        if not plugins:
+            self._plugin_list.addItem(
+                "(No plugins found in the configured search paths)"
+            )
+            return
+        for loaded in plugins:
+            manifest = loaded.manifest
+            disabled = self._plugin_manager.is_disabled(manifest.name)
+            status = (
+                "disabled"
+                if disabled
+                else ("OK" if loaded.loaded_successfully else "error")
+            )
+            item = QListWidgetItem(f"{manifest.name} ({manifest.version}) — {status}")
+            if loaded.errors:
+                item.setToolTip("\n".join(loaded.errors))
+            self._plugin_list.addItem(item)
+
+    def _on_toggle_plugin(self) -> None:
+        row = self._plugin_list.currentRow()
+        assert self._plugin_manager is not None  # guarded: tab only built when set
+        plugins = self._plugin_manager.list_plugins()
+        if row < 0 or row >= len(plugins):
+            QMessageBox.information(
+                self, "No Plugin Selected", "Select a plugin first."
+            )
+            return
+
+        plugin_name = plugins[row].manifest.name
+        if self._plugin_manager.is_disabled(plugin_name):
+            self._plugin_manager.enable_plugin(plugin_name)
+        else:
+            self._plugin_manager.disable_plugin(plugin_name)
+
+        disabled_names = [
+            p.manifest.name
+            for p in self._plugin_manager.list_plugins()
+            if self._plugin_manager.is_disabled(p.manifest.name)
+        ]
+        self._settings_service.set(
+            "plugins", "disabled_plugin_names", value=disabled_names
+        )
+        self._refresh_plugin_list()
 
     # -- AI tab: provider profile list management --------------------------
 

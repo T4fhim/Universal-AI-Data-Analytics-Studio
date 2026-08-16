@@ -34,6 +34,7 @@ from src.core.bootstrap import BootstrapContext
 from src.core.constants import APP_NAME, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH
 from src.core.exceptions import ApplicationError, ServiceError
 from src.core.logger import get_logger
+from src.plugins.plugin_manager import PluginManager
 from src.readers.reader_registry import get_reader_for_path
 from src.services.project_service import ProjectService
 from src.services.settings_service import SettingsService
@@ -170,6 +171,7 @@ class MainWindow(QMainWindow):
         self._settings_service = context.container.resolve(SettingsService)
         self._project_service = context.container.resolve(ProjectService)
         self._workspace_service = context.container.resolve(WorkspaceService)
+        self._plugin_manager = context.container.resolve(PluginManager)
         # Constructed lazily on first chat message, not here — building
         # it eagerly would mean every window construction (including
         # ones where the user never opens the AI panel) pays the cost
@@ -668,7 +670,9 @@ class MainWindow(QMainWindow):
     # -- Settings / theme / about -----------------------------------------------
 
     def _on_open_settings(self) -> None:
-        dialog = SettingsDialog(self._settings_service, self)
+        dialog = SettingsDialog(
+            self._settings_service, self, plugin_manager=self._plugin_manager
+        )
         if dialog.exec() == SettingsDialog.DialogCode.Accepted:
             self._apply_theme_from_settings()
 

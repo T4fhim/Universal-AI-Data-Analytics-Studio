@@ -28,39 +28,28 @@ from PySide6.QtWidgets import (
 
 from src.core.exceptions import ApplicationError
 from src.core.logger import get_logger
-from src.visualization.advanced_charts import (
-    BubbleChart,
-    FunnelChart,
-    HeatmapChart,
-    WaterfallChart,
-)
-from src.visualization.categorical_charts import BarChart, PieChart
-from src.visualization.continuous_charts import LineChart, ScatterChart
-from src.visualization.distribution_charts import BoxPlotChart, HistogramChart
+from src.visualization.chart_registry import display_name_for, list_dialog_charts
 
 _logger = get_logger(__name__)
 
-# Each entry: (builder class, required column-picker fields, optional
-# column-picker fields). Field names here match each builder's own
-# keyword argument names exactly, since they are passed straight
-# through — see _on_accept below.
+# Milestone 12: sourced from src.visualization.chart_registry rather
+# than a dict this dialog maintained independently — see that
+# module's own docstring for why. Each entry: (builder class,
+# required column-picker fields, optional column-picker fields).
+# Field names match each builder's own keyword argument names exactly,
+# since they are passed straight through — see _on_accept below.
+# Only chart_registry.list_dialog_charts()'s entries appear here
+# (excludes Treemap/Radar — see ChartRegistration.dialog_compatible's
+# own docstring for why); every excluded type remains reachable
+# through src.ai.tool_registry, whose JSON-schema parameters handle
+# array-typed fields natively.
 _CHART_REGISTRY: dict[str, tuple[type, list[str], list[str]]] = {
-    "Bar": (BarChart, ["category_column"], ["value_column"]),
-    "Pie": (PieChart, ["category_column"], ["value_column"]),
-    "Line": (LineChart, ["y_column"], ["x_column"]),
-    "Scatter": (ScatterChart, ["x_column", "y_column"], ["color_column"]),
-    "Histogram": (HistogramChart, ["column"], []),
-    "Box Plot": (BoxPlotChart, ["value_column"], ["group_column"]),
-    # Milestone 11: Treemap and Radar are deliberately not registered
-    # here — both take a list[str] parameter (path_columns,
-    # value_columns) this dialog's one-QComboBox-per-field column
-    # picker has no way to build without a multi-select rework; they
-    # remain available through src.ai.tool_registry, whose JSON-schema
-    # parameters handle array types natively.
-    "Heatmap": (HeatmapChart, [], []),
-    "Bubble": (BubbleChart, ["x_column", "y_column", "size_column"], ["color_column"]),
-    "Waterfall": (WaterfallChart, ["category_column", "value_column"], []),
-    "Funnel": (FunnelChart, ["stage_column", "value_column"], []),
+    display_name_for(name): (
+        registration.chart_class,
+        list(registration.required_fields),
+        list(registration.optional_fields),
+    )
+    for name, registration in list_dialog_charts().items()
 }
 
 

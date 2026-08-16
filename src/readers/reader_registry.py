@@ -32,7 +32,7 @@ _logger = get_logger(__name__)
 # one could theoretically claim a file. Across all nine readers as of
 # milestone 2c-ii, can_read() checks remain based on mutually
 # exclusive extensions, so no real ambiguity exists.
-_REGISTERED_READERS: tuple[type[BaseReader], ...] = (
+_BUILTIN_READERS: tuple[type[BaseReader], ...] = (
     CsvReader,
     JsonReader,
     TextReader,
@@ -43,6 +43,53 @@ _REGISTERED_READERS: tuple[type[BaseReader], ...] = (
     XmlReader,
     ImageReader,
 )
+
+# Milestone 12: readers a plugin registers via register_reader(),
+# separate from the built-in tuple above rather than appended into a
+# single mutable list — keeping the two apart means a bad plugin can
+# never corrupt or shadow the built-in list itself, only add entries
+# checked strictly after every built-in has already had a chance to
+# claim the file (see get_reader_for_path below).
+_PLUGIN_READERS: list[type[BaseReader]] = []
+
+
+def register_reader(reader_class: type[BaseReader]) -> None:
+    """Register a plugin-provided reader, checked after every built-in reader.
+
+    Args:
+        reader_class: A :class:`~src.readers.base_reader.BaseReader`
+            subclass.
+
+    Raises:
+        ReaderError: If ``reader_class`` is already registered (either
+            as a built-in or a previously registered plugin reader) —
+            re-registering the same class is almost certainly a
+            plugin-loading bug (a plugin loaded twice), not an
+            intentional replacement; this project has no "last
+            registration wins" convention for any registry (see
+            :func:`~src.visualization.chart_registry.register_chart`
+            for the same reasoning).
+    """
+    if reader_class in _BUILTIN_READERS or reader_class in _PLUGIN_READERS:
+        raise ReaderError(f"Reader {reader_class.__name__} is already registered.")
+    _PLUGIN_READERS.append(reader_class)
+    _logger.debug("Registered plugin reader: %s.", reader_class.__name__)
+
+
+def unregister_reader(reader_class: type[BaseReader]) -> None:
+    """Remove a previously plugin-registered reader.
+
+    Used by :class:`~src.plugins.plugin_manager.PluginManager` when a
+    plugin is disabled — same reasoning as
+    :func:`~src.visualization.chart_registry.unregister_chart`. Built-
+    in readers can never be unregistered (they are not stored in
+    ``_PLUGIN_READERS`` at all); calling this with a built-in reader
+    class is a silent no-op rather than an error, since a plugin
+    manager iterating over "what this plugin registered" should never
+    need to special-case built-ins.
+    """
+    if reader_class in _PLUGIN_READERS:
+        _PLUGIN_READERS.remove(reader_class)
 
 
 def get_reader_for_path(path: Path) -> type[BaseReader]:
@@ -56,15 +103,16 @@ def get_reader_for_path(path: Path) -> type[BaseReader]:
             ``True`` for this path — most commonly an unsupported
             file extension.
     """
-    for reader_class in _REGISTERED_READERS:
+    for reader_class in (*_BUILTIN_READERS, *_PLUGIN_READERS):
         if reader_class.can_read(path):
             _logger.debug("Selected %s for %s.", reader_class.__name__, path)
             return reader_class
 
+    all_readers = (*_BUILTIN_READERS, *_PLUGIN_READERS)
     supported_extensions = sorted(
         {
             ext
-            for reader_class in _REGISTERED_READERS
+            for reader_class in all_readers
             for ext in reader_class.SUPPORTED_EXTENSIONS
         }
     )

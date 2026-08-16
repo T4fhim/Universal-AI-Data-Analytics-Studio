@@ -39,6 +39,7 @@ from src.core.constants import CONFIG_FILE_PATH, LOG_DIR
 from src.core.dependency_container import DependencyContainer
 from src.core.exceptions import BootstrapError
 from src.core.logger import configure_logging, get_logger
+from src.plugins.plugin_manager import PluginManager
 from src.services.analysis_orchestrator_service import AnalysisOrchestratorService
 from src.services.project_service import ProjectService
 from src.services.settings_service import SettingsService
@@ -167,6 +168,25 @@ def bootstrap(
     logger.debug(
         "Registered AnalysisOrchestratorService into the dependency container."
     )
+
+    # Milestone 12: constructed and loaded here — plugins should be
+    # discovered and registered before anything in the UI layer (the
+    # chart-builder dialog, the AI tool registry) first reads from the
+    # shared chart/operation/reader registries those plugins register
+    # into, so a plugin's classes are available from the very first
+    # frame rather than appearing only after a later manual reload.
+    # load_plugins() never raises for an individual plugin's own
+    # problems (see plugin_loader.py's own docstring for why) — a bad
+    # plugin is recorded on the PluginManager's loaded-plugin list for
+    # a settings panel to surface, not a BootstrapError.
+    plugin_manager = PluginManager(
+        search_paths=config.plugin_search_paths,
+        enabled=config.plugins_enabled,
+        disabled_plugin_names=set(config.plugin_disabled_names),
+    )
+    plugin_manager.load_plugins()
+    container.register(PluginManager, lambda: plugin_manager, singleton=True)
+    logger.debug("Registered PluginManager into the dependency container.")
 
     context = BootstrapContext(config=config, container=container, state=state)
 

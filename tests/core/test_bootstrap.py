@@ -17,6 +17,7 @@ import yaml
 from src.core.application_state import ApplicationState
 from src.core.bootstrap import BootstrapContext, bootstrap
 from src.core.config import AppConfig, load_config
+from src.plugins.plugin_manager import PluginManager
 from src.services.analysis_orchestrator_service import AnalysisOrchestratorService
 from src.services.project_service import ProjectService
 from src.services.settings_service import SettingsService
@@ -62,6 +63,12 @@ def test_bootstrap_registers_all_milestone_services(
     assert context.container.resolve(
         AnalysisOrchestratorService
     ) is context.container.resolve(AnalysisOrchestratorService)
+
+    assert context.container.is_registered(PluginManager)
+    assert isinstance(context.container.resolve(PluginManager), PluginManager)
+    assert context.container.resolve(PluginManager) is context.container.resolve(
+        PluginManager
+    )
 
 
 def test_bootstrap_seeds_project_service_from_config_recent_projects(

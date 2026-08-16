@@ -48,42 +48,19 @@ from src.forecasting.model_comparison import compare_forecast_models
 from src.forecasting.prophet_forecast import forecast_prophet
 from src.forecasting.random_forest_forecast import forecast_random_forest
 from src.services.workspace_service import Dataset
-from src.visualization.advanced_charts import (
-    BubbleChart,
-    FunnelChart,
-    HeatmapChart,
-    RadarChart,
-    TreemapChart,
-    WaterfallChart,
-)
-from src.visualization.categorical_charts import BarChart, PieChart
-from src.visualization.continuous_charts import LineChart, ScatterChart
-from src.visualization.distribution_charts import BoxPlotChart, HistogramChart
+from src.visualization.chart_registry import list_charts
 
-# Milestone 9: the AI charting tool needs the same chart-name ->
-# builder-class mapping src.ui.dialogs.create_visualization_dialog
-# already has as its own private _CHART_REGISTRY. Deliberately
-# duplicated here rather than imported from that module — the
-# milestone plan itself (see Milestone 12) flags that charts have no
-# shared public registry yet and defers building one until the plugin
-# milestone actually requires dynamic discovery; importing a UI
-# module's private name from this AI module would also be a layering
-# violation (src.ai should not depend on src.ui). Keep this in sync
-# with that dialog's registry by hand until Milestone 12 replaces both
-# with one real registry.
+# Milestone 12: sourced from src.visualization.chart_registry, the one
+# shared registry both this module and
+# src.ui.dialogs.create_visualization_dialog now read from — see that
+# module's own docstring for why a single registry replaced the two
+# independently hand-maintained dicts this used to be (one of them
+# duplicated here). A plugin-registered chart type becomes usable by
+# the AI assistant automatically the moment
+# src.plugins.plugin_manager.PluginManager registers it, with no edit
+# to this file required.
 _CHART_BUILDERS: dict[str, type] = {
-    "bar": BarChart,
-    "pie": PieChart,
-    "line": LineChart,
-    "scatter": ScatterChart,
-    "histogram": HistogramChart,
-    "box_plot": BoxPlotChart,
-    "heatmap": HeatmapChart,
-    "bubble": BubbleChart,
-    "treemap": TreemapChart,
-    "radar": RadarChart,
-    "waterfall": WaterfallChart,
-    "funnel": FunnelChart,
+    name: registration.chart_class for name, registration in list_charts().items()
 }
 
 
