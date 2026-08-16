@@ -27,11 +27,17 @@ from __future__ import annotations
 import logging
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QDockWidget, QListWidget, QMainWindow,
-                               QPlainTextEdit)
+from PySide6.QtWidgets import (
+    QDockWidget,
+    QListWidget,
+    QMainWindow,
+    QPlainTextEdit,
+    QTabWidget,
+)
 
 from src.core.logger import get_logger
 from src.ui.widgets.chart_view import ChartView
+from src.ui.widgets.chat_panel import ChatPanel
 
 _logger = get_logger(__name__)
 
@@ -79,6 +85,7 @@ class DockManager:
         self.dock_console = self._build_console_dock()
         self.dock_logging = self._build_logging_dock()
         self.dock_chart = self._build_chart_dock()
+        self.dock_ai_chat = self._build_ai_chat_dock()
 
         parent_window.addDockWidget(
             Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_project_explorer
@@ -86,7 +93,9 @@ class DockManager:
         parent_window.addDockWidget(
             Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_dataset_explorer
         )
-        parent_window.tabifyDockWidget(self.dock_project_explorer, self.dock_dataset_explorer)
+        parent_window.tabifyDockWidget(
+            self.dock_project_explorer, self.dock_dataset_explorer
+        )
 
         parent_window.addDockWidget(
             Qt.DockWidgetArea.BottomDockWidgetArea, self.dock_console
@@ -100,7 +109,23 @@ class DockManager:
         # enough content that it should be immediately visible once
         # populated, not hidden behind a tab click the way
         # Project/Dataset Explorer or Console/Log reasonably are.
-        parent_window.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock_chart)
+        parent_window.addDockWidget(
+            Qt.DockWidgetArea.RightDockWidgetArea, self.dock_chart
+        )
+
+        # Milestone 10: the AI chat panel — stacked below the chart dock
+        # in the same (right) area rather than tabbed with it, so a
+        # chart and an in-progress conversation can both stay visible
+        # at once (splitting vertically is Qt's default for two docks
+        # added to the same area without an explicit tabifyDockWidget
+        # call, matching how Project/Dataset Explorer and Console/Log
+        # are *deliberately* tabbed above while this pair is not).
+        parent_window.addDockWidget(
+            Qt.DockWidgetArea.RightDockWidgetArea, self.dock_ai_chat
+        )
+        parent_window.splitDockWidget(
+            self.dock_chart, self.dock_ai_chat, Qt.Orientation.Vertical
+        )
 
         self.dock_project_explorer.raise_()
         self.dock_console.raise_()
@@ -203,23 +228,64 @@ class DockManager:
         return dock
 
     def _build_chart_dock(self) -> QDockWidget:
-        dock = QDockWidget("Chart", self._parent_window)
+        dock = QDockWidget("Charts", self._parent_window)
         dock.setObjectName("dockChart")
-        self._chart_view = ChartView(dock)
-        dock.setWidget(self._chart_view)
+        # Milestone 10: a QTabWidget of independent ChartView instances,
+        # replacing the single-ChartView-overwrites-previous behavior —
+        # each call to display_chart() below adds a new tab rather than
+        # replacing whatever was already shown, so a dashboard, a
+        # dataset visualization, and an AI-built chart (milestone 9's
+        # build_chart tool) can all stay open for comparison instead of
+        # each one silently discarding the last.
+        self._chart_tabs = QTabWidget(dock)
+        self._chart_tabs.setTabsClosable(True)
+        self._chart_tabs.tabCloseRequested.connect(self._on_chart_tab_close_requested)
+        dock.setWidget(self._chart_tabs)
         return dock
 
-    def display_chart(self, figure) -> None:
-        """Render ``figure`` into the chart dock and bring it to the foreground.
+    def _on_chart_tab_close_requested(self, index: int) -> None:
+        widget = self._chart_tabs.widget(index)
+        self._chart_tabs.removeTab(index)
+        if widget is not None:
+            # Qt's removeTab() does not itself destroy the removed
+            # widget — without this, each closed chart tab would leak
+            # its QWebEngineView (ChartView) rather than being freed.
+            widget.deleteLater()
+
+    def display_chart(self, figure, name: str | None = None) -> None:
+        """Add ``figure`` as a new tab in the chart dock and bring it to the foreground.
 
         Args:
             figure: A Plotly figure — see
                 :meth:`~src.ui.widgets.chart_view.ChartView.
                 display_figure` for the accepted types.
+            name: Tab label. Defaults to ``"Chart N"`` (using the
+                current tab count) so call sites written before
+                milestone 10 keep working without passing a name —
+                callers that have a meaningful name (a
+                ``Visualization.name``, a dashboard title) should pass
+                it for a more useful tab label.
         """
-        self._chart_view.display_figure(figure)
+        chart_view = ChartView(self._chart_tabs)
+        chart_view.display_figure(figure)
+        tab_label = name or f"Chart {self._chart_tabs.count() + 1}"
+        index = self._chart_tabs.addTab(chart_view, tab_label)
+        self._chart_tabs.setCurrentIndex(index)
         self.dock_chart.raise_()
         self.dock_chart.show()
+
+    def _build_ai_chat_dock(self) -> QDockWidget:
+        dock = QDockWidget("AI Assistant", self._parent_window)
+        dock.setObjectName("dockAiChat")
+        # Stored as self.chat_panel (public, unlike most of this
+        # class's per-dock widgets) because main_window.py needs to
+        # connect send_button.clicked and append conversation turns
+        # after construction — the same reason self._dataset_list_widget
+        # is retained above, just public since the caller here is a
+        # different module rather than a method on this same class.
+        self.chat_panel = ChatPanel(dock)
+        dock.setWidget(self.chat_panel)
+        return dock
 
     def remove_log_handler(self) -> None:
         """Detach the logging-panel handler from the root logger.
@@ -251,4 +317,5 @@ class DockManager:
             self.dock_console.toggleViewAction(),
             self.dock_logging.toggleViewAction(),
             self.dock_chart.toggleViewAction(),
+            self.dock_ai_chat.toggleViewAction(),
         ]
