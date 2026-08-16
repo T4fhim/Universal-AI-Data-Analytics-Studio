@@ -16,12 +16,24 @@ types milestone 5a actually built.
 from __future__ import annotations
 
 import pandas as pd
-from pptx import exc
-from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
-                               QFormLayout, QLineEdit, QMessageBox, QWidget)
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QLineEdit,
+    QMessageBox,
+    QWidget,
+)
 
 from src.core.exceptions import ApplicationError
 from src.core.logger import get_logger
+from src.visualization.advanced_charts import (
+    BubbleChart,
+    FunnelChart,
+    HeatmapChart,
+    WaterfallChart,
+)
 from src.visualization.categorical_charts import BarChart, PieChart
 from src.visualization.continuous_charts import LineChart, ScatterChart
 from src.visualization.distribution_charts import BoxPlotChart, HistogramChart
@@ -39,6 +51,16 @@ _CHART_REGISTRY: dict[str, tuple[type, list[str], list[str]]] = {
     "Scatter": (ScatterChart, ["x_column", "y_column"], ["color_column"]),
     "Histogram": (HistogramChart, ["column"], []),
     "Box Plot": (BoxPlotChart, ["value_column"], ["group_column"]),
+    # Milestone 11: Treemap and Radar are deliberately not registered
+    # here — both take a list[str] parameter (path_columns,
+    # value_columns) this dialog's one-QComboBox-per-field column
+    # picker has no way to build without a multi-select rework; they
+    # remain available through src.ai.tool_registry, whose JSON-schema
+    # parameters handle array types natively.
+    "Heatmap": (HeatmapChart, [], []),
+    "Bubble": (BubbleChart, ["x_column", "y_column", "size_column"], ["color_column"]),
+    "Waterfall": (WaterfallChart, ["category_column", "value_column"], []),
+    "Funnel": (FunnelChart, ["stage_column", "value_column"], []),
 }
 
 
@@ -105,7 +127,9 @@ class CreateVisualizationDialog(QDialog):
             self._column_field_layout.removeRow(0)
         self._column_combos.clear()
 
-        _builder_class, required_fields, optional_fields = _CHART_REGISTRY[chart_type_name]
+        _builder_class, required_fields, optional_fields = _CHART_REGISTRY[
+            chart_type_name
+        ]
 
         for field_name in required_fields:
             combo = QComboBox(self)
@@ -117,7 +141,9 @@ class CreateVisualizationDialog(QDialog):
             combo = QComboBox(self)
             combo.addItem("(none)")
             combo.addItems(self._column_names)
-            self._column_field_layout.addRow(f"{_humanize(field_name)} (optional):", combo)
+            self._column_field_layout.addRow(
+                f"{_humanize(field_name)} (optional):", combo
+            )
             self._column_combos[field_name] = combo
 
     def _on_accept(self) -> None:
@@ -141,10 +167,12 @@ class CreateVisualizationDialog(QDialog):
             _logger.warning("Chart build failed: %s", exc)
             return
         except Exception as exc:
-            QMessageBox.critical(self, "Failed to Build Chart", f"Unexpected error: {exc}")
+            QMessageBox.critical(
+                self, "Failed to Build Chart", f"Unexpected error: {exc}"
+            )
             _logger.error("Chart build failed unexpectedly: %s", exc)
             return
-        
+
         self._built_figure = figure
         self._built_chart_type = builder_class.__name__
         self._built_parameters = parameters

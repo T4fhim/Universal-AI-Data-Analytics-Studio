@@ -48,6 +48,14 @@ from src.forecasting.model_comparison import compare_forecast_models
 from src.forecasting.prophet_forecast import forecast_prophet
 from src.forecasting.random_forest_forecast import forecast_random_forest
 from src.services.workspace_service import Dataset
+from src.visualization.advanced_charts import (
+    BubbleChart,
+    FunnelChart,
+    HeatmapChart,
+    RadarChart,
+    TreemapChart,
+    WaterfallChart,
+)
 from src.visualization.categorical_charts import BarChart, PieChart
 from src.visualization.continuous_charts import LineChart, ScatterChart
 from src.visualization.distribution_charts import BoxPlotChart, HistogramChart
@@ -70,6 +78,12 @@ _CHART_BUILDERS: dict[str, type] = {
     "scatter": ScatterChart,
     "histogram": HistogramChart,
     "box_plot": BoxPlotChart,
+    "heatmap": HeatmapChart,
+    "bubble": BubbleChart,
+    "treemap": TreemapChart,
+    "radar": RadarChart,
+    "waterfall": WaterfallChart,
+    "funnel": FunnelChart,
 }
 
 
@@ -845,21 +859,47 @@ TOOLS: list[ToolDefinition] = [
                     "enum": sorted(_CHART_BUILDERS.keys()),
                 },
                 "title": {"type": "string"},
-                "category_column": {"type": "string", "description": "Bar/Pie charts."},
+                "category_column": {
+                    "type": "string",
+                    "description": "Bar/Pie/Waterfall charts.",
+                },
                 "value_column": {
                     "type": "string",
-                    "description": "Bar/Pie/Box Plot charts.",
+                    "description": "Bar/Pie/Box Plot/Treemap/Waterfall/Funnel charts.",
                 },
-                "x_column": {"type": "string", "description": "Line/Scatter charts."},
-                "y_column": {"type": "string", "description": "Line/Scatter charts."},
+                "x_column": {
+                    "type": "string",
+                    "description": "Line/Scatter/Bubble charts.",
+                },
+                "y_column": {
+                    "type": "string",
+                    "description": "Line/Scatter/Bubble charts.",
+                },
                 "color_column": {
                     "type": "string",
-                    "description": "Scatter chart (optional).",
+                    "description": "Scatter/Bubble chart (optional).",
                 },
                 "column": {"type": "string", "description": "Histogram chart."},
                 "group_column": {
                     "type": "string",
                     "description": "Box Plot chart (optional).",
+                },
+                "size_column": {"type": "string", "description": "Bubble chart."},
+                "stage_column": {"type": "string", "description": "Funnel chart."},
+                "path_columns": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Treemap chart — 1 or 2 categorical columns, outermost first.",
+                },
+                "value_columns": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Radar chart — 3 or more numeric columns compared.",
+                },
+                "method": {
+                    "type": "string",
+                    "enum": ["pearson", "spearman", "kendall"],
+                    "description": "Heatmap chart (optional, defaults to pearson).",
                 },
             },
             "required": ["chart_type"],
