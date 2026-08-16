@@ -26,13 +26,15 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QDateTime, Qt
 from PySide6.QtWidgets import (
     QDockWidget,
     QListWidget,
     QMainWindow,
     QPlainTextEdit,
     QTabWidget,
+    QTreeWidget,
+    QTreeWidgetItem,
 )
 
 from src.core.logger import get_logger
@@ -143,21 +145,29 @@ class DockManager:
     def _build_dataset_explorer_dock(self) -> QDockWidget:
         dock = QDockWidget("Dataset Explorer", self._parent_window)
         dock.setObjectName("dockDatasetExplorer")
-        # Stored as self._dataset_list_widget (not just a local
+        # Stored as self._dataset_tree_widget (not just a local
         # variable, unlike the project-explorer dock's list widget
         # above) because milestone 2's "Open Dataset" action needs to
         # push live updates into this dock after this constructor has
         # already returned — see refresh_dataset_list below, which
         # main_window.py calls whenever WorkspaceService's set of
         # loaded datasets changes.
-        self._dataset_list_widget = QListWidget(dock)
+        #
+        # Milestone 10: a QTreeWidget rather than the original flat
+        # QListWidget, so a cleaned/derived dataset nests under the
+        # dataset it came from instead of appearing as an unrelated
+        # sibling — this is the same parent_dataset_id lineage
+        # WorkspaceService.get_lineage/get_children already expose,
+        # just made visible rather than only queryable in code.
+        self._dataset_tree_widget = QTreeWidget(dock)
+        self._dataset_tree_widget.setHeaderHidden(True)
         self._show_no_datasets_placeholder()
-        dock.setWidget(self._dataset_list_widget)
+        dock.setWidget(self._dataset_tree_widget)
         return dock
 
     def _show_no_datasets_placeholder(self) -> None:
-        self._dataset_list_widget.clear()
-        self._dataset_list_widget.addItem("(No datasets loaded)")
+        self._dataset_tree_widget.clear()
+        QTreeWidgetItem(self._dataset_tree_widget, ["(No datasets loaded)"])
 
     def refresh_dataset_list(self, datasets: list) -> None:
         """Rebuild the Dataset Explorer dock's contents from the current dataset list.
@@ -179,34 +189,81 @@ class DockManager:
         Called by :mod:`src.ui.main_window` after any operation that
         adds or removes a dataset from the workspace (currently: after
         a successful "Open Dataset" action). This clears and rebuilds
-        the list each time rather than diffing against the previous
+        the tree each time rather than diffing against the previous
         contents — matching the same rebuild-not-diff approach
         :meth:`~src.ui.menu_bar.ApplicationMenuBar.update_recent_projects_menu`
         already uses for the same reason: the list is expected to stay
         small, and full-rebuild is simpler and less error-prone than
         incremental widget-state maintenance for a list this size.
+
+        Datasets whose ``parent_dataset_id`` points at another dataset
+        in ``datasets`` are nested as tree children of that parent,
+        recursively, so a chain of cleaning operations reads as a
+        lineage rather than a flat, unordered list. A dataset whose
+        ``parent_dataset_id`` is set but not present in ``datasets``
+        (the parent was closed — see the "non-cascading close" rule in
+        CLAUDE.md's Workspace model section) is rendered at the top
+        level rather than dropped, since it is still a real, openable
+        dataset regardless of whether its lineage is fully visible
+        right now.
         """
-        self._dataset_list_widget.clear()
+        self._dataset_tree_widget.clear()
         if not datasets:
             self._show_no_datasets_placeholder()
             return
+
+        by_id = {dataset.dataset_id: dataset for dataset in datasets}
+        items_by_id: dict[str, QTreeWidgetItem] = {}
+
+        def _label(dataset) -> str:
+            return f"{dataset.name} ({dataset.row_count} rows × {dataset.column_count} cols)"
+
+        def _build_item(dataset) -> QTreeWidgetItem:
+            if dataset.dataset_id in items_by_id:
+                return items_by_id[dataset.dataset_id]
+            parent_id = dataset.parent_dataset_id
+            if parent_id is not None and parent_id in by_id:
+                parent_item = _build_item(by_id[parent_id])
+                item = QTreeWidgetItem(parent_item, [_label(dataset)])
+            else:
+                item = QTreeWidgetItem(self._dataset_tree_widget, [_label(dataset)])
+            items_by_id[dataset.dataset_id] = item
+            return item
+
         for dataset in datasets:
-            row_count = dataset.row_count
-            column_count = dataset.column_count
-            self._dataset_list_widget.addItem(
-                f"{dataset.name} ({row_count} rows × {column_count} cols)"
-            )
+            _build_item(dataset)
+        self._dataset_tree_widget.expandAll()
 
     def _build_console_dock(self) -> QDockWidget:
         dock = QDockWidget("Console", self._parent_window)
         dock.setObjectName("dockConsole")
-        text_widget = QPlainTextEdit(dock)
-        text_widget.setReadOnly(True)
-        text_widget.setPlaceholderText(
-            "Console output will appear here in a later milestone."
+        # Milestone 10: stored as self._console_text_widget (previously
+        # a local variable, since nothing wrote to it after
+        # construction) — append_console_message below needs to reach
+        # it from outside __init__, the same reason
+        # self._dataset_tree_widget and self._chart_tabs are retained.
+        self._console_text_widget = QPlainTextEdit(dock)
+        self._console_text_widget.setReadOnly(True)
+        self._console_text_widget.setPlaceholderText(
+            "Pipeline stages, worker activity, and tool calls will appear here."
         )
-        dock.setWidget(text_widget)
+        dock.setWidget(self._console_text_widget)
         return dock
+
+    def append_console_message(self, text: str) -> None:
+        """Append one timestamped line to the Console dock.
+
+        Called by :mod:`src.ui.main_window` for the same events already
+        surfaced elsewhere (status-bar messages, AI tool activity,
+        analysis-pipeline stages) — the Console dock's job is to be the
+        one place a durable, scrollable record of *everything* that
+        happened accumulates, since the status bar's messages are
+        transient and the AI chat panel's tool-activity notes only
+        cover assistant-driven actions, not menu-driven ones like
+        "Open Dataset" or "Create Dashboard".
+        """
+        timestamp = QDateTime.currentDateTime().toString("HH:mm:ss")
+        self._console_text_widget.appendPlainText(f"{timestamp} | {text}")
 
     def _build_logging_dock(self) -> QDockWidget:
         dock = QDockWidget("Log", self._parent_window)

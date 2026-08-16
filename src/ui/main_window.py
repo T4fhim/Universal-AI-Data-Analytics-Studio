@@ -315,6 +315,10 @@ class MainWindow(QMainWindow):
             self._workspace_service.add_dataset(dataset)
 
         self._dock_manager.refresh_dataset_list(self._workspace_service.list_datasets())
+        self._dock_manager.append_console_message(
+            f"Reloaded {len(datasets)} dataset(s) from project"
+            + (f"; {len(failures)} failed." if failures else ".")
+        )
 
         if failures:
             failures_text = "\n".join(f"• {f}" for f in failures)
@@ -454,6 +458,10 @@ class MainWindow(QMainWindow):
             f"Loaded dataset: {dataset.name} "
             f"({dataset.row_count} rows × {dataset.column_count} cols)"
         )
+        self._dock_manager.append_console_message(
+            f"Loaded dataset '{dataset.name}' "
+            f"({dataset.row_count} rows × {dataset.column_count} cols)."
+        )
         _logger.info(
             "Dataset opened via UI: %s (%d rows, %d cols, %d warning(s))",
             dataset.name,
@@ -492,6 +500,7 @@ class MainWindow(QMainWindow):
         # whatever it caught unchanged, so this handler treats it the
         # same as the old synchronous except block did.
         QMessageBox.critical(self, "Failed to Open Dataset", str(exc))
+        self._dock_manager.append_console_message(f"⚠ Failed to open dataset: {exc}")
         _logger.warning("Failed to open dataset from %s: %s", file_path_str, exc)
 
     def _on_create_visualization(self) -> None:
@@ -522,6 +531,9 @@ class MainWindow(QMainWindow):
         self._dock_manager.display_chart(figure, name=visualization.name)
 
         self._status_bar.show_message(f"Created visualization: {visualization.name}")
+        self._dock_manager.append_console_message(
+            f"Created visualization '{visualization.name}' ({chart_type})."
+        )
         _logger.info(
             "Visualization created via UI: %s (%s)", visualization.name, chart_type
         )
@@ -584,10 +596,14 @@ class MainWindow(QMainWindow):
         self._status_bar.show_message(
             f"Created dashboard with {tile_count} visualization(s)."
         )
+        self._dock_manager.append_console_message(
+            f"Created dashboard with {tile_count} visualization(s)."
+        )
         _logger.info("Dashboard created via UI: %d tile(s).", tile_count)
 
     def _on_dashboard_render_error(self, exc: Exception, traceback_text: str) -> None:
         _logger.error("Dashboard rendering failed: %s\n%s", exc, traceback_text)
+        self._dock_manager.append_console_message(f"⚠ Dashboard creation failed: {exc}")
         QMessageBox.critical(self, "Failed to Create Dashboard", str(exc))
 
     def _resolve_table_name(self, reader_class, dataset_path: Path):
@@ -766,10 +782,15 @@ class MainWindow(QMainWindow):
     def _on_assistant_turn_result(self, result: AssistantTurnResult) -> None:
         chat_panel = self._dock_manager.chat_panel
         chat_panel.append_assistant_message(result.reply_text)
+        self._dock_manager.append_console_message("AI assistant turn completed.")
 
         if result.new_datasets:
             chat_panel.append_tool_activity(
                 f"Created {len(result.new_datasets)} new dataset(s): "
+                f"{', '.join(d.name for d in result.new_datasets)}."
+            )
+            self._dock_manager.append_console_message(
+                f"AI tool created dataset(s): "
                 f"{', '.join(d.name for d in result.new_datasets)}."
             )
             self._dock_manager.refresh_dataset_list(
@@ -779,6 +800,9 @@ class MainWindow(QMainWindow):
         for visualization in result.new_visualizations:
             chat_panel.append_tool_activity(
                 f"Created visualization: {visualization.name}."
+            )
+            self._dock_manager.append_console_message(
+                f"AI tool created visualization: {visualization.name}."
             )
             self._dock_manager.display_chart(
                 visualization.figure, name=visualization.name
@@ -794,6 +818,7 @@ class MainWindow(QMainWindow):
 
     def _on_assistant_turn_error(self, exc: Exception, traceback_text: str) -> None:
         self._dock_manager.chat_panel.append_error_message(str(exc))
+        self._dock_manager.append_console_message(f"⚠ AI assistant turn failed: {exc}")
         _logger.warning("Assistant turn failed: %s\n%s", exc, traceback_text)
 
     def _on_assistant_turn_finished(self) -> None:
