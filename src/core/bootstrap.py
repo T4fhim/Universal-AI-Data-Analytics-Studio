@@ -39,6 +39,7 @@ from src.core.constants import CONFIG_FILE_PATH, LOG_DIR
 from src.core.dependency_container import DependencyContainer
 from src.core.exceptions import BootstrapError
 from src.core.logger import configure_logging, get_logger
+from src.services.analysis_orchestrator_service import AnalysisOrchestratorService
 from src.services.project_service import ProjectService
 from src.services.settings_service import SettingsService
 from src.services.workspace_service import WorkspaceService
@@ -71,7 +72,9 @@ class BootstrapContext:
     state: ApplicationState
 
 
-def bootstrap(config_path: Path = CONFIG_FILE_PATH, log_dir: Path = LOG_DIR) -> BootstrapContext:
+def bootstrap(
+    config_path: Path = CONFIG_FILE_PATH, log_dir: Path = LOG_DIR
+) -> BootstrapContext:
     """Run application startup and return a ready-to-use context.
 
     Args:
@@ -149,6 +152,21 @@ def bootstrap(config_path: Path = CONFIG_FILE_PATH, log_dir: Path = LOG_DIR) -> 
     workspace_service = WorkspaceService()
     container.register(WorkspaceService, lambda: workspace_service, singleton=True)
     logger.debug("Registered WorkspaceService into the dependency container.")
+
+    # Milestone 9: depends on the WorkspaceService instance just
+    # registered above (resolves/mutates datasets and visualizations
+    # through it, exactly as AssistantService does) — registered after
+    # it for the same "construct in dependency order" reasoning this
+    # function already documents for every service above.
+    analysis_orchestrator_service = AnalysisOrchestratorService(workspace_service)
+    container.register(
+        AnalysisOrchestratorService,
+        lambda: analysis_orchestrator_service,
+        singleton=True,
+    )
+    logger.debug(
+        "Registered AnalysisOrchestratorService into the dependency container."
+    )
 
     context = BootstrapContext(config=config, container=container, state=state)
 

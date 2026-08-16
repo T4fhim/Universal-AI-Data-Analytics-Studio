@@ -18,6 +18,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
+import plotly.graph_objects as go
+
 from src.ai.llm_provider import PendingToolCall
 from src.ai.provider_rotation import (
     ProviderRotationService,
@@ -28,7 +30,7 @@ from src.ai.tool_registry import get_anthropic_tool_schemas, get_tool_by_name
 from src.core.exceptions import ApplicationError, ServiceError
 from src.core.expertise_level import EXPERTISE_LEVEL_GUIDANCE, ExpertiseLevel
 from src.core.logger import get_logger
-from src.services.workspace_service import Dataset, WorkspaceService
+from src.services.workspace_service import Dataset, Visualization, WorkspaceService
 
 _logger = get_logger(__name__)
 
@@ -82,10 +84,17 @@ class AssistantTurnResult:
         reply_text: The assistant's natural-language reply.
         new_datasets: Any new datasets created by tool calls during
             this turn (already added to ``WorkspaceService``).
+        new_visualizations: Any new visualizations created by the
+            ``build_chart`` tool during this turn (milestone 9; already
+            added to ``WorkspaceService``) — mirrors ``new_datasets``
+            for the same reason: a caller (the future chat panel, or a
+            test) needs to know what got created without re-querying
+            the whole workspace.
     """
 
     reply_text: str
     new_datasets: list[Dataset] = field(default_factory=list)
+    new_visualizations: list[Visualization] = field(default_factory=list)
 
 
 class AssistantService:
@@ -218,6 +227,7 @@ class AssistantService:
         provider = self._rotation.current_provider()
         self._history = provider.append_user_message(self._history, user_message)
         new_datasets: list[Dataset] = []
+        new_visualizations: list[Visualization] = []
         tool_schemas = get_anthropic_tool_schemas()
 
         while True:
@@ -227,17 +237,21 @@ class AssistantService:
 
             if not turn.tool_calls:
                 return AssistantTurnResult(
-                    reply_text=turn.text, new_datasets=new_datasets
+                    reply_text=turn.text,
+                    new_datasets=new_datasets,
+                    new_visualizations=new_visualizations,
                 )
 
             results: list[tuple[PendingToolCall, str]] = []
             for call in turn.tool_calls:
-                result_text, produced_dataset = self._execute_tool(
-                    call.name, call.arguments, active_dataset
+                result_text, produced_dataset, produced_visualization = (
+                    self._execute_tool(call.name, call.arguments, active_dataset)
                 )
                 if produced_dataset is not None:
                     new_datasets.append(produced_dataset)
                     active_dataset = produced_dataset
+                if produced_visualization is not None:
+                    new_visualizations.append(produced_visualization)
                 results.append((call, result_text))
 
             self._history = provider.append_tool_results(self._history, results)
@@ -316,8 +330,16 @@ class AssistantService:
 
     def _execute_tool(
         self, tool_name: str, tool_input: dict[str, Any], active_dataset: Dataset
-    ) -> tuple[str, Dataset | None]:
-        """Run one tool call, returning (result text for the model, new Dataset if any).
+    ) -> tuple[str, Dataset | None, Visualization | None]:
+        """Run one tool call.
+
+        Returns:
+            ``(result text for the model, new Dataset if any, new
+            Visualization if any)`` — exactly one of the latter two is
+            ever non-``None`` (a tool either produces a derived
+            dataset, a visualization, or neither; never both), but both
+            are always present in the tuple so every call site
+            unpacks the same shape regardless of which tool ran.
 
         Errors are caught and reported back to the model as the tool
         result rather than raised, so a mistaken tool call becomes a
@@ -327,17 +349,17 @@ class AssistantService:
         try:
             tool = get_tool_by_name(tool_name)
         except KeyError as exc:
-            return f"Error: {exc}", None
+            return f"Error: {exc}", None, None
 
         try:
             clean_input = {k: v for k, v in tool_input.items() if k}
             result = tool.handler(active_dataset, **clean_input)
         except ApplicationError as exc:
             _logger.warning("Tool '%s' failed: %s", tool_name, exc)
-            return f"Error: {exc}", None
+            return f"Error: {exc}", None, None
         except Exception as exc:
             _logger.error("Tool '%s' raised an unexpected error: %s", tool_name, exc)
-            return f"Unexpected error: {exc}", None
+            return f"Unexpected error: {exc}", None, None
 
         if isinstance(result, Dataset):
             self._workspace_service.add_dataset(result)
@@ -352,6 +374,34 @@ class AssistantService:
                 f"({result.row_count} rows, {result.column_count} cols). "
                 f"{result.derivation_description}",
                 result,
+                None,
             )
 
-        return json.dumps(result, default=str), None
+        if isinstance(result, go.Figure):
+            # Milestone 9's build_chart tool — mirrors the Dataset
+            # branch above: the tool's real product is registered into
+            # WorkspaceService immediately (not left for the caller to
+            # do), since a Figure has nowhere else meaningful to live
+            # and the model's own reply text can't carry a chart.
+            visualization = Visualization(
+                name=tool_input.get("title")
+                or f"{tool_input.get('chart_type', 'chart')} chart",
+                dataset_id=active_dataset.dataset_id,
+                figure=result,
+                chart_type=str(tool_input.get("chart_type", "")),
+                chart_parameters=dict(tool_input),
+            )
+            self._workspace_service.add_visualization(visualization)
+            _logger.info(
+                "Assistant tool '%s' produced new visualization: %s (%s)",
+                tool_name,
+                visualization.name,
+                visualization.visualization_id,
+            )
+            return (
+                f"Success. Created visualization '{visualization.name}'.",
+                None,
+                visualization,
+            )
+
+        return json.dumps(result, default=str), None, None
