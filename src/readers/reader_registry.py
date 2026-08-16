@@ -15,23 +15,35 @@ from pathlib import Path
 
 from src.core.exceptions import ReaderError
 from src.core.logger import get_logger
+from src.readers.archive_reader import ArchiveReader
 from src.readers.base_reader import BaseReader
 from src.readers.csv_reader import CsvReader
 from src.readers.excel_reader import ExcelReader
+from src.readers.feather_reader import FeatherReader
+from src.readers.html_reader import HtmlReader
 from src.readers.image_reader import ImageReader
 from src.readers.json_reader import JsonReader
+from src.readers.ods_reader import OdsReader
+from src.readers.parquet_reader import ParquetReader
 from src.readers.pdf_reader import PdfReader
+from src.readers.powerpoint_reader import PowerPointReader
 from src.readers.sqlite_reader import SqliteReader
 from src.readers.text_reader import TextReader
 from src.readers.word_reader import WordReader
 from src.readers.xml_reader import XmlReader
+from src.readers.yaml_reader import YamlReader
 
 _logger = get_logger(__name__)
 
 # Order matters only for which reader is tried first when more than
-# one could theoretically claim a file. Across all nine readers as of
-# milestone 2c-ii, can_read() checks remain based on mutually
-# exclusive extensions, so no real ambiguity exists.
+# one could theoretically claim a file. Across all sixteen readers as
+# of milestone 14, can_read() checks remain based on mutually
+# exclusive extensions, so no real ambiguity exists. ArchiveReader is
+# listed last among the milestone-14 additions since it is the one
+# reader whose can_read() match (a .zip/.gz extension) says nothing
+# about the tabular format actually inside — every other reader gets
+# first refusal on its own extension before archive delegation is even
+# relevant.
 _BUILTIN_READERS: tuple[type[BaseReader], ...] = (
     CsvReader,
     JsonReader,
@@ -42,6 +54,13 @@ _BUILTIN_READERS: tuple[type[BaseReader], ...] = (
     WordReader,
     XmlReader,
     ImageReader,
+    OdsReader,
+    YamlReader,
+    ParquetReader,
+    FeatherReader,
+    PowerPointReader,
+    HtmlReader,
+    ArchiveReader,
 )
 
 # Milestone 12: readers a plugin registers via register_reader(),

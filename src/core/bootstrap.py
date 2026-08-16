@@ -41,6 +41,7 @@ from src.core.exceptions import BootstrapError
 from src.core.logger import configure_logging, get_logger
 from src.plugins.plugin_manager import PluginManager
 from src.services.analysis_orchestrator_service import AnalysisOrchestratorService
+from src.services.database_connection_service import DatabaseConnectionService
 from src.services.project_service import ProjectService
 from src.services.report_service import ReportService
 from src.services.settings_service import SettingsService
@@ -179,6 +180,16 @@ def bootstrap(
     report_service = ReportService(workspace_service, analysis_orchestrator_service)
     container.register(ReportService, lambda: report_service, singleton=True)
     logger.debug("Registered ReportService into the dependency container.")
+
+    # Milestone 14: depends on SettingsService for saved (credential-
+    # free) connection profiles — see DatabaseConnectionService's own
+    # docstring for why live connections/passwords are kept purely
+    # in-memory and never routed through SettingsService at all.
+    database_connection_service = DatabaseConnectionService(settings_service)
+    container.register(
+        DatabaseConnectionService, lambda: database_connection_service, singleton=True
+    )
+    logger.debug("Registered DatabaseConnectionService into the dependency container.")
 
     # Milestone 12: constructed and loaded here — plugins should be
     # discovered and registered before anything in the UI layer (the

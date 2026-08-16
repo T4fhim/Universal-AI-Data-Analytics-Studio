@@ -116,6 +116,17 @@ def _default_config_dict() -> dict[str, Any]:
         "reports": {
             "default_export_format": "pdf",
         },
+        "database": {
+            # Milestone 14: saved "Connect to Database" profiles.
+            # Deliberately metadata-only — name/db_type/host/port/
+            # database/username. No password field exists anywhere in
+            # this list on purpose: a password typed into the "Connect
+            # to Database" dialog lives only in
+            # DatabaseConnectionService's in-memory session state (see
+            # that module's own docstring for the full reasoning) and
+            # is never written to this plain-text config file.
+            "profiles": [],
+        },
     }
 
 
@@ -132,6 +143,7 @@ _TOP_LEVEL_SCHEMA: dict[str, type] = {
     "plugins": dict,
     "forecasting": dict,
     "reports": dict,
+    "database": dict,
 }
 
 _NESTED_SCHEMA: dict[str, dict[str, type]] = {
@@ -152,6 +164,7 @@ _NESTED_SCHEMA: dict[str, dict[str, type]] = {
     },
     "forecasting": {"default_horizon_periods": int},
     "reports": {"default_export_format": str},
+    "database": {"profiles": list},
 }
 
 
@@ -241,6 +254,28 @@ def _migrate_legacy_plugins_section(data: dict[str, Any]) -> None:
             "'disabled_plugin_names' key — defaulted it to an empty list "
             "in memory. Save settings once to persist this change."
         )
+
+
+def _migrate_legacy_database_section(data: dict[str, Any]) -> None:
+    """Back-fill milestone 14's ``database`` section into a config saved before it existed, in place.
+
+    Unlike :func:`_migrate_legacy_ai_section`/
+    :func:`_migrate_legacy_plugins_section` (which back-fill one key
+    within an already-present section), a ``config.yaml`` saved before
+    this milestone has no ``database`` key at all — this adds the whole
+    section, empty, so :func:`validate_config_structure` does not fail
+    on the very next startup for a user upgrading from an older
+    version.
+    """
+    if "database" not in data or not isinstance(data.get("database"), dict):
+        data["database"] = {"profiles": []}
+        _bootstrap_logger.warning(
+            "config.yaml predates milestone 14's 'database' section — "
+            "added an empty one in memory. Save settings once to "
+            "persist this change."
+        )
+    elif "profiles" not in data["database"]:
+        data["database"]["profiles"] = []
 
 
 def validate_config_structure(data: dict[str, Any]) -> None:
@@ -361,6 +396,7 @@ def load_config(path: Path = CONFIG_FILE_PATH) -> dict[str, Any]:
 
     _migrate_legacy_ai_section(loaded)
     _migrate_legacy_plugins_section(loaded)
+    _migrate_legacy_database_section(loaded)
     validate_config_structure(loaded)
     return loaded
 
@@ -401,6 +437,7 @@ class AppConfig:
     plugin_disabled_names: list[str]
     forecasting_default_horizon_periods: int
     reports_default_export_format: str
+    database_profiles: list[dict[str, Any]]
 
     _raw: dict[str, Any] = field(repr=False, compare=False)
 
@@ -435,6 +472,7 @@ class AppConfig:
                 "default_horizon_periods"
             ],
             reports_default_export_format=data["reports"]["default_export_format"],
+            database_profiles=list(data["database"]["profiles"]),
             _raw=data,
         )
 

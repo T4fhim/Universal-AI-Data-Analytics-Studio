@@ -40,6 +40,7 @@ from src.services.analysis_orchestrator_service import (
     AnalysisOrchestratorService,
     PipelineStage,
 )
+from src.services.database_connection_service import DatabaseConnectionService
 from src.services.project_service import ProjectService
 from src.services.report_service import ReportService
 from src.services.settings_service import SettingsService
@@ -50,6 +51,7 @@ from src.services.workspace_service import (
     WorkspaceService,
 )
 from src.ui.dialogs.about_dialog import AboutDialog
+from src.ui.dialogs.connect_database_dialog import ConnectDatabaseDialog
 from src.ui.dialogs.create_visualization_dialog import CreateVisualizationDialog
 from src.ui.dialogs.generate_report_dialog import GenerateReportDialog
 from src.ui.dialogs.settings_dialog import SettingsDialog
@@ -75,13 +77,16 @@ _PROJECT_FILE_FILTER = "Universal AI Data Analytics Studio Project (*.uads.json)
 # reader_registry.get_reader_for_path's own error-message construction
 # does; a hardcoded filter string here is clearer than deriving one
 # generically. Extended in milestone 2b to include Excel and SQLite
-# alongside 2a's original three formats — this constant needs a
-# manual update whenever a new reader is added to src.readers, since
-# nothing enforces the two staying in sync automatically.
+# alongside 2a's original three formats, and again in milestone 14 to
+# include ODS/YAML/Parquet/Feather/PowerPoint/HTML/ZIP-GZIP — this
+# constant needs a manual update whenever a new reader is added to
+# src.readers, since nothing enforces the two staying in sync
+# automatically.
 _DATASET_FILE_FILTER = (
     "All Supported Datasets (*.csv *.tsv *.json *.txt *.xlsx *.xls "
     "*.db *.sqlite *.sqlite3 *.pdf *.docx *.xml *.png *.jpg *.jpeg "
-    "*.bmp *.tiff *.tif);;"
+    "*.bmp *.tiff *.tif *.ods *.yaml *.yml *.parquet *.feather *.pptx "
+    "*.html *.htm *.zip *.gz *.gzip);;"
     "CSV Files (*.csv *.tsv);;"
     "JSON Files (*.json);;"
     "Text Files (*.txt);;"
@@ -90,7 +95,14 @@ _DATASET_FILE_FILTER = (
     "PDF Files (*.pdf);;"
     "Word Documents (*.docx);;"
     "XML Files (*.xml);;"
-    "Images (*.png *.jpg *.jpeg *.bmp *.tiff *.tif)"
+    "Images (*.png *.jpg *.jpeg *.bmp *.tiff *.tif);;"
+    "OpenDocument Spreadsheets (*.ods);;"
+    "YAML Files (*.yaml *.yml);;"
+    "Parquet Files (*.parquet);;"
+    "Feather Files (*.feather);;"
+    "PowerPoint Presentations (*.pptx);;"
+    "HTML Files (*.html *.htm);;"
+    "Archives (*.zip *.gz *.gzip)"
 )
 
 # Sentinel distinct from None: None is already a legitimate return
@@ -182,6 +194,7 @@ class MainWindow(QMainWindow):
             AnalysisOrchestratorService
         )
         self._report_service = context.container.resolve(ReportService)
+        self._database_service = context.container.resolve(DatabaseConnectionService)
         # Constructed lazily on first chat message, not here — building
         # it eagerly would mean every window construction (including
         # ones where the user never opens the AI panel) pays the cost
@@ -225,6 +238,9 @@ class MainWindow(QMainWindow):
         self._menu_bar.action_new_project.triggered.connect(self._on_new_project)
         self._menu_bar.action_open_project.triggered.connect(self._on_open_project)
         self._menu_bar.action_open_dataset.triggered.connect(self._on_open_dataset)
+        self._menu_bar.action_connect_database.triggered.connect(
+            self._on_connect_database
+        )
         self._menu_bar.action_create_visualization.triggered.connect(
             self._on_create_visualization
         )
@@ -517,6 +533,21 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, "Failed to Open Dataset", str(exc))
         self._dock_manager.append_console_message(f"⚠ Failed to open dataset: {exc}")
         _logger.warning("Failed to open dataset from %s: %s", file_path_str, exc)
+
+    def _on_connect_database(self) -> None:
+        # Synchronous, not BaseWorker-offloaded — see
+        # ConnectDatabaseDialog's own module docstring for why a live
+        # database connection is a deliberate exception to this
+        # window's usual "slow work runs off the UI thread" rule.
+        dialog = ConnectDatabaseDialog(self._database_service, self)
+        if dialog.exec() != ConnectDatabaseDialog.DialogCode.Accepted:
+            return
+
+        dataset = dialog.get_result()
+        if dataset is None:
+            return  # dialog accepted without a table having been read; nothing to add
+
+        self._on_dataset_read(dataset)
 
     def _on_create_visualization(self) -> None:
         active_dataset = self._workspace_service.get_active_dataset()

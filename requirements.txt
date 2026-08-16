@@ -22,6 +22,11 @@ pytesseract
 beautifulsoup4
 lxml
 sqlalchemy
+pymysql
+psycopg2-binary
+pyodbc
+oracledb
+duckdb_engine
 pyarrow
 fastparquet
 python-magic

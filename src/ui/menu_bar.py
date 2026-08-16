@@ -76,6 +76,15 @@ class ApplicationMenuBar(QMenuBar):
         self.action_open_dataset.setShortcut("Ctrl+Shift+O")
         file_menu.addAction(self.action_open_dataset)
 
+        # Milestone 14: a live database connection is a different kind
+        # of dataset source from a file (see
+        # src.database.database_reader's own docstring for why it
+        # isn't dispatched through the same reader_registry path as
+        # action_open_dataset above) but belongs in the same "bring
+        # data into the workspace" menu group.
+        self.action_connect_database = QAction("Connect to &Database...", parent_window)
+        file_menu.addAction(self.action_connect_database)
+
         file_menu.addSeparator()
 
         self.action_save_project = QAction("&Save Project", parent_window)

@@ -61,24 +61,50 @@ every milestone is separately git-tagged; this is reconstructed from in-code cit
   LLM-callable tools, inventing no new capability), and `AssistantService` (the provider-neutral
   tool-dispatch loop). Per `tool_registry.py`'s own docstring, every tool it exposes "calls
   directly into a function already built and tested in an earlier milestone."
+- **6** — Async foundation: `src/workers/base_worker.py` (`BaseWorker`/`WorkerSignals` over
+  `QThreadPool`), used to move dataset reads, project reload, dashboard rendering, AI turns, and
+  report generation off the UI thread.
+- **7** — Provider-agnostic AI config: `ai.providers` profile list (replacing a single
+  provider/api key pair), Groq multi-key rotation.
+- **8** — Progressive Expertise: `src/core/expertise_level.py`'s `ExpertiseLevel` enum, and
+  `src/analysis/explanation.py`'s `Explanation` shape the AI layer fills in about an
+  already-computed result.
+- **9** — Guided Universal Data Scientist pipeline: `AnalysisOrchestratorService`,
+  `PipelineStage`, `AnalysisLog`/`AnalysisLogEntry` (the Reproducible Analysis record every later
+  reporting feature replays).
+- **10** — Foundational UI overhaul: AI chat panel, multi-chart tabs, tree-based Dataset Explorer,
+  wired Console dock.
+- **11** — Statistics & forecasting expansion: `src/analysis/` gained t-tests, ANOVA, chi-square,
+  linear regression, normality checks, PCA, k-means; `src/forecasting/` gained linear-regression,
+  ARIMA (`pmdarima`), and Random Forest forecasters plus `model_comparison.py`'s Automatic Model
+  Competition across all five methods; `src/visualization/` gained Heatmap/Bubble/Treemap/Radar/
+  Waterfall/Funnel charts and `chart_recommender.py`'s Smart Visualization Selection.
+- **12** — Plugin system: `src/plugins/` (`PluginManifest`, `discover_plugins`, `PluginManager`),
+  plus the shared `chart_registry.py`/`operation_registry.py`/extended `reader_registry.py` every
+  plugin category registers into.
+- **13** — Reporting: `src/reports/` (`BaseReportExporter` and PDF/HTML/Word/Excel exporters,
+  each rendering a shared `ReportContent`), `src/services/report_service.py` (replays a dataset's
+  `AnalysisLog` into a report — Reproducible Analysis and Reporting share the same underlying
+  data), and the "Generate Report" wizard in the Analysis menu.
+- **14** — Additional readers/database connectivity: seven more `src/readers/` formats (ODS,
+  YAML, Parquet, Feather, PowerPoint, HTML tables, ZIP/GZIP), bringing the reader count to
+  sixteen; `src/database/` (`BaseDatabaseConnection` — a second deliberate exception to the
+  stateless `Base*` pattern alongside `BaseLLMProvider` — with PostgreSQL/MySQL/SQL Server/
+  Oracle/DuckDB connectors, `ConnectionProfile` deliberately holding no password field, and
+  `DatabaseReader`, which does not subclass `BaseReader` since a live connection has no path to
+  dispatch on); the "Connect to Database" dialog.
 
 ## What is explicitly not built yet
 
-Stated directly in CLAUDE.md: several `src/` subpackages remain empty directories awaiting
-their milestone —
+`src/models/` remains an empty directory awaiting its milestone — no milestone in the plan this
+project has followed so far (`plans/defining-features-what-stateless-zebra.md`) names what it is
+for.
 
-- `database/`
-- `models/`
-- `plugins/`
-- `workers/`
-- `reports/`
-- `resources/` (partially used today only for `resources/styles/*.qss` theme files, referenced
-  directly by `ThemeManager` rather than through a `src/resources/` module)
+- `resources/` remains partially used only for `resources/styles/*.qss` theme files, referenced
+  directly by `ThemeManager` rather than through a `src/resources/` module.
 
 Also not yet built, evidenced directly by repository state rather than a docstring claim:
 
-- **Automated test coverage.** `tests/` is empty despite `pytest` being a declared dependency in
-  `requirements.txt`.
 - **Enforced formatting/linting.** `black`, `isort`, and `mypy` are declared dependencies with
   no committed configuration file and no CI gate.
 - **Undo/redo for cleaning operations.** The lineage fields added in milestone 3a
@@ -88,16 +114,25 @@ Also not yet built, evidenced directly by repository state rather than a docstri
   doesn't exist yet.
 - **Visualization rebuild.** `Visualization.chart_type`/`chart_parameters` are recorded (as of
   milestone 5b) but nothing yet consumes them to actually rebuild a chart against updated data.
+- **Association rules.** Explicitly deferred in milestone 11 (no `mlxtend` dependency).
+- **Report-format plugin extensibility and a `forecast_models`/`ai_providers` plugin category.**
+  Both deliberately excluded from milestone 12's plugin system — see
+  `src/plugins/plugin_manifest.py`'s `SUPPORTED_CATEGORIES` and `src/services/report_service.py`'s
+  own docstrings for why.
+- **Orchestrator REPORT-stage UI.** `AnalysisOrchestratorService` is registered in the dependency
+  container but was never resolved by any UI code before milestone 13 — "Generate Report" is
+  reachable via the Analysis menu only, not a pipeline-stage checkpoint.
+
+`tests/` (empty at the point CLAUDE.md's own commands section was written) now has real
+coverage — see git history for the milestone-by-milestone test additions.
 
 ## Broader intended scope (not committed, not yet started)
 
-[SPECIFICATION.md](../SPECIFICATION.md) describes a much larger eventual feature set — additional
-file formats (SPSS, Stata, SAS, MATLAB, NetCDF, DICOM, CAD, HDF5 via a future plugin system),
-additional statistical methods (ANOVA, regression, chi-square, t-tests, PCA, clustering,
-association rules), additional chart types (treemap, sunburst, radar, parallel coordinates,
-waterfall, funnel, candlestick, geographic maps, 3D scatter/surface, animated charts), database
-connectivity (MySQL, PostgreSQL, SQL Server, Oracle, DuckDB), and full report export (PDF, Word,
-Excel, interactive HTML dashboards). This is recorded here only as SPECIFICATION.md's own stated
-scope — it is explicitly a superset of what exists in `src/` today (per CLAUDE.md's own
+[SPECIFICATION.md](../SPECIFICATION.md) describes a larger eventual feature set beyond even
+milestone 14 — additional file formats (SPSS, Stata, SAS, MATLAB, NetCDF, DICOM, CAD, HDF5 via a
+third-party plugin), association-rule mining, and further chart types (sunburst, parallel
+coordinates, candlestick, geographic maps, 3D scatter/surface, animated charts) among them. This
+is recorded here only as SPECIFICATION.md's own stated scope — it is explicitly a superset of
+what exists in `src/` today (per CLAUDE.md's own
 instruction not to assume something described there already exists), and nothing in this
 document should be read as a committed timeline for building it.
