@@ -26,15 +26,27 @@ from typing import Any
 import plotly.graph_objects as go
 
 from src.analysis.aggregation import aggregate
+from src.analysis.anova import one_way_anova
+from src.analysis.chi_square import chi_square_test
+from src.analysis.clustering import k_means_clustering
 from src.analysis.correlation import compute_correlation
 from src.analysis.crosstab import cross_tabulate
 from src.analysis.dataset_profile import profile_dataset
+from src.analysis.normality import check_normality
+from src.analysis.pca import compute_pca
+from src.analysis.regression import linear_regression
+from src.analysis.t_test import independent_t_test, paired_t_test
 from src.cleaning.duplicates import DropDuplicates
 from src.cleaning.missing_values import DropMissingValues, FillMissingValues
 from src.cleaning.text_normalization import NormalizeText
 from src.cleaning.type_conversion import ConvertType
+from src.core.exceptions import ServiceError
+from src.forecasting.arima_forecast import forecast_arima
 from src.forecasting.exponential_smoothing import forecast_exponential_smoothing
+from src.forecasting.linear_regression_forecast import forecast_linear_regression
+from src.forecasting.model_comparison import compare_forecast_models
 from src.forecasting.prophet_forecast import forecast_prophet
+from src.forecasting.random_forest_forecast import forecast_random_forest
 from src.services.workspace_service import Dataset
 from src.visualization.categorical_charts import BarChart, PieChart
 from src.visualization.continuous_charts import LineChart, ScatterChart
@@ -235,6 +247,175 @@ def _forecast_prophet_tool(
         include_confidence_interval=True,
     )
     return _forecast_result_to_dict(result)
+
+
+def _independent_t_test_tool(
+    dataset: Dataset,
+    value_column: str,
+    group_column: str,
+    group_a: Any,
+    group_b: Any,
+    equal_variance: bool = False,
+) -> dict:
+    result = independent_t_test(
+        dataset.dataframe, value_column, group_column, group_a, group_b, equal_variance
+    )
+    return {
+        "statistic": result.statistic,
+        "p_value": result.p_value,
+        "degrees_of_freedom": result.degrees_of_freedom,
+        "group_a_mean": result.group_a_mean,
+        "group_b_mean": result.group_b_mean,
+        "significant_at_0_05": result.significant_at_0_05,
+    }
+
+
+def _paired_t_test_tool(dataset: Dataset, column_a: str, column_b: str) -> dict:
+    result = paired_t_test(dataset.dataframe, column_a, column_b)
+    return {
+        "statistic": result.statistic,
+        "p_value": result.p_value,
+        "degrees_of_freedom": result.degrees_of_freedom,
+        "group_a_mean": result.group_a_mean,
+        "group_b_mean": result.group_b_mean,
+        "significant_at_0_05": result.significant_at_0_05,
+    }
+
+
+def _one_way_anova_tool(dataset: Dataset, value_column: str, group_column: str) -> dict:
+    result = one_way_anova(dataset.dataframe, value_column, group_column)
+    return {
+        "f_statistic": result.f_statistic,
+        "p_value": result.p_value,
+        "group_means": result.group_means,
+        "group_sizes": result.group_sizes,
+        "significant_at_0_05": result.significant_at_0_05,
+    }
+
+
+def _chi_square_test_tool(
+    dataset: Dataset, row_column: str, column_column: str
+) -> dict:
+    result = chi_square_test(dataset.dataframe, row_column, column_column)
+    return {
+        "statistic": result.statistic,
+        "p_value": result.p_value,
+        "degrees_of_freedom": result.degrees_of_freedom,
+        "contingency_table": result.contingency_table.to_dict(),
+        "significant_at_0_05": result.significant_at_0_05,
+    }
+
+
+def _linear_regression_tool(
+    dataset: Dataset, target_column: str, feature_columns: list[str]
+) -> dict:
+    result = linear_regression(dataset.dataframe, target_column, feature_columns)
+    return {
+        "target_column": result.target_column,
+        "feature_columns": result.feature_columns,
+        "coefficients": result.coefficients,
+        "intercept": result.intercept,
+        "p_values": result.p_values,
+        "r_squared": result.r_squared,
+        "adjusted_r_squared": result.adjusted_r_squared,
+        "observation_count": result.observation_count,
+    }
+
+
+def _check_normality_tool(
+    dataset: Dataset, column: str, method: str = "shapiro_wilk"
+) -> dict:
+    result = check_normality(dataset.dataframe, column, method)
+    return {
+        "method": result.method,
+        "statistic": result.statistic,
+        "p_value": result.p_value,
+        "appears_normal_at_0_05": result.appears_normal_at_0_05,
+        "observation_count": result.observation_count,
+    }
+
+
+def _compute_pca_tool(
+    dataset: Dataset, columns: list[str] | None = None, n_components: int | None = None
+) -> dict:
+    result = compute_pca(dataset.dataframe, columns=columns, n_components=n_components)
+    return {
+        "included_columns": result.included_columns,
+        "explained_variance_ratio": result.explained_variance_ratio,
+        "cumulative_variance_ratio": result.cumulative_variance_ratio,
+        "component_loadings": result.component_loadings,
+    }
+
+
+def _k_means_clustering_tool(
+    dataset: Dataset, k: int, columns: list[str] | None = None
+) -> dict:
+    result = k_means_clustering(dataset.dataframe, k, columns=columns)
+    return {
+        "included_columns": result.included_columns,
+        "k": result.k,
+        "cluster_sizes": result.cluster_sizes,
+        "cluster_centers": result.cluster_centers,
+        "inertia": result.inertia,
+    }
+
+
+def _forecast_linear_regression_tool(
+    dataset: Dataset, date_column: str, value_column: str, periods: int, degree: int = 1
+) -> dict:
+    result = forecast_linear_regression(
+        dataset.dataframe, date_column, value_column, periods, degree=degree
+    )
+    return _forecast_result_to_dict(result)
+
+
+def _forecast_arima_tool(
+    dataset: Dataset,
+    date_column: str,
+    value_column: str,
+    periods: int,
+    seasonal: bool = False,
+    seasonal_periods: int | None = None,
+) -> dict:
+    result = forecast_arima(
+        dataset.dataframe,
+        date_column,
+        value_column,
+        periods,
+        seasonal=seasonal,
+        seasonal_periods=seasonal_periods,
+    )
+    return _forecast_result_to_dict(result)
+
+
+def _forecast_random_forest_tool(
+    dataset: Dataset, date_column: str, value_column: str, periods: int
+) -> dict:
+    result = forecast_random_forest(
+        dataset.dataframe, date_column, value_column, periods
+    )
+    return _forecast_result_to_dict(result)
+
+
+def _compare_forecast_models_tool(
+    dataset: Dataset, date_column: str, value_column: str, periods: int
+) -> dict:
+    """Fit every registered forecaster and report the ranked comparison — backs Milestone 9's Automatic Model Competition."""
+    result = compare_forecast_models(
+        dataset.dataframe, date_column, value_column, periods
+    )
+    return {
+        "winner": _forecast_result_to_dict(result.winner.result)
+        | {"mape": result.winner.mape, "rmse": result.winner.rmse},
+        "candidates": [
+            {
+                "method": c.method,
+                "mape": c.mape,
+                "rmse": c.rmse,
+            }
+            for c in result.candidates
+        ],
+    }
 
 
 def _build_chart(
@@ -448,6 +629,206 @@ TOOLS: list[ToolDefinition] = [
             "required": ["date_column", "value_column", "periods"],
         },
         handler=_forecast_prophet_tool,
+    ),
+    ToolDefinition(
+        name="independent_t_test",
+        description="Compare a numeric column's mean between two groups defined by a categorical column.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "value_column": {"type": "string"},
+                "group_column": {"type": "string"},
+                "group_a": {
+                    "description": "Value of group_column identifying the first group."
+                },
+                "group_b": {
+                    "description": "Value of group_column identifying the second group."
+                },
+                "equal_variance": {"type": "boolean", "default": False},
+            },
+            "required": ["value_column", "group_column", "group_a", "group_b"],
+        },
+        handler=_independent_t_test_tool,
+    ),
+    ToolDefinition(
+        name="paired_t_test",
+        description="Compare two paired numeric columns (e.g. before/after measurements on the same rows).",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "column_a": {"type": "string"},
+                "column_b": {"type": "string"},
+            },
+            "required": ["column_a", "column_b"],
+        },
+        handler=_paired_t_test_tool,
+    ),
+    ToolDefinition(
+        name="one_way_anova",
+        description="Test whether a numeric column's mean differs across 3+ groups defined by a categorical column.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "value_column": {"type": "string"},
+                "group_column": {"type": "string"},
+            },
+            "required": ["value_column", "group_column"],
+        },
+        handler=_one_way_anova_tool,
+    ),
+    ToolDefinition(
+        name="chi_square_test",
+        description="Test whether two categorical columns are statistically independent.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "row_column": {"type": "string"},
+                "column_column": {"type": "string"},
+            },
+            "required": ["row_column", "column_column"],
+        },
+        handler=_chi_square_test_tool,
+    ),
+    ToolDefinition(
+        name="linear_regression",
+        description="Fit an OLS linear regression (simple or multiple) of a numeric target on one or more numeric features.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "target_column": {"type": "string"},
+                "feature_columns": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["target_column", "feature_columns"],
+        },
+        handler=_linear_regression_tool,
+    ),
+    ToolDefinition(
+        name="check_normality",
+        description="Test whether a numeric column's values appear normally distributed.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "column": {"type": "string"},
+                "method": {
+                    "type": "string",
+                    "enum": ["shapiro_wilk", "dagostino_pearson"],
+                    "default": "shapiro_wilk",
+                },
+            },
+            "required": ["column"],
+        },
+        handler=_check_normality_tool,
+    ),
+    ToolDefinition(
+        name="compute_pca",
+        description="Run principal component analysis over the active dataset's numeric columns.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "columns": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Omit to use every genuinely numeric column.",
+                },
+                "n_components": {
+                    "type": "integer",
+                    "description": "Omit to use the number of included columns.",
+                },
+            },
+        },
+        handler=_compute_pca_tool,
+    ),
+    ToolDefinition(
+        name="k_means_clustering",
+        description="Cluster the active dataset's rows into k groups by their numeric columns.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "k": {
+                    "type": "integer",
+                    "description": "Number of clusters (at least 2).",
+                },
+                "columns": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Omit to use every genuinely numeric column.",
+                },
+            },
+            "required": ["k"],
+        },
+        handler=_k_means_clustering_tool,
+    ),
+    ToolDefinition(
+        name="forecast_linear_regression",
+        description="Forecast future values by fitting a linear or polynomial trend against elapsed time. Fast baseline for a trend-dominated series with no real seasonality.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "date_column": {"type": "string"},
+                "value_column": {"type": "string"},
+                "periods": {"type": "integer"},
+                "degree": {
+                    "type": "integer",
+                    "default": 1,
+                    "description": "1 for a straight line, higher for a polynomial curve (max 5).",
+                },
+            },
+            "required": ["date_column", "value_column", "periods"],
+        },
+        handler=_forecast_linear_regression_tool,
+    ),
+    ToolDefinition(
+        name="forecast_arima",
+        description="Forecast future values using an auto-selected ARIMA/SARIMA model (via auto_arima). Good for series with autocorrelation patterns exponential smoothing and Prophet don't capture as well.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "date_column": {"type": "string"},
+                "value_column": {"type": "string"},
+                "periods": {"type": "integer"},
+                "seasonal": {"type": "boolean", "default": False},
+                "seasonal_periods": {
+                    "type": "integer",
+                    "description": "Length of one seasonal cycle. Required if seasonal is true.",
+                },
+            },
+            "required": ["date_column", "value_column", "periods"],
+        },
+        handler=_forecast_arima_tool,
+    ),
+    ToolDefinition(
+        name="forecast_random_forest",
+        description="Forecast future values using a Random Forest fit over lagged values. A nonlinear alternative to the other forecasters.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "date_column": {"type": "string"},
+                "value_column": {"type": "string"},
+                "periods": {"type": "integer"},
+            },
+            "required": ["date_column", "value_column", "periods"],
+        },
+        handler=_forecast_random_forest_tool,
+    ),
+    ToolDefinition(
+        name="compare_forecast_models",
+        description=(
+            "Fit every available forecasting model on the same series, score each "
+            "by holdout accuracy (MAPE/RMSE), and return the ranked comparison "
+            "with the winning model's forecast. Use this instead of a single "
+            "forecast_* tool when the user hasn't specified a method and wants "
+            "the best available forecast."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "date_column": {"type": "string"},
+                "value_column": {"type": "string"},
+                "periods": {"type": "integer"},
+            },
+            "required": ["date_column", "value_column", "periods"],
+        },
+        handler=_compare_forecast_models_tool,
     ),
     ToolDefinition(
         name="build_chart",

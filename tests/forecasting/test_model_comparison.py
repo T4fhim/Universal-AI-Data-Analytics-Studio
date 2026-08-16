@@ -37,7 +37,15 @@ def test_compare_forecast_models_winner_forecast_has_requested_periods() -> None
     result = compare_forecast_models(_trending_series(), "date", "value", periods=7)
 
     assert len(result.winner.result.forecast_values) == 7
-    assert result.winner.result.method in {"exponential_smoothing", "prophet"}
+    # Milestone 11 expanded the candidate set beyond the original two —
+    # any registered candidate is a legitimate winner now.
+    assert result.winner.result.method in {
+        "exponential_smoothing",
+        "prophet",
+        "linear_regression",
+        "arima",
+        "random_forest",
+    }
 
 
 def test_compare_forecast_models_rmse_always_present_mape_may_be_none() -> None:

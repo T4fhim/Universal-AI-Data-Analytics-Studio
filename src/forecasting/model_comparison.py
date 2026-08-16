@@ -26,12 +26,15 @@ import pandas as pd
 
 from src.core.exceptions import ServiceError
 from src.core.logger import get_logger
+from src.forecasting.arima_forecast import forecast_arima
 from src.forecasting.exponential_smoothing import (
     ForecastResult,
     forecast_exponential_smoothing,
 )
 from src.forecasting.forecast_input import validate_time_series
+from src.forecasting.linear_regression_forecast import forecast_linear_regression
 from src.forecasting.prophet_forecast import forecast_prophet
+from src.forecasting.random_forest_forecast import forecast_random_forest
 
 _logger = get_logger(__name__)
 
@@ -54,6 +57,24 @@ _CANDIDATE_FORECASTERS: list[
         "prophet",
         lambda df, date_col, value_col, periods: forecast_prophet(
             df, date_col, value_col, periods, include_confidence_interval=False
+        ),
+    ),
+    (
+        "linear_regression",
+        lambda df, date_col, value_col, periods: forecast_linear_regression(
+            df, date_col, value_col, periods
+        ),
+    ),
+    (
+        "arima",
+        lambda df, date_col, value_col, periods: forecast_arima(
+            df, date_col, value_col, periods
+        ),
+    ),
+    (
+        "random_forest",
+        lambda df, date_col, value_col, periods: forecast_random_forest(
+            df, date_col, value_col, periods
         ),
     ),
 ]
