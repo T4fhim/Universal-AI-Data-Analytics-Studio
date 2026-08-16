@@ -30,11 +30,16 @@ from typing import Any
 
 import yaml
 
-from src.core.constants import (AVAILABLE_THEMES, CONFIG_FILE_PATH,
-                                DEFAULT_LOG_FILE_BACKUP_COUNT,
-                                DEFAULT_LOG_FILE_MAX_BYTES, DEFAULT_LOG_LEVEL,
-                                DEFAULT_THEME, DEFAULT_WINDOW_HEIGHT,
-                                DEFAULT_WINDOW_WIDTH)
+from src.core.constants import (
+    AVAILABLE_THEMES,
+    CONFIG_FILE_PATH,
+    DEFAULT_LOG_FILE_BACKUP_COUNT,
+    DEFAULT_LOG_FILE_MAX_BYTES,
+    DEFAULT_LOG_LEVEL,
+    DEFAULT_THEME,
+    DEFAULT_WINDOW_HEIGHT,
+    DEFAULT_WINDOW_WIDTH,
+)
 from src.core.exceptions import ConfigError
 
 # Bootstrap-time-only logger. Deliberately not src.core.logger.get_logger
@@ -71,8 +76,30 @@ def _default_config_dict() -> dict[str, Any]:
         },
         "ai": {
             "enabled": False,
-            "provider": None,
-            "api_key_env_var": "ANTHROPIC_API_KEY",
+            # Milestone 7: a list of provider profiles rather than one
+            # provider/api_key_env_var pair — lets the user configure
+            # several Groq keys (or a mix of providers) and have
+            # AssistantService fail over between them, and delivers
+            # provider-agnostic AI (including local-first Ollama, which
+            # needs no api_key_env_var at all) rather than hardcoding a
+            # single active provider. Each profile:
+            #   name: user-facing label, e.g. "Groq key 1".
+            #   provider_type: "anthropic" | "gemini" | "groq" | "ollama".
+            #   api_key_env_var: name of the environment variable holding
+            #     the key; None for providers that need no key (ollama).
+            #   model: provider-specific model override, or None to use
+            #     that provider class's own default.
+            "providers": [],
+            "active_provider_index": 0,
+            "rotation_enabled": False,
+            # Milestone 8: drives both the AI system prompt's register
+            # (see assistant_service._SYSTEM_PROMPT) and, once milestone
+            # 10 builds result panels, their density/vocabulary — see
+            # src.core.expertise_level.ExpertiseLevel for the full set
+            # of valid values. Stored as a plain string (not the enum
+            # itself) for the same reason every other config value is a
+            # plain string/int/bool: config.yaml is plain YAML.
+            "expertise_level": "beginner",
         },
         "plugins": {
             "enabled": True,
@@ -106,9 +133,80 @@ _NESTED_SCHEMA: dict[str, dict[str, type]] = {
     "window": {"width": int, "height": int},
     "autosave": {"enabled": bool, "interval_minutes": int},
     "logging": {"level": str, "max_bytes": int, "backup_count": int},
+    "ai": {
+        "enabled": bool,
+        "providers": list,
+        "active_provider_index": int,
+        "rotation_enabled": bool,
+        "expertise_level": str,
+    },
     "forecasting": {"default_horizon_periods": int},
     "reports": {"default_export_format": str},
 }
+
+
+def _migrate_legacy_ai_section(data: dict[str, Any]) -> None:
+    """Rewrite a pre-milestone-7 ``ai`` section into the current provider-list shape, in place.
+
+    Before milestone 7, ``ai`` held a single ``provider``/
+    ``api_key_env_var`` pair instead of a ``providers`` list. Without
+    this step, any ``config.yaml`` written before this milestone would
+    fail :func:`validate_config_structure` on the very next startup —
+    breaking this module's own documented self-healing promise ("a
+    missing *or invalid* config is repaired, not fatal"). Detected by
+    the absence of the ``providers`` key rather than a version number,
+    since no config schema version field exists in this project; if
+    that changes later, prefer switching this check to it.
+
+    Does nothing if ``data["ai"]`` is missing entirely or already has
+    the current shape — safe to call unconditionally from
+    :func:`load_config` before validation runs.
+    """
+    ai_section = data.get("ai")
+    if not isinstance(ai_section, dict):
+        return  # missing/malformed entirely; validation will catch it
+
+    if "providers" not in ai_section:
+        legacy_provider = ai_section.get("provider")
+        legacy_api_key_env_var = ai_section.get("api_key_env_var")
+        providers = (
+            [
+                {
+                    "name": f"{legacy_provider} (migrated)",
+                    "provider_type": legacy_provider,
+                    "api_key_env_var": legacy_api_key_env_var,
+                    "model": None,
+                }
+            ]
+            if legacy_provider
+            else []
+        )
+        data["ai"] = {
+            "enabled": ai_section.get("enabled", False),
+            "providers": providers,
+            "active_provider_index": 0,
+            "rotation_enabled": False,
+            "expertise_level": "beginner",
+        }
+        _bootstrap_logger.warning(
+            "config.yaml's 'ai' section used the pre-milestone-7 single-provider "
+            "shape — migrated it to the new provider-list shape in memory. Save "
+            "settings once (e.g. via the Settings dialog) to persist this change."
+        )
+        return
+
+    # Separately: a config.yaml saved between milestones 7 and 8 has the
+    # current providers-list shape but predates 'expertise_level' —
+    # back-fill just that one key rather than routing through the
+    # legacy-migration branch above, which would incorrectly discard an
+    # already-current providers list.
+    if "expertise_level" not in ai_section:
+        ai_section["expertise_level"] = "beginner"
+        _bootstrap_logger.warning(
+            "config.yaml's 'ai' section predates milestone 8's "
+            "'expertise_level' key — defaulted it to 'beginner' in memory. "
+            "Save settings once to persist this change."
+        )
 
 
 def validate_config_structure(data: dict[str, Any]) -> None:
@@ -148,8 +246,7 @@ def validate_config_structure(data: dict[str, Any]) -> None:
         for nested_key, expected_type in nested_schema.items():
             if nested_key not in parent_value:
                 raise ConfigError(
-                    f"config.yaml key '{parent_key}.{nested_key}' is "
-                    f"missing."
+                    f"config.yaml key '{parent_key}.{nested_key}' is missing."
                 )
             if not isinstance(parent_value[nested_key], expected_type):
                 raise ConfigError(
@@ -178,7 +275,9 @@ def _write_default_config(path: Path) -> dict[str, Any]:
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         with path.open("w", encoding="utf-8") as handle:
-            yaml.safe_dump(default_data, handle, default_flow_style=False, sort_keys=False)
+            yaml.safe_dump(
+                default_data, handle, default_flow_style=False, sort_keys=False
+            )
     except OSError as exc:
         raise ConfigError(
             f"Failed to write default configuration to {path}: {exc}"
@@ -226,6 +325,7 @@ def load_config(path: Path = CONFIG_FILE_PATH) -> dict[str, Any]:
         )
         return _write_default_config(path)
 
+    _migrate_legacy_ai_section(loaded)
     validate_config_structure(loaded)
     return loaded
 
@@ -257,8 +357,10 @@ class AppConfig:
     log_max_bytes: int
     log_backup_count: int
     ai_enabled: bool
-    ai_provider: str | None
-    ai_api_key_env_var: str
+    ai_providers: list[dict[str, Any]]
+    ai_active_provider_index: int
+    ai_rotation_enabled: bool
+    ai_expertise_level: str
     plugins_enabled: bool
     plugin_search_paths: list[str]
     forecasting_default_horizon_periods: int
@@ -286,8 +388,10 @@ class AppConfig:
             log_max_bytes=data["logging"]["max_bytes"],
             log_backup_count=data["logging"]["backup_count"],
             ai_enabled=data["ai"]["enabled"],
-            ai_provider=data["ai"].get("provider"),
-            ai_api_key_env_var=data["ai"]["api_key_env_var"],
+            ai_providers=list(data["ai"]["providers"]),
+            ai_active_provider_index=data["ai"]["active_provider_index"],
+            ai_rotation_enabled=data["ai"]["rotation_enabled"],
+            ai_expertise_level=data["ai"]["expertise_level"],
             plugins_enabled=data["plugins"]["enabled"],
             plugin_search_paths=list(data["plugins"]["search_paths"]),
             forecasting_default_horizon_periods=data["forecasting"][

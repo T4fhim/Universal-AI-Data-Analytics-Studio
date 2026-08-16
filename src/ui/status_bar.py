@@ -15,7 +15,7 @@ permanent messages:
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QLabel, QMainWindow, QStatusBar
+from PySide6.QtWidgets import QLabel, QMainWindow, QProgressBar, QStatusBar
 
 from src.core.logger import get_logger
 
@@ -37,10 +37,50 @@ class ApplicationStatusBar(QStatusBar):
         self._project_label = QLabel("No project open")
         self.addPermanentWidget(self._project_label)
 
+        # Busy indicator (milestone 6): indeterminate (0/0 range) rather
+        # than a real percentage, since most background tasks wrapped by
+        # src.workers.BaseWorker (dataset reads, dashboard renders) have
+        # no natural sub-steps to report progress against — this widget
+        # exists to make "something is happening on a worker thread"
+        # visible, not to report exact completion. Retained as an
+        # instance attribute per this repo's Live Widget References
+        # convention (see the pyside6-development skill) so
+        # show_busy/hide_busy can update it without reconstructing it.
+        self._busy_indicator = QProgressBar(self)
+        self._busy_indicator.setRange(0, 0)
+        self._busy_indicator.setMaximumWidth(120)
+        self._busy_indicator.setTextVisible(False)
+        self._busy_indicator.setVisible(False)
+        self.addPermanentWidget(self._busy_indicator)
+
         self.showMessage("Ready")
         _logger.debug("Status bar constructed.")
 
-    def show_message(self, message: str, timeout_ms: int = _DEFAULT_MESSAGE_TIMEOUT_MS) -> None:
+    def show_busy(self, message: str = "Working…") -> None:
+        """Show the indeterminate busy indicator and a transient status message.
+
+        Args:
+            message: Shown via :meth:`show_message` alongside the
+                indicator, with a zero timeout (stays until
+                :meth:`hide_busy` or the next message replaces it)
+                since a busy operation's duration isn't known in
+                advance.
+        """
+        self._busy_indicator.setVisible(True)
+        self.show_message(message, timeout_ms=0)
+
+    def hide_busy(self) -> None:
+        """Hide the busy indicator.
+
+        Does not clear the transient message area — callers typically
+        follow this with their own ``show_message`` reporting the
+        operation's outcome (e.g. "Loaded dataset: ...").
+        """
+        self._busy_indicator.setVisible(False)
+
+    def show_message(
+        self, message: str, timeout_ms: int = _DEFAULT_MESSAGE_TIMEOUT_MS
+    ) -> None:
         """Show a transient message that clears after ``timeout_ms``.
 
         Args:

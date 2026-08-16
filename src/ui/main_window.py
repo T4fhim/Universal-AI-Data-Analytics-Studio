@@ -21,23 +21,29 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QFileDialog, QInputDialog, QMainWindow,
-                               QMessageBox, QWidget)
+from PySide6.QtCore import QThreadPool
+from PySide6.QtWidgets import (
+    QFileDialog,
+    QInputDialog,
+    QMainWindow,
+    QMessageBox,
+)
 
 from src.core.bootstrap import BootstrapContext
-from src.core.constants import (APP_NAME, DEFAULT_WINDOW_HEIGHT,
-                                DEFAULT_WINDOW_WIDTH)
+from src.core.constants import APP_NAME, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH
 from src.core.exceptions import ApplicationError
 from src.core.logger import get_logger
 from src.readers.reader_registry import get_reader_for_path
 from src.services.project_service import ProjectService
 from src.services.settings_service import SettingsService
-from src.services.workspace_service import (Dashboard, DashboardTile,
-                                            Visualization, WorkspaceService)
+from src.services.workspace_service import (
+    Dashboard,
+    DashboardTile,
+    Visualization,
+    WorkspaceService,
+)
 from src.ui.dialogs.about_dialog import AboutDialog
-from src.ui.dialogs.create_visualization_dialog import \
-    CreateVisualizationDialog
+from src.ui.dialogs.create_visualization_dialog import CreateVisualizationDialog
 from src.ui.dialogs.settings_dialog import SettingsDialog
 from src.ui.dock_manager import DockManager
 from src.ui.menu_bar import ApplicationMenuBar
@@ -46,6 +52,7 @@ from src.ui.theme_manager import ThemeManager
 from src.ui.toolbar import ApplicationToolBar
 from src.ui.widgets.welcome_widget import WelcomeWidget
 from src.visualization.dashboard_renderer import render_dashboard
+from src.workers import BaseWorker
 
 _logger = get_logger(__name__)
 
@@ -100,6 +107,47 @@ _TABLE_SELECTION_CANCELLED = object()
 _NO_TABLES_AVAILABLE = object()
 
 
+def _read_recorded_datasets(recorded: list[tuple[str, Path]]) -> tuple[list, list[str]]:
+    """Read every ``(name, source_path)`` pair recorded in a project, off the UI thread.
+
+    Module-level (not a ``MainWindow`` method) and touches no Qt
+    widgets or services deliberately — this is the function
+    :meth:`MainWindow._reload_project_datasets` hands to a
+    :class:`~src.workers.BaseWorker`, and everything a ``BaseWorker``
+    runs executes on a background thread where touching
+    ``self._workspace_service`` or any widget would be unsafe. Returns
+    plain data; the caller applies it to the workspace back on the UI
+    thread in :meth:`MainWindow._on_datasets_reloaded`.
+
+    Returns:
+        A ``(datasets, failures)`` tuple: successfully read
+        :class:`~src.services.workspace_service.Dataset` objects, and
+        human-readable failure strings for recorded datasets that
+        could not be reloaded (multi-table source, or a caught
+        :class:`~src.core.exceptions.ApplicationError`) — same
+        skip-with-a-warning behavior as before this milestone, just
+        computed on a worker thread instead of the UI thread.
+    """
+    datasets = []
+    failures: list[str] = []
+    for name, source_path in recorded:
+        try:
+            reader_class = get_reader_for_path(source_path)
+            available_tables = reader_class.list_tables(source_path)
+            if len(available_tables) > 1:
+                failures.append(
+                    f"{name}: has multiple tables; re-open it manually "
+                    f"via Open Dataset and select a table."
+                )
+                continue
+            datasets.append(reader_class.read(source_path))
+        except ApplicationError as exc:
+            failures.append(f"{name}: {exc}")
+            continue
+
+    return datasets, failures
+
+
 class MainWindow(QMainWindow):
     """The application's main window.
 
@@ -141,7 +189,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self._welcome_widget)
 
         self._connect_actions()
-        self._menu_bar.update_recent_projects_menu(self._project_service.get_recent_projects())
+        self._menu_bar.update_recent_projects_menu(
+            self._project_service.get_recent_projects()
+        )
 
         _logger.info("Main window constructed.")
 
@@ -155,10 +205,16 @@ class MainWindow(QMainWindow):
         self._menu_bar.action_new_project.triggered.connect(self._on_new_project)
         self._menu_bar.action_open_project.triggered.connect(self._on_open_project)
         self._menu_bar.action_open_dataset.triggered.connect(self._on_open_dataset)
-        self._menu_bar.action_create_visualization.triggered.connect(self._on_create_visualization)
-        self._menu_bar.action_create_dashboard.triggered.connect(self._on_create_dashboard)
+        self._menu_bar.action_create_visualization.triggered.connect(
+            self._on_create_visualization
+        )
+        self._menu_bar.action_create_dashboard.triggered.connect(
+            self._on_create_dashboard
+        )
         self._menu_bar.action_save_project.triggered.connect(self._on_save_project)
-        self._menu_bar.action_save_project_as.triggered.connect(self._on_save_project_as)
+        self._menu_bar.action_save_project_as.triggered.connect(
+            self._on_save_project_as
+        )
         self._menu_bar.action_settings.triggered.connect(self._on_open_settings)
         self._menu_bar.action_exit.triggered.connect(self.close)
         self._menu_bar.action_toggle_theme.triggered.connect(self._on_toggle_theme)
@@ -191,7 +247,9 @@ class MainWindow(QMainWindow):
 
         self._status_bar.set_active_project_label(project.name)
         self._status_bar.show_message(f"Opened project: {project.name}")
-        self._menu_bar.update_recent_projects_menu(self._project_service.get_recent_projects())
+        self._menu_bar.update_recent_projects_menu(
+            self._project_service.get_recent_projects()
+        )
         self._reload_project_datasets(project)
 
     def _reload_project_datasets(self, project) -> None:
@@ -208,27 +266,40 @@ class MainWindow(QMainWindow):
         was originally loaded), so any recorded dataset that turns out
         to need a table selection is skipped with a warning rather
         than guessed at.
+
+        Milestone 6: the actual per-file reading (``_read_recorded_datasets``)
+        runs on a :class:`~src.workers.BaseWorker` thread rather than
+        blocking the UI thread for however long every recorded dataset
+        takes to re-read — this was one of the two hot spots the
+        milestone plan named explicitly. The worker function only reads
+        files and returns plain data; mutating ``self._workspace_service``
+        happens back on the UI thread in :meth:`_on_datasets_reloaded`,
+        since ``WorkspaceService`` is not documented or verified as
+        thread-safe and every other consumer only ever touches it from
+        the UI thread.
         """
         recorded = self._project_service.get_recorded_dataset_paths(project)
         if not recorded:
             return
 
-        failures: list[str] = []
-        for name, source_path in recorded:
-            try:
-                reader_class = get_reader_for_path(source_path)
-                available_tables = reader_class.list_tables(source_path)
-                if len(available_tables) > 1:
-                    failures.append(
-                        f"{name}: has multiple tables; re-open it manually "
-                        f"via Open Dataset and select a table."
-                    )
-                    continue
-                dataset = reader_class.read(source_path)
-            except ApplicationError as exc:
-                failures.append(f"{name}: {exc}")
-                continue
+        self._status_bar.show_busy(f"Reloading {len(recorded)} dataset(s)…")
+        worker = BaseWorker(_read_recorded_datasets, recorded)
+        worker.signals.result.connect(self._on_datasets_reloaded)
+        worker.signals.error.connect(self._on_datasets_reload_error)
+        worker.signals.finished.connect(self._status_bar.hide_busy)
+        QThreadPool.globalInstance().start(worker)
 
+    def _on_datasets_reloaded(self, result: tuple[list, list[str]]) -> None:
+        """Apply the datasets read by :func:`_read_recorded_datasets` to the workspace.
+
+        Runs on the UI thread (connected to ``BaseWorker.signals.result``,
+        which Qt's queued-connection default delivers on the receiver's
+        thread — the main window lives on the UI thread, so this method
+        does too) so ``WorkspaceService`` mutation and dock refresh stay
+        off the worker thread.
+        """
+        datasets, failures = result
+        for dataset in datasets:
             self._workspace_service.add_dataset(dataset)
 
         self._dock_manager.refresh_dataset_list(self._workspace_service.list_datasets())
@@ -242,6 +313,20 @@ class MainWindow(QMainWindow):
                 f"dataset(s) could not be automatically reloaded:\n\n"
                 f"{failures_text}",
             )
+
+    def _on_datasets_reload_error(self, exc: Exception, traceback_text: str) -> None:
+        # _read_recorded_datasets already catches ApplicationError per
+        # dataset internally (see its own docstring) — reaching this
+        # handler means something unexpected escaped that loop
+        # entirely, not a normal per-dataset failure.
+        _logger.error(
+            "Unexpected failure reloading project datasets: %s\n%s", exc, traceback_text
+        )
+        QMessageBox.critical(
+            self,
+            "Failed to Reload Datasets",
+            f"An unexpected error occurred while reloading the project's datasets: {exc}",
+        )
 
     def _on_save_project(self) -> None:
         project = self._project_service.get_active_project()
@@ -290,7 +375,9 @@ class MainWindow(QMainWindow):
             return
 
         self._status_bar.show_message(f"Saved project: {project.name}")
-        self._menu_bar.update_recent_projects_menu(self._project_service.get_recent_projects())
+        self._menu_bar.update_recent_projects_menu(
+            self._project_service.get_recent_projects()
+        )
 
     # -- Dataset actions --------------------------------------------------------
 
@@ -330,13 +417,23 @@ class MainWindow(QMainWindow):
             _logger.info("No tables found in %s; nothing to load.", file_path_str)
             return
 
-        try:
-            dataset = reader_class.read(dataset_path, table_name=table_name)
-        except ApplicationError as exc:
-            QMessageBox.critical(self, "Failed to Open Dataset", str(exc))
-            _logger.warning("Failed to open dataset from %s: %s", file_path_str, exc)
-            return
+        # Milestone 6: the actual file read — the other named hot spot in the
+        # milestone plan alongside project reload — runs on a BaseWorker
+        # thread. Everything above this point (dialogs, list_tables) must
+        # stay on the UI thread since it drives Qt dialogs directly; only
+        # the read() call itself, which can genuinely take a while for a
+        # large file, moves off it.
+        self._status_bar.show_busy(f"Loading {dataset_path.name}…")
+        worker = BaseWorker(reader_class.read, dataset_path, table_name=table_name)
+        worker.signals.result.connect(self._on_dataset_read)
+        worker.signals.error.connect(
+            lambda exc, tb: self._on_dataset_read_error(file_path_str, exc, tb)
+        )
+        worker.signals.finished.connect(self._status_bar.hide_busy)
+        QThreadPool.globalInstance().start(worker)
 
+    def _on_dataset_read(self, dataset) -> None:
+        """Apply a successfully read dataset to the workspace (UI thread)."""
         self._workspace_service.add_dataset(dataset)
         self._workspace_service.set_active_dataset(dataset.dataset_id)
         self._dock_manager.refresh_dataset_list(self._workspace_service.list_datasets())
@@ -373,6 +470,17 @@ class MainWindow(QMainWindow):
                 f"'{dataset.name}' was loaded successfully, but the "
                 f"following was noted while reading it:\n\n{warnings_text}",
             )
+
+    def _on_dataset_read_error(
+        self, file_path_str: str, exc: Exception, traceback_text: str
+    ) -> None:
+        # Mirrors the try/except this replaced: reader_class.read()
+        # normally raises ApplicationError for expected failure modes
+        # (malformed file, unsupported encoding); BaseWorker forwards
+        # whatever it caught unchanged, so this handler treats it the
+        # same as the old synchronous except block did.
+        QMessageBox.critical(self, "Failed to Open Dataset", str(exc))
+        _logger.warning("Failed to open dataset from %s: %s", file_path_str, exc)
 
     def _on_create_visualization(self) -> None:
         active_dataset = self._workspace_service.get_active_dataset()
@@ -437,18 +545,38 @@ class MainWindow(QMainWindow):
 
         try:
             self._workspace_service.add_dashboard(dashboard)
-            resolved = self._workspace_service.get_dashboard_tiles(dashboard.dashboard_id)
-            combined_figure = render_dashboard(dashboard, resolved)
+            resolved = self._workspace_service.get_dashboard_tiles(
+                dashboard.dashboard_id
+            )
         except ApplicationError as exc:
             QMessageBox.critical(self, "Failed to Create Dashboard", str(exc))
             _logger.warning("Dashboard creation failed: %s", exc)
             return
 
+        # Milestone 6: render_dashboard's Plotly-figure assembly is the
+        # third named hot spot in the milestone plan (dataset reads,
+        # project reload, dashboard rendering) — offloaded the same way,
+        # since combining several figures into one grid is real work that
+        # scales with tile count.
+        self._status_bar.show_busy("Building dashboard…")
+        worker = BaseWorker(render_dashboard, dashboard, resolved)
+        worker.signals.result.connect(
+            lambda figure: self._on_dashboard_rendered(figure, len(tiles))
+        )
+        worker.signals.error.connect(self._on_dashboard_render_error)
+        worker.signals.finished.connect(self._status_bar.hide_busy)
+        QThreadPool.globalInstance().start(worker)
+
+    def _on_dashboard_rendered(self, combined_figure, tile_count: int) -> None:
         self._dock_manager.display_chart(combined_figure)
         self._status_bar.show_message(
-            f"Created dashboard with {len(tiles)} visualization(s)."
+            f"Created dashboard with {tile_count} visualization(s)."
         )
-        _logger.info("Dashboard created via UI: %d tile(s).", len(tiles))
+        _logger.info("Dashboard created via UI: %d tile(s).", tile_count)
+
+    def _on_dashboard_render_error(self, exc: Exception, traceback_text: str) -> None:
+        _logger.error("Dashboard rendering failed: %s\n%s", exc, traceback_text)
+        QMessageBox.critical(self, "Failed to Create Dashboard", str(exc))
 
     def _resolve_table_name(self, reader_class, dataset_path: Path):
         """Determine which table to read, prompting the user if more than one exists.
@@ -556,7 +684,7 @@ class MainWindow(QMainWindow):
 
     # -- Window lifecycle --------------------------------------------------------
 
-    def closeEvent(self, event) -> None:  # noqa: N802 — Qt's own method naming
+    def closeEvent(self, event) -> None:
         """Detach the logging-panel handler before the window closes.
 
         Without this, the root logger retains a handler wrapping this

@@ -111,18 +111,24 @@ def active_dataset(workspace: WorkspaceService) -> Dataset:
 def make_provider(
     monkeypatch: pytest.MonkeyPatch, turns: list[LLMTurn]
 ) -> FakeLLMProvider:
-    """Patch src.ai.assistant_service.create_provider to hand back a scripted FakeLLMProvider.
+    """Patch src.ai.provider_rotation.create_provider to hand back a scripted FakeLLMProvider.
 
-    Patching at this module boundary (not touching AssistantService's
-    internals) means AssistantService.__init__'s real
-    ``create_provider(provider_name, api_key)`` call site is exercised
-    unchanged; only what it resolves to is swapped, which is exactly
-    the seam BaseLLMProvider exists to provide.
+    Patched at ``src.ai.provider_rotation`` (milestone 7), not
+    ``src.ai.assistant_service`` — since that milestone,
+    ``AssistantService`` no longer calls ``create_provider`` directly;
+    it goes through ``ProviderRotationService.current_provider()``,
+    which is where the real ``create_provider(provider_name, api_key,
+    model=None)`` call site now lives. Patching there keeps this fixture
+    exercising the real construction path unchanged, only swapping what
+    it resolves to — the same seam BaseLLMProvider always provided, just
+    one module further down the call chain than before rotation existed.
     """
-    import src.ai.assistant_service as assistant_service_module
+    import src.ai.provider_rotation as provider_rotation_module
 
     fake = FakeLLMProvider(turns)
     monkeypatch.setattr(
-        assistant_service_module, "create_provider", lambda provider_name, api_key: fake
+        provider_rotation_module,
+        "create_provider",
+        lambda provider_name, api_key, model=None: fake,
     )
     return fake

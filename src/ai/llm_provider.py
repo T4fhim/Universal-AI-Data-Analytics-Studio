@@ -261,7 +261,9 @@ class GeminiProvider(BaseLLMProvider):
         return LLMTurn(text=text, tool_calls=tool_calls), response
 
     def append_user_message(self, history: list[Any], text: str) -> list[Any]:
-        return history + [self._types.Content(role="user", parts=[self._types.Part(text=text)])]
+        return history + [
+            self._types.Content(role="user", parts=[self._types.Part(text=text)])
+        ]
 
     def append_assistant_turn(self, history: list[Any], raw_response: Any) -> list[Any]:
         return history + [raw_response.candidates[0].content]
@@ -306,11 +308,15 @@ class GroqProvider(BaseLLMProvider):
     def __init__(self, api_key: str, model: str = "openai/gpt-oss-120b") -> None:
         import openai
 
-        self._client = openai.OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1", max_retries=1)
+        self._client = openai.OpenAI(
+            api_key=api_key, base_url="https://api.groq.com/openai/v1", max_retries=1
+        )
         self._model = model
         self._openai = openai
 
-    def _build_tool_schemas(self, tool_schemas: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _build_tool_schemas(
+        self, tool_schemas: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         return [
             {
                 "type": "function",
@@ -355,7 +361,9 @@ class GroqProvider(BaseLLMProvider):
                         f"'{tc.function.name}': {exc}"
                     ) from exc
                 tool_calls.append(
-                    PendingToolCall(call_id=tc.id, name=tc.function.name, arguments=arguments)
+                    PendingToolCall(
+                        call_id=tc.id, name=tc.function.name, arguments=arguments
+                    )
                 )
 
         return LLMTurn(text=text, tool_calls=tool_calls), response
@@ -371,7 +379,10 @@ class GroqProvider(BaseLLMProvider):
                 {
                     "id": tc.id,
                     "type": "function",
-                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    },
                 }
                 for tc in message.tool_calls
             ]
@@ -387,22 +398,175 @@ class GroqProvider(BaseLLMProvider):
         return history + tool_messages
 
 
-def create_provider(provider_name: str, api_key: str) -> BaseLLMProvider:
+class OllamaProvider(BaseLLMProvider):
+    """Wraps a local Ollama server's OpenAI-adjacent ``/api/chat`` endpoint.
+
+    Delivers "Local-First AI" (milestone 7): no API key, no outbound
+    network call beyond ``localhost`` — the model runs entirely on the
+    user's machine via a locally running ``ollama serve``. Uses
+    ``requests`` directly (already a declared project dependency)
+    rather than pulling in a dedicated Ollama SDK, since the raw HTTP
+    surface is small and stable
+    (https://github.com/ollama/ollama/blob/main/docs/api.md).
+
+    Confirmed against Ollama's documented ``/api/chat`` shape before
+    writing this class: a request takes ``model``/``messages``/
+    ``tools``/``stream``; ``tools`` uses the same
+    ``{"type": "function", "function": {name, description,
+    parameters}}`` shape OpenAI (and this project's ``GroqProvider``)
+    already use, so :meth:`_build_tool_schemas` is intentionally
+    identical in shape to ``GroqProvider``'s. The one confirmed
+    difference: a response's ``message.tool_calls[].function.arguments``
+    arrives as an already-parsed object, not a JSON string the way
+    Groq's does — handled by accepting either shape rather than
+    assuming one, since this varies across Ollama server versions.
+    """
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str = "llama3.1",
+        base_url: str = "http://localhost:11434",
+    ) -> None:
+        # api_key accepted (and ignored) only so create_provider() can
+        # construct every provider through one uniform call signature
+        # without a provider-specific branch — Ollama itself needs no
+        # credential since it only ever talks to localhost.
+        del api_key
+        self._model = model
+        self._base_url = base_url.rstrip("/")
+
+    def _build_tool_schemas(
+        self, tool_schemas: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": schema["name"],
+                    "description": schema["description"],
+                    "parameters": schema["input_schema"],
+                },
+            }
+            for schema in tool_schemas
+        ]
+
+    def send(
+        self,
+        history: list[Any],
+        system_prompt: str,
+        tool_schemas: list[dict[str, Any]],
+    ) -> tuple[LLMTurn, Any]:
+        import requests
+
+        messages = [{"role": "system", "content": system_prompt}] + history
+        try:
+            response = requests.post(
+                f"{self._base_url}/api/chat",
+                json={
+                    "model": self._model,
+                    "messages": messages,
+                    "tools": self._build_tool_schemas(tool_schemas)
+                    if tool_schemas
+                    else None,
+                    "stream": False,
+                },
+                timeout=120,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise ServiceError(
+                f"Ollama request failed (is 'ollama serve' running at "
+                f"{self._base_url}?): {exc}"
+            ) from exc
+
+        payload = response.json()
+        message = payload.get("message", {})
+        text = message.get("content") or ""
+
+        tool_calls = []
+        for i, tc in enumerate(message.get("tool_calls") or []):
+            function = tc.get("function", {})
+            raw_arguments = function.get("arguments", {})
+            if isinstance(raw_arguments, str):
+                import json
+
+                try:
+                    arguments = json.loads(raw_arguments)
+                except json.JSONDecodeError as exc:
+                    raise ServiceError(
+                        f"Ollama returned malformed tool arguments for "
+                        f"'{function.get('name')}': {exc}"
+                    ) from exc
+            else:
+                arguments = dict(raw_arguments or {})
+            # Ollama's /api/chat does not assign tool_calls an id the
+            # way Anthropic/Groq do — synthesize a stable one from
+            # position within this turn, since PendingToolCall.call_id
+            # must be non-empty for append_tool_results below to pair
+            # results back up correctly.
+            tool_calls.append(
+                PendingToolCall(
+                    call_id=tc.get("id") or f"ollama-call-{i}",
+                    name=function.get("name", ""),
+                    arguments=arguments,
+                )
+            )
+
+        return LLMTurn(text=text, tool_calls=tool_calls), payload
+
+    def append_user_message(self, history: list[Any], text: str) -> list[Any]:
+        return history + [{"role": "user", "content": text}]
+
+    def append_assistant_turn(self, history: list[Any], raw_response: Any) -> list[Any]:
+        message = raw_response.get("message", {})
+        entry: dict[str, Any] = {
+            "role": "assistant",
+            "content": message.get("content") or "",
+        }
+        if message.get("tool_calls"):
+            entry["tool_calls"] = message["tool_calls"]
+        return history + [entry]
+
+    def append_tool_results(
+        self, history: list[Any], results: list[tuple[PendingToolCall, str]]
+    ) -> list[Any]:
+        tool_messages = [
+            {"role": "tool", "content": result_text} for _call, result_text in results
+        ]
+        return history + tool_messages
+
+
+def create_provider(
+    provider_name: str, api_key: str, model: str | None = None
+) -> BaseLLMProvider:
     """Construct a provider by name.
 
     Args:
-        provider_name: ``"anthropic"``, ``"gemini"``, or ``"groq"``.
-        api_key: The provider's API key.
+        provider_name: ``"anthropic"``, ``"gemini"``, ``"groq"``, or
+            ``"ollama"``.
+        api_key: The provider's API key. Ignored for ``"ollama"``,
+            which needs none.
+        model: Optional model override, passed through to the
+            provider's constructor. ``None`` uses that provider
+            class's own default (see each class's ``__init__``).
 
     Raises:
         ServiceError: If ``provider_name`` is not recognized.
     """
+    kwargs: dict[str, Any] = {"api_key": api_key}
+    if model is not None:
+        kwargs["model"] = model
+
     if provider_name == "anthropic":
-        return AnthropicProvider(api_key=api_key)
+        return AnthropicProvider(**kwargs)
     if provider_name == "gemini":
-        return GeminiProvider(api_key=api_key)
+        return GeminiProvider(**kwargs)
     if provider_name == "groq":
-        return GroqProvider(api_key=api_key)
+        return GroqProvider(**kwargs)
+    if provider_name == "ollama":
+        return OllamaProvider(**kwargs)
     raise ServiceError(
-        f"Unknown provider: {provider_name!r}. Must be 'anthropic', 'gemini', or 'groq'."
+        f"Unknown provider: {provider_name!r}. Must be 'anthropic', 'gemini', "
+        f"'groq', or 'ollama'."
     )

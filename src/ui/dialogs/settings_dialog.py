@@ -22,24 +22,47 @@ close button:
   restoring the settings service's in-memory state to whatever is
   currently on disk — which is exactly what "Cancel" should mean.
 
-This milestone exposes only the settings that already exist in
-``config.yaml``'s schema (theme, autosave) as editable controls.
-AI/plugin/forecast/report settings are present in the config schema
-(see :func:`src.core.config._default_config_dict`) but have no UI here
-yet, since building controls for them without the features they
-configure existing yet would be UI for behavior that doesn't exist.
+Through milestone 6 this dialog exposed only theme/autosave. Milestone
+7 adds a second tab covering ``ai.*`` — the first UI surface the AI
+layer gets at all (the full chat panel is milestone 10) — since
+provider-agnostic config + Groq multi-key rotation are meaningless to
+a user with no way to enter provider profiles or API key environment
+variable names. Plugin/forecast/report settings still have no UI here
+yet, for the same "no controls for features that don't exist yet"
+reason the milestone-6 docstring above originally gave for AI too.
 """
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox,
-                               QFormLayout, QSpinBox, QWidget)
+from typing import Any
+
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QHBoxLayout,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from src.core.constants import AVAILABLE_THEMES
+from src.core.expertise_level import ExpertiseLevel
 from src.core.logger import get_logger
 from src.services.settings_service import SettingsService
 
 _logger = get_logger(__name__)
+
+_PROVIDER_TYPES = ("groq", "anthropic", "gemini", "ollama")
 
 
 class SettingsDialog(QDialog):
@@ -56,30 +79,52 @@ class SettingsDialog(QDialog):
         parent: Parent widget, typically the main window.
     """
 
-    def __init__(self, settings_service: SettingsService, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, settings_service: SettingsService, parent: QWidget | None = None
+    ) -> None:
         super().__init__(parent)
         self._settings_service = settings_service
         self.setWindowTitle("Settings")
         self.setModal(True)
-        self.setMinimumWidth(360)
+        self.setMinimumWidth(420)
 
-        layout = QFormLayout(self)
+        outer_layout = QVBoxLayout(self)
 
-        self._theme_combo = QComboBox(self)
+        tabs = QTabWidget(self)
+        tabs.addTab(self._build_general_tab(), "General")
+        tabs.addTab(self._build_ai_tab(), "AI")
+        outer_layout.addWidget(tabs)
+
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel,
+            self,
+        )
+        button_box.accepted.connect(self._on_save)
+        button_box.rejected.connect(self._on_cancel)
+        outer_layout.addWidget(button_box)
+
+        _logger.debug("Settings dialog constructed.")
+
+    def _build_general_tab(self) -> QWidget:
+        tab = QWidget(self)
+        layout = QFormLayout(tab)
+
+        self._theme_combo = QComboBox(tab)
         self._theme_combo.addItems(AVAILABLE_THEMES)
         current_theme = self._settings_service.get("theme", default=AVAILABLE_THEMES[0])
         self._theme_combo.setCurrentText(current_theme)
         self._theme_combo.currentTextChanged.connect(self._on_theme_changed)
         layout.addRow("Theme:", self._theme_combo)
 
-        self._autosave_checkbox = QCheckBox(self)
+        self._autosave_checkbox = QCheckBox(tab)
         self._autosave_checkbox.setChecked(
             self._settings_service.get("autosave", "enabled", default=True)
         )
         self._autosave_checkbox.toggled.connect(self._on_autosave_enabled_changed)
         layout.addRow("Enable autosave:", self._autosave_checkbox)
 
-        self._autosave_interval_spinbox = QSpinBox(self)
+        self._autosave_interval_spinbox = QSpinBox(tab)
         self._autosave_interval_spinbox.setRange(1, 120)
         self._autosave_interval_spinbox.setSuffix(" minutes")
         self._autosave_interval_spinbox.setValue(
@@ -90,15 +135,136 @@ class SettingsDialog(QDialog):
         )
         layout.addRow("Autosave interval:", self._autosave_interval_spinbox)
 
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel,
-            self,
-        )
-        button_box.accepted.connect(self._on_save)
-        button_box.rejected.connect(self._on_cancel)
-        layout.addRow(button_box)
+        return tab
 
-        _logger.debug("Settings dialog constructed.")
+    def _build_ai_tab(self) -> QWidget:
+        """Provider profiles (milestone 7): add/remove/reorder, rotation toggle.
+
+        Reads/writes ``ai.providers`` as one list value via
+        ``SettingsService.get``/``set`` rather than per-field paths —
+        the list itself is the unit of change (adding, removing, or
+        reordering a profile all replace the whole list), unlike
+        ``theme``/``autosave.*`` above, which are genuinely independent
+        scalars.
+        """
+        tab = QWidget(self)
+        layout = QVBoxLayout(tab)
+
+        form = QFormLayout()
+        self._ai_enabled_checkbox = QCheckBox(tab)
+        self._ai_enabled_checkbox.setChecked(
+            self._settings_service.get("ai", "enabled", default=False)
+        )
+        self._ai_enabled_checkbox.toggled.connect(
+            lambda checked: self._settings_service.set("ai", "enabled", value=checked)
+        )
+        form.addRow("Enable AI assistant:", self._ai_enabled_checkbox)
+
+        self._rotation_checkbox = QCheckBox(tab)
+        self._rotation_checkbox.setChecked(
+            self._settings_service.get("ai", "rotation_enabled", default=False)
+        )
+        self._rotation_checkbox.setToolTip(
+            "When enabled, a rate-limited provider automatically fails over "
+            "to the next profile in the list below (e.g. several Groq keys)."
+        )
+        self._rotation_checkbox.toggled.connect(
+            lambda checked: self._settings_service.set(
+                "ai", "rotation_enabled", value=checked
+            )
+        )
+        form.addRow("Enable key/provider rotation:", self._rotation_checkbox)
+
+        # Milestone 8: drives the AI system prompt's register/depth (see
+        # assistant_service._build_system_prompt) — displayed as the
+        # enum's readable member names, stored as its lowercase value
+        # (ExpertiseLevel subclasses str for exactly this: no manual
+        # value<->label conversion needed beyond this cosmetic mapping).
+        self._expertise_combo = QComboBox(tab)
+        for level in ExpertiseLevel:
+            self._expertise_combo.addItem(
+                level.name.replace("_", " ").title(), level.value
+            )
+        current_level = self._settings_service.get(
+            "ai", "expertise_level", default=ExpertiseLevel.BEGINNER.value
+        )
+        index = self._expertise_combo.findData(current_level)
+        if index >= 0:
+            self._expertise_combo.setCurrentIndex(index)
+        self._expertise_combo.currentIndexChanged.connect(
+            self._on_expertise_level_changed
+        )
+        form.addRow("Explain results for:", self._expertise_combo)
+
+        layout.addLayout(form)
+
+        self._provider_list = QListWidget(tab)
+        self._provider_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        for profile in self._settings_service.get("ai", "providers", default=[]):
+            self._provider_list.addItem(_provider_list_item(profile))
+        layout.addWidget(self._provider_list)
+
+        buttons_row = QHBoxLayout()
+        add_button = QPushButton("Add…", tab)
+        add_button.clicked.connect(self._on_add_provider)
+        remove_button = QPushButton("Remove", tab)
+        remove_button.clicked.connect(self._on_remove_provider)
+        move_up_button = QPushButton("Move Up", tab)
+        move_up_button.clicked.connect(lambda: self._on_move_provider(-1))
+        move_down_button = QPushButton("Move Down", tab)
+        move_down_button.clicked.connect(lambda: self._on_move_provider(1))
+        for button in (add_button, remove_button, move_up_button, move_down_button):
+            buttons_row.addWidget(button)
+        layout.addLayout(buttons_row)
+
+        return tab
+
+    # -- AI tab: provider profile list management --------------------------
+
+    def _current_providers(self) -> list[dict[str, Any]]:
+        return list(self._settings_service.get("ai", "providers", default=[]))
+
+    def _write_providers(self, providers: list[dict[str, Any]]) -> None:
+        self._settings_service.set("ai", "providers", value=providers)
+        self._provider_list.clear()
+        for profile in providers:
+            self._provider_list.addItem(_provider_list_item(profile))
+
+    def _on_add_provider(self) -> None:
+        dialog = _ProviderProfileDialog(self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        providers = self._current_providers()
+        providers.append(dialog.get_profile())
+        self._write_providers(providers)
+
+    def _on_remove_provider(self) -> None:
+        row = self._provider_list.currentRow()
+        if row < 0:
+            QMessageBox.information(
+                self, "No Profile Selected", "Select a provider profile to remove."
+            )
+            return
+        providers = self._current_providers()
+        del providers[row]
+        self._write_providers(providers)
+
+    def _on_move_provider(self, delta: int) -> None:
+        row = self._provider_list.currentRow()
+        new_row = row + delta
+        providers = self._current_providers()
+        if row < 0 or not (0 <= new_row < len(providers)):
+            return  # nothing selected, or already at the list's edge
+        providers[row], providers[new_row] = providers[new_row], providers[row]
+        self._write_providers(providers)
+        self._provider_list.setCurrentRow(new_row)
+
+    def _on_expertise_level_changed(self, index: int) -> None:
+        self._settings_service.set(
+            "ai", "expertise_level", value=self._expertise_combo.itemData(index)
+        )
 
     def _on_theme_changed(self, theme_name: str) -> None:
         self._settings_service.set("theme", value=theme_name)
@@ -118,3 +284,85 @@ class SettingsDialog(QDialog):
         self._settings_service.reload()
         _logger.info("Settings dialog cancelled; in-memory changes discarded.")
         self.reject()
+
+
+def _provider_list_item(profile: dict[str, Any]) -> QListWidgetItem:
+    """Build one QListWidgetItem's display text for a provider profile dict.
+
+    Module-level (not a method) since it has no dependency on
+    ``SettingsDialog`` state — used by both the initial population loop
+    and :meth:`SettingsDialog._write_providers`, and keeping it a plain
+    function makes that shared formatting rule visible at a glance
+    rather than buried as another private method among the dialog's
+    many event handlers.
+    """
+    model_suffix = f" ({profile['model']})" if profile.get("model") else ""
+    return QListWidgetItem(
+        f"{profile['name']} — {profile['provider_type']}{model_suffix}"
+    )
+
+
+class _ProviderProfileDialog(QDialog):
+    """A small modal form for entering one AI provider profile.
+
+    Private to this module (leading underscore, not exported) —
+    :class:`SettingsDialog` is the only intended caller; this exists
+    purely to keep :meth:`SettingsDialog._build_ai_tab` from growing a
+    second, more complex form inline where the provider list buttons
+    already are.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Add AI Provider Profile")
+        self.setModal(True)
+
+        layout = QFormLayout(self)
+
+        self._name_edit = QLineEdit(self)
+        self._name_edit.setPlaceholderText("e.g. Groq key 1")
+        layout.addRow("Name:", self._name_edit)
+
+        self._provider_type_combo = QComboBox(self)
+        self._provider_type_combo.addItems(_PROVIDER_TYPES)
+        layout.addRow("Provider:", self._provider_type_combo)
+
+        self._api_key_env_var_edit = QLineEdit(self)
+        self._api_key_env_var_edit.setPlaceholderText(
+            "e.g. GROQ_API_KEY_1 (not needed for ollama)"
+        )
+        layout.addRow("API key env var:", self._api_key_env_var_edit)
+
+        self._model_edit = QLineEdit(self)
+        self._model_edit.setPlaceholderText("Leave blank for provider default")
+        layout.addRow("Model override:", self._model_edit)
+
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+            self,
+        )
+        button_box.accepted.connect(self._on_accept)
+        button_box.rejected.connect(self.reject)
+        layout.addRow(button_box)
+
+    def _on_accept(self) -> None:
+        if not self._name_edit.text().strip():
+            QMessageBox.warning(
+                self, "Name Required", "Give this provider profile a name."
+            )
+            return
+        self.accept()
+
+    def get_profile(self) -> dict[str, Any]:
+        """Return the entered profile as an ``ai.providers`` list entry.
+
+        Only valid to call after :meth:`exec` returned
+        ``QDialog.DialogCode.Accepted`` — :meth:`_on_accept` is what
+        enforces the one required field (name) before allowing that.
+        """
+        return {
+            "name": self._name_edit.text().strip(),
+            "provider_type": self._provider_type_combo.currentText(),
+            "api_key_env_var": self._api_key_env_var_edit.text().strip() or None,
+            "model": self._model_edit.text().strip() or None,
+        }
