@@ -36,7 +36,12 @@ from src.core.exceptions import ApplicationError, ServiceError
 from src.core.logger import get_logger
 from src.plugins.plugin_manager import PluginManager
 from src.readers.reader_registry import get_reader_for_path
+from src.services.analysis_orchestrator_service import (
+    AnalysisOrchestratorService,
+    PipelineStage,
+)
 from src.services.project_service import ProjectService
+from src.services.report_service import ReportService
 from src.services.settings_service import SettingsService
 from src.services.workspace_service import (
     Dashboard,
@@ -46,6 +51,7 @@ from src.services.workspace_service import (
 )
 from src.ui.dialogs.about_dialog import AboutDialog
 from src.ui.dialogs.create_visualization_dialog import CreateVisualizationDialog
+from src.ui.dialogs.generate_report_dialog import GenerateReportDialog
 from src.ui.dialogs.settings_dialog import SettingsDialog
 from src.ui.dock_manager import DockManager
 from src.ui.menu_bar import ApplicationMenuBar
@@ -172,6 +178,10 @@ class MainWindow(QMainWindow):
         self._project_service = context.container.resolve(ProjectService)
         self._workspace_service = context.container.resolve(WorkspaceService)
         self._plugin_manager = context.container.resolve(PluginManager)
+        self._orchestrator_service = context.container.resolve(
+            AnalysisOrchestratorService
+        )
+        self._report_service = context.container.resolve(ReportService)
         # Constructed lazily on first chat message, not here — building
         # it eagerly would mean every window construction (including
         # ones where the user never opens the AI panel) pays the cost
@@ -220,6 +230,9 @@ class MainWindow(QMainWindow):
         )
         self._menu_bar.action_create_dashboard.triggered.connect(
             self._on_create_dashboard
+        )
+        self._menu_bar.action_generate_report.triggered.connect(
+            self._on_generate_report
         )
         self._menu_bar.action_save_project.triggered.connect(self._on_save_project)
         self._menu_bar.action_save_project_as.triggered.connect(
@@ -607,6 +620,58 @@ class MainWindow(QMainWindow):
         _logger.error("Dashboard rendering failed: %s\n%s", exc, traceback_text)
         self._dock_manager.append_console_message(f"⚠ Dashboard creation failed: {exc}")
         QMessageBox.critical(self, "Failed to Create Dashboard", str(exc))
+
+    def _on_generate_report(self) -> None:
+        active_dataset = self._workspace_service.get_active_dataset()
+        if active_dataset is None:
+            QMessageBox.information(
+                self,
+                "No Active Dataset",
+                "Open or select a dataset before generating a report.",
+            )
+            return
+
+        completed_stages = self._orchestrator_service.get_log(
+            active_dataset.dataset_id
+        ).completed_stages()
+        available_stages = [
+            stage for stage in PipelineStage if stage in completed_stages
+        ]
+
+        dialog = GenerateReportDialog(active_dataset.name, available_stages, self)
+        if dialog.exec() != GenerateReportDialog.DialogCode.Accepted:
+            return
+
+        options = dialog.get_result()
+
+        # Milestone 6: report generation rasterizes every chart via
+        # kaleido and writes a real file — exactly the kind of
+        # operation that must not block the UI thread, matching how
+        # _on_create_dashboard above offloads render_dashboard.
+        self._status_bar.show_busy("Generating report…")
+        worker = BaseWorker(
+            self._report_service.generate_report,
+            active_dataset.dataset_id,
+            options["output_path"],
+            options["report_format"],
+            options["expertise_level"],
+            title=options["title"],
+            included_stages=options["included_stages"],
+        )
+        worker.signals.result.connect(self._on_report_generated)
+        worker.signals.error.connect(self._on_report_generation_error)
+        worker.signals.finished.connect(self._status_bar.hide_busy)
+        QThreadPool.globalInstance().start(worker)
+
+    def _on_report_generated(self, output_path: Path) -> None:
+        self._status_bar.show_message(f"Report saved to {output_path}")
+        self._dock_manager.append_console_message(f"Generated report: {output_path}")
+        _logger.info("Report generated via UI: %s", output_path)
+
+    def _on_report_generation_error(self, exc: Exception, traceback_text: str) -> None:
+        _logger.error("Report generation failed: %s\n%s", exc, traceback_text)
+        self._dock_manager.append_console_message(f"⚠ Report generation failed: {exc}")
+        QMessageBox.critical(self, "Failed to Generate Report", str(exc))
 
     def _resolve_table_name(self, reader_class, dataset_path: Path):
         """Determine which table to read, prompting the user if more than one exists.

@@ -20,6 +20,7 @@ from src.core.config import AppConfig, load_config
 from src.plugins.plugin_manager import PluginManager
 from src.services.analysis_orchestrator_service import AnalysisOrchestratorService
 from src.services.project_service import ProjectService
+from src.services.report_service import ReportService
 from src.services.settings_service import SettingsService
 from src.services.workspace_service import WorkspaceService
 
@@ -68,6 +69,12 @@ def test_bootstrap_registers_all_milestone_services(
     assert isinstance(context.container.resolve(PluginManager), PluginManager)
     assert context.container.resolve(PluginManager) is context.container.resolve(
         PluginManager
+    )
+
+    assert context.container.is_registered(ReportService)
+    assert isinstance(context.container.resolve(ReportService), ReportService)
+    assert context.container.resolve(ReportService) is context.container.resolve(
+        ReportService
     )
 
 

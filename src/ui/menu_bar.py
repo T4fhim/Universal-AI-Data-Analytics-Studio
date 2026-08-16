@@ -139,6 +139,15 @@ class ApplicationMenuBar(QMenuBar):
         self.action_create_dashboard = QAction("Create &Dashboard", parent_window)
         analysis_menu.addAction(self.action_create_dashboard)
 
+        analysis_menu.addSeparator()
+
+        # Milestone 13: replays the active dataset's AnalysisLog into a
+        # PDF/HTML/Word/Excel document — see
+        # src.services.report_service.ReportService and
+        # src.ui.dialogs.generate_report_dialog.GenerateReportDialog.
+        self.action_generate_report = QAction("&Generate Report...", parent_window)
+        analysis_menu.addAction(self.action_generate_report)
+
     def _build_help_menu(self, parent_window: QMainWindow) -> None:
         help_menu = self.addMenu("&Help")
 
