@@ -15,6 +15,9 @@ known_first_party = ["src"]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-ra"
+markers = [
+    "webengine: constructs a real QWebEngineView and waits for a page load. Offscreen QWebEngineView can hang or fail to initialize (plan risk R6) -- kept as the one guarded smoke test per chart-related module rather than the default for every assertion.",
+]
 
 [tool.mypy]
 python_version = "3.13"

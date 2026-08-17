@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<!--
+  Static chart-hosting shell for src/ui/widgets/chart_view.py.
+
+  This file is loaded exactly once per ChartView (see web_assets.py for why
+  it -- and its plotly.min.js/chart_bridge.js neighbours -- are staged into a
+  single process-lifetime temp directory rather than served straight out of
+  resources/web/). Every subsequent figure render or theme change reuses the
+  already-loaded page via renderFigure()/relayout() (chart_bridge.js), pushed
+  in through QWebEngineView.page().runJavaScript() from Python. No new HTML
+  file and no page reload happens after the first load -- that is the fix
+  for the milestone-16 temp-file leak this page's predecessor (a fresh
+  ~4.7 MB HTML file written per chart tab, never deleted) caused.
+-->
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>chart</title>
+  <style>
+    html, body, #chart {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      /* Matches ThemeTokens.surface_1 in spirit (the exact colour arrives
+         via renderFigure()'s layout.paper_bgcolor once Plotly draws) --
+         this is only the flash-of-white guard before the first render. */
+      background: #1e1e1e;
+    }
+  </style>
+  <script src="plotly.min.js"></script>
+  <!-- qwebchannel.js is a built-in Qt resource, not a file on disk -- Qt
+       WebEngine registers the qrc:// scheme for it automatically whenever
+       QtWebChannel is linked, regardless of the page's own origin (file://
+       here). This is the documented way to reach it from a plain HTML page:
+       https://doc.qt.io/qt-6/qtwebchannel-javascript.html -->
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+</head>
+<body>
+  <div id="chart"></div>
+  <script src="chart_bridge.js"></script>
+</body>
+</html>

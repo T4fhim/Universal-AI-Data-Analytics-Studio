@@ -25,6 +25,7 @@ output logger.py already provides.
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QDateTime, Qt
 from PySide6.QtWidgets import (
@@ -40,6 +41,9 @@ from PySide6.QtWidgets import (
 from src.core.logger import get_logger
 from src.ui.widgets.chart_view import ChartView
 from src.ui.widgets.chat_panel import ChatPanel
+
+if TYPE_CHECKING:
+    pass
 
 _logger = get_logger(__name__)
 
@@ -81,6 +85,13 @@ class DockManager:
 
     def __init__(self, parent_window: QMainWindow) -> None:
         self._parent_window = parent_window
+        # Set by attach_theme_manager() -- constructed after this class, by
+        # src/core/app.py, the same reason main_window.py's own theme
+        # manager reference is attached post-construction rather than
+        # passed into __init__ (see MainWindow.attach_theme_manager's
+        # docstring). None means "no theme applied yet"; display_chart()
+        # falls back to DARK_TOKENS in that case rather than failing.
+        self._theme_manager: ThemeManager | None = None
 
         self.dock_project_explorer = self._build_project_explorer_dock()
         self.dock_dataset_explorer = self._build_dataset_explorer_dock()
@@ -324,12 +335,42 @@ class DockManager:
                 it for a more useful tab label.
         """
         chart_view = ChartView(self._chart_tabs)
-        chart_view.display_figure(figure)
+        tokens = (
+            self._theme_manager.current_tokens()
+            if self._theme_manager is not None
+            else None
+        ) or DARK_TOKENS
+        chart_view.display_figure(figure, tokens)
         tab_label = name or f"Chart {self._chart_tabs.count() + 1}"
         index = self._chart_tabs.addTab(chart_view, tab_label)
         self._chart_tabs.setCurrentIndex(index)
         self.dock_chart.raise_()
         self.dock_chart.show()
+
+    def attach_theme_manager(self, theme_manager: ThemeManager) -> None:
+        """Subscribe every open and future :class:`ChartView` to theme changes.
+
+        Called once by :mod:`src.ui.main_window` from its own
+        ``attach_theme_manager`` (mirroring how that method itself is
+        called once by :mod:`src.core.app` after the ``QApplication``
+        exists), so that a theme toggle recolours every chart tab already
+        open at the time via ``Plotly.relayout`` -- no page reload, no
+        flicker -- rather than only affecting charts opened after the
+        toggle.
+        """
+        self._theme_manager = theme_manager
+        theme_manager.theme_changed.connect(self._on_theme_changed)
+
+    def _on_theme_changed(self, _theme_name: str) -> None:
+        if self._theme_manager is None:
+            return
+        tokens = self._theme_manager.current_tokens()
+        if tokens is None:
+            return
+        for index in range(self._chart_tabs.count()):
+            widget = self._chart_tabs.widget(index)
+            if isinstance(widget, ChartView):
+                widget.apply_theme(tokens)
 
     def _build_ai_chat_dock(self) -> QDockWidget:
         dock = QDockWidget("AI Assistant", self._parent_window)

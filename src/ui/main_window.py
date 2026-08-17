@@ -805,6 +805,13 @@ class MainWindow(QMainWindow):
         exist that early (see above).
         """
         self.setProperty("theme_manager", theme_manager)
+        # Milestone 16: the dock manager's open chart tabs need to hear
+        # about theme changes too, to recolour via Plotly.relayout — see
+        # DockManager.attach_theme_manager for why this is a separate call
+        # rather than DockManager reading self.property("theme_manager")
+        # itself (it would need a live QWidget reference to do that, which
+        # this class already is and DockManager deliberately is not).
+        self._dock_manager.attach_theme_manager(theme_manager)
 
     def _on_open_about(self) -> None:
         dialog = AboutDialog(self)
