@@ -41,9 +41,16 @@ from PySide6.QtWidgets import (
 from src.core.logger import get_logger
 from src.ui.widgets.chart_view import ChartView
 from src.ui.widgets.chat_panel import ChatPanel
+from src.ui.widgets.data_table.data_table_view import DataTableView
 
 if TYPE_CHECKING:
-    pass
+    # A previous edit's ruff auto-fix pass stripped this import as
+    # apparently-unused (the annotation-only reference on
+    # self._theme_manager and attach_theme_manager's parameter, both
+    # deferred strings under `from __future__ import annotations`, were
+    # not visible to that pass) -- restored here since the type is genuinely
+    # referenced twice below.
+    from src.ui.theme_manager import ThemeManager
 
 _logger = get_logger(__name__)
 
@@ -93,11 +100,19 @@ class DockManager:
         # falls back to DARK_TOKENS in that case rather than failing.
         self._theme_manager: ThemeManager | None = None
 
+        # Milestone 18: dataset_id -> already-open DataTableView, so a
+        # second double-click on the same dataset raises the existing tab
+        # instead of opening a duplicate one. Populated by
+        # display_dataset_table(); entries are dropped in
+        # _on_data_table_tab_close_requested() when their tab closes.
+        self._dataset_table_views: dict[str, DataTableView] = {}
+
         self.dock_project_explorer = self._build_project_explorer_dock()
         self.dock_dataset_explorer = self._build_dataset_explorer_dock()
         self.dock_console = self._build_console_dock()
         self.dock_logging = self._build_logging_dock()
         self.dock_chart = self._build_chart_dock()
+        self.dock_data_table = self._build_data_table_dock()
         self.dock_ai_chat = self._build_ai_chat_dock()
 
         parent_window.addDockWidget(
@@ -125,6 +140,17 @@ class DockManager:
         parent_window.addDockWidget(
             Qt.DockWidgetArea.RightDockWidgetArea, self.dock_chart
         )
+
+        # Milestone 18: the data table dock IS tabbed with Chart -- unlike
+        # the chart/AI-chat split above, a chart and a data table are the
+        # same kind of thing (a view onto one dataset's content), so
+        # sharing a tab strip rather than each claiming permanent screen
+        # space matches how Project/Dataset Explorer and Console/Log are
+        # already tabbed for the same reason.
+        parent_window.addDockWidget(
+            Qt.DockWidgetArea.RightDockWidgetArea, self.dock_data_table
+        )
+        parent_window.tabifyDockWidget(self.dock_chart, self.dock_data_table)
 
         # Milestone 10: the AI chat panel — stacked below the chart dock
         # in the same (right) area rather than tabbed with it, so a
@@ -238,6 +264,11 @@ class DockManager:
                 item = QTreeWidgetItem(parent_item, [_label(dataset)])
             else:
                 item = QTreeWidgetItem(self._dataset_tree_widget, [_label(dataset)])
+            # Milestone 18: the item's dataset_id, read back out by
+            # connect_dataset_double_click's handler. Before this, an
+            # item carried only its display label -- there was no way for
+            # a double-click handler to know *which* dataset was clicked.
+            item.setData(0, Qt.ItemDataRole.UserRole, dataset.dataset_id)
             items_by_id[dataset.dataset_id] = item
             return item
 
@@ -319,6 +350,97 @@ class DockManager:
             # widget — without this, each closed chart tab would leak
             # its QWebEngineView (ChartView) rather than being freed.
             widget.deleteLater()
+
+    def _build_data_table_dock(self) -> QDockWidget:
+        dock = QDockWidget("Data Table", self._parent_window)
+        dock.setObjectName("dockDataTable")
+        # Milestone 18: mirrors _build_chart_dock's QTabWidget-of-
+        # independent-views shape exactly -- one DataTableView per opened
+        # dataset, each an independent tab, so viewing two datasets side
+        # by side (via tab switching) works the same way comparing two
+        # charts already does.
+        self._data_table_tabs = QTabWidget(dock)
+        self._data_table_tabs.setTabsClosable(True)
+        self._data_table_tabs.tabCloseRequested.connect(
+            self._on_data_table_tab_close_requested
+        )
+        dock.setWidget(self._data_table_tabs)
+        return dock
+
+    def _on_data_table_tab_close_requested(self, index: int) -> None:
+        widget = self._data_table_tabs.widget(index)
+        self._data_table_tabs.removeTab(index)
+        if widget is None:
+            return
+        # Drop the dataset_id -> view entry for the tab that just closed,
+        # so a later double-click on that dataset opens a fresh tab
+        # instead of trying to re-show a widget removeTab() already
+        # detached (indices would also be wrong here after a removal --
+        # this is why display_dataset_table below looks views up by
+        # dataset_id/widget identity, never by a stored tab index).
+        stale_ids = [
+            dataset_id
+            for dataset_id, view in self._dataset_table_views.items()
+            if view is widget
+        ]
+        for dataset_id in stale_ids:
+            del self._dataset_table_views[dataset_id]
+        widget.deleteLater()
+
+    def connect_dataset_double_click(self, handler) -> None:
+        """Call ``handler(dataset_id)`` when a Dataset Explorer entry is double-clicked.
+
+        Milestone 18: before this, a dataset's tree item carried no
+        machine-readable identity at all (only its display label) and
+        nothing was connected to ``itemDoubleClicked`` -- double-clicking
+        a dataset did nothing. ``refresh_dataset_list`` below now attaches
+        each item's ``dataset_id`` via ``setData(0, Qt.ItemDataRole.
+        UserRole, ...)``, which is what this reads back out.
+        """
+
+        def _on_item_double_clicked(item: QTreeWidgetItem, _column: int) -> None:
+            dataset_id = item.data(0, Qt.ItemDataRole.UserRole)
+            if dataset_id is not None:
+                handler(dataset_id)
+
+        self._dataset_tree_widget.itemDoubleClicked.connect(_on_item_double_clicked)
+
+    def display_dataset_table(self, dataset) -> None:
+        """Open (or bring to front) a :class:`DataTableView` tab for ``dataset``.
+
+        Args:
+            dataset: A :class:`~src.services.workspace_service.Dataset`.
+                Untyped here for the same reason ``refresh_dataset_list``'s
+                ``datasets`` parameter is a plain ``list`` -- avoiding an
+                import of ``src.services.workspace_service`` for one
+                parameter's annotation alone.
+
+        A dataset already open in its own tab is raised rather than
+        duplicated -- double-clicking the same dataset twice should not
+        accumulate identical tabs.
+        """
+        existing_view = self._dataset_table_views.get(dataset.dataset_id)
+        if existing_view is not None:
+            index = self._data_table_tabs.indexOf(existing_view)
+            if index != -1:
+                self._data_table_tabs.setCurrentIndex(index)
+                self.dock_data_table.raise_()
+                self.dock_data_table.show()
+                return
+            # The view object survived but its tab did not (should not
+            # happen given the close-handler cleanup above, but falling
+            # through to rebuild rather than raising here keeps this
+            # method itself never able to leave the dock in a broken
+            # state over a bookkeeping edge case).
+            del self._dataset_table_views[dataset.dataset_id]
+
+        view = DataTableView(self._data_table_tabs)
+        view.load_dataset(dataset)
+        index = self._data_table_tabs.addTab(view, dataset.name)
+        self._dataset_table_views[dataset.dataset_id] = view
+        self._data_table_tabs.setCurrentIndex(index)
+        self.dock_data_table.raise_()
+        self.dock_data_table.show()
 
     def display_chart(self, figure, name: str | None = None) -> None:
         """Add ``figure`` as a new tab in the chart dock and bring it to the foreground.
@@ -415,5 +537,6 @@ class DockManager:
             self.dock_console.toggleViewAction(),
             self.dock_logging.toggleViewAction(),
             self.dock_chart.toggleViewAction(),
+            self.dock_data_table.toggleViewAction(),
             self.dock_ai_chat.toggleViewAction(),
         ]

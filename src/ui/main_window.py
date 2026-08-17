@@ -297,6 +297,11 @@ class MainWindow(QMainWindow):
             self._on_send_chat_message
         )
 
+        # Milestone 18: the first time double-clicking a dataset has ever
+        # done anything in this application -- see DockManager.
+        # connect_dataset_double_click's own docstring.
+        self._dock_manager.connect_dataset_double_click(self._on_dataset_double_clicked)
+
     def _on_ui_state_changed(self) -> None:
         """Recompute and apply enablement -- the sole consumer of ``state_changed``.
 
@@ -562,6 +567,30 @@ class MainWindow(QMainWindow):
         worker.signals.progress.connect(self._status_bar.show_progress)
         worker.signals.finished.connect(self._status_bar.hide_busy)
         QThreadPool.globalInstance().start(worker)
+
+    def _on_dataset_double_clicked(self, dataset_id: str) -> None:
+        """Open a data-table tab for the double-clicked Dataset Explorer entry.
+
+        Milestone 18: before this, there was no ``QTableView``/
+        ``QAbstractTableModel`` anywhere in the application -- a user
+        could open a dataset and never see a single cell value, only the
+        Dataset Explorer's ``"name (N rows x M cols)"`` summary text.
+        """
+        try:
+            dataset = self._workspace_service.get_dataset(dataset_id)
+        except ServiceError as exc:
+            # Not fatal -- the item's dataset_id can be stale if the
+            # dataset was closed after the tree was last rebuilt but
+            # before this double-click was processed. Logged, not shown
+            # as a dialog: a double-click on a no-longer-existing item is
+            # a timing edge case, not something the user did wrong.
+            _logger.warning(
+                "Double-clicked dataset %s is no longer loaded: %s",
+                dataset_id,
+                exc,
+            )
+            return
+        self._dock_manager.display_dataset_table(dataset)
 
     def _on_dataset_read(self, dataset) -> None:
         """Apply a successfully read dataset to the workspace (UI thread)."""
