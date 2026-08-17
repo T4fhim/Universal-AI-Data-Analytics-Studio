@@ -37,12 +37,16 @@ def _non_docstring_line_count(path: Path) -> int:
     docstring_lines: set[int] = set()
 
     for node in ast.walk(tree):
-        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+        if isinstance(
+            node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+        ):
             docstring_node = ast.get_docstring(node, clean=False)
             if docstring_node is not None and node.body:
                 first = node.body[0]
                 if isinstance(first, ast.Expr):
-                    docstring_lines.update(range(first.lineno, (first.end_lineno or first.lineno) + 1))
+                    docstring_lines.update(
+                        range(first.lineno, (first.end_lineno or first.lineno) + 1)
+                    )
 
     lines = source.splitlines()
     return sum(
@@ -57,11 +61,15 @@ def _ui_modules() -> list[Path]:
     return sorted(path for path in ui_root.rglob("*.py") if path.name != "__init__.py")
 
 
-@pytest.mark.parametrize("path", _ui_modules(), ids=lambda p: str(p.relative_to(PROJECT_ROOT)))
+@pytest.mark.parametrize(
+    "path", _ui_modules(), ids=lambda p: str(p.relative_to(PROJECT_ROOT))
+)
 def test_ui_module_stays_under_the_line_budget(path: Path) -> None:
     relative = str(path.relative_to(PROJECT_ROOT)).replace("\\", "/")
     if relative in _LEGACY_EXEMPTIONS:
-        pytest.skip(f"{relative} is exempted pending its scheduled decomposition milestone")
+        pytest.skip(
+            f"{relative} is exempted pending its scheduled decomposition milestone"
+        )
     count = _non_docstring_line_count(path)
     assert count <= _MAX_LINES, (
         f"{relative} has {count} non-docstring lines (budget {_MAX_LINES}). "

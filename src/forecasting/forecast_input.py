@@ -72,7 +72,9 @@ def validate_time_series(
     working = dataframe[[date_column, value_column]].copy()
 
     parsed_dates = pd.to_datetime(working[date_column], errors="coerce")
-    unparseable_count = int(parsed_dates.isna().sum() - working[date_column].isna().sum())
+    unparseable_count = int(
+        parsed_dates.isna().sum() - working[date_column].isna().sum()
+    )
     if unparseable_count > 0:
         raise ServiceError(
             f"date_column '{date_column}' contains {unparseable_count} "

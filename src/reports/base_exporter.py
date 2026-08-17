@@ -28,9 +28,7 @@ class BaseReportExporter(ABC):
 
     @classmethod
     @abstractmethod
-    def export(
-        cls, report_content: ReportContent, output_path: Path, **kwargs
-    ) -> Path:
+    def export(cls, report_content: ReportContent, output_path: Path, **kwargs) -> Path:
         """Render ``report_content`` to ``output_path`` in this exporter's format.
 
         Args:

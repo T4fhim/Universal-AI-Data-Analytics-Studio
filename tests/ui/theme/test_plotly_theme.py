@@ -12,7 +12,9 @@ from src.ui.theme.plotly_theme import plotly_config, plotly_layout
 from src.ui.theme.tokens import DARK_TOKENS, LIGHT_TOKENS, TOKENS_BY_NAME
 
 
-@pytest.mark.parametrize("tokens", list(TOKENS_BY_NAME.values()), ids=list(TOKENS_BY_NAME))
+@pytest.mark.parametrize(
+    "tokens", list(TOKENS_BY_NAME.values()), ids=list(TOKENS_BY_NAME)
+)
 def test_layout_paper_and_plot_background_are_not_transparent(tokens) -> None:
     """A transparent paper would show the QWebEngineView's own white backing
     through on dark themes -- see the module docstring for why this matters.

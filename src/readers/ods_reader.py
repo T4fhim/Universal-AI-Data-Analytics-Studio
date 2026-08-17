@@ -107,9 +107,11 @@ class OdsReader(BaseReader):
         )
 
         return Dataset(
-            name=f"{path.stem} — {table_name}"
-            if len(available_sheets) > 1
-            else path.stem,
+            name=(
+                f"{path.stem} — {table_name}"
+                if len(available_sheets) > 1
+                else path.stem
+            ),
             dataframe=dataframe,
             source_format="ods",
             source_path=path,

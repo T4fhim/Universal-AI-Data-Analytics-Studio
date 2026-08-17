@@ -25,7 +25,9 @@ def test_available_themes_matches_tokens() -> None:
     assert set(AVAILABLE_THEMES) == set(TOKENS_BY_NAME)
 
 
-@pytest.mark.parametrize("tokens", list(TOKENS_BY_NAME.values()), ids=list(TOKENS_BY_NAME))
+@pytest.mark.parametrize(
+    "tokens", list(TOKENS_BY_NAME.values()), ids=list(TOKENS_BY_NAME)
+)
 def test_as_qss_mapping_has_no_empty_values(tokens) -> None:
     mapping = tokens.as_qss_mapping()
     for key, value in mapping.items():

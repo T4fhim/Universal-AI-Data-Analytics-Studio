@@ -44,11 +44,15 @@ class DropDuplicates(BaseOperation):
                 )
 
         subset_arg = columns if columns else None
-        deduplicated = dataset.dataframe.drop_duplicates(subset=subset_arg, keep="first")
+        deduplicated = dataset.dataframe.drop_duplicates(
+            subset=subset_arg, keep="first"
+        )
 
         rows_dropped = len(dataset.dataframe) - len(deduplicated)
         column_description = (
-            f"considering {', '.join(columns)}" if columns else "considering all columns"
+            f"considering {', '.join(columns)}"
+            if columns
+            else "considering all columns"
         )
 
         _logger.info(

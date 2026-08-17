@@ -151,9 +151,7 @@ class IconProvider(QObject):
 
     def _render(self, svg_path: Path, color: str, size: int) -> QPixmap:
         """Rasterise ``svg_path`` at ``size``, with strokes set to ``color``."""
-        markup = svg_path.read_text(encoding="utf-8").replace(
-            _COLOR_PLACEHOLDER, color
-        )
+        markup = svg_path.read_text(encoding="utf-8").replace(_COLOR_PLACEHOLDER, color)
         renderer = QSvgRenderer(markup.encode("utf-8"))
 
         pixmap = QPixmap(QSize(size * _RENDER_SCALE, size * _RENDER_SCALE))

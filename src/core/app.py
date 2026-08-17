@@ -104,6 +104,7 @@ class Application:
         # correctly in a normal browser but stayed blank inside the app,
         # isolating the failure to Qt's GPU compositing path specifically.
         from PySide6.QtCore import QCoreApplication, Qt
+
         QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_UseSoftwareOpenGL)
         QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
 

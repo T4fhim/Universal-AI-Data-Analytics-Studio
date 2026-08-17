@@ -150,8 +150,7 @@ class ExcelReader(BaseReader):
             )
 
         _logger.info(
-            "Read Excel sheet '%s' from %s: %d rows, %d columns, "
-            "%d warning(s).",
+            "Read Excel sheet '%s' from %s: %d rows, %d columns, " "%d warning(s).",
             table_name,
             path,
             len(dataframe),
@@ -160,7 +159,11 @@ class ExcelReader(BaseReader):
         )
 
         return Dataset(
-            name=f"{path.stem} — {table_name}" if len(available_sheets) > 1 else path.stem,
+            name=(
+                f"{path.stem} — {table_name}"
+                if len(available_sheets) > 1
+                else path.stem
+            ),
             dataframe=dataframe,
             source_format="xlsx" if path.suffix.lower() == ".xlsx" else "xls",
             source_path=path,

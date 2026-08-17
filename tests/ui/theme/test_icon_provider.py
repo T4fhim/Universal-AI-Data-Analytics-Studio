@@ -29,7 +29,9 @@ def test_every_bundled_icon_renders_without_error(provider: IconProvider) -> Non
         assert not icon.isNull(), f"icon '{name}' failed to render"
 
 
-def test_missing_icon_degrades_to_empty_icon_not_a_crash(provider: IconProvider) -> None:
+def test_missing_icon_degrades_to_empty_icon_not_a_crash(
+    provider: IconProvider,
+) -> None:
     icon = provider.icon("this-does-not-exist")
     assert icon.isNull()
 

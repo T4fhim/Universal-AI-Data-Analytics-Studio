@@ -159,11 +159,23 @@ class ThemeTokens:
             "radius_md": f"{self.radius_md}px",
         }
         for field_name in (
-            "surface_0", "surface_1", "surface_2",
-            "text_primary", "text_secondary", "text_disabled", "text_on_accent",
-            "accent", "accent_hover", "accent_pressed",
-            "border", "border_strong", "focus_ring",
-            "success", "warning", "danger", "info",
+            "surface_0",
+            "surface_1",
+            "surface_2",
+            "text_primary",
+            "text_secondary",
+            "text_disabled",
+            "text_on_accent",
+            "accent",
+            "accent_hover",
+            "accent_pressed",
+            "border",
+            "border_strong",
+            "focus_ring",
+            "success",
+            "warning",
+            "danger",
+            "info",
         ):
             mapping[field_name] = getattr(self, field_name)
         for step in range(1, 6):
@@ -182,12 +194,28 @@ class ThemeTokens:
 # import from src.services — tokens are consumed by the QSS compiler, which
 # must remain loadable with nothing else in the application constructed.
 _DARK_STAGE_HUES = (
-    "#7AA2F7", "#56B4E9", "#00BE8C", "#A6D75B", "#E69F00",
-    "#F07030", "#E86A9A", "#CC79A7", "#9B8CF0", "#B0B0B0",
+    "#7AA2F7",
+    "#56B4E9",
+    "#00BE8C",
+    "#A6D75B",
+    "#E69F00",
+    "#F07030",
+    "#E86A9A",
+    "#CC79A7",
+    "#9B8CF0",
+    "#B0B0B0",
 )
 _LIGHT_STAGE_HUES = (
-    "#2B5FCC", "#1B7FB5", "#00795C", "#4A7A00", "#B07500",
-    "#C0450A", "#C0326B", "#A6417F", "#6A4FC0", "#5F5F5F",
+    "#2B5FCC",
+    "#1B7FB5",
+    "#00795C",
+    "#4A7A00",
+    "#B07500",
+    "#C0450A",
+    "#C0326B",
+    "#A6417F",
+    "#6A4FC0",
+    "#5F5F5F",
 )
 
 # Okabe-Ito hue order, retinted per theme so each entry clears 3:1 against
@@ -195,12 +223,24 @@ _LIGHT_STAGE_HUES = (
 # safe for colour-vision deficiency, and lightening or darkening preserves
 # hue, so both ramps keep that property.
 _DARK_CHART_COLORS = (
-    "#E69F00", "#56B4E9", "#00BE8C", "#F0E442",
-    "#4DA3E0", "#F07030", "#CC79A7", "#B0B0B0",
+    "#E69F00",
+    "#56B4E9",
+    "#00BE8C",
+    "#F0E442",
+    "#4DA3E0",
+    "#F07030",
+    "#CC79A7",
+    "#B0B0B0",
 )
 _LIGHT_CHART_COLORS = (
-    "#B07500", "#1B7FB5", "#00795C", "#7A6E00",
-    "#0059A8", "#C0450A", "#A6417F", "#5F5F5F",
+    "#B07500",
+    "#1B7FB5",
+    "#00795C",
+    "#7A6E00",
+    "#0059A8",
+    "#C0450A",
+    "#A6417F",
+    "#5F5F5F",
 )
 
 DARK_TOKENS = ThemeTokens(
@@ -274,13 +314,18 @@ HIGH_CONTRAST_TOKENS = ThemeTokens(
     info="#7ac9ff",
     stage_hues=("#ffffff",) * 10,
     chart_categorical=(
-        "#ffffff", "#ffd400", "#7ac9ff", "#4dff9f",
-        "#ff6b6b", "#d7a3ff", "#ffb066", "#b0b0b0",
+        "#ffffff",
+        "#ffd400",
+        "#7ac9ff",
+        "#4dff9f",
+        "#ff6b6b",
+        "#d7a3ff",
+        "#ffb066",
+        "#b0b0b0",
     ),
     focus_ring_width=3,
 )
 
 TOKENS_BY_NAME: dict[str, ThemeTokens] = {
-    tokens.name: tokens
-    for tokens in (DARK_TOKENS, LIGHT_TOKENS, HIGH_CONTRAST_TOKENS)
+    tokens.name: tokens for tokens in (DARK_TOKENS, LIGHT_TOKENS, HIGH_CONTRAST_TOKENS)
 }

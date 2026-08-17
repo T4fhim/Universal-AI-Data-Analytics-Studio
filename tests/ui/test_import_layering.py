@@ -148,9 +148,9 @@ def test_every_ui_module_parses_and_resolves_its_own_dotted_name() -> None:
     every other test in this module passes vacuously.
     """
     modules = _all_ui_modules()
-    assert len(modules) > 5, (
-        "src/ui/ appears empty; the layering tests would pass vacuously"
-    )
+    assert (
+        len(modules) > 5
+    ), "src/ui/ appears empty; the layering tests would pass vacuously"
     for path in modules:
         ast.parse(
             path.read_text(encoding="utf-8"), filename=str(path)

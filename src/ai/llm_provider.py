@@ -466,9 +466,9 @@ class OllamaProvider(BaseLLMProvider):
                 json={
                     "model": self._model,
                     "messages": messages,
-                    "tools": self._build_tool_schemas(tool_schemas)
-                    if tool_schemas
-                    else None,
+                    "tools": (
+                        self._build_tool_schemas(tool_schemas) if tool_schemas else None
+                    ),
                     "stream": False,
                 },
                 timeout=120,

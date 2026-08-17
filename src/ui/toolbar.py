@@ -34,7 +34,9 @@ class ApplicationToolBar(QToolBar):
             add to the toolbar without it.
     """
 
-    def __init__(self, parent_window: QMainWindow, menu_bar: ApplicationMenuBar) -> None:
+    def __init__(
+        self, parent_window: QMainWindow, menu_bar: ApplicationMenuBar
+    ) -> None:
         super().__init__("Main Toolbar", parent_window)
         self.setMovable(False)
         self._build_actions(menu_bar)

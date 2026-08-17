@@ -32,7 +32,9 @@ _THEME_IDS = list(TOKENS_BY_NAME)
 
 @pytest.mark.parametrize("tokens", _THEMES, ids=_THEME_IDS)
 @pytest.mark.parametrize(
-    "requirement", CONTRAST_REQUIREMENTS, ids=lambda r: f"{r.foreground}-on-{r.background}"
+    "requirement",
+    CONTRAST_REQUIREMENTS,
+    ids=lambda r: f"{r.foreground}-on-{r.background}",
 )
 def test_token_pairing_meets_wcag_aa(tokens: ThemeTokens, requirement) -> None:
     foreground = getattr(tokens, requirement.foreground)

@@ -42,7 +42,9 @@ class WelcomeWidget(QWidget):
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title_label)
 
-        subtitle_label = QLabel("Create a new project or open an existing one to get started.")
+        subtitle_label = QLabel(
+            "Create a new project or open an existing one to get started."
+        )
         subtitle_label.setObjectName("welcomeSubtitle")
         subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(subtitle_label)
@@ -51,11 +53,15 @@ class WelcomeWidget(QWidget):
 
         self.button_new_project = QPushButton("New Project")
         self.button_new_project.setMinimumWidth(200)
-        layout.addWidget(self.button_new_project, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(
+            self.button_new_project, alignment=Qt.AlignmentFlag.AlignCenter
+        )
 
         self.button_open_project = QPushButton("Open Project...")
         self.button_open_project.setObjectName("secondaryButton")
         self.button_open_project.setMinimumWidth(200)
-        layout.addWidget(self.button_open_project, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(
+            self.button_open_project, alignment=Qt.AlignmentFlag.AlignCenter
+        )
 
         _logger.debug("Welcome widget constructed.")

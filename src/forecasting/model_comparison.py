@@ -19,8 +19,8 @@ throw away the most recent data from the forecast that ships.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import pandas as pd
 

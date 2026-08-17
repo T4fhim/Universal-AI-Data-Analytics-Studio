@@ -61,7 +61,9 @@ def aggregate(
             f"{', '.join(sorted(_VALID_AGG_FUNCTIONS))}."
         )
 
-    if agg_function != "count" and not pd.api.types.is_numeric_dtype(dataframe[agg_column]):
+    if agg_function != "count" and not pd.api.types.is_numeric_dtype(
+        dataframe[agg_column]
+    ):
         raise ServiceError(
             f"agg_function '{agg_function}' requires a numeric column; "
             f"'{agg_column}' has dtype {dataframe[agg_column].dtype}. "

@@ -25,7 +25,9 @@ def _clear_compiler_cache() -> None:
     qss_compiler.clear_cache()
 
 
-@pytest.mark.parametrize("tokens", list(TOKENS_BY_NAME.values()), ids=list(TOKENS_BY_NAME))
+@pytest.mark.parametrize(
+    "tokens", list(TOKENS_BY_NAME.values()), ids=list(TOKENS_BY_NAME)
+)
 def test_compiles_without_leaving_any_placeholder_behind(tokens) -> None:
     css = compile_qss(tokens, use_cache=False)
     assert "$" not in css, "a literal '$' survived compilation"
@@ -42,17 +44,23 @@ def test_real_template_compiles_under_20ms() -> None:
     assert elapsed_ms < 20, f"compile_qss took {elapsed_ms:.2f}ms, budget is 20ms"
 
 
-def test_missing_token_raises_service_error_not_silent_placeholder(tmp_path: Path) -> None:
+def test_missing_token_raises_service_error_not_silent_placeholder(
+    tmp_path: Path,
+) -> None:
     """The whole reason substitute() was chosen over safe_substitute()."""
     broken_template = tmp_path / "broken.qss.template"
-    broken_template.write_text("QWidget { color: ${not_a_real_token}; }", encoding="utf-8")
+    broken_template.write_text(
+        "QWidget { color: ${not_a_real_token}; }", encoding="utf-8"
+    )
     with pytest.raises(ServiceError, match="not_a_real_token"):
         compile_qss(DARK_TOKENS, template_path=broken_template, use_cache=False)
 
 
 def test_missing_template_file_raises_service_error(tmp_path: Path) -> None:
     with pytest.raises(ServiceError, match="not found"):
-        compile_qss(DARK_TOKENS, template_path=tmp_path / "nope.qss.template", use_cache=False)
+        compile_qss(
+            DARK_TOKENS, template_path=tmp_path / "nope.qss.template", use_cache=False
+        )
 
 
 def test_result_is_cached_by_theme_and_density() -> None:
