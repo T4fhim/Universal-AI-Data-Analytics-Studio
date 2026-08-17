@@ -1,92 +1,146 @@
 # File: src/ui/theme_manager.py
-"""Loads and applies QSS theme stylesheets to the running application.
+"""Compiles design tokens into QSS and applies the result to the application.
 
-:class:`ThemeManager` reads a theme's ``.qss`` file from
-``resources/styles/`` and applies it via ``QApplication.setStyleSheet``,
-which cascades to every widget in the application rather than requiring
-each widget to apply its own styling. Switching themes at runtime is
-supported: calling :meth:`apply_theme` again with a different theme
-name re-reads that theme's file and re-applies it, and every widget
-already on screen picks up the new stylesheet immediately — this is
-standard Qt behavior for ``setStyleSheet`` on the application object,
-not something this class needs to implement itself.
+:class:`ThemeManager` no longer reads a per-theme ``.qss`` file. Milestone 15
+replaced ``resources/styles/dark.qss`` and ``light.qss`` -- two independently
+hand-maintained files with no shared colour vocabulary -- with a single
+``base.qss.template`` plus the token sets in :mod:`src.ui.theme.tokens`. This
+class is the seam between the two: it resolves a theme name to a
+:class:`~src.ui.theme.tokens.ThemeTokens`, hands it to
+:func:`~src.ui.theme.qss_compiler.compile_qss`, and applies the result with
+``QApplication.setStyleSheet`` so every widget -- including ones constructed
+later -- inherits it without any per-widget styling logic.
+
+**Now a ``QObject``.** It was a plain class through milestone 14, which was
+adequate while QSS was the only thing a theme affected. It no longer is: the
+icons rendered by :class:`~src.ui.theme.icon_provider.IconProvider` are
+recoloured from ``text_primary``, and Plotly figures are themed from
+``chart_categorical`` (see :mod:`src.ui.theme.plotly_theme`). Neither is
+reachable through a stylesheet, so both must be told when the theme changes.
+:attr:`theme_changed` is that notification. A plain observer-callback list
+would have worked too, and was rejected because every consumer here is
+already a ``QObject`` living on the UI thread -- a Qt signal gives automatic
+disconnection on destruction, which a hand-rolled callback list would have to
+reimplement badly.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
-
+from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QApplication
 
-from src.core.constants import AVAILABLE_THEMES, PROJECT_ROOT
+from src.core.constants import AVAILABLE_THEMES
 from src.core.exceptions import ServiceError
 from src.core.logger import get_logger
+from src.ui.theme.qss_compiler import compile_qss
+from src.ui.theme.tokens import TOKENS_BY_NAME, Density, ThemeTokens
 
 _logger = get_logger(__name__)
 
-_STYLES_DIR = PROJECT_ROOT / "resources" / "styles"
 
-
-class ThemeManager:
-    """Applies named QSS themes to a running :class:`QApplication`.
+class ThemeManager(QObject):
+    """Applies token-compiled themes to a running :class:`QApplication`.
 
     Args:
-        application: The ``QApplication`` instance themes are applied
-            to. Stored by reference — this class does not construct
-            its own ``QApplication``, since exactly one must exist per
-            process and :mod:`src.core.app` (extended in this
-            milestone) is responsible for constructing it.
-        styles_dir: Directory containing ``<theme_name>.qss`` files.
-            Defaults to the project's standard styles location;
-            overridable primarily for tests that want to supply a
-            temporary directory with fake theme files.
+        application: The ``QApplication`` themes are applied to. Stored by
+            reference -- this class does not construct one, since exactly one
+            must exist per process and :mod:`src.core.app` owns that.
+        parent: Optional ``QObject`` parent. Defaults to ``None`` so the
+            manager's lifetime is controlled by whoever holds the reference,
+            matching how :mod:`src.core.app` keeps it alive for the duration
+            of :meth:`~src.core.app.Application.run`.
+
+    Signals:
+        theme_changed: Emitted with the new theme name **after** the
+            stylesheet has been applied, so a slot that re-renders icons or
+            charts observes an already-consistent application.
     """
 
+    theme_changed = Signal(str)
+
     def __init__(
-        self,
-        application: QApplication,
-        styles_dir: Path = _STYLES_DIR,
+        self, application: QApplication, parent: QObject | None = None
     ) -> None:
+        super().__init__(parent)
         self._application = application
-        self._styles_dir = styles_dir
         self._current_theme: str | None = None
+        self._density: Density = Density.COZY
 
     def apply_theme(self, theme_name: str) -> None:
-        """Load ``theme_name``'s QSS file and apply it to the application.
+        """Compile ``theme_name``'s tokens and apply the stylesheet.
 
         Args:
-            theme_name: One of :data:`~src.core.constants.AVAILABLE_THEMES`
-                (currently ``"dark"`` or ``"light"``).
+            theme_name: One of :data:`~src.core.constants.AVAILABLE_THEMES`.
 
         Raises:
-            ServiceError: If ``theme_name`` is not a recognized theme,
-                or if its QSS file cannot be read.
+            ServiceError: If ``theme_name`` is unknown, or the template is
+                missing, unreadable, or references an undefined token.
+        """
+        tokens = self._resolve_tokens(theme_name)
+        stylesheet = compile_qss(tokens)
+
+        self._application.setStyleSheet(stylesheet)
+        self._current_theme = theme_name
+        _logger.info(
+            "Applied theme '%s' (density %s).", theme_name, self._density.value
+        )
+        # Emitted last, deliberately: a slot that re-renders icons reads
+        # current_tokens(), which must already describe what is on screen.
+        self.theme_changed.emit(theme_name)
+
+    def set_density(self, density: Density) -> None:
+        """Change spacing scale and re-apply the current theme.
+
+        Separate from :meth:`apply_theme` because density and colour scheme
+        are independent axes -- milestone 25 drives density from
+        :class:`~src.core.expertise_level.ExpertiseLevel` while leaving the
+        user's dark/light choice alone. A no-op when nothing changes, so
+        callers may set it unconditionally without forcing a repolish of the
+        entire widget tree.
+        """
+        if density is self._density:
+            return
+        self._density = density
+        if self._current_theme is not None:
+            self.apply_theme(self._current_theme)
+
+    def current_theme(self) -> str | None:
+        """Return the applied theme's name, or ``None`` before the first apply.
+
+        There is no meaningful Qt-level default to assume, so this class
+        takes no theme at construction and requires an explicit first call.
+        """
+        return self._current_theme
+
+    def current_tokens(self) -> ThemeTokens | None:
+        """Return the applied theme's tokens, or ``None`` before the first apply.
+
+        This is what :class:`~src.ui.theme.icon_provider.IconProvider` and
+        :mod:`src.ui.theme.plotly_theme` read from a
+        :attr:`theme_changed` slot -- they need the colour values, not the
+        name.
+        """
+        if self._current_theme is None:
+            return None
+        return self._resolve_tokens(self._current_theme)
+
+    def _resolve_tokens(self, theme_name: str) -> ThemeTokens:
+        """Return the token set for ``theme_name`` at the current density.
+
+        Validates against :data:`~src.core.constants.AVAILABLE_THEMES` first
+        rather than just checking ``TOKENS_BY_NAME`` membership, so that a
+        theme present in one and absent from the other produces a clear error
+        naming the supported set instead of a bare ``KeyError``.
         """
         if theme_name not in AVAILABLE_THEMES:
             raise ServiceError(
                 f"Unknown theme: '{theme_name}'. Available themes: "
                 f"{AVAILABLE_THEMES}."
             )
-
-        qss_path = self._styles_dir / f"{theme_name}.qss"
-        if not qss_path.exists():
-            raise ServiceError(f"Theme file not found: {qss_path}")
-
-        try:
-            stylesheet = qss_path.read_text(encoding="utf-8")
-        except OSError as exc:
-            raise ServiceError(f"Failed to read theme file {qss_path}: {exc}") from exc
-
-        self._application.setStyleSheet(stylesheet)
-        self._current_theme = theme_name
-        _logger.info("Applied theme: %s", theme_name)
-
-    def current_theme(self) -> str | None:
-        """Return the name of the currently applied theme, or ``None``.
-
-        ``None`` only if :meth:`apply_theme` has never been called on
-        this instance — there is no meaningful Qt-level default this
-        class should assume, so it takes no theme at construction time
-        and requires an explicit first call.
-        """
-        return self._current_theme
+        tokens = TOKENS_BY_NAME.get(theme_name)
+        if tokens is None:
+            raise ServiceError(
+                f"Theme '{theme_name}' is listed in AVAILABLE_THEMES but has "
+                f"no token set in src.ui.theme.tokens.TOKENS_BY_NAME."
+            )
+        return tokens.with_density(self._density)

@@ -48,6 +48,11 @@ openai
 google-genai
 python-dotenv
 rich
+# Explicit rather than relying on it arriving transitively via rich: the
+# milestone-27 in-app manual (src/ui/help/) compiles docs/manual/*.md through
+# markdown_it. It has been importable in this venv only as rich's own
+# dependency, which is fragile -- a future rich upgrade could drop it.
+markdown-it-py
 joblib
 numba
 dask

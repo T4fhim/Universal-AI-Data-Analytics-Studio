@@ -1,0 +1,521 @@
+/* File: resources/styles/base.qss.template */
+/*
+The one stylesheet for every theme.
+
+This replaces the former resources/styles/dark.qss and light.qss, which held
+twelve hand-maintained literal hex values each with no shared vocabulary.
+Every colour, space, and radius below is a named placeholder substituted
+by src/ui/theme/qss_compiler.py from a src.ui.theme.tokens.ThemeTokens
+instance, so adding a theme means adding a token set — never editing this
+file — and the themes cannot drift apart.
+
+Qt Style Sheets support the box model but not flexbox or grid, so all layout
+remains the responsibility of Qt layout classes; this file styles appearance
+only. Placeholders already carry their units -- space_2 resolves to 8px, not 8 --
+so never append a unit to one.
+
+Rule order below mirrors the visual stack: base, chrome, content, controls,
+then feedback.
+*/
+
+/* -- Base ---------------------------------------------------------------- */
+
+* {
+    font-family: ${font_family};
+    font-size: ${font_size_md};
+}
+
+QMainWindow, QDialog {
+    background-color: ${surface_0};
+    color: ${text_primary};
+}
+
+QWidget:disabled {
+    color: ${text_disabled};
+}
+
+/* Focus is styled once, universally, rather than per-widget. WCAG 2.2
+   2.4.11 requires a visible indicator with 3:1 contrast against both the
+   focused and unfocused states; the former per-widget ":focus border-color"
+   rules covered only text inputs, leaving buttons, lists, trees, and tabs
+   with no keyboard-visible focus at all. */
+*:focus {
+    outline: none;
+}
+
+/* -- Chrome: menu bar, menus, toolbar, status bar, docks ------------------ */
+
+QMenuBar {
+    background-color: ${surface_1};
+    color: ${text_primary};
+    border-bottom: 1px solid ${border};
+    padding: ${space_1} ${space_1};
+}
+
+QMenuBar::item {
+    background: transparent;
+    padding: ${space_1} ${space_2};
+    border-radius: ${radius_sm};
+}
+
+QMenuBar::item:selected {
+    background-color: ${surface_2};
+}
+
+QMenuBar::item:disabled {
+    color: ${text_disabled};
+}
+
+QMenu {
+    background-color: ${surface_1};
+    color: ${text_primary};
+    border: 1px solid ${border};
+    padding: ${space_1};
+}
+
+QMenu::item {
+    padding: ${space_2} ${space_5} ${space_2} ${space_3};
+    border-radius: ${radius_sm};
+}
+
+QMenu::item:selected {
+    background-color: ${accent};
+    color: ${text_on_accent};
+}
+
+QMenu::item:disabled {
+    color: ${text_disabled};
+}
+
+QMenu::separator {
+    height: 1px;
+    background-color: ${border};
+    margin: ${space_1} ${space_2};
+}
+
+QToolBar {
+    background-color: ${surface_1};
+    border-bottom: 1px solid ${border};
+    padding: ${space_1};
+    spacing: ${space_1};
+}
+
+QToolBar::separator {
+    width: 1px;
+    background-color: ${border};
+    margin: ${space_1} ${space_2};
+}
+
+QToolButton {
+    background: transparent;
+    border: none;
+    border-radius: ${radius_sm};
+    padding: ${space_2};
+    color: ${text_primary};
+    min-width: 24px;
+    min-height: 24px;
+}
+
+QToolButton:hover {
+    background-color: ${surface_2};
+}
+
+QToolButton:pressed, QToolButton:checked {
+    background-color: ${accent};
+    color: ${text_on_accent};
+}
+
+QToolButton:focus {
+    border: ${focus_ring_width} solid ${focus_ring};
+}
+
+QToolButton:disabled {
+    color: ${text_disabled};
+}
+
+QStatusBar {
+    background-color: ${surface_1};
+    color: ${text_secondary};
+    border-top: 1px solid ${border};
+}
+
+QStatusBar::item {
+    border: none;
+}
+
+QDockWidget {
+    color: ${text_primary};
+    titlebar-close-icon: none;
+    titlebar-normal-icon: none;
+}
+
+QDockWidget::title {
+    background-color: ${surface_1};
+    padding: ${space_2} ${space_2};
+    border-bottom: 1px solid ${border};
+}
+
+QSplitter::handle {
+    background-color: ${border};
+}
+
+QSplitter::handle:horizontal {
+    width: ${space_1};
+}
+
+QSplitter::handle:vertical {
+    height: ${space_1};
+}
+
+QSplitter::handle:hover {
+    background-color: ${focus_ring};
+}
+
+/* -- Text and headings ---------------------------------------------------- */
+
+QLabel {
+    color: ${text_primary};
+    background: transparent;
+}
+
+QLabel:disabled {
+    color: ${text_disabled};
+}
+
+QLabel#welcomeTitle {
+    font-size: 24px;
+    font-weight: 600;
+    color: ${text_primary};
+}
+
+QLabel#welcomeSubtitle {
+    font-size: ${font_size_lg};
+    color: ${text_secondary};
+}
+
+QLabel#sectionHeading {
+    font-size: ${font_size_lg};
+    font-weight: 600;
+    color: ${text_primary};
+}
+
+QLabel#hintLabel {
+    color: ${text_secondary};
+    font-size: ${font_size_sm};
+}
+
+QWidget#welcomeWidget {
+    background-color: ${surface_0};
+}
+
+/* -- Buttons -------------------------------------------------------------- */
+
+/* min-height 24px satisfies WCAG 2.2 2.5.8 Target Size (Minimum). */
+QPushButton {
+    background-color: ${accent};
+    color: ${text_on_accent};
+    border: none;
+    border-radius: ${radius_md};
+    padding: ${space_2} ${space_4};
+    font-weight: 500;
+    min-height: 24px;
+}
+
+QPushButton:hover {
+    background-color: ${accent_hover};
+}
+
+QPushButton:pressed {
+    background-color: ${accent_pressed};
+}
+
+QPushButton:disabled {
+    background-color: ${surface_2};
+    color: ${text_disabled};
+}
+
+QPushButton:focus {
+    border: ${focus_ring_width} solid ${focus_ring};
+}
+
+QPushButton#secondaryButton {
+    background-color: ${surface_1};
+    color: ${text_primary};
+    border: 1px solid ${border_strong};
+}
+
+QPushButton#secondaryButton:hover {
+    background-color: ${surface_2};
+}
+
+QPushButton#dangerButton {
+    background-color: ${danger};
+    color: ${surface_0};
+}
+
+QDialogButtonBox QPushButton {
+    min-width: 84px;
+}
+
+/* -- Inputs --------------------------------------------------------------- */
+
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QPlainTextEdit, QTextEdit,
+QDateEdit, QTimeEdit, QDateTimeEdit {
+    background-color: ${surface_1};
+    color: ${text_primary};
+    border: 1px solid ${border_strong};
+    border-radius: ${radius_sm};
+    padding: ${space_1} ${space_2};
+    selection-background-color: ${accent};
+    selection-color: ${text_on_accent};
+    min-height: 24px;
+}
+
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus,
+QPlainTextEdit:focus, QTextEdit:focus, QDateEdit:focus, QTimeEdit:focus,
+QDateTimeEdit:focus {
+    border: ${focus_ring_width} solid ${focus_ring};
+}
+
+QLineEdit:disabled, QSpinBox:disabled, QComboBox:disabled,
+QPlainTextEdit:disabled, QTextEdit:disabled {
+    background-color: ${surface_0};
+    color: ${text_disabled};
+}
+
+QLineEdit[invalid="true"], QComboBox[invalid="true"], QSpinBox[invalid="true"] {
+    border: ${focus_ring_width} solid ${danger};
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: ${space_5};
+}
+
+QComboBox QAbstractItemView {
+    background-color: ${surface_1};
+    color: ${text_primary};
+    border: 1px solid ${border};
+    selection-background-color: ${accent};
+    selection-color: ${text_on_accent};
+}
+
+QCheckBox, QRadioButton {
+    color: ${text_primary};
+    spacing: ${space_2};
+    min-height: 24px;
+}
+
+QCheckBox:disabled, QRadioButton:disabled {
+    color: ${text_disabled};
+}
+
+QCheckBox::indicator, QRadioButton::indicator {
+    width: 16px;
+    height: 16px;
+    border: 1px solid ${border_strong};
+    background-color: ${surface_1};
+}
+
+QCheckBox::indicator {
+    border-radius: 3px;
+}
+
+QRadioButton::indicator {
+    border-radius: 8px;
+}
+
+QCheckBox::indicator:checked, QRadioButton::indicator:checked {
+    background-color: ${accent};
+    border-color: ${accent};
+}
+
+QCheckBox:focus, QRadioButton:focus {
+    border: ${focus_ring_width} solid ${focus_ring};
+}
+
+QGroupBox {
+    color: ${text_primary};
+    border: 1px solid ${border};
+    border-radius: ${radius_md};
+    margin-top: ${space_3};
+    padding-top: ${space_3};
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: ${space_3};
+    padding: 0 ${space_1};
+    color: ${text_secondary};
+    font-weight: 600;
+}
+
+/* -- Item views: lists, trees, and the milestone-18 table ------------------ */
+
+QListWidget, QListView, QTreeWidget, QTreeView, QTableView, QColumnView {
+    background-color: ${surface_1};
+    alternate-background-color: ${surface_0};
+    color: ${text_primary};
+    border: 1px solid ${border};
+    border-radius: ${radius_sm};
+    outline: none;
+    selection-background-color: ${accent};
+    selection-color: ${text_on_accent};
+}
+
+QListWidget::item, QTreeWidget::item, QTreeView::item, QTableView::item {
+    padding: ${space_1} ${space_2};
+    min-height: 24px;
+}
+
+QListWidget::item:hover, QTreeWidget::item:hover, QTreeView::item:hover,
+QTableView::item:hover {
+    background-color: ${surface_2};
+}
+
+QListWidget::item:selected, QTreeWidget::item:selected,
+QTreeView::item:selected, QTableView::item:selected {
+    background-color: ${accent};
+    color: ${text_on_accent};
+}
+
+/* An item view that has keyboard focus must say so even when its current
+   item is also selected, otherwise focus and selection are indistinguishable
+   for a keyboard user moving between panes. */
+QListWidget:focus, QListView:focus, QTreeWidget:focus, QTreeView:focus,
+QTableView:focus {
+    border: ${focus_ring_width} solid ${focus_ring};
+}
+
+QHeaderView {
+    background-color: ${surface_1};
+}
+
+QHeaderView::section {
+    background-color: ${surface_1};
+    color: ${text_secondary};
+    border: none;
+    border-right: 1px solid ${border};
+    border-bottom: 1px solid ${border};
+    padding: ${space_1} ${space_2};
+    font-weight: 600;
+}
+
+QHeaderView::section:hover {
+    background-color: ${surface_2};
+    color: ${text_primary};
+}
+
+QHeaderView::section:checked {
+    color: ${text_primary};
+    border-bottom: ${focus_ring_width} solid ${accent};
+}
+
+QTableView {
+    gridline-color: ${border};
+}
+
+QTableCornerButton::section {
+    background-color: ${surface_1};
+    border: none;
+    border-right: 1px solid ${border};
+    border-bottom: 1px solid ${border};
+}
+
+/* -- Tabs ------------------------------------------------------------------ */
+
+QTabWidget::pane {
+    border: 1px solid ${border};
+    background-color: ${surface_0};
+}
+
+QTabBar::tab {
+    background-color: ${surface_1};
+    color: ${text_secondary};
+    padding: ${space_2} ${space_4};
+    border: none;
+    min-height: 24px;
+}
+
+QTabBar::tab:hover {
+    background-color: ${surface_2};
+    color: ${text_primary};
+}
+
+QTabBar::tab:selected {
+    background-color: ${surface_0};
+    color: ${text_primary};
+    border-bottom: ${focus_ring_width} solid ${accent};
+}
+
+QTabBar::tab:focus {
+    border: ${focus_ring_width} solid ${focus_ring};
+}
+
+/* -- Scrollbars ------------------------------------------------------------ */
+
+QScrollBar:vertical {
+    background: ${surface_0};
+    width: 12px;
+    margin: 0;
+}
+
+QScrollBar:horizontal {
+    background: ${surface_0};
+    height: 12px;
+    margin: 0;
+}
+
+QScrollBar::handle:vertical {
+    background: ${surface_2};
+    border-radius: ${radius_md};
+    min-height: 24px;
+}
+
+QScrollBar::handle:horizontal {
+    background: ${surface_2};
+    border-radius: ${radius_md};
+    min-width: 24px;
+}
+
+QScrollBar::handle:hover {
+    background: ${border_strong};
+}
+
+QScrollBar::add-line, QScrollBar::sub-line {
+    height: 0;
+    width: 0;
+}
+
+QScrollBar::add-page, QScrollBar::sub-page {
+    background: transparent;
+}
+
+/* -- Feedback: progress, tooltips, semantic states ------------------------- */
+
+QProgressBar {
+    background-color: ${surface_1};
+    color: ${text_primary};
+    border: 1px solid ${border};
+    border-radius: ${radius_sm};
+    text-align: center;
+    min-height: 16px;
+}
+
+QProgressBar::chunk {
+    background-color: ${accent};
+    border-radius: ${radius_sm};
+}
+
+QToolTip {
+    background-color: ${surface_2};
+    color: ${text_primary};
+    border: 1px solid ${border_strong};
+    border-radius: ${radius_sm};
+    padding: ${space_1} ${space_2};
+}
+
+QLabel#statusSuccess { color: ${success}; }
+QLabel#statusWarning { color: ${warning}; }
+QLabel#statusDanger  { color: ${danger}; }
+QLabel#statusInfo    { color: ${info}; }
