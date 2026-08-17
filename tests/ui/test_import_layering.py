@@ -161,6 +161,34 @@ def test_ui_state_bus_does_not_import_the_rest_of_ui() -> None:
     assert not offenders, f"ui_state_bus.py imports from src.ui: {offenders}"
 
 
+# Widget/dialog packages that are display-only and must never import
+# src.ui.controllers -- the dependency direction controllers depend on
+# widgets (they call methods on dock_manager/dialogs/etc.), never the
+# reverse. Milestone 19 introduced src.ui.controllers itself, which is
+# exactly the "controllers/" this file's original docstring anticipated
+# when it said the widgets-never-import-controllers rule should grow
+# alongside that package rather than being deferred to milestone 27.
+_WIDGET_LIKE_PACKAGES = ("widgets", "dialogs")
+
+
+@pytest.mark.parametrize("package", _WIDGET_LIKE_PACKAGES, ids=lambda p: f"src.ui.{p}")
+def test_widget_like_packages_do_not_import_controllers(package: str) -> None:
+    package_root = _SRC_ROOT / "ui" / package
+    offenders: dict[str, set[str]] = {}
+    for path in sorted(package_root.rglob("*.py")):
+        bad = {
+            name
+            for name in _imported_modules(path)
+            if name == "src.ui.controllers" or name.startswith("src.ui.controllers.")
+        }
+        if bad:
+            offenders[str(path.relative_to(PROJECT_ROOT))] = bad
+    assert not offenders, (
+        f"src/ui/{package}/ must never import src.ui.controllers -- controllers "
+        f"depend on widgets/dialogs, not the other way around: {offenders}"
+    )
+
+
 def test_every_ui_module_parses_and_resolves_its_own_dotted_name() -> None:
     """A guard against the helper functions above silently no-op'ing on a
     syntax error or an empty file list -- if src/ui/ has no .py files at all,

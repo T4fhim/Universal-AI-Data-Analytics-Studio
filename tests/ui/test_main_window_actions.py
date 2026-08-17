@@ -53,7 +53,7 @@ def test_new_project_enables_save_action(
 ) -> None:
     from tests.ui.qt_helpers import process_events
 
-    main_window._on_new_project()
+    main_window._project_controller.new_project()
     process_events()  # let UiStateBus's coalesced singleShot(0, ...) fire
 
     action = main_window._binder.action_for("project.save")
@@ -81,3 +81,19 @@ def test_context_capture_against_real_services_does_not_raise(
     )
     assert context.has_project is False
     assert context.has_active_dataset is False
+
+
+def test_close_event_closes_every_live_database_connection(
+    main_window: MainWindow,
+) -> None:
+    """Milestone 19: before this, closeEvent never called
+    DatabaseConnectionService.close_all_connections() at all -- a
+    connection opened via Connect to Database stayed open until the
+    process exited rather than being released when the window closed.
+    """
+    calls: list[bool] = []
+    main_window._database_service.close_all_connections = lambda: calls.append(True)
+
+    main_window.close()
+
+    assert calls == [True]

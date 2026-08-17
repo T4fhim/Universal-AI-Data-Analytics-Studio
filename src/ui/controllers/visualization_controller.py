@@ -1,0 +1,165 @@
+# File: src/ui/controllers/visualization_controller.py
+"""Owns visualization creation and combining visualizations into a dashboard.
+
+Moved out of ``main_window.py`` in milestone 19 -- see
+:mod:`src.ui.controllers`'s own docstring for why this package exists.
+"""
+
+from __future__ import annotations
+
+from PySide6.QtWidgets import QMessageBox, QWidget
+
+from src.core.exceptions import ApplicationError
+from src.core.logger import get_logger
+from src.services.workspace_service import (
+    Dashboard,
+    DashboardTile,
+    Visualization,
+    WorkspaceService,
+)
+from src.ui.dialogs.create_visualization_dialog import CreateVisualizationDialog
+from src.ui.dock_manager import DockManager
+from src.ui.status_bar import ApplicationStatusBar
+from src.ui.ui_state_bus import UiStateBus
+from src.ui.worker_runner import WorkerRunner
+from src.visualization.dashboard_renderer import render_dashboard
+
+_logger = get_logger(__name__)
+
+
+class VisualizationController:
+    """Handles creating a single visualization and combining several into a dashboard.
+
+    Args:
+        parent: The window dialogs should be parented to.
+        workspace_service: Visualizations/dashboards are added and
+            activated here.
+        dock_manager: For opening chart tabs and appending console
+            messages.
+        status_bar: For busy/progress/message feedback.
+        state_bus: Refreshed after a visualization is created, since
+            ``visualization_count`` just changed.
+        worker_runner: Runs dashboard rendering (a real, tile-count-scaling
+            operation) off the UI thread.
+    """
+
+    def __init__(
+        self,
+        parent: QWidget,
+        workspace_service: WorkspaceService,
+        dock_manager: DockManager,
+        status_bar: ApplicationStatusBar,
+        state_bus: UiStateBus,
+        worker_runner: WorkerRunner,
+    ) -> None:
+        self._parent = parent
+        self._workspace_service = workspace_service
+        self._dock_manager = dock_manager
+        self._status_bar = status_bar
+        self._state_bus = state_bus
+        self._worker_runner = worker_runner
+
+    def create_visualization(self) -> None:
+        active_dataset = self._workspace_service.get_active_dataset()
+        if active_dataset is None:
+            QMessageBox.information(
+                self._parent,
+                "No Active Dataset",
+                "Open or select a dataset before creating a visualization.",
+            )
+            return
+
+        dialog = CreateVisualizationDialog(active_dataset.dataframe, self._parent)
+        if dialog.exec() != CreateVisualizationDialog.DialogCode.Accepted:
+            return
+
+        figure, chart_type, parameters = dialog.get_result()
+
+        visualization = Visualization(
+            name=parameters.get("title") or f"{chart_type} of {active_dataset.name}",
+            dataset_id=active_dataset.dataset_id,
+            figure=figure,
+            chart_type=chart_type,
+            chart_parameters=parameters,
+        )
+        self._workspace_service.add_visualization(visualization)
+        self._workspace_service.set_active_visualization(visualization.visualization_id)
+        self._dock_manager.display_chart(figure, name=visualization.name)
+        self._state_bus.request_refresh()  # visualization_count just changed
+
+        self._status_bar.show_message(f"Created visualization: {visualization.name}")
+        self._dock_manager.append_console_message(
+            f"Created visualization '{visualization.name}' ({chart_type})."
+        )
+        _logger.info(
+            "Visualization created via UI: %s (%s)", visualization.name, chart_type
+        )
+
+    def create_dashboard(self) -> None:
+        """Combine every currently tracked visualization into one auto-arranged dashboard.
+
+        A first, bounded version -- combines all visualizations rather than
+        offering a picker/layout designer, which is real additional UI
+        work not built yet. Grid arranged 2 columns wide, row-major order,
+        matching how many tiles happen to exist.
+        """
+        visualizations = self._workspace_service.list_visualizations()
+        if len(visualizations) < 2:
+            QMessageBox.information(
+                self._parent,
+                "Not Enough Visualizations",
+                "Create at least 2 visualizations before building a dashboard.",
+            )
+            return
+
+        columns_per_row = 2
+        tiles = [
+            DashboardTile(
+                visualization_id=viz.visualization_id,
+                row=i // columns_per_row,
+                column=i % columns_per_row,
+            )
+            for i, viz in enumerate(visualizations)
+        ]
+        dashboard = Dashboard(name="Dashboard", tiles=tiles)
+
+        try:
+            self._workspace_service.add_dashboard(dashboard)
+            resolved = self._workspace_service.get_dashboard_tiles(
+                dashboard.dashboard_id
+            )
+        except ApplicationError as exc:
+            QMessageBox.critical(self._parent, "Failed to Create Dashboard", str(exc))
+            _logger.warning("Dashboard creation failed: %s", exc)
+            return
+
+        # Milestone 6: render_dashboard's Plotly-figure assembly is a
+        # named hot spot in the milestone plan (alongside dataset reads
+        # and project reload) -- offloaded the same way, since combining
+        # several figures into one grid is real work that scales with
+        # tile count.
+        self._status_bar.show_busy("Building dashboard…")
+        self._worker_runner.run(
+            render_dashboard,
+            dashboard,
+            resolved,
+            on_result=lambda figure: self._on_dashboard_rendered(figure, len(tiles)),
+            on_error=self._on_dashboard_render_error,
+            on_progress=self._status_bar.show_progress,
+            on_finished=self._status_bar.hide_busy,
+        )
+
+    def _on_dashboard_rendered(self, combined_figure, tile_count: int) -> None:
+        self._dock_manager.display_chart(combined_figure, name="Dashboard")
+        self._status_bar.show_message(
+            f"Created dashboard with {tile_count} visualization(s)."
+        )
+        self._dock_manager.append_console_message(
+            f"Created dashboard with {tile_count} visualization(s)."
+        )
+        _logger.info("Dashboard created via UI: %d tile(s).", tile_count)
+
+    def _on_dashboard_render_error(self, exc: Exception, traceback_text: str) -> None:
+        _logger.error("Dashboard rendering failed: %s\n%s", exc, traceback_text)
+        self._dock_manager.append_console_message(f"⚠ Dashboard creation failed: {exc}")
+        QMessageBox.critical(self._parent, "Failed to Create Dashboard", str(exc))

@@ -9,8 +9,11 @@ problem in a different file (workbench.py, a controller, a stage page).
 
 400 lines excludes docstrings and blank lines, so a well-documented module is
 not penalised for the documentation this project's own conventions require.
-main_window.py itself is allowed to exceed the limit until milestone 19
-(MainWindow decomposition) actually shrinks it -- see _LEGACY_EXEMPTIONS.
+main_window.py was exempted until milestone 19 (MainWindow decomposition)
+actually shrank it (942 -> 238 non-docstring lines, by moving every
+project/dataset/visualization/report/assistant handler into
+src/ui/controllers/) -- the exemption is removed now that the real fix has
+landed, per _LEGACY_EXEMPTIONS' own docstring below.
 """
 
 from __future__ import annotations
@@ -25,9 +28,10 @@ from src.core.constants import PROJECT_ROOT
 _MAX_LINES = 400
 
 # Modules that predate this limit and are explicitly scheduled to shrink in a
-# later milestone (M19's MainWindow decomposition) rather than being padded
-# out today just to pass this test.
-_LEGACY_EXEMPTIONS = {"src/ui/main_window.py", "src/ui/dialogs/settings_dialog.py"}
+# later milestone rather than being padded out today just to pass this test.
+# main_window.py was removed from this set in milestone 19, once its own
+# decomposition actually shrank it below the budget.
+_LEGACY_EXEMPTIONS = {"src/ui/dialogs/settings_dialog.py"}
 
 
 def _non_docstring_line_count(path: Path) -> int:
