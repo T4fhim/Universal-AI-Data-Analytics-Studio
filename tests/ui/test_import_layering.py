@@ -38,10 +38,13 @@ _SRC_ROOT = PROJECT_ROOT / "src"
 # a11y legitimately depends on theme (contrast_manifest.py references
 # ContrastRequirement/AA_BODY_TEXT from theme.contrast); that is a DAG edge
 # within the foundation, not a violation of it, so long as theme never
-# imports a11y back. What this rule actually forbids is a leaf depending on
-# a *non-leaf* UI module (actions/, workbench/, controllers/, ...), which
-# would make it not a foundation at all.
-_LEAF_PACKAGES = ("theme", "a11y")
+# imports a11y back. Milestone 17 adds actions/ to this set for the same
+# reason: action_binder.py depends on theme.icon_provider (another
+# leaf-to-leaf edge), and action_registry.py/action_context.py import
+# nothing from src.ui at all. What this rule actually forbids is a leaf
+# depending on a *non-leaf* UI module (workbench/, controllers/, ...),
+# which would make it not a foundation at all.
+_LEAF_PACKAGES = ("theme", "a11y", "actions")
 
 # src/core/app.py is the application's composition root -- the one place
 # documented in docs/ARCHITECTURE.md that constructs QApplication, MainWindow,
@@ -140,6 +143,22 @@ def test_theme_manager_does_not_import_the_rest_of_ui() -> None:
         and not name.startswith("src.ui.theme")
     }
     assert not offenders, f"theme_manager.py imports from src.ui: {offenders}"
+
+
+def test_ui_state_bus_does_not_import_the_rest_of_ui() -> None:
+    """ui_state_bus.py is the third single-file foundation module (alongside
+    theme_manager.py), anticipated by name in this file's own original
+    docstring before it existed. Every other UI module may depend on it
+    (see its own module docstring for why menu_bar.py/main_window.py call
+    ``request_refresh()``), so it must depend on nothing in src.ui itself.
+    """
+    path = _SRC_ROOT / "ui" / "ui_state_bus.py"
+    offenders = {
+        name
+        for name in _imported_modules(path)
+        if name == "src.ui" or name.startswith("src.ui.")
+    }
+    assert not offenders, f"ui_state_bus.py imports from src.ui: {offenders}"
 
 
 def test_every_ui_module_parses_and_resolves_its_own_dotted_name() -> None:

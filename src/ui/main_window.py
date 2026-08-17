@@ -22,6 +22,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QThreadPool
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QFileDialog,
     QInputDialog,
@@ -29,6 +30,14 @@ from PySide6.QtWidgets import (
     QMessageBox,
 )
 
+# Import-time registration side effect, matching how src.visualization.
+# chart_registry's own built-ins are seeded — this module must be imported
+# somewhere before ActionBinder.assert_all_bound() runs below, or the
+# registry it populates would simply be empty. main_window.py is the
+# composition root for the UI's action-consuming side, so it is the
+# natural place for this import to live rather than a scattered import in
+# menu_bar.py/toolbar.py, which only *consume* the registry, not populate it.
+import src.ui.actions.builtin_actions  # noqa: F401
 from src.ai.assistant_service import AssistantService, AssistantTurnResult
 from src.core.bootstrap import BootstrapContext
 from src.core.constants import APP_NAME, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH
@@ -50,6 +59,9 @@ from src.services.workspace_service import (
     Visualization,
     WorkspaceService,
 )
+from src.ui.actions.action_binder import ActionBinder
+from src.ui.actions.action_context import ActionContext
+from src.ui.command_palette import CommandPalette
 from src.ui.dialogs.about_dialog import AboutDialog
 from src.ui.dialogs.connect_database_dialog import ConnectDatabaseDialog
 from src.ui.dialogs.create_visualization_dialog import CreateVisualizationDialog
@@ -58,8 +70,11 @@ from src.ui.dialogs.settings_dialog import SettingsDialog
 from src.ui.dock_manager import DockManager
 from src.ui.menu_bar import ApplicationMenuBar
 from src.ui.status_bar import ApplicationStatusBar
+from src.ui.theme.icon_provider import IconProvider
+from src.ui.theme.tokens import DARK_TOKENS
 from src.ui.theme_manager import ThemeManager
 from src.ui.toolbar import ApplicationToolBar
+from src.ui.ui_state_bus import UiStateBus
 from src.ui.widgets.welcome_widget import WelcomeWidget
 from src.visualization.dashboard_renderer import render_dashboard
 from src.workers import BaseWorker
@@ -206,10 +221,21 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(APP_NAME)
         self.resize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
 
-        self._menu_bar = ApplicationMenuBar(self)
+        # Milestone 17: IconProvider needs a ThemeTokens instance at
+        # construction, but ThemeManager (which knows the real, configured
+        # theme) is not constructed until after this window is, by
+        # src/core/app.py — see attach_theme_manager below for where this
+        # gets corrected to the real theme. DARK_TOKENS here is a safe,
+        # visible-either-way placeholder for the brief window before that
+        # call, not a real theme decision.
+        self._icon_provider = IconProvider(DARK_TOKENS, parent=self)
+        self._state_bus = UiStateBus(self)
+        self._binder = ActionBinder(self, self._icon_provider)
+
+        self._menu_bar = ApplicationMenuBar(self, self._binder, self._state_bus)
         self.setMenuBar(self._menu_bar)
 
-        self._tool_bar = ApplicationToolBar(self, self._menu_bar)
+        self._tool_bar = ApplicationToolBar(self, self._binder)
         self.addToolBar(self._tool_bar)
 
         self._status_bar = ApplicationStatusBar(self)
@@ -221,9 +247,23 @@ class MainWindow(QMainWindow):
         self._welcome_widget = WelcomeWidget(self)
         self.setCentralWidget(self._welcome_widget)
 
+        self._command_palette = CommandPalette(self, self._binder, self._state_bus)
+        self._command_palette_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
+        self._command_palette_shortcut.activated.connect(self._command_palette.exec)
+
         self._connect_actions()
+        self._binder.assert_all_bound()
+        self._state_bus.state_changed.connect(self._on_ui_state_changed)
+        # Seed enablement once immediately -- every QAction defaults to
+        # Qt's own enabled=True, and state_changed only fires from
+        # request_refresh() (a later mutation) or a menu's aboutToShow.
+        # Without this call, "Save Project" would show enabled on a cold
+        # start with no project open until the user first did something.
+        self._on_ui_state_changed()
+
         self._menu_bar.update_recent_projects_menu(
-            self._project_service.get_recent_projects()
+            self._project_service.get_recent_projects(),
+            on_open=self._on_open_recent_project,
         )
 
         _logger.info("Main window constructed.")
@@ -235,29 +275,20 @@ class MainWindow(QMainWindow):
             self._menu_bar.menu_view.addAction(toggle_action)
 
     def _connect_actions(self) -> None:
-        self._menu_bar.action_new_project.triggered.connect(self._on_new_project)
-        self._menu_bar.action_open_project.triggered.connect(self._on_open_project)
-        self._menu_bar.action_open_dataset.triggered.connect(self._on_open_dataset)
-        self._menu_bar.action_connect_database.triggered.connect(
-            self._on_connect_database
-        )
-        self._menu_bar.action_create_visualization.triggered.connect(
-            self._on_create_visualization
-        )
-        self._menu_bar.action_create_dashboard.triggered.connect(
-            self._on_create_dashboard
-        )
-        self._menu_bar.action_generate_report.triggered.connect(
-            self._on_generate_report
-        )
-        self._menu_bar.action_save_project.triggered.connect(self._on_save_project)
-        self._menu_bar.action_save_project_as.triggered.connect(
-            self._on_save_project_as
-        )
-        self._menu_bar.action_settings.triggered.connect(self._on_open_settings)
-        self._menu_bar.action_exit.triggered.connect(self.close)
-        self._menu_bar.action_toggle_theme.triggered.connect(self._on_toggle_theme)
-        self._menu_bar.action_about.triggered.connect(self._on_open_about)
+        bind = self._binder.bind
+        bind("project.new", self._on_new_project)
+        bind("project.open", self._on_open_project)
+        bind("dataset.open", self._on_open_dataset)
+        bind("dataset.connect_database", self._on_connect_database)
+        bind("analysis.visualize", self._on_create_visualization)
+        bind("analysis.dashboard", self._on_create_dashboard)
+        bind("analysis.generate_report", self._on_generate_report)
+        bind("project.save", self._on_save_project)
+        bind("project.save_as", self._on_save_project_as)
+        bind("project.settings", self._on_open_settings)
+        bind("project.exit", self.close)
+        bind("view.toggle_theme", self._on_toggle_theme)
+        bind("help.about", self._on_open_about)
 
         self._welcome_widget.button_new_project.clicked.connect(self._on_new_project)
         self._welcome_widget.button_open_project.clicked.connect(self._on_open_project)
@@ -266,6 +297,25 @@ class MainWindow(QMainWindow):
             self._on_send_chat_message
         )
 
+    def _on_ui_state_changed(self) -> None:
+        """Recompute and apply enablement -- the sole consumer of ``state_changed``.
+
+        Rebuilds a fresh :class:`~src.ui.actions.action_context.ActionContext`
+        from the live services on every call rather than tracking one
+        incrementally, per that class's own docstring. ``is_busy`` is
+        always ``False`` here: no current ``ActionSpec`` reads it (only
+        ``can_undo``/``can_redo``, also always ``False`` until milestone 23,
+        share that "field exists, nothing consumes it yet" status), so
+        wiring live worker-busy tracking now would be speculative plumbing
+        with no predicate to observe it.
+        """
+        context = ActionContext.capture(
+            project_service=self._project_service,
+            workspace_service=self._workspace_service,
+            settings_service=self._settings_service,
+        )
+        self._binder.refresh_enablement(context)
+
     # -- Project actions --------------------------------------------------------
 
     def _on_new_project(self) -> None:
@@ -273,6 +323,7 @@ class MainWindow(QMainWindow):
         self._status_bar.set_active_project_label(project.name)
         self._status_bar.show_message(f"Created new project: {project.name}")
         _logger.info("New project created via UI: %s", project.name)
+        self._state_bus.request_refresh()  # has_project just became True
 
     def _on_open_project(self) -> None:
         file_path_str, _selected_filter = QFileDialog.getOpenFileName(
@@ -280,19 +331,43 @@ class MainWindow(QMainWindow):
         )
         if not file_path_str:
             return  # user cancelled the dialog
+        self._open_project_at_path(Path(file_path_str))
 
+    def _on_open_recent_project(self, path_str: str) -> None:
+        """Handler for a clicked "Open Recent" entry.
+
+        Milestone 17: before this milestone, ``menu_bar.py`` built these
+        entries with a target path stored via ``QAction.setData()`` but
+        nothing ever connected a handler to them at all — a real, visible,
+        clickable menu item that did nothing when clicked, found by the
+        audit behind this whole overhaul. ``menu_bar.py``'s
+        ``update_recent_projects_menu`` now wires each entry's
+        ``triggered`` signal directly to this method.
+        """
+        self._open_project_at_path(Path(path_str))
+
+    def _open_project_at_path(self, path: Path) -> None:
+        """Shared "open a project file and reload its datasets" logic.
+
+        Used by both :meth:`_on_open_project` (path chosen via a file
+        dialog) and :meth:`_on_open_recent_project` (path chosen from the
+        "Open Recent" submenu) — the two differ only in how ``path`` is
+        obtained, not in what happens once it is.
+        """
         try:
-            project = self._project_service.open_project(Path(file_path_str))
+            project = self._project_service.open_project(path)
         except ApplicationError as exc:
             QMessageBox.critical(self, "Failed to Open Project", str(exc))
-            _logger.warning("Failed to open project from %s: %s", file_path_str, exc)
+            _logger.warning("Failed to open project from %s: %s", path, exc)
             return
 
         self._status_bar.set_active_project_label(project.name)
         self._status_bar.show_message(f"Opened project: {project.name}")
         self._menu_bar.update_recent_projects_menu(
-            self._project_service.get_recent_projects()
+            self._project_service.get_recent_projects(),
+            on_open=self._on_open_recent_project,
         )
+        self._state_bus.request_refresh()  # has_project just became True
         self._reload_project_datasets(project)
 
     def _reload_project_datasets(self, project) -> None:
@@ -329,6 +404,13 @@ class MainWindow(QMainWindow):
         worker = BaseWorker(_read_recorded_datasets, recorded)
         worker.signals.result.connect(self._on_datasets_reloaded)
         worker.signals.error.connect(self._on_datasets_reload_error)
+        # Milestone 17: status_bar.show_progress exists and every worker's
+        # progress signal is now connected to it, even though
+        # _read_recorded_datasets does not itself accept a
+        # progress_callback yet (report_progress=False above) -- see
+        # ApplicationStatusBar.show_progress's own docstring for why that
+        # is deliberate, incremental wiring rather than dead code.
+        worker.signals.progress.connect(self._status_bar.show_progress)
         worker.signals.finished.connect(self._status_bar.hide_busy)
         QThreadPool.globalInstance().start(worker)
 
@@ -423,7 +505,8 @@ class MainWindow(QMainWindow):
 
         self._status_bar.show_message(f"Saved project: {project.name}")
         self._menu_bar.update_recent_projects_menu(
-            self._project_service.get_recent_projects()
+            self._project_service.get_recent_projects(),
+            on_open=self._on_open_recent_project,
         )
 
     # -- Dataset actions --------------------------------------------------------
@@ -476,6 +559,7 @@ class MainWindow(QMainWindow):
         worker.signals.error.connect(
             lambda exc, tb: self._on_dataset_read_error(file_path_str, exc, tb)
         )
+        worker.signals.progress.connect(self._status_bar.show_progress)
         worker.signals.finished.connect(self._status_bar.hide_busy)
         QThreadPool.globalInstance().start(worker)
 
@@ -484,6 +568,7 @@ class MainWindow(QMainWindow):
         self._workspace_service.add_dataset(dataset)
         self._workspace_service.set_active_dataset(dataset.dataset_id)
         self._dock_manager.refresh_dataset_list(self._workspace_service.list_datasets())
+        self._state_bus.request_refresh()  # has_active_dataset just became True
 
         self._status_bar.show_message(
             f"Loaded dataset: {dataset.name} "
@@ -575,6 +660,7 @@ class MainWindow(QMainWindow):
         self._workspace_service.add_visualization(visualization)
         self._workspace_service.set_active_visualization(visualization.visualization_id)
         self._dock_manager.display_chart(figure, name=visualization.name)
+        self._state_bus.request_refresh()  # visualization_count just changed
 
         self._status_bar.show_message(f"Created visualization: {visualization.name}")
         self._dock_manager.append_console_message(
@@ -634,6 +720,7 @@ class MainWindow(QMainWindow):
             lambda figure: self._on_dashboard_rendered(figure, len(tiles))
         )
         worker.signals.error.connect(self._on_dashboard_render_error)
+        worker.signals.progress.connect(self._status_bar.show_progress)
         worker.signals.finished.connect(self._status_bar.hide_busy)
         QThreadPool.globalInstance().start(worker)
 
@@ -691,6 +778,7 @@ class MainWindow(QMainWindow):
         )
         worker.signals.result.connect(self._on_report_generated)
         worker.signals.error.connect(self._on_report_generation_error)
+        worker.signals.progress.connect(self._status_bar.show_progress)
         worker.signals.finished.connect(self._status_bar.hide_busy)
         QThreadPool.globalInstance().start(worker)
 
@@ -812,6 +900,19 @@ class MainWindow(QMainWindow):
         # itself (it would need a live QWidget reference to do that, which
         # this class already is and DockManager deliberately is not).
         self._dock_manager.attach_theme_manager(theme_manager)
+
+        # Milestone 17: self._icon_provider was constructed with DARK_TOKENS
+        # as a placeholder in __init__ (ThemeManager did not exist yet) --
+        # correct it to the real, configured theme now, and keep it
+        # current on every future toggle. current_tokens() is not None
+        # here: src/core/app.py always calls apply_theme() before this
+        # method, so a theme has already been applied by this point.
+        current_tokens = theme_manager.current_tokens()
+        if current_tokens is not None:
+            self._icon_provider.set_tokens(current_tokens)
+        theme_manager.theme_changed.connect(
+            lambda _name: self._icon_provider.set_tokens(theme_manager.current_tokens())
+        )
 
     def _on_open_about(self) -> None:
         dialog = AboutDialog(self)

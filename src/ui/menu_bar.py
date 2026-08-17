@@ -1,30 +1,54 @@
 # File: src/ui/menu_bar.py
-"""Constructs the application's menu bar.
+"""Constructs the application's menu bar from the action registry.
 
-:class:`ApplicationMenuBar` builds the File, Edit, View, and Help
-menus and their actions, but does not itself implement what any action
-*does* — each ``QAction`` is exposed as a public attribute (for
-example, ``self.action_new_project``) so that :mod:`src.ui.main_window`
-can connect it to a real handler that calls into
-:class:`~src.services.project_service.ProjectService` or whichever
-service the action concerns. This keeps "what menu items exist and how
-they're organized" separate from "what happens when the user clicks
-one," matching the separation already used between service and UI
-layers elsewhere in this project.
+Milestone 17 rewrite. Before this milestone, ``ApplicationMenuBar``
+constructed each ``QAction`` itself and exposed it as a named attribute
+(``self.action_new_project``), which ``main_window.py`` connected by hand --
+nothing enforced that every constructed action actually got a handler. Now
+each menu is a flat, declarative list of
+:class:`~src.ui.actions.action_registry.ActionSpec` ids, handed to
+:meth:`~src.ui.actions.action_binder.ActionBinder.build_menu`, which
+constructs (or reuses) the real ``QAction`` for each id -- the same
+``QAction`` the toolbar and command palette also reference, so there is
+exactly one object per action rather than three independent ones that could
+drift out of sync.
 
-Keyboard shortcuts are attached here, since a shortcut is a property of
-the action itself (what key combination triggers it) rather than of
-the handler (what the trigger does).
+The **Edit menu is removed** in this milestone, not merely emptied.
+``Undo``/``Redo`` were real, clickable ``QAction``s connected to nothing
+before this milestone -- exactly the dead-action defect this whole
+overhaul's audit flagged. Milestone 23 gives them real semantics; until
+then, no menu is more honest than one with two permanently-inert entries
+(the same "absence over inert placeholder" reasoning milestone 20 applies
+to the Project Explorer dock).
+
+"Open Recent" stays bespoke rather than becoming registry entries: each
+item's target path is per-instance data no static
+:class:`~src.ui.actions.action_registry.ActionSpec` could represent (there
+is no fixed set of "recent project" ids to register). See
+:meth:`update_recent_projects_menu`.
 """
 
 from __future__ import annotations
 
-from PySide6.QtGui import QAction, QKeySequence
+from collections.abc import Callable
+
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMainWindow, QMenuBar
 
 from src.core.logger import get_logger
+from src.ui.actions.action_binder import ActionBinder
+from src.ui.ui_state_bus import UiStateBus
 
 _logger = get_logger(__name__)
+
+_ANALYSIS_MENU_ACTIONS: tuple[str | None, ...] = (
+    "analysis.visualize",
+    "analysis.dashboard",
+    None,
+    "analysis.generate_report",
+)
+
+_HELP_MENU_ACTIONS: tuple[str | None, ...] = ("help.about",)
 
 
 class ApplicationMenuBar(QMenuBar):
@@ -32,153 +56,105 @@ class ApplicationMenuBar(QMenuBar):
 
     Args:
         parent_window: The main window this menu bar belongs to.
-            Passed through to ``QMenuBar``'s own parent parameter and
-            also used as the parent for each ``QAction``, since Qt
-            actions need a parent to participate correctly in the
-            widget's event and shortcut handling.
+        binder: Constructs and owns every ``QAction`` this menu bar
+            displays -- see the module docstring for why menu construction
+            no longer owns its own actions directly.
+        state_bus: If given, connected to ``aboutToShow`` on every
+            registry-backed menu, so enablement is recomputed just before a
+            menu opens even if a call site failed to call
+            :meth:`~src.ui.ui_state_bus.UiStateBus.request_refresh` itself
+            -- the lazy safety net that module's docstring describes.
     """
 
-    def __init__(self, parent_window: QMainWindow) -> None:
+    def __init__(
+        self,
+        parent_window: QMainWindow,
+        binder: ActionBinder,
+        state_bus: UiStateBus | None = None,
+    ) -> None:
         super().__init__(parent_window)
-        self._build_file_menu(parent_window)
-        self._build_edit_menu(parent_window)
-        self._build_view_menu(parent_window)
-        self._build_analysis_menu(parent_window)
-        self._build_help_menu(parent_window)
+        self.binder = binder
+        self._state_bus = state_bus
+
+        self._build_file_menu()
+        self._build_view_menu()
+        self._build_analysis_menu()
+        self._build_help_menu()
         _logger.debug("Menu bar constructed.")
 
-    def _build_file_menu(self, parent_window: QMainWindow) -> None:
+    def _connect_refresh(self, menu) -> None:
+        if self._state_bus is not None:
+            menu.aboutToShow.connect(self._state_bus.request_refresh)
+
+    def _build_file_menu(self) -> None:
         file_menu = self.addMenu("&File")
+        self._connect_refresh(file_menu)
 
-        self.action_new_project = QAction("&New Project", parent_window)
-        self.action_new_project.setShortcut(QKeySequence.StandardKey.New)
-        file_menu.addAction(self.action_new_project)
-
-        self.action_open_project = QAction("&Open Project...", parent_window)
-        self.action_open_project.setShortcut(QKeySequence.StandardKey.Open)
-        file_menu.addAction(self.action_open_project)
+        self.binder.build_menu(file_menu, ("project.new", "project.open"))
 
         self.menu_recent_projects = file_menu.addMenu("Open &Recent")
 
         file_menu.addSeparator()
+        self.binder.build_menu(
+            file_menu,
+            (
+                "dataset.open",
+                "dataset.connect_database",
+                None,
+                "project.save",
+                "project.save_as",
+                None,
+                "project.settings",
+                None,
+                "project.exit",
+            ),
+        )
 
-        # Dataset actions are grouped separately from project actions
-        # (above) and settings/exit actions (below) — opening a
-        # dataset (a .csv/.json/.txt file, via src.readers) is a
-        # conceptually different operation from opening a project (a
-        # .uads.json file, via ProjectService), even though both are
-        # "open a file" in a loose sense. QKeySequence.StandardKey.Open
-        # (Ctrl+O) is already claimed by action_open_project above, so
-        # this needs its own explicit, non-conflicting shortcut rather
-        # than reusing a standard key that would create an ambiguous
-        # double-binding.
-        self.action_open_dataset = QAction("Open &Dataset...", parent_window)
-        self.action_open_dataset.setShortcut("Ctrl+Shift+O")
-        file_menu.addAction(self.action_open_dataset)
-
-        # Milestone 14: a live database connection is a different kind
-        # of dataset source from a file (see
-        # src.database.database_reader's own docstring for why it
-        # isn't dispatched through the same reader_registry path as
-        # action_open_dataset above) but belongs in the same "bring
-        # data into the workspace" menu group.
-        self.action_connect_database = QAction("Connect to &Database...", parent_window)
-        file_menu.addAction(self.action_connect_database)
-
-        file_menu.addSeparator()
-
-        self.action_save_project = QAction("&Save Project", parent_window)
-        self.action_save_project.setShortcut(QKeySequence.StandardKey.Save)
-        file_menu.addAction(self.action_save_project)
-
-        self.action_save_project_as = QAction("Save Project &As...", parent_window)
-        self.action_save_project_as.setShortcut(QKeySequence.StandardKey.SaveAs)
-        file_menu.addAction(self.action_save_project_as)
-
-        file_menu.addSeparator()
-
-        self.action_settings = QAction("Se&ttings...", parent_window)
-        self.action_settings.setShortcut(QKeySequence.StandardKey.Preferences)
-        file_menu.addAction(self.action_settings)
-
-        file_menu.addSeparator()
-
-        self.action_exit = QAction("E&xit", parent_window)
-        self.action_exit.setShortcut(QKeySequence.StandardKey.Quit)
-        file_menu.addAction(self.action_exit)
-
-    def _build_edit_menu(self, parent_window: QMainWindow) -> None:
-        edit_menu = self.addMenu("&Edit")
-
-        self.action_undo = QAction("&Undo", parent_window)
-        self.action_undo.setShortcut(QKeySequence.StandardKey.Undo)
-        edit_menu.addAction(self.action_undo)
-
-        self.action_redo = QAction("&Redo", parent_window)
-        self.action_redo.setShortcut(QKeySequence.StandardKey.Redo)
-        edit_menu.addAction(self.action_redo)
-
-    def _build_view_menu(self, parent_window: QMainWindow) -> None:
+    def _build_view_menu(self) -> None:
         view_menu = self.addMenu("&View")
-
-        self.action_toggle_theme = QAction("Toggle &Dark / Light Theme", parent_window)
-        view_menu.addAction(self.action_toggle_theme)
-
+        self._connect_refresh(view_menu)
+        self.binder.build_menu(view_menu, ("view.toggle_theme",))
         view_menu.addSeparator()
 
         # Dock-widget visibility toggles are added here by main_window.py
-        # after DockManager has constructed the actual dock widgets,
-        # since this menu needs a reference to each dock's own
-        # toggleViewAction() — this class does not construct docks
-        # itself (that is DockManager's responsibility) and so cannot
-        # populate these entries at __init__ time.
+        # after DockManager has constructed the actual dock widgets --
+        # unchanged from before this milestone; a dock's own
+        # toggleViewAction() is per-instance state this class has no
+        # reason to know about, the same category of exception "Open
+        # Recent" is.
         self.menu_view = view_menu
 
-    def _build_analysis_menu(self, parent_window: QMainWindow) -> None:
-        # Separate from View: a chart is a data action performed on
-        # the active dataset (closer in kind to Open Dataset), not a
-        # toggle of the window's own appearance. Also gives future
-        # Statistics Engine actions (correlation, aggregation views) a
-        # natural home without a second menu reshuffle later.
+    def _build_analysis_menu(self) -> None:
         analysis_menu = self.addMenu("&Analysis")
+        self._connect_refresh(analysis_menu)
+        self.binder.build_menu(analysis_menu, _ANALYSIS_MENU_ACTIONS)
 
-        self.action_create_visualization = QAction("&Visualize...", parent_window)
-        analysis_menu.addAction(self.action_create_visualization)
-
-        self.action_create_dashboard = QAction("Create &Dashboard", parent_window)
-        analysis_menu.addAction(self.action_create_dashboard)
-
-        analysis_menu.addSeparator()
-
-        # Milestone 13: replays the active dataset's AnalysisLog into a
-        # PDF/HTML/Word/Excel document — see
-        # src.services.report_service.ReportService and
-        # src.ui.dialogs.generate_report_dialog.GenerateReportDialog.
-        self.action_generate_report = QAction("&Generate Report...", parent_window)
-        analysis_menu.addAction(self.action_generate_report)
-
-    def _build_help_menu(self, parent_window: QMainWindow) -> None:
+    def _build_help_menu(self) -> None:
         help_menu = self.addMenu("&Help")
+        self._connect_refresh(help_menu)
+        self.binder.build_menu(help_menu, _HELP_MENU_ACTIONS)
 
-        self.action_about = QAction("&About", parent_window)
-        help_menu.addAction(self.action_about)
-
-    def update_recent_projects_menu(self, recent_paths: list[str]) -> None:
-        """Rebuild the "Open Recent" submenu from a list of project paths.
+    def update_recent_projects_menu(
+        self, recent_paths: list[str], on_open: Callable[[str], None]
+    ) -> None:
+        """Rebuild the "Open Recent" submenu and wire each entry to actually open.
 
         Args:
             recent_paths: Paths as returned by
                 :meth:`~src.services.project_service.ProjectService.get_recent_projects`,
-                most recent first. Each becomes a clickable action;
-                connecting those actions to actually opening the
-                project is :mod:`src.ui.main_window`'s job, done after
-                calling this method, since this method only rebuilds
-                the menu structure and does not know how to open a
-                project itself.
+                most recent first.
+            on_open: Called with the clicked path when a recent-project
+                entry is selected. Wiring happens *here*, in the same
+                method that (re)builds the submenu, rather than at each of
+                this method's several call sites in ``main_window.py`` --
+                before this milestone, no call site did this at all,
+                which is exactly why "Open Recent" was a no-op; doing it
+                in one place means a future call site cannot reintroduce
+                that gap by forgetting to connect.
 
         This clears and rebuilds the submenu each time rather than
-        diffing against the previous contents, since the list is
-        small (capped at 10 by
+        diffing against the previous contents, since the list is small
+        (capped at 10 by
         :class:`~src.services.project_service.ProjectService`) and
         rebuilding is simpler and less error-prone than maintaining
         incremental menu state.
@@ -195,5 +171,13 @@ class ApplicationMenuBar(QMenuBar):
         for path_str in recent_paths:
             action = QAction(path_str, self)
             action.setData(path_str)
+            # Bound as a default argument, not a closure over the loop
+            # variable -- `lambda: on_open(path_str)` without the default
+            # would have every action in this loop end up calling on_open
+            # with whatever path_str happened to be *last* in the list,
+            # the classic late-binding-closure bug.
+            action.triggered.connect(
+                lambda _checked=False, path=path_str: on_open(path)
+            )
             self.menu_recent_projects.addAction(action)
             self.actions_recent_projects.append(action)

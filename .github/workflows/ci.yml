@@ -54,13 +54,24 @@ jobs:
         # DependencyContainer.resolve() returning `object`, an
         # architecture-level typing gap predating this overhaul), which is
         # out of scope for a "ChartView hardening + CI gate" milestone to
-        # silently fix or silently ignore. src/ui/theme, src/ui/a11y, and
-        # src/ui/web are the Qt-free-or-Qt-isolated foundation packages
-        # this overhaul has built so far and kept genuinely mypy-clean;
-        # this list is expected to grow as later milestones make each new
-        # package clean, the same way tests/ui/test_module_size.py's
+        # silently fix or silently ignore. src/ui/theme, src/ui/a11y,
+        # src/ui/web, and (as of milestone 17) src/ui/actions are the
+        # Qt-free-or-Qt-isolated foundation packages this overhaul has
+        # built so far and kept genuinely mypy-clean; this list is
+        # expected to grow as later milestones make each new package
+        # clean, the same way tests/ui/test_module_size.py's
         # _LEGACY_EXEMPTIONS shrinks rather than one big repo-wide fix now.
-        run: python -m mypy src/ui/theme src/ui/a11y src/ui/web --ignore-missing-imports
+        #
+        # --follow-imports=silent: action_context.py imports the services
+        # layer (ProjectService/WorkspaceService/SettingsService/
+        # PipelineStage) to build its snapshot, and without this flag
+        # mypy also emits diagnostics for *those* modules' own pre-
+        # existing errors (a handful of BaseOperation.apply signature
+        # mismatches, unrelated to anything this milestone touches) --
+        # this flag keeps mypy using their type signatures for checking
+        # actions/ itself while not holding actions/ responsible for
+        # fixing debt in modules it merely calls into.
+        run: python -m mypy src/ui/theme src/ui/a11y src/ui/web src/ui/actions --ignore-missing-imports --follow-imports=silent
 
       - name: pytest
         run: python -m pytest tests/ -q
