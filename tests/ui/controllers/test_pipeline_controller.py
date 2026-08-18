@@ -33,6 +33,7 @@ from src.services.analysis_orchestrator_service import (
 )
 from src.services.project_service import ProjectService
 from src.services.workspace_service import Dataset, WorkspaceService
+from src.ui.command_stack import CommandStack
 from src.ui.controllers.pipeline_controller import PipelineController
 from src.ui.dock_manager import DockManager
 from src.ui.status_bar import ApplicationStatusBar
@@ -60,6 +61,7 @@ def _make_controller(
     state_bus = UiStateBus(window)
     worker_runner = WorkerRunner(window)
 
+    command_stack = CommandStack(workspace_service)
     controller = PipelineController(
         window,
         workspace_service,
@@ -69,6 +71,7 @@ def _make_controller(
         status_bar,
         state_bus,
         worker_runner,
+        command_stack,
     )
     return controller, workspace_service, orchestrator_service, project_service
 
@@ -160,6 +163,7 @@ def test_restore_logs_for_project_installs_logs_into_the_orchestrator(
         controller._status_bar,
         controller._state_bus,
         controller._worker_runner,
+        controller._command_stack,
     )
     assert fresh_orchestrator.get_log(dataset.dataset_id).entries == []
 
@@ -201,6 +205,7 @@ def test_round_trip_through_a_real_project_file_preserves_the_analysis_log(
         controller._status_bar,
         controller._state_bus,
         controller._worker_runner,
+        controller._command_stack,
     )
 
     fresh_controller.restore_logs_for_project(reopened_project)

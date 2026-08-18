@@ -84,7 +84,11 @@ class VisualizationController:
         )
         self._workspace_service.add_visualization(visualization)
         self._workspace_service.set_active_visualization(visualization.visualization_id)
-        self._dock_manager.display_chart(figure, name=visualization.name)
+        self._dock_manager.display_chart(
+            figure,
+            name=visualization.name,
+            closable_ref=("visualization", visualization.visualization_id),
+        )
         self._state_bus.request_refresh()  # visualization_count just changed
 
         self._status_bar.show_message(f"Created visualization: {visualization.name}")
@@ -143,14 +147,20 @@ class VisualizationController:
             render_dashboard,
             dashboard,
             resolved,
-            on_result=lambda figure: self._on_dashboard_rendered(figure, len(tiles)),
+            on_result=lambda figure: self._on_dashboard_rendered(
+                figure, len(tiles), dashboard.dashboard_id
+            ),
             on_error=self._on_dashboard_render_error,
             on_progress=self._status_bar.show_progress,
             on_finished=self._status_bar.hide_busy,
         )
 
-    def _on_dashboard_rendered(self, combined_figure, tile_count: int) -> None:
-        self._dock_manager.display_chart(combined_figure, name="Dashboard")
+    def _on_dashboard_rendered(
+        self, combined_figure, tile_count: int, dashboard_id: str
+    ) -> None:
+        self._dock_manager.display_chart(
+            combined_figure, name="Dashboard", closable_ref=("dashboard", dashboard_id)
+        )
         self._status_bar.show_message(
             f"Created dashboard with {tile_count} visualization(s)."
         )
@@ -158,6 +168,36 @@ class VisualizationController:
             f"Created dashboard with {tile_count} visualization(s)."
         )
         _logger.info("Dashboard created via UI: %d tile(s).", tile_count)
+
+    # -- Closing (milestone 23) --------------------------------------------------------
+
+    def on_chart_closed(self, kind: str, ref_id: str) -> None:
+        """Close whichever workspace object a just-closed chart-dock tab represented.
+
+        Connected to :meth:`~src.ui.dock_manager.DockManager.connect_chart_closed`, which
+        fires with the ``closable_ref`` a tab was opened with (see :meth:`create_visualization`/
+        :meth:`_on_dashboard_rendered` above) -- ``kind`` is always either ``"visualization"``
+        or ``"dashboard"`` (the only two kinds either call site ever passes), dispatched to the
+        matching :class:`~src.services.workspace_service.WorkspaceService` close method. A tab
+        opened with no ``closable_ref`` (an AI-built chart not tracked as a real
+        :class:`~src.services.workspace_service.Visualization` -- see
+        :meth:`~src.ui.dock_manager.DockManager.display_chart`'s own docstring) never reaches
+        this method at all; that gap is not this milestone's scope.
+        """
+        try:
+            if kind == "visualization":
+                self._workspace_service.close_visualization(ref_id)
+            elif kind == "dashboard":
+                self._workspace_service.close_dashboard(ref_id)
+            else:  # pragma: no cover -- defensive; only the two kinds above are ever passed
+                _logger.warning("Unknown closable_ref kind: %r", kind)
+                return
+        except ApplicationError as exc:
+            _logger.warning("Could not close %s %s: %s", kind, ref_id, exc)
+            return
+        self._state_bus.request_refresh()  # visualization_count just changed
+        self._dock_manager.append_console_message(f"Closed {kind} {ref_id}.")
+        _logger.info("Closed %s via UI: %s", kind, ref_id)
 
     def _on_dashboard_render_error(self, exc: Exception, traceback_text: str) -> None:
         _logger.error("Dashboard rendering failed: %s\n%s", exc, traceback_text)

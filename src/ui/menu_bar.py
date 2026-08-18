@@ -13,13 +13,13 @@ constructs (or reuses) the real ``QAction`` for each id -- the same
 exactly one object per action rather than three independent ones that could
 drift out of sync.
 
-The **Edit menu is removed** in this milestone, not merely emptied.
-``Undo``/``Redo`` were real, clickable ``QAction``s connected to nothing
-before this milestone -- exactly the dead-action defect this whole
-overhaul's audit flagged. Milestone 23 gives them real semantics; until
-then, no menu is more honest than one with two permanently-inert entries
-(the same "absence over inert placeholder" reasoning milestone 20 applies
-to the Project Explorer dock).
+The **Edit menu was removed** in milestone 17, not merely emptied --
+``Undo``/``Redo`` were real, clickable ``QAction``s connected to nothing at
+the time, exactly the dead-action defect this whole overhaul's audit
+flagged (the same "absence over inert placeholder" reasoning milestone 20
+applies to the Project Explorer dock). **It returns here in milestone 23**,
+now that ``edit.undo``/``edit.redo`` have real semantics -- see
+:mod:`~src.ui.command_stack`'s own docstring.
 
 "Open Recent" stays bespoke rather than becoming registry entries: each
 item's target path is per-instance data no static
@@ -77,6 +77,7 @@ class ApplicationMenuBar(QMenuBar):
         self._state_bus = state_bus
 
         self._build_file_menu()
+        self._build_edit_menu()
         self._build_view_menu()
         self._build_analysis_menu()
         self._build_help_menu()
@@ -109,6 +110,11 @@ class ApplicationMenuBar(QMenuBar):
                 "project.exit",
             ),
         )
+
+    def _build_edit_menu(self) -> None:
+        self.menu_edit = self.addMenu("&Edit")
+        self._connect_refresh(self.menu_edit)
+        self.binder.build_menu(self.menu_edit, ("edit.undo", "edit.redo"))
 
     def _build_view_menu(self) -> None:
         view_menu = self.addMenu("&View")

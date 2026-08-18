@@ -13,6 +13,7 @@ from src.ui.workbench import stage_page, stage_registry
 def test_builtin_stages_are_registered() -> None:
     registered = stage_registry.list_registered_stages()
     assert PipelineStage.UNDERSTAND in registered
+    assert PipelineStage.CLEAN in registered
     assert PipelineStage.EXPLORE in registered
     assert PipelineStage.ANALYZE in registered
     assert PipelineStage.EXPLAIN in registered
@@ -21,7 +22,8 @@ def test_builtin_stages_are_registered() -> None:
 
 
 def test_get_stage_page_class_returns_none_for_an_unregistered_stage() -> None:
-    assert stage_registry.get_stage_page_class(PipelineStage.CLEAN) is None
+    # VISUALIZE has no page yet (milestone 24's own scope) -- CLEAN gained one in milestone 23.
+    assert stage_registry.get_stage_page_class(PipelineStage.VISUALIZE) is None
 
 
 def test_register_stage_page_rejects_a_duplicate_stage() -> None:

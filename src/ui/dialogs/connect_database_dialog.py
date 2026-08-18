@@ -89,7 +89,17 @@ class ConnectDatabaseDialog(QDialog):
         self._saved_profile_combo.currentIndexChanged.connect(
             self._on_saved_profile_selected
         )
-        layout.addRow("Saved profile:", self._saved_profile_combo)
+        # Milestone 23: "Delete Profile" -- the first UI path to
+        # DatabaseConnectionService.delete_profile; before this, a saved profile could only
+        # accumulate, never be removed, once written.
+        self._delete_profile_button = QPushButton("Delete Profile", self)
+        self._delete_profile_button.clicked.connect(self._on_delete_profile)
+        saved_profile_row = QWidget(self)
+        saved_profile_row_layout = QHBoxLayout(saved_profile_row)
+        saved_profile_row_layout.setContentsMargins(0, 0, 0, 0)
+        saved_profile_row_layout.addWidget(self._saved_profile_combo, 1)
+        saved_profile_row_layout.addWidget(self._delete_profile_button)
+        layout.addRow("Saved profile:", saved_profile_row)
 
         self._name_field = QLineEdit(self)
         layout.addRow("Profile name:", self._name_field)
@@ -183,6 +193,22 @@ class ConnectDatabaseDialog(QDialog):
         self._database_field.setText(profile.database)
         self._username_field.setText(profile.username)
         self._password_field.clear()  # never saved — see module docstring
+
+    def _on_delete_profile(self) -> None:
+        """Delete the currently selected saved profile -- real, reachable path to
+        :meth:`~src.services.database_connection_service.DatabaseConnectionService.
+        delete_profile` (milestone 23)."""
+        profile: ConnectionProfile | None = self._saved_profile_combo.currentData()
+        if profile is None:
+            QMessageBox.information(
+                self, "No Profile Selected", "Choose a saved profile to delete."
+            )
+            return
+        self._database_service.delete_profile(profile.profile_id)
+        index = self._saved_profile_combo.currentIndex()
+        self._saved_profile_combo.removeItem(index)
+        self._saved_profile_combo.setCurrentIndex(0)  # back to "(New profile)"
+        _logger.info("Deleted saved connection profile '%s'.", profile.name)
 
     def _on_db_type_changed(self) -> None:
         db_type = self._current_db_type()

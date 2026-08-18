@@ -28,10 +28,11 @@ def test_workbench_starts_on_the_welcome_page(qapp: QApplication) -> None:
 def test_workbench_has_a_page_for_every_registered_stage(qapp: QApplication) -> None:
     workbench = Workbench()
     assert workbench.page_for(PipelineStage.UNDERSTAND) is not None
+    assert workbench.page_for(PipelineStage.CLEAN) is not None
     assert workbench.page_for(PipelineStage.REPORT) is not None
     assert workbench.page_for(PipelineStage.REPRODUCE) is not None
-    # CLEAN has no page yet (milestone 23's own scope) -- returns None, not a crash.
-    assert workbench.page_for(PipelineStage.CLEAN) is None
+    # VISUALIZE has no page yet (milestone 24's own scope) -- returns None, not a crash.
+    assert workbench.page_for(PipelineStage.VISUALIZE) is None
 
 
 def test_opening_a_dataset_transitions_the_center_pane_off_welcome(

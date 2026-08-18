@@ -19,22 +19,26 @@ def _menu_titles(menu_bar: ApplicationMenuBar) -> set[str]:
     return {action.text().replace("&", "") for action in menu_bar.actions()}
 
 
-def test_edit_menu_does_not_exist(qapp: QApplication) -> None:
-    """Milestone 17 removes Undo/Redo entirely rather than keeping them as
-    permanently-disabled placeholders -- see menu_bar.py's module
-    docstring. No Edit menu at all is the visible result.
+def test_edit_menu_has_undo_and_redo(qapp: QApplication) -> None:
+    """Milestone 23 reintroduces the Edit menu -- removed in milestone 17 because Undo/Redo
+    were connected to nothing, restored now that they have real semantics (see
+    src/ui/command_stack.py's own docstring).
     """
     window = QMainWindow()
     binder = ActionBinder(window)
     menu_bar = ApplicationMenuBar(window, binder)
-    assert "Edit" not in _menu_titles(menu_bar)
+    assert "Edit" in _menu_titles(menu_bar)
+    assert {a.text().replace("&", "") for a in menu_bar.menu_edit.actions()} == {
+        "Undo",
+        "Redo",
+    }
 
 
 def test_expected_menus_exist(qapp: QApplication) -> None:
     window = QMainWindow()
     binder = ActionBinder(window)
     menu_bar = ApplicationMenuBar(window, binder)
-    assert _menu_titles(menu_bar) == {"File", "View", "Analysis", "Help"}
+    assert _menu_titles(menu_bar) == {"File", "Edit", "View", "Analysis", "Help"}
 
 
 def test_recent_projects_menu_shows_placeholder_when_empty(

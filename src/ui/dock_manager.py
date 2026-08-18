@@ -42,6 +42,7 @@ direct method call never had.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QDateTime, QObject, Qt, Signal
@@ -55,6 +56,8 @@ from PySide6.QtWidgets import (
 )
 
 from src.core.logger import get_logger
+from src.ui.dataset_close_menu import DatasetCloseMenu
+from src.ui.theme.tokens import DARK_TOKENS
 from src.ui.widgets.chart_view import ChartView
 from src.ui.widgets.chat_panel import ChatPanel
 from src.ui.widgets.data_table.data_table_view import DataTableView
@@ -162,6 +165,10 @@ class DockManager:
         self._project_label = "(No project open)"
         self._last_datasets: list = []
 
+        # Milestone 23: see connect_chart_closed below (dataset closing is handled by
+        # DatasetCloseMenu itself -- constructed in _build_dataset_explorer_dock).
+        self._chart_closed_handler: Callable[[str, str], None] | None = None
+
         self.dock_dataset_explorer = self._build_dataset_explorer_dock()
         self.dock_console = self._build_console_dock()
         self.dock_logging = self._build_logging_dock()
@@ -245,9 +252,18 @@ class DockManager:
         # just made visible rather than only queryable in code.
         self._dataset_tree_widget = QTreeWidget(dock)
         self._dataset_tree_widget.setHeaderHidden(True)
+        # Milestone 23: right-click "Close Dataset" -- see dataset_close_menu.py.
+        self._dataset_close_menu = DatasetCloseMenu(self._dataset_tree_widget)
         self._rebuild_dataset_tree([])
         dock.setWidget(self._dataset_tree_widget)
         return dock
+
+    def connect_dataset_close_requested(self, handler: Callable[[str], None]) -> None:
+        """Call ``handler(dataset_id)`` when "Close Dataset" is chosen from the tree's context menu.
+
+        See :mod:`~src.ui.dataset_close_menu`'s own docstring for the full rationale.
+        """
+        self._dataset_close_menu.connect(handler)
 
     def set_project_label(self, project_name: str | None) -> None:
         """Update the "Project" top-level node's text and rebuild the tree to show it.
@@ -421,11 +437,27 @@ class DockManager:
     def _on_chart_tab_close_requested(self, index: int) -> None:
         widget = self._chart_tabs.widget(index)
         self._chart_tabs.removeTab(index)
-        if widget is not None:
-            # Qt's removeTab() does not itself destroy the removed
-            # widget — without this, each closed chart tab would leak
-            # its QWebEngineView (ChartView) rather than being freed.
-            widget.deleteLater()
+        if widget is None:
+            return
+        # Milestone 23: forward display_chart(closable_ref=...)'s stashed property to
+        # connect_chart_closed's handler -- None for a tab with no closable_ref.
+        closable_ref = widget.property("closableRef")
+        if closable_ref is not None and self._chart_closed_handler is not None:
+            self._chart_closed_handler(*closable_ref)
+        widget.deleteLater()  # removeTab() alone does not destroy the removed widget
+
+    def connect_chart_closed(self, handler: Callable[[str, str], None]) -> None:
+        """Call ``handler(kind, ref_id)`` when a chart-dock tab opened with a ``closable_ref``
+        (see :meth:`display_chart`) is closed.
+
+        Milestone 23: the same "genuinely reachable" close wiring
+        :meth:`connect_dataset_close_requested` gives datasets, for visualizations and
+        dashboards -- ``kind`` is ``"visualization"`` or ``"dashboard"``, matching whichever
+        string :meth:`~src.ui.controllers.visualization_controller.VisualizationController.
+        create_visualization`/``_on_dashboard_rendered`` passed as ``closable_ref``'s first
+        element.
+        """
+        self._chart_closed_handler = handler
 
     def _build_data_table_dock(self) -> QDockWidget:
         dock = QDockWidget("Data Table", self._parent_window)
@@ -518,7 +550,12 @@ class DockManager:
         self.dock_data_table.raise_()
         self.dock_data_table.show()
 
-    def display_chart(self, figure, name: str | None = None) -> None:
+    def display_chart(
+        self,
+        figure,
+        name: str | None = None,
+        closable_ref: tuple[str, str] | None = None,
+    ) -> None:
         """Add ``figure`` as a new tab in the chart dock and bring it to the foreground.
 
         Args:
@@ -531,6 +568,14 @@ class DockManager:
                 callers that have a meaningful name (a
                 ``Visualization.name``, a dashboard title) should pass
                 it for a more useful tab label.
+            closable_ref: Milestone 23. ``(kind, id)`` -- ``("visualization",
+                visualization_id)`` or ``("dashboard", dashboard_id)`` -- identifying which
+                :class:`~src.services.workspace_service.WorkspaceService`-tracked object this
+                tab represents, so :meth:`connect_chart_closed`'s handler can actually close
+                it when the tab closes. ``None`` (the default) for a tab with nothing tracked
+                to close (an AI-built chart -- milestone 9's ``build_chart`` tool -- is never
+                added as a :class:`~src.services.workspace_service.Visualization`), matching
+                every call site written before this milestone, which keeps working unchanged.
         """
         chart_view = ChartView(self._chart_tabs)
         tokens = (
@@ -539,6 +584,8 @@ class DockManager:
             else None
         ) or DARK_TOKENS
         chart_view.display_figure(figure, tokens)
+        if closable_ref is not None:
+            chart_view.setProperty("closableRef", closable_ref)
         tab_label = name or f"Chart {self._chart_tabs.count() + 1}"
         index = self._chart_tabs.addTab(chart_view, tab_label)
         self._chart_tabs.setCurrentIndex(index)

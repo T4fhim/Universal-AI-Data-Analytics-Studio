@@ -239,6 +239,30 @@ class DatasetController:
                 f"following was noted while reading it:\n\n{warnings_text}",
             )
 
+    def close_dataset(self, dataset_id: str) -> None:
+        """Remove ``dataset_id`` from the workspace -- milestone 23's "data accumulates until
+        exit" fix. Connected to :meth:`~src.ui.dock_manager.DockManager.
+        connect_dataset_close_requested`'s "Close Dataset" context-menu action.
+
+        Per :meth:`~src.services.workspace_service.WorkspaceService.close_dataset`'s own
+        docstring, this does **not** cascade to datasets derived from ``dataset_id`` -- a
+        dangling ``parent_dataset_id`` on a child dataset is expected, not an error this
+        method guards against (see that method's own reasoning).
+        """
+        try:
+            self._workspace_service.close_dataset(dataset_id)
+        except ServiceError as exc:
+            # Stale id (double-close via a rebuild race) -- logged, not shown as a dialog,
+            # matching on_dataset_double_clicked's own "not fatal" handling of the same
+            # class of timing edge case.
+            _logger.warning("Could not close dataset %s: %s", dataset_id, exc)
+            return
+        self._dock_manager.refresh_dataset_list(self._workspace_service.list_datasets())
+        self._state_bus.request_refresh()
+        self._status_bar.show_message("Closed dataset.")
+        self._dock_manager.append_console_message(f"Closed dataset {dataset_id}.")
+        _logger.info("Dataset closed via UI: %s", dataset_id)
+
     def _on_dataset_read_error(
         self, file_path_str: str, exc: Exception, traceback_text: str
     ) -> None:

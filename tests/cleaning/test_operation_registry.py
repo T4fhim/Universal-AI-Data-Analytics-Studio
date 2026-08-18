@@ -11,6 +11,7 @@ from src.cleaning.operation_registry import (
     get_operation,
     list_operations,
     register_operation,
+    unregister_operation,
 )
 from src.core.exceptions import ServiceError
 
@@ -33,5 +34,13 @@ def test_register_operation_duplicate_name_raises() -> None:
 
 
 def test_register_operation_new_name_succeeds() -> None:
+    # _REGISTRY is process-global module state (see operation_registry.py's own
+    # "populate at import time" design, mirroring chart_registry/reader_registry) --
+    # unregistered here so this test does not leak "_test_only_operation" into every other
+    # test in the suite that calls list_operations()/get_operation() afterward (notably
+    # tests/ui/workbench/test_clean_page.py's exact-count assertions).
     register_operation("_test_only_operation", DropMissingValues)
-    assert get_operation("_test_only_operation") is DropMissingValues
+    try:
+        assert get_operation("_test_only_operation") is DropMissingValues
+    finally:
+        unregister_operation("_test_only_operation")

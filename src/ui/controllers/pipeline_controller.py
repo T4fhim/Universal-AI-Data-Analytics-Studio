@@ -81,6 +81,12 @@ class PipelineController:
             thread -- ``profile_dataset`` iterates every column and is not guaranteed fast
             on a large dataset, matching why :class:`~src.ui.controllers.dataset_controller.
             DatasetController` offloads its own reads.
+        command_stack: Milestone 23. Where :meth:`register_clean_operation` pushes a new
+            undoable command and :meth:`undo`/:meth:`redo` replay one -- constructed once in
+            ``main_window.py`` (not resolved from the ``DependencyContainer``; see
+            :mod:`~src.ui.command_stack`'s own docstring for why) and handed to this
+            controller since ``PipelineController`` already owns every other pipeline-shaped
+            mutation of the active dataset (``run_understand_stage``, ``reproduce_active_dataset``).
         on_changed: Called after anything that could have changed the active dataset's
             pipeline state (a stage ran, a reproduction completed, logs were restored from a
             reopened project) -- typically
@@ -99,6 +105,7 @@ class PipelineController:
         status_bar: ApplicationStatusBar,
         state_bus: UiStateBus,
         worker_runner: WorkerRunner,
+        command_stack: CommandStack,
         on_changed: Callable[[], None] | None = None,
     ) -> None:
         self._parent = parent
@@ -109,6 +116,7 @@ class PipelineController:
         self._status_bar = status_bar
         self._state_bus = state_bus
         self._worker_runner = worker_runner
+        self._command_stack = command_stack
         self._on_changed = on_changed
 
     # -- Reading pipeline state --------------------------------------------------------
@@ -174,6 +182,74 @@ class PipelineController:
         _logger.error("Pipeline stage run failed: %s\n%s", exc, traceback_text)
         self._dock_manager.append_console_message(f"⚠ Pipeline stage failed: {exc}")
         QMessageBox.critical(self._parent, "Stage Failed", str(exc))
+
+    # -- Cleaning (milestone 23) --------------------------------------------------------
+
+    def register_clean_operation(self, derived: Dataset) -> None:
+        """Add a cleaning operation's result to the workspace and make it undoable.
+
+        Connected to :attr:`~src.ui.workbench.pages.clean_page.CleanPage.operation_applied` in
+        ``main_window.py``. ``derived`` has already been produced by
+        :meth:`~src.cleaning.base_operation.BaseOperation.apply` by the time this runs (see
+        ``CleanPage``'s own docstring for why the page computes it, not this controller) --
+        this method's only job is bookkeeping: add it to the workspace, make it active, and
+        push a :class:`~src.ui.command_stack.DatasetPointerCommand` so :meth:`undo` can move
+        the active pointer back.
+        """
+        self._workspace_service.add_dataset(derived)
+        self._workspace_service.set_active_dataset(derived.dataset_id)
+        self._command_stack.push(
+            DatasetPointerCommand(
+                description=derived.derivation_description or "Cleaning operation",
+                dataset_id=derived.dataset_id,
+                parent_dataset_id=derived.parent_dataset_id,
+            )
+        )
+        self._dock_manager.refresh_dataset_list(self._workspace_service.list_datasets())
+        self._state_bus.request_refresh()  # has_active_dataset/can_undo both just changed
+        self._status_bar.show_message(
+            derived.derivation_description or f"Created dataset '{derived.name}'."
+        )
+        self._dock_manager.append_console_message(
+            f"Cleaning: {derived.derivation_description or derived.name}"
+        )
+        if self._on_changed is not None:
+            self._on_changed()
+
+    def undo(self) -> None:
+        """Move the active-dataset pointer back to the parent of the most recent operation.
+
+        Never mutates any dataset's dataframe -- see
+        :meth:`~src.ui.command_stack.CommandStack.undo`'s own docstring; this method is a thin
+        UI-feedback wrapper around it (busy state is not needed here, unlike
+        :meth:`run_understand_stage` -- moving a pointer is O(1), nothing to offload).
+        """
+        try:
+            command = self._command_stack.undo()
+        except ServiceError as exc:
+            _logger.warning("Undo requested with nothing to undo: %s", exc)
+            return
+        self._status_bar.show_message(f"Undid: {command.description}")
+        self._dock_manager.append_console_message(f"Undo: {command.description}")
+        self._state_bus.request_refresh()
+        if self._on_changed is not None:
+            self._on_changed()
+
+    def redo(self) -> None:
+        """Move the active-dataset pointer forward to the most recently undone operation's result.
+
+        See :meth:`undo`'s own docstring -- identical reasoning, opposite direction.
+        """
+        try:
+            command = self._command_stack.redo()
+        except ServiceError as exc:
+            _logger.warning("Redo requested with nothing to redo: %s", exc)
+            return
+        self._status_bar.show_message(f"Redid: {command.description}")
+        self._dock_manager.append_console_message(f"Redo: {command.description}")
+        self._state_bus.request_refresh()
+        if self._on_changed is not None:
+            self._on_changed()
 
     # -- Reproducing --------------------------------------------------------
 

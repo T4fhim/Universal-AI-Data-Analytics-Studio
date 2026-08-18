@@ -60,6 +60,7 @@ from src.services.workspace_service import WorkspaceService
 from src.ui.actions.action_binder import ActionBinder
 from src.ui.actions.action_context import ActionContext
 from src.ui.command_palette import CommandPalette
+from src.ui.command_stack import CommandStack
 from src.ui.controllers.assistant_controller import AssistantController
 from src.ui.controllers.database_controller import DatabaseController
 from src.ui.controllers.dataset_controller import DatasetController
@@ -78,6 +79,7 @@ from src.ui.theme_manager import ThemeManager
 from src.ui.toolbar import ApplicationToolBar
 from src.ui.ui_state_bus import UiStateBus
 from src.ui.workbench.pages.analyze_page import AnalyzePage
+from src.ui.workbench.pages.clean_page import CleanPage
 from src.ui.workbench.pages.explore_page import ExplorePage
 from src.ui.workbench.pages.report_page import ReportPage
 from src.ui.workbench.pages.reproduce_page import ReproducePage
@@ -129,6 +131,10 @@ class MainWindow(QMainWindow):
         self._state_bus = UiStateBus(self)
         self._binder = ActionBinder(self, self._icon_provider)
         self._worker_runner = WorkerRunner(self)
+        # Milestone 23: constructed directly here, not resolved from the
+        # DependencyContainer -- see src/ui/command_stack.py's own docstring for why it
+        # follows UiStateBus/WorkerRunner's construction pattern rather than bootstrap.py's.
+        self._command_stack = CommandStack(self._workspace_service)
 
         self._menu_bar = ApplicationMenuBar(self, self._binder, self._state_bus)
         self.setMenuBar(self._menu_bar)
@@ -196,6 +202,7 @@ class MainWindow(QMainWindow):
             self._status_bar,
             self._state_bus,
             self._worker_runner,
+            self._command_stack,
             on_changed=self._refresh_workbench,
         )
         self._project_controller = ProjectController(
@@ -266,6 +273,8 @@ class MainWindow(QMainWindow):
         bind("project.exit", self.close)
         bind("view.toggle_theme", self._on_toggle_theme)
         bind("help.about", self._on_open_about)
+        bind("edit.undo", self._pipeline_controller.undo)
+        bind("edit.redo", self._pipeline_controller.redo)
 
         self._workbench.welcome_page.button_new_project.clicked.connect(
             self._project_controller.new_project
@@ -314,6 +323,26 @@ class MainWindow(QMainWindow):
             reproduce_page.reproduce_requested.connect(
                 self._pipeline_controller.reproduce_active_dataset
             )
+        # Milestone 23: CleanPage computes the derived dataset itself (see its own
+        # docstring for why) and hands it off via a signal, the same "structure here,
+        # behavior wired by the caller" split every other stage page above uses.
+        clean_page = self._workbench.page_for(PipelineStage.CLEAN)
+        if isinstance(clean_page, CleanPage):
+            clean_page.operation_applied.connect(
+                self._pipeline_controller.register_clean_operation
+            )
+
+        # Milestone 23: "genuinely reachable" close actions -- see
+        # DockManager.connect_dataset_close_requested/connect_chart_closed's own
+        # docstrings for why these are wired as callbacks rather than QActions
+        # (there is no fixed, registrable set of "which dataset/chart" ids the way
+        # ActionRegistry's own entries are all parameter-free).
+        self._dock_manager.connect_dataset_close_requested(
+            self._dataset_controller.close_dataset
+        )
+        self._dock_manager.connect_chart_closed(
+            self._visualization_controller.on_chart_closed
+        )
 
     def _on_ui_state_changed(self) -> None:
         """Recompute and apply enablement -- the sole consumer of ``state_changed``.
@@ -321,11 +350,10 @@ class MainWindow(QMainWindow):
         Rebuilds a fresh :class:`~src.ui.actions.action_context.ActionContext`
         from the live services on every call rather than tracking one
         incrementally, per that class's own docstring. ``is_busy`` is
-        always ``False`` here: no current ``ActionSpec`` reads it (only
-        ``can_undo``/``can_redo``, also always ``False`` until milestone 23,
-        share that "field exists, nothing consumes it yet" status), so
-        wiring live worker-busy tracking now would be speculative plumbing
-        with no predicate to observe it.
+        always ``False`` here: no current ``ActionSpec`` reads it, so wiring
+        live worker-busy tracking now would be speculative plumbing with no
+        predicate to observe it. ``can_undo``/``can_redo`` (milestone 23) are
+        real, read from :attr:`_command_stack`.
 
         Milestone 20: also refreshes the Dataset Explorer's "Project" node
         and the workbench's pipeline state -- ``state_changed`` already
@@ -338,6 +366,8 @@ class MainWindow(QMainWindow):
             project_service=self._project_service,
             workspace_service=self._workspace_service,
             settings_service=self._settings_service,
+            can_undo=self._command_stack.can_undo(),
+            can_redo=self._command_stack.can_redo(),
         )
         self._binder.refresh_enablement(context)
 
@@ -382,6 +412,24 @@ class MainWindow(QMainWindow):
         explore_page = self._workbench.page_for(PipelineStage.EXPLORE)
         if isinstance(explore_page, ExplorePage):
             explore_page.set_dataset(active_dataset)
+
+        # Milestone 23: same hand-off, plus feeding the real
+        # get_lineage/get_children output into LineageView -- see
+        # CleanPage.show_lineage's own docstring for why the page itself
+        # never calls WorkspaceService directly.
+        clean_page = self._workbench.page_for(PipelineStage.CLEAN)
+        if isinstance(clean_page, CleanPage):
+            clean_page.set_dataset(active_dataset)
+            if active_dataset is not None:
+                ancestors = self._workspace_service.get_lineage(
+                    active_dataset.dataset_id
+                )
+                descendants = self._workspace_service.get_children(
+                    active_dataset.dataset_id
+                )
+                clean_page.show_lineage(ancestors, active_dataset, descendants)
+            else:
+                clean_page.show_lineage([], None, [])
 
     # -- Settings / theme / about -----------------------------------------------
 

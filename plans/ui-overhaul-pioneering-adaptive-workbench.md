@@ -1,13 +1,13 @@
 # Universal AI Data Analytics Studio — UI Overhaul (Milestones 15–29)
 
 > **Status.** M15 (`39d12fb`), M16 (`cfe8f24`, `bd96e4e`), M17 (`f07514a`), M18 (`c1ee88c`), M19
-> (`6683489`), M20 (`5f9c6eb`), M22 (`0991f74`), and M21 are complete and committed — see
+> (`6683489`), M20 (`5f9c6eb`), M22 (`0991f74`), M21, and M23 are complete and committed — see
 > the Milestones section for as-built file lists and verification results. M22 was built before
 > M21 despite the numbering, per that milestone's own "Build order note" (one of M21's five
 > acceptance criteria depends on M22's `ResultCard`/`ExplanationPanel`; the other four do not) —
 > M21 itself was then built immediately after M22, closing that dependency the same session it was
 > introduced.
-> M23–M29 remain. This revision
+> M24–M29 remain. This revision
 > (renumbered from the original 15–27 draft) closes gaps a self-review found after M15 shipped: two
 > inserted milestones (M21 AI chat panel, M27 empty/error states + i18n), acceptance criteria and
 > sizing on every milestone, a CI gate, a screen-reader verification protocol, a dialog-disposition
@@ -888,19 +888,108 @@ Acceptance criteria:
 - [x] `ExplanationPanel` defaults its expanded section per `ExpertiseLevel` as specified (a real
       test per level, including the 3 levels A5 does not name explicitly).
 
-### M23 — Clean stage, lineage, workspace lifecycle, real Undo · Size **L**
+### M23 — Clean stage, lineage, workspace lifecycle, real Undo · Size **L** · ✅ **DONE**
 
-Files: `pages/clean_page.py` with a before/after `DataTableView` split ·
-`widgets/lineage_view.py` over `get_lineage`/`get_children` · `src/ui/command_stack.py`.
+**As built.** `src/ui/workbench/pages/clean_page.py` (new): a `StagePage` with a
+`_tool_combo` listing all 5 `operation_registry` operations, a "Configure & Run" button that
+opens `AnalysisParameterDialog` (reusing `tool_registry.get_tool_by_name` purely for its JSON
+schema, not as an AI call — see the page's own docstring for why this stays a "first non-AI
+path"), and independent `before_table`/`after_table` `DataTableView`s. `apply_operation()` calls
+`operation_registry.get_operation(...).apply(dataset, **parameters)` directly and emits the
+resulting `Dataset` via `operation_applied`; the page holds no `WorkspaceService` reference and
+performs no workspace mutation itself, matching every other stage page's "structure here,
+behavior wired by the caller" split. `src/ui/command_stack.py` (new): a Qt-free
+`CommandStack`/`DatasetPointerCommand` pair — undo/redo replay nothing but
+`WorkspaceService.set_active_dataset(parent_id)`/`set_active_dataset(child_id)`, never touching a
+`Dataset` or its dataframe (see the module's own docstring for why the never-mutate-in-place
+contract makes this sufficient). `src/ui/widgets/lineage_view.py` (new): a plain `QTreeWidget`
+rendering `get_lineage()`'s ancestor chain → the target (marked `[active]`) →
+`get_children()`'s direct descendants, one level deep by design. `src/ui/dataset_close_menu.py`
+(new): the Dataset Explorer tree's right-click "Close Dataset" context menu, split out of
+`dock_manager.py` to stay under `test_module_size.py`'s line budget; its popup construction is
+isolated in `_show_menu()` so a test can bypass `QMenu.exec()`'s real blocking popup without
+faking mouse input. `src/ui/controllers/{dataset_controller,visualization_controller,
+pipeline_controller}.py` extended: `DatasetController.close_dataset`,
+`VisualizationController.on_chart_closed` (dispatches to `close_visualization`/`close_dashboard`
+by the `closable_ref` kind `display_chart`/`create_visualization` stashed),
+`PipelineController.register_clean_operation`/`undo`/`redo`. `src/ui/dialogs/
+connect_database_dialog.py` gains a "Delete Profile" button calling
+`DatabaseConnectionService.delete_profile` — the first UI path to it. `src/ui/actions/
+{action_context,builtin_actions}.py` register real `edit.undo`/`edit.redo` `ActionSpec`s gated by
+`ActionContext.can_undo`/`can_redo` (previously connected to nothing since M17 explicitly deferred
+their semantics here). `src/ui/main_window.py`/`stage_registry.py`/`menu_bar.py`/`dock_manager.py`
+wire all of the above together.
+
+**Two real, pre-existing bugs found and fixed along the way** (neither introduced by this
+milestone, both caught by its own new tests): `dock_manager.py`'s `display_chart()` referenced
+`DARK_TOKENS` with no import at all, a `NameError` on any chart display without a theme manager
+attached; and `tests/plugins/test_plugin_manager.py`'s `PluginManager`-backed tests registered
+real cleaning operations into `operation_registry`'s process-global dict with no teardown,
+leaking into every test that ran afterward in the same session — surfaced by this milestone's own
+`test_clean_page.py::test_every_registered_operation_is_offered_in_the_tool_combo` asserting an
+exact count of 5, which only failed under a full-suite run, never in isolation. Fixed with an
+autouse snapshot/restore fixture in that file, plus a `try/finally` + `unregister_operation` in
+the one other file with the same latent leak (`tests/cleaning/test_operation_registry.py`).
+
+**Verified.** New test files: `tests/ui/test_command_stack.py` (8 tests),
+`tests/ui/widgets/test_lineage_view.py` (6), `tests/ui/workbench/test_clean_page.py` (9),
+`tests/ui/test_dataset_close_menu.py` (4), `tests/ui/controllers/test_dataset_controller.py` (2),
+`tests/ui/controllers/test_visualization_controller.py` (4),
+`tests/ui/dialogs/test_connect_database_dialog.py` (2) — 35 new tests total pass in isolation and
+inside the full suite, plus small additions to `test_builtin_actions.py`/`test_menu_bar.py`/
+`test_stage_registry.py`/`test_workbench.py`/`test_pipeline_controller.py` for the registry/menu/
+workbench wiring. Full suite: **882 passed, 83 skipped, 0 failed**, reproduced twice in a row (up
+from 843 passed / 79 skipped at M21). `black`/`isort` clean on `src/` and `tests/` repo-wide;
+`mypy --follow-imports=silent` clean both on `ci.yml`'s scoped packages
+(`src/ui/theme src/ui/a11y src/ui/web src/ui/actions`) and, individually, on every new `src/ui/`
+file this milestone added (`command_stack.py`, `dataset_close_menu.py`, `widgets/lineage_view.py`,
+`workbench/pages/clean_page.py`, `dock_manager.py`).
+
+**Plan-doc precedent followed.** M21's commit (`ec67eae`) included its own plan-doc update,
+departing from M19/M20/M22's "leave it uncommitted" precedent; this milestone follows M21's
+precedent (the more recent one, and the only one that has needed to reconcile two inserted
+milestones' numbering) rather than reverting to the earlier one.
 
 Acceptance criteria:
-- [ ] All 5 `operation_registry` cleaning operations are reachable from the Clean page — first
-      non-AI path to any cleaning operation.
-- [ ] Undo reverses the active-dataset pointer to the parent (never re-mutates data) — a test
+- [x] All 5 `operation_registry` cleaning operations are reachable from the Clean page — first
+      non-AI path to any cleaning operation. Verified by
+      `test_every_registered_operation_is_offered_in_the_tool_combo` (asserts the combo's 5 items
+      equal `list_operations()` exactly) and
+      `test_all_five_operations_are_runnable_end_to_end` (drives all 5 through `apply_operation`,
+      the same method the Run button calls), plus
+      `test_apply_drop_missing_values_produces_a_correctly_linked_derived_dataset` proving the
+      real before/after `DataTableView` split shows real cell values (`parent_dataset_id`,
+      `derivation_description`, and both tables' actual row/cell contents asserted).
+- [x] Undo reverses the active-dataset pointer to the parent (never re-mutates data) — a test
       asserts the parent's dataframe is byte-identical before and after an undo/redo cycle.
-- [ ] `close_dataset`/`close_visualization`/`close_dashboard`/`delete_profile` are reachable from
-      UI — closes the "data accumulates until exit" leak named in the original audit.
-- [ ] Lineage view renders `get_lineage`/`get_children` output as a tree, previously orphaned.
+      Verified by `test_command_stack.py::
+      test_undo_then_redo_cycle_never_mutates_the_parents_dataframe`: a real `DropDuplicates`
+      operation, a real `WorkspaceService`, a full undo→redo round trip, and
+      `pandas.testing.assert_frame_equal` against the parent's dataframe both before and after,
+      plus an `is`-identity check that the workspace's stored dataframe object itself never
+      changed.
+- [x] `close_dataset`/`close_visualization`/`close_dashboard`/`delete_profile` are reachable from
+      UI — closes the "data accumulates until exit" leak named in the original audit. Verified
+      against real `WorkspaceService`/`DatabaseConnectionService` instances (no mocking):
+      `test_dataset_close_menu.py::test_right_clicking_a_dataset_item_calls_the_connected_handler_with_its_id`
+      drives the real context-menu item-lookup path; `test_dataset_controller.py::
+      test_close_dataset_calls_through_to_workspace_service_with_the_right_id` proves the
+      controller method that menu is wired to in `main_window.py` reaches
+      `WorkspaceService.close_dataset` with the right id;
+      `test_visualization_controller.py::test_create_visualization_wires_a_closable_ref_that_closes_it`
+      drives the real `DockManager` tab-close signal handler end to end for
+      `close_visualization`, and `test_on_chart_closed_with_dashboard_kind_calls_close_dashboard`
+      covers `close_dashboard`; `test_connect_database_dialog.py::
+      test_delete_profile_button_calls_through_to_the_service_with_the_right_id` clicks the real
+      "Delete Profile" button against a real `tmp_path`-backed `DatabaseConnectionService`.
+- [x] Lineage view renders `get_lineage`/`get_children` output as a tree, previously orphaned.
+      Verified by `test_lineage_view.py::
+      test_lineage_for_the_middle_dataset_shows_ancestor_target_and_descendant`: a real
+      dataset → cleaned child → cleaned grandchild chain built via two real `DropDuplicates.apply()`
+      calls, viewed centered on the middle dataset — asserts the root sits above it, the target
+      itself is marked `[active]`, and the grandchild is nested one level below, all against real
+      `WorkspaceService.get_lineage()`/`get_children()` output (not hand-built `Dataset`
+      stand-ins).
 
 ### M24 — Visualize stage: multi-select, recommendations, all 12 charts · Size **M**
 

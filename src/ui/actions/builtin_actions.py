@@ -19,14 +19,15 @@ box. For example ``analysis.generate_report`` requires an active dataset
 and shows "No Active Dataset" if it is ``None``, never touching
 ``ProjectService`` at all.
 
-``edit.undo``/``edit.redo`` are deliberately **not registered here**. Before
-this milestone they were real, clickable ``QAction``s connected to nothing
--- exactly the dead-action defect this whole package exists to make
-impossible. Milestone 23 is where real undo/redo semantics land; until
-then, removing the actions entirely is more honest than keeping a
-permanently-disabled placeholder, matching this plan's own reasoning for
-removing the Project Explorer dock in milestone 20 rather than leaving it
-permanently showing "(No project open)".
+``edit.undo``/``edit.redo`` **are now registered** (milestone 23) -- see
+:mod:`~src.ui.command_stack`'s own docstring for the real semantics behind
+them. Both use ``predicate`` rather than ``requires``: ``Requirement`` has no
+"can undo" member (a boolean precondition would be the wrong shape even if
+it did -- see ``ActionContext.can_undo``'s own docstring on why it is a
+plain field, not derived from a ``Requirement``), so each reads
+``ActionContext.can_undo``/``can_redo`` directly, the same way
+``analysis.dashboard`` already reads ``visualization_count`` via its own
+predicate rather than forcing a boolean ``Requirement`` to fit.
 """
 
 from __future__ import annotations
@@ -181,6 +182,30 @@ def _register_builtins() -> None:
             status_tip="Export the active dataset's analysis log as a report",
             requires=frozenset({Requirement.ACTIVE_DATASET}),
             help_anchor="report/generate",
+        )
+    )
+    register_action(
+        ActionSpec(
+            action_id="edit.undo",
+            label="&Undo",
+            category=ActionCategory.EDIT,
+            icon_name="undo",
+            shortcut="Ctrl+Z",
+            status_tip="Undo the most recent cleaning operation",
+            predicate=lambda ctx: ctx.can_undo,
+            help_anchor="edit/undo",
+        )
+    )
+    register_action(
+        ActionSpec(
+            action_id="edit.redo",
+            label="&Redo",
+            category=ActionCategory.EDIT,
+            icon_name="redo",
+            shortcut="Ctrl+Y",
+            status_tip="Redo the most recently undone cleaning operation",
+            predicate=lambda ctx: ctx.can_redo,
+            help_anchor="edit/redo",
         )
     )
     register_action(

@@ -38,13 +38,28 @@ def test_every_action_has_a_non_empty_label() -> None:
     assert empty == []
 
 
-def test_edit_undo_and_redo_are_not_registered() -> None:
-    """Milestone 17 removes the dead Undo/Redo QActions entirely rather
-    than keeping them permanently disabled -- see builtin_actions.py's
-    module docstring. Real semantics land in milestone 23.
+def test_edit_undo_and_redo_are_registered_with_real_predicates() -> None:
+    """Milestone 17 removed the dead Undo/Redo QActions entirely rather than keeping them
+    permanently disabled -- see builtin_actions.py's module docstring. Milestone 23 re-adds
+    them with real semantics: gated by CommandStack.can_undo/can_redo via a predicate, since
+    Requirement has no boolean member for "can undo" (see ActionContext.can_undo's own
+    docstring).
     """
-    assert "edit.undo" not in list_actions()
-    assert "edit.redo" not in list_actions()
+    from dataclasses import dataclass
+
+    @dataclass
+    class _Stub:
+        can_undo: bool
+        can_redo: bool
+
+    undo_spec = list_actions()["edit.undo"]
+    redo_spec = list_actions()["edit.redo"]
+    assert undo_spec.predicate is not None
+    assert redo_spec.predicate is not None
+    assert undo_spec.predicate(_Stub(can_undo=True, can_redo=False)) is True
+    assert undo_spec.predicate(_Stub(can_undo=False, can_redo=False)) is False
+    assert redo_spec.predicate(_Stub(can_undo=False, can_redo=True)) is True
+    assert redo_spec.predicate(_Stub(can_undo=False, can_redo=False)) is False
 
 
 def test_save_actions_require_project_open() -> None:
