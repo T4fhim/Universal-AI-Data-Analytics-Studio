@@ -1,18 +1,18 @@
 # File: src/ui/dock_manager.py
 """Constructs and manages the application's dockable panels.
 
-:class:`DockManager` builds the four dock widgets the original
-specification calls for — Project Explorer, Dataset Explorer, Console,
-and a Logging panel — and docks them onto the main window at
-reasonable default positions. Each dock's actual content in this
-milestone is a placeholder ``QListWidget`` or ``QPlainTextEdit`` with
-no data behind it yet; wiring these to real project/dataset data is
-out of scope here (that belongs to milestones that build the readers
-and data-model layers) and populating them with fake sample data would
-misrepresent the application's current state as further along than it
-is. What this milestone delivers is the docking *infrastructure* —
-resizable, closable, re-orderable panels with working visibility
-toggles — which is a real, complete piece of functionality on its own.
+:class:`DockManager` builds every dock widget the application uses -- Dataset Explorer,
+Console, Logging, Charts, Data Table, and AI Assistant -- and docks them onto the main window at
+reasonable default positions.
+
+Milestone 20 note: the original Project Explorer dock is deleted here, not merely hidden -- it
+never worked (its ``QListWidget`` always read ``"(No project open)"`` and nothing ever wired it
+to anything real; confirmed by this overhaul's own audit) and its one job, naming the open
+project, is absorbed into Dataset Explorer as a top-level "Project" node (see
+:meth:`DockManager.set_project_label`). The Charts dock is demoted to default-hidden in the same
+milestone -- a chart's primary home is now the workbench's Visualize stage page (milestone 24),
+not a dock that claims screen space before any chart exists. Both changes are named explicitly
+in the plan's A3 dock-disposition table as this overhaul's only user-visible dock removals.
 
 The Logging panel is the one dock with genuine behavior already: it
 attaches a ``logging.Handler`` to the root logger so that every log
@@ -20,6 +20,23 @@ message the application emits (through
 :func:`~src.core.logger.get_logger`, used throughout this codebase)
 appears in this panel live, not just in the rotating file and console
 output logger.py already provides.
+
+Milestone 20 note: ``_QtLogHandler`` gained a real cross-thread-safety fix here, found by this
+milestone's own tests (not a defect this milestone introduced -- the handler existed since
+milestone 1b-ii, and readers already logged from worker threads before this milestone too; this
+is simply the first call path that reliably crashed under test, and a crash found while adding
+UI is a crash worth fixing on the same milestone that found it, not deferred). A ``logging.Handler``
+whose ``emit()`` runs on whatever thread the logging call itself happens on -- and
+:meth:`~src.services.analysis_orchestrator_service.AnalysisOrchestratorService.run_stage`, called
+from :class:`~src.ui.controllers.pipeline_controller.PipelineController` via
+:class:`~src.ui.worker_runner.WorkerRunner`, logs from a ``QThreadPool`` worker thread -- was
+calling ``QPlainTextEdit.appendPlainText`` directly from that non-GUI thread, which is undefined
+behavior in Qt and reproduced as a real ``Windows fatal exception: access violation`` crash
+during this milestone's own end-to-end test. The fix: ``_QtLogHandler`` is now also a ``QObject``
+and routes the actual widget write through a ``Signal`` instead of calling the widget method
+directly -- Qt's auto connection type resolves to a queued (thread-safe) delivery whenever the
+emitting thread differs from the signal's own (GUI-thread) affinity, exactly the guarantee a
+direct method call never had.
 """
 
 from __future__ import annotations
@@ -27,10 +44,9 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QDateTime, Qt
+from PySide6.QtCore import QDateTime, QObject, Qt, Signal
 from PySide6.QtWidgets import (
     QDockWidget,
-    QListWidget,
     QMainWindow,
     QPlainTextEdit,
     QTabWidget,
@@ -55,7 +71,7 @@ if TYPE_CHECKING:
 _logger = get_logger(__name__)
 
 
-class _QtLogHandler(logging.Handler):
+class _QtLogHandler(QObject, logging.Handler):
     """A ``logging.Handler`` that appends formatted records to a QPlainTextEdit.
 
     Kept as a private, module-level class rather than a method on
@@ -63,16 +79,46 @@ class _QtLogHandler(logging.Handler):
     lifecycle (attached to and eventually removable from a logger)
     that is cleaner to reason about as a standalone object than as
     behavior mixed into the dock-construction class.
+
+    Also a ``QObject`` (multiple inheritance alongside ``logging.Handler``) purely to own
+    :attr:`_append_requested` -- see this module's own docstring for why a direct
+    ``QPlainTextEdit.appendPlainText`` call from :meth:`emit` is not safe, and why the fix is
+    "emit a signal instead of calling the widget," not e.g. a manual lock (a lock would only
+    serialize the *write*, not move it onto the GUI thread Qt widgets actually require).
     """
 
-    def __init__(self, text_widget: QPlainTextEdit) -> None:
-        super().__init__()
-        self._text_widget = text_widget
+    _append_requested = Signal(str)
 
-    def emit(self, record: logging.LogRecord) -> None:
+    def __init__(self, text_widget: QPlainTextEdit) -> None:
+        # Both base __init__s are called explicitly (super().__init__()
+        # alone would only walk one branch of the MRO) -- QObject.__init__
+        # sets up the signal/slot machinery this class needs;
+        # logging.Handler.__init__ sets up the level/formatter/lock
+        # attributes logging.Handler.handle() (called by the logging
+        # module before emit()) assumes exist.
+        QObject.__init__(self)
+        logging.Handler.__init__(self)
+        # AutoConnection (the default) resolves to Queued whenever the
+        # emitting thread differs from this handler's own thread affinity
+        # (the GUI thread, since it is constructed there -- see
+        # DockManager._build_logging_dock) -- this is what makes a call to
+        # emit() from a QThreadPool worker thread land safely back on the
+        # GUI thread instead of touching text_widget cross-thread.
+        self._append_requested.connect(text_widget.appendPlainText)
+
+    def emit(self, record: logging.LogRecord) -> None:  # type: ignore[override]
+        # mypy sees this as overriding QObject.emit (the low-level "emit an
+        # arbitrary Qt signal by name" method PySide6 stubs for internal
+        # use) rather than logging.Handler.emit, because this class
+        # multiply-inherits both -- the two methods are unrelated in
+        # practice (Python's MRO resolves the *call* through
+        # logging.Handler.handle(), which is the only real caller), but
+        # mypy compares signatures structurally against whichever base
+        # declared it first. A genuine name collision from mixing two
+        # unrelated base classes, not a real Liskov violation.
         try:
             message = self.format(record)
-            self._text_widget.appendPlainText(message)
+            self._append_requested.emit(message)
         except Exception:
             # A logging handler must never raise — doing so risks
             # taking down whatever code just tried to log a message,
@@ -107,7 +153,15 @@ class DockManager:
         # _on_data_table_tab_close_requested() when their tab closes.
         self._dataset_table_views: dict[str, DataTableView] = {}
 
-        self.dock_project_explorer = self._build_project_explorer_dock()
+        # Milestone 20: the "(No project open)" Project Explorer dock never
+        # worked (its QListWidget was never wired to anything -- see this
+        # milestone's plan entry, A3's dock-disposition table) and is
+        # deleted outright rather than kept as a second, still-broken dock.
+        # Dataset Explorer absorbs its role as a top-level "Project" node --
+        # see _build_dataset_explorer_dock/set_project_label below.
+        self._project_label = "(No project open)"
+        self._last_datasets: list = []
+
         self.dock_dataset_explorer = self._build_dataset_explorer_dock()
         self.dock_console = self._build_console_dock()
         self.dock_logging = self._build_logging_dock()
@@ -116,13 +170,7 @@ class DockManager:
         self.dock_ai_chat = self._build_ai_chat_dock()
 
         parent_window.addDockWidget(
-            Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_project_explorer
-        )
-        parent_window.addDockWidget(
             Qt.DockWidgetArea.LeftDockWidgetArea, self.dock_dataset_explorer
-        )
-        parent_window.tabifyDockWidget(
-            self.dock_project_explorer, self.dock_dataset_explorer
         )
 
         parent_window.addDockWidget(
@@ -135,8 +183,8 @@ class DockManager:
 
         # Right side, not tabbed with anything: a chart is significant
         # enough content that it should be immediately visible once
-        # populated, not hidden behind a tab click the way
-        # Project/Dataset Explorer or Console/Log reasonably are.
+        # populated, not hidden behind a tab click the way Dataset
+        # Explorer or Console/Log reasonably are.
         parent_window.addDockWidget(
             Qt.DockWidgetArea.RightDockWidgetArea, self.dock_chart
         )
@@ -145,8 +193,8 @@ class DockManager:
         # the chart/AI-chat split above, a chart and a data table are the
         # same kind of thing (a view onto one dataset's content), so
         # sharing a tab strip rather than each claiming permanent screen
-        # space matches how Project/Dataset Explorer and Console/Log are
-        # already tabbed for the same reason.
+        # space matches how Console/Log are already tabbed for the same
+        # reason.
         parent_window.addDockWidget(
             Qt.DockWidgetArea.RightDockWidgetArea, self.dock_data_table
         )
@@ -157,8 +205,8 @@ class DockManager:
         # chart and an in-progress conversation can both stay visible
         # at once (splitting vertically is Qt's default for two docks
         # added to the same area without an explicit tabifyDockWidget
-        # call, matching how Project/Dataset Explorer and Console/Log
-        # are *deliberately* tabbed above while this pair is not).
+        # call, matching how Console/Log are *deliberately* tabbed above
+        # while this pair is not).
         parent_window.addDockWidget(
             Qt.DockWidgetArea.RightDockWidgetArea, self.dock_ai_chat
         )
@@ -166,25 +214,24 @@ class DockManager:
             self.dock_chart, self.dock_ai_chat, Qt.Orientation.Vertical
         )
 
-        self.dock_project_explorer.raise_()
+        # Milestone 20: Charts is demoted -- a chart's primary home is now
+        # the Visualize stage page (milestone 24's own scope; the dock
+        # itself is unaffected today), not the permanently-visible surface
+        # it was before the workbench existed. The dock survives for
+        # pinned side-by-side chart comparisons, it just no longer claims
+        # screen space by default. See A3's dock-disposition table.
+        self.dock_chart.hide()
+
+        self.dock_dataset_explorer.raise_()
         self.dock_console.raise_()
 
         _logger.debug("Dock widgets constructed and attached to main window.")
-
-    def _build_project_explorer_dock(self) -> QDockWidget:
-        dock = QDockWidget("Project Explorer", self._parent_window)
-        dock.setObjectName("dockProjectExplorer")
-        list_widget = QListWidget(dock)
-        list_widget.addItem("(No project open)")
-        dock.setWidget(list_widget)
-        return dock
 
     def _build_dataset_explorer_dock(self) -> QDockWidget:
         dock = QDockWidget("Dataset Explorer", self._parent_window)
         dock.setObjectName("dockDatasetExplorer")
         # Stored as self._dataset_tree_widget (not just a local
-        # variable, unlike the project-explorer dock's list widget
-        # above) because milestone 2's "Open Dataset" action needs to
+        # variable) because milestone 2's "Open Dataset" action needs to
         # push live updates into this dock after this constructor has
         # already returned — see refresh_dataset_list below, which
         # main_window.py calls whenever WorkspaceService's set of
@@ -198,13 +245,39 @@ class DockManager:
         # just made visible rather than only queryable in code.
         self._dataset_tree_widget = QTreeWidget(dock)
         self._dataset_tree_widget.setHeaderHidden(True)
-        self._show_no_datasets_placeholder()
+        self._rebuild_dataset_tree([])
         dock.setWidget(self._dataset_tree_widget)
         return dock
 
-    def _show_no_datasets_placeholder(self) -> None:
+    def set_project_label(self, project_name: str | None) -> None:
+        """Update the "Project" top-level node's text and rebuild the tree to show it.
+
+        Milestone 20: the deleted Project Explorer dock's one job -- naming the open project
+        (or "(No project open)") -- is absorbed here as a top-level node in Dataset Explorer,
+        per A3's dock-disposition table ("Dataset Explorer... absorb the project explorer as a
+        top-level 'Project' node"). Called by :mod:`src.ui.main_window` alongside
+        :meth:`refresh_dataset_list`, from the same call sites that used to only update the
+        status bar's project label (new/open/save-as).
+        """
+        self._project_label = (
+            f"Project: {project_name}" if project_name else "(No project open)"
+        )
+        self._rebuild_dataset_tree(self._last_datasets)
+
+    def _rebuild_dataset_tree(self, datasets: list) -> None:
+        """Clear and repopulate the tree: the Project node first, then datasets or a placeholder.
+
+        Split out of :meth:`refresh_dataset_list` so :meth:`set_project_label` can trigger the
+        same rebuild without needing a fresh dataset list passed in -- it reuses whatever
+        :attr:`_last_datasets` the most recent :meth:`refresh_dataset_list` call recorded.
+        """
+        self._last_datasets = datasets
         self._dataset_tree_widget.clear()
-        QTreeWidgetItem(self._dataset_tree_widget, ["(No datasets loaded)"])
+        QTreeWidgetItem(self._dataset_tree_widget, [self._project_label])
+        if not datasets:
+            QTreeWidgetItem(self._dataset_tree_widget, ["(No datasets loaded)"])
+            return
+        self._populate_dataset_items(datasets)
 
     def refresh_dataset_list(self, datasets: list) -> None:
         """Rebuild the Dataset Explorer dock's contents from the current dataset list.
@@ -243,12 +316,15 @@ class DockManager:
         level rather than dropped, since it is still a real, openable
         dataset regardless of whether its lineage is fully visible
         right now.
-        """
-        self._dataset_tree_widget.clear()
-        if not datasets:
-            self._show_no_datasets_placeholder()
-            return
 
+        Milestone 20: a top-level "Project" node (see :meth:`set_project_label`) is always the
+        tree's first item now, ahead of either the dataset items below or the "(No datasets
+        loaded)" placeholder -- the absorbed Project Explorer dock's one job, made visible here
+        instead.
+        """
+        self._rebuild_dataset_tree(datasets)
+
+    def _populate_dataset_items(self, datasets: list) -> None:
         by_id = {dataset.dataset_id: dataset for dataset in datasets}
         items_by_id: dict[str, QTreeWidgetItem] = {}
 
@@ -532,7 +608,6 @@ class DockManager:
         class independently.
         """
         return [
-            self.dock_project_explorer.toggleViewAction(),
             self.dock_dataset_explorer.toggleViewAction(),
             self.dock_console.toggleViewAction(),
             self.dock_logging.toggleViewAction(),

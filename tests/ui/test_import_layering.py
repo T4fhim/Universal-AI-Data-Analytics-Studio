@@ -168,7 +168,9 @@ def test_ui_state_bus_does_not_import_the_rest_of_ui() -> None:
 # exactly the "controllers/" this file's original docstring anticipated
 # when it said the widgets-never-import-controllers rule should grow
 # alongside that package rather than being deferred to milestone 27.
-_WIDGET_LIKE_PACKAGES = ("widgets", "dialogs")
+# Milestone 20 adds "workbench" -- see src/ui/workbench/__init__.py's own
+# docstring for why it is held to the same display-only rule.
+_WIDGET_LIKE_PACKAGES = ("widgets", "dialogs", "workbench")
 
 
 @pytest.mark.parametrize("package", _WIDGET_LIKE_PACKAGES, ids=lambda p: f"src.ui.{p}")

@@ -27,7 +27,9 @@ def test_dataset_tree_items_carry_their_dataset_id(qapp: QApplication) -> None:
     dataset = _make_dataset()
     manager.refresh_dataset_list([dataset])
 
-    item = manager._dataset_tree_widget.topLevelItem(0)
+    # Milestone 20: index 0 is now the absorbed "Project" node (see
+    # DockManager.set_project_label) -- the dataset item is index 1.
+    item = manager._dataset_tree_widget.topLevelItem(1)
     assert item.data(0, Qt.ItemDataRole.UserRole) == dataset.dataset_id
 
 
@@ -40,7 +42,7 @@ def test_double_click_handler_receives_the_dataset_id(qapp: QApplication) -> Non
     received = []
     manager.connect_dataset_double_click(received.append)
 
-    item = manager._dataset_tree_widget.topLevelItem(0)
+    item = manager._dataset_tree_widget.topLevelItem(1)
     manager._dataset_tree_widget.itemDoubleClicked.emit(item, 0)
 
     assert received == [dataset.dataset_id]

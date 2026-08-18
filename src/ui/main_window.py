@@ -2,15 +2,16 @@
 """The application's main window.
 
 :class:`MainWindow` assembles every piece built in milestone 1b-ii --
-menu bar, toolbar, status bar, dock manager, theme manager, and the
-welcome widget as initial central content -- and, since milestone 19,
-constructs the per-concern controllers in :mod:`src.ui.controllers` and
-wires :class:`~src.ui.actions.action_binder.ActionBinder` to their
-methods rather than holding every handler itself. This class does not
-construct its own service instances: it resolves what it needs from
-``context.container``, the same container every other part of the
-running application resolves from, and hands those services to whichever
-controller owns the concern they belong to.
+menu bar, toolbar, status bar, dock manager, theme manager, and (since
+milestone 20) the workbench as initial central content -- and, since
+milestone 19, constructs the per-concern controllers in
+:mod:`src.ui.controllers` and wires
+:class:`~src.ui.actions.action_binder.ActionBinder` to their methods rather
+than holding every handler itself. This class does not construct its own
+service instances: it resolves what it needs from ``context.container``,
+the same container every other part of the running application resolves
+from, and hands those services to whichever controller owns the concern
+they belong to.
 
 Milestone 19 note: before this milestone, this file held every project/
 dataset/visualization/report/assistant handler directly and had grown to
@@ -20,6 +21,14 @@ pure refactor: every controller method in :mod:`src.ui.controllers` is
 the same logic that used to live here, moved verbatim. What remains here
 is genuinely window-level: settings/theme/about, the command palette
 shortcut, and window lifecycle.
+
+Milestone 20 note: :class:`~src.ui.workbench.workbench.Workbench` replaces
+``WelcomeWidget`` as the central widget (see :meth:`__init__`'s own
+comment on that call site), and :meth:`_refresh_workbench` -- reached via
+``state_changed`` alongside the existing enablement recompute -- is the one
+place this file reads live :class:`~src.services.analysis_orchestrator_service.
+AnalysisOrchestratorService` state and pushes it into that otherwise
+service-free widget tree.
 """
 
 from __future__ import annotations
@@ -39,7 +48,10 @@ from src.core.bootstrap import BootstrapContext
 from src.core.constants import APP_NAME, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH
 from src.core.logger import get_logger
 from src.plugins.plugin_manager import PluginManager
-from src.services.analysis_orchestrator_service import AnalysisOrchestratorService
+from src.services.analysis_orchestrator_service import (
+    AnalysisOrchestratorService,
+    PipelineStage,
+)
 from src.services.database_connection_service import DatabaseConnectionService
 from src.services.project_service import ProjectService
 from src.services.report_service import ReportService
@@ -51,6 +63,7 @@ from src.ui.command_palette import CommandPalette
 from src.ui.controllers.assistant_controller import AssistantController
 from src.ui.controllers.database_controller import DatabaseController
 from src.ui.controllers.dataset_controller import DatasetController
+from src.ui.controllers.pipeline_controller import PipelineController
 from src.ui.controllers.project_controller import ProjectController
 from src.ui.controllers.report_controller import ReportController
 from src.ui.controllers.visualization_controller import VisualizationController
@@ -64,7 +77,10 @@ from src.ui.theme.tokens import DARK_TOKENS
 from src.ui.theme_manager import ThemeManager
 from src.ui.toolbar import ApplicationToolBar
 from src.ui.ui_state_bus import UiStateBus
-from src.ui.widgets.welcome_widget import WelcomeWidget
+from src.ui.workbench.pages.report_page import ReportPage
+from src.ui.workbench.pages.reproduce_page import ReproducePage
+from src.ui.workbench.pages.understand_page import UnderstandPage
+from src.ui.workbench.workbench import Workbench
 from src.ui.worker_runner import WorkerRunner
 
 _logger = get_logger(__name__)
@@ -124,8 +140,14 @@ class MainWindow(QMainWindow):
         self._dock_manager = DockManager(self)
         self._populate_view_menu()
 
-        self._welcome_widget = WelcomeWidget(self)
-        self.setCentralWidget(self._welcome_widget)
+        # Milestone 20: Workbench replaces WelcomeWidget as the central
+        # widget -- unlike WelcomeWidget (setCentralWidget called exactly
+        # once, forever, before this milestone), Workbench itself IS the
+        # permanent central widget, and internally switches from its
+        # welcome page to a pipeline stage page once a dataset becomes
+        # active -- see _refresh_workbench, called from _on_ui_state_changed.
+        self._workbench = Workbench(self)
+        self.setCentralWidget(self._workbench)
 
         self._command_palette = CommandPalette(self, self._binder, self._state_bus)
         self._command_palette_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
@@ -152,13 +174,28 @@ class MainWindow(QMainWindow):
     # -- Setup helpers --------------------------------------------------------
 
     def _build_controllers(self) -> None:
-        """Construct every milestone-19 controller, each holding only what it needs.
+        """Construct every controller, each holding only what it needs.
 
         One controller per concern rather than a shared "god context"
         object -- see :mod:`src.ui.controllers`'s own docstring for why.
-        ``DatabaseController`` is built last because it depends on
-        ``DatasetController.load_dataset`` as its result callback.
+        ``PipelineController`` is built first because ``ProjectController``
+        depends on two of its methods (``persist_all_logs``/
+        ``restore_logs_for_project``) as callbacks -- milestone 20's own
+        version of the same "built last/first because it depends on another
+        controller's method" ordering ``DatabaseController`` already
+        established for ``DatasetController.load_dataset``.
         """
+        self._pipeline_controller = PipelineController(
+            self,
+            self._workspace_service,
+            self._orchestrator_service,
+            self._project_service,
+            self._dock_manager,
+            self._status_bar,
+            self._state_bus,
+            self._worker_runner,
+            on_changed=self._refresh_workbench,
+        )
         self._project_controller = ProjectController(
             self,
             self._project_service,
@@ -168,6 +205,8 @@ class MainWindow(QMainWindow):
             self._state_bus,
             self._worker_runner,
             self._menu_bar,
+            on_before_save=self._pipeline_controller.persist_all_logs,
+            on_project_opened=self._pipeline_controller.restore_logs_for_project,
         )
         self._dataset_controller = DatasetController(
             self,
@@ -226,10 +265,10 @@ class MainWindow(QMainWindow):
         bind("view.toggle_theme", self._on_toggle_theme)
         bind("help.about", self._on_open_about)
 
-        self._welcome_widget.button_new_project.clicked.connect(
+        self._workbench.welcome_page.button_new_project.clicked.connect(
             self._project_controller.new_project
         )
-        self._welcome_widget.button_open_project.clicked.connect(
+        self._workbench.welcome_page.button_open_project.clicked.connect(
             self._project_controller.open_project
         )
 
@@ -244,6 +283,29 @@ class MainWindow(QMainWindow):
             self._dataset_controller.on_dataset_double_clicked
         )
 
+        # Milestone 20: workbench stage pages emit signals rather than
+        # calling services themselves (see src/ui/workbench/__init__.py's
+        # own docstring) -- this is where those signals meet the
+        # controller methods that actually do the work. isinstance narrows
+        # StagePage down to each concrete subclass so its own signals (not
+        # declared on the StagePage base) are visible to mypy, rather than
+        # an `is not None` check alone.
+        understand_page = self._workbench.page_for(PipelineStage.UNDERSTAND)
+        if isinstance(understand_page, UnderstandPage):
+            understand_page.run_requested.connect(
+                self._pipeline_controller.run_understand_stage
+            )
+        report_page = self._workbench.page_for(PipelineStage.REPORT)
+        if isinstance(report_page, ReportPage):
+            report_page.generate_report_requested.connect(
+                self._report_controller.generate_report
+            )
+        reproduce_page = self._workbench.page_for(PipelineStage.REPRODUCE)
+        if isinstance(reproduce_page, ReproducePage):
+            reproduce_page.reproduce_requested.connect(
+                self._pipeline_controller.reproduce_active_dataset
+            )
+
     def _on_ui_state_changed(self) -> None:
         """Recompute and apply enablement -- the sole consumer of ``state_changed``.
 
@@ -255,6 +317,13 @@ class MainWindow(QMainWindow):
         share that "field exists, nothing consumes it yet" status), so
         wiring live worker-busy tracking now would be speculative plumbing
         with no predicate to observe it.
+
+        Milestone 20: also refreshes the Dataset Explorer's "Project" node
+        and the workbench's pipeline state -- ``state_changed`` already
+        fires at exactly the moments either could have changed (a project
+        opened/saved, a dataset activated, a stage ran), so this is the one
+        place both piggyback on rather than each needing their own
+        notification wiring.
         """
         context = ActionContext.capture(
             project_service=self._project_service,
@@ -262,6 +331,37 @@ class MainWindow(QMainWindow):
             settings_service=self._settings_service,
         )
         self._binder.refresh_enablement(context)
+
+        active_project = self._project_service.get_active_project()
+        self._dock_manager.set_project_label(
+            active_project.name if active_project is not None else None
+        )
+        self._refresh_workbench()
+
+    def _refresh_workbench(self) -> None:
+        """Push a fresh :class:`~src.ui.controllers.pipeline_controller.PipelineSnapshot`
+        into the workbench -- the sole place that reads
+        :class:`~src.services.analysis_orchestrator_service.AnalysisOrchestratorService`
+        state and translates it into what :class:`~src.ui.workbench.workbench.Workbench`
+        (a display-only widget with no service reference of its own) renders.
+        """
+        active_dataset = self._workspace_service.get_active_dataset()
+        snapshot = self._pipeline_controller.snapshot_for_active_dataset()
+        log = snapshot.log if snapshot is not None else None
+        proposal = snapshot.proposal if snapshot is not None else None
+        self._workbench.update_pipeline_state(
+            dataset_active=active_dataset is not None, log=log, proposal=proposal
+        )
+
+        understand_page = self._workbench.page_for(PipelineStage.UNDERSTAND)
+        if isinstance(understand_page, UnderstandPage) and log is not None:
+            understand_entries = [
+                entry
+                for entry in log.entries
+                if entry.stage == PipelineStage.UNDERSTAND
+            ]
+            if understand_entries:
+                understand_page.show_profile_summary(understand_entries[-1].outputs)
 
     # -- Settings / theme / about -----------------------------------------------
 

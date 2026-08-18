@@ -9,6 +9,7 @@ why every method below is the same logic that used to live on
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -17,7 +18,7 @@ from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
 from src.core.exceptions import ApplicationError
 from src.core.logger import get_logger
 from src.readers.reader_registry import get_reader_for_path
-from src.services.project_service import ProjectService
+from src.services.project_service import Project, ProjectService
 from src.services.workspace_service import WorkspaceService
 from src.ui.dock_manager import DockManager
 from src.ui.status_bar import ApplicationStatusBar
@@ -90,6 +91,21 @@ class ProjectController:
         worker_runner: Runs the dataset-reload read off the UI thread.
         menu_bar: The "Open Recent" submenu is rebuilt here after any
             open/save-as that could have changed the recent-projects list.
+        on_before_save: Milestone 20 -- called with the :class:`~src.services.project_service.
+            Project` about to be saved, just before :meth:`~src.services.project_service.
+            ProjectService.save_project` is called, so every loaded dataset's current analysis
+            log gets recorded into the project's contents first. Typically
+            :meth:`~src.ui.controllers.pipeline_controller.PipelineController.persist_all_logs`.
+            This module deliberately does not import ``PipelineController`` to call it
+            directly -- see :mod:`src.ui.controllers.pipeline_controller`'s own docstring on
+            why this is a callback, matching how :class:`~src.ui.controllers.database_controller.
+            DatabaseController` already receives ``on_dataset_loaded`` rather than importing
+            :class:`~src.ui.controllers.dataset_controller.DatasetController`.
+        on_project_opened: Milestone 20 -- called with the :class:`~src.services.project_service.
+            Project` just opened, after every other post-open bookkeeping in
+            :meth:`open_project_at_path` below, so recorded analysis logs are restored into the
+            orchestrator. Typically :meth:`~src.ui.controllers.pipeline_controller.
+            PipelineController.restore_logs_for_project`.
     """
 
     def __init__(
@@ -102,6 +118,8 @@ class ProjectController:
         state_bus: UiStateBus,
         worker_runner: WorkerRunner,
         menu_bar: ApplicationMenuBar,
+        on_before_save: Callable[[Project], None] | None = None,
+        on_project_opened: Callable[[Project], None] | None = None,
     ) -> None:
         self._parent = parent
         self._project_service = project_service
@@ -111,6 +129,8 @@ class ProjectController:
         self._state_bus = state_bus
         self._worker_runner = worker_runner
         self._menu_bar = menu_bar
+        self._on_before_save = on_before_save
+        self._on_project_opened = on_project_opened
 
     # -- Project actions --------------------------------------------------------
 
@@ -165,6 +185,8 @@ class ProjectController:
         )
         self._state_bus.request_refresh()  # has_project just became True
         self._reload_project_datasets(project)
+        if self._on_project_opened is not None:
+            self._on_project_opened(project)
 
     def _reload_project_datasets(self, project) -> None:
         """Re-read every dataset recorded in ``project`` and load it into the workspace.
@@ -264,6 +286,8 @@ class ProjectController:
         skipped_names = self._project_service.record_datasets(
             project, self._workspace_service.list_datasets()
         )
+        if self._on_before_save is not None:
+            self._on_before_save(project)
 
         try:
             self._project_service.save_project(project)
@@ -293,6 +317,8 @@ class ProjectController:
         skipped_names = self._project_service.record_datasets(
             project, self._workspace_service.list_datasets()
         )
+        if self._on_before_save is not None:
+            self._on_before_save(project)
 
         try:
             self._project_service.save_project(project, Path(file_path_str))

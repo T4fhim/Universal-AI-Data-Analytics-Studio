@@ -97,3 +97,109 @@ def test_close_event_closes_every_live_database_connection(
     main_window.close()
 
     assert calls == [True]
+
+
+# -- Milestone 20: Workbench as the central widget --------------------------------------------
+
+
+def test_workbench_is_the_central_widget(main_window: MainWindow) -> None:
+    """Acceptance criterion 1: Workbench, not WelcomeWidget, is the central widget."""
+    from src.ui.workbench.workbench import Workbench
+
+    assert isinstance(main_window.centralWidget(), Workbench)
+    assert main_window.centralWidget() is main_window._workbench
+
+
+def test_opening_a_dataset_transitions_the_workbench_off_the_welcome_page(
+    main_window: MainWindow, qapp: QApplication
+) -> None:
+    """Acceptance criterion 1, end to end through a real dataset load."""
+    import pandas as pd
+
+    from src.services.workspace_service import Dataset
+    from tests.ui.qt_helpers import process_events
+
+    dataset = Dataset(
+        name="test", dataframe=pd.DataFrame({"a": [1, 2, 3]}), source_format="csv"
+    )
+
+    main_window._dataset_controller.load_dataset(dataset)
+    process_events()
+
+    assert (
+        main_window._workbench.stack.currentWidget()
+        is not main_window._workbench.welcome_page
+    )
+
+
+def test_opening_a_dataset_shows_upload_complete_and_understand_proposed_on_the_rail(
+    main_window: MainWindow, qapp: QApplication
+) -> None:
+    """Acceptance criterion 2, end to end through real services."""
+    import pandas as pd
+
+    from src.services.analysis_orchestrator_service import PipelineStage
+    from src.services.workspace_service import Dataset
+    from tests.ui.qt_helpers import process_events
+
+    dataset = Dataset(
+        name="test", dataframe=pd.DataFrame({"a": [1, 2, 3]}), source_format="csv"
+    )
+
+    main_window._dataset_controller.load_dataset(dataset)
+    process_events()
+
+    rail = main_window._workbench.stage_rail
+    assert rail.status_for(PipelineStage.UPLOAD) == "complete"
+    assert rail.status_for(PipelineStage.UNDERSTAND) == "proposed"
+
+    understand_page = main_window._workbench.page_for(PipelineStage.UNDERSTAND)
+    assert understand_page._guidance_label.text()  # the real StageProposal.rationale
+
+
+def test_clicking_run_on_understand_produces_a_real_log_entry_end_to_end(
+    main_window: MainWindow, qapp: QApplication
+) -> None:
+    """Acceptance criterion 3, driven through the actual page's Run button."""
+    import pandas as pd
+
+    from src.services.analysis_orchestrator_service import PipelineStage
+    from src.services.workspace_service import Dataset
+    from tests.ui.qt_helpers import process_events, wait_for_signal
+
+    dataset = Dataset(
+        name="test", dataframe=pd.DataFrame({"a": [1, 2, 3]}), source_format="csv"
+    )
+    main_window._dataset_controller.load_dataset(dataset)
+    process_events()
+
+    # Capture the real BaseWorker run_understand_stage starts, so this test
+    # can block on its own `finished` signal (a real Qt wait) rather than a
+    # fixed process_events() tick count, which was measured to be flaky
+    # here. Deliberately calls QPushButton.click() directly -- NOT
+    # tests.ui.qt_helpers.click(), whose own process_events() call can let
+    # a fast worker finish (and deliver its `finished` signal) before this
+    # test's wait_for_signal below has a chance to connect, which would
+    # then wait for a signal that has already fired and time out.
+    original_run = main_window._pipeline_controller._worker_runner.run
+    started_workers: list = []
+
+    def _capturing_run(*args, **kwargs):
+        worker = original_run(*args, **kwargs)
+        started_workers.append(worker)
+        return worker
+
+    main_window._pipeline_controller._worker_runner.run = _capturing_run
+
+    understand_page = main_window._workbench.page_for(PipelineStage.UNDERSTAND)
+    understand_page.run_button.click()
+    wait_for_signal(started_workers[0].signals.finished)
+    process_events()  # let the queued on_result callback itself run
+
+    log = main_window._orchestrator_service.get_log(dataset.dataset_id)
+    assert len(log.entries) == 1
+    assert log.entries[0].tool_name == "profile_dataset"
+    assert (
+        "1,204" not in understand_page._result_label.text()
+    )  # sanity: real data, not a stub
+    assert "3" in understand_page._result_label.text()  # 3 rows, profiled for real
