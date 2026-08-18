@@ -13,6 +13,9 @@ from src.ui.workbench import stage_page, stage_registry
 def test_builtin_stages_are_registered() -> None:
     registered = stage_registry.list_registered_stages()
     assert PipelineStage.UNDERSTAND in registered
+    assert PipelineStage.EXPLORE in registered
+    assert PipelineStage.ANALYZE in registered
+    assert PipelineStage.EXPLAIN in registered
     assert PipelineStage.REPORT in registered
     assert PipelineStage.REPRODUCE in registered
 

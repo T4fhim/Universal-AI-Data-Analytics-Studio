@@ -100,7 +100,7 @@ def unregister_stage_page(stage: PipelineStage) -> None:
 
 
 def _register_builtins() -> None:
-    """Populate the registry with every stage page built as of milestone 20.
+    """Populate the registry with every stage page built as of milestone 22.
 
     Imported here, at the bottom of this module, rather than at module top --
     :mod:`~src.ui.workbench.pages.understand_page` and its siblings import
@@ -108,12 +108,25 @@ def _register_builtins() -> None:
     real import cycle either way; the local import is kept purely to match
     :func:`~src.visualization.chart_registry._register_builtins`'s own "populate at the
     bottom, after every name this function needs already exists" shape.
+
+    Milestone 22 adds EXPLORE/ANALYZE/EXPLAIN -- see
+    :mod:`~src.ui.workbench.pages.analyze_page`'s own docstring for why these pages call
+    :mod:`src.analysis` directly rather than through the orchestrator's ``run_stage``, and for
+    the real integration gap this leaves (``main_window.py`` does not yet wire their
+    ``set_dataset``/``run_*`` methods to a live dataset-changed signal the way
+    :class:`~src.ui.controllers.pipeline_controller.PipelineController` does for UNDERSTAND).
     """
+    from src.ui.workbench.pages.analyze_page import AnalyzePage
+    from src.ui.workbench.pages.explain_page import ExplainPage
+    from src.ui.workbench.pages.explore_page import ExplorePage
     from src.ui.workbench.pages.report_page import ReportPage
     from src.ui.workbench.pages.reproduce_page import ReproducePage
     from src.ui.workbench.pages.understand_page import UnderstandPage
 
     register_stage_page(PipelineStage.UNDERSTAND, UnderstandPage)
+    register_stage_page(PipelineStage.EXPLORE, ExplorePage)
+    register_stage_page(PipelineStage.ANALYZE, AnalyzePage)
+    register_stage_page(PipelineStage.EXPLAIN, ExplainPage)
     register_stage_page(PipelineStage.REPORT, ReportPage)
     register_stage_page(PipelineStage.REPRODUCE, ReproducePage)
 

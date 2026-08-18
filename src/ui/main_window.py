@@ -77,6 +77,8 @@ from src.ui.theme.tokens import DARK_TOKENS
 from src.ui.theme_manager import ThemeManager
 from src.ui.toolbar import ApplicationToolBar
 from src.ui.ui_state_bus import UiStateBus
+from src.ui.workbench.pages.analyze_page import AnalyzePage
+from src.ui.workbench.pages.explore_page import ExplorePage
 from src.ui.workbench.pages.report_page import ReportPage
 from src.ui.workbench.pages.reproduce_page import ReproducePage
 from src.ui.workbench.pages.understand_page import UnderstandPage
@@ -362,6 +364,17 @@ class MainWindow(QMainWindow):
             ]
             if understand_entries:
                 understand_page.show_profile_summary(understand_entries[-1].outputs)
+
+        # Milestone 22: AnalyzePage/ExplorePage hold a plain Dataset (not a service
+        # reference -- see AnalyzePage's own docstring), so this is the same "structure
+        # here, behavior wired by the caller" hand-off UnderstandPage.show_profile_summary
+        # above already uses, just handing over the dataset itself instead of a log entry.
+        analyze_page = self._workbench.page_for(PipelineStage.ANALYZE)
+        if isinstance(analyze_page, AnalyzePage):
+            analyze_page.set_dataset(active_dataset)
+        explore_page = self._workbench.page_for(PipelineStage.EXPLORE)
+        if isinstance(explore_page, ExplorePage):
+            explore_page.set_dataset(active_dataset)
 
     # -- Settings / theme / about -----------------------------------------------
 
