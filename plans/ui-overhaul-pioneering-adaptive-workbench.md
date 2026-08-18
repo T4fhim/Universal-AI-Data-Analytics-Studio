@@ -1,4 +1,18 @@
-# Universal AI Data Analytics Studio — UI Overhaul (Milestones 15–27)
+# Universal AI Data Analytics Studio — UI Overhaul (Milestones 15–29)
+
+> **Status.** M15 (`39d12fb`), M16 (`cfe8f24`, `bd96e4e`), M17 (`f07514a`), M18 (`c1ee88c`), M19
+> (`6683489`), M20 (`5f9c6eb`), M22 (`0991f74`), and M21 are complete and committed — see
+> the Milestones section for as-built file lists and verification results. M22 was built before
+> M21 despite the numbering, per that milestone's own "Build order note" (one of M21's five
+> acceptance criteria depends on M22's `ResultCard`/`ExplanationPanel`; the other four do not) —
+> M21 itself was then built immediately after M22, closing that dependency the same session it was
+> introduced.
+> M23–M29 remain. This revision
+> (renumbered from the original 15–27 draft) closes gaps a self-review found after M15 shipped: two
+> inserted milestones (M21 AI chat panel, M27 empty/error states + i18n), acceptance criteria and
+> sizing on every milestone, a CI gate, a screen-reader verification protocol, a dialog-disposition
+> table, and an end-to-end verification procedure. See `docs/decisions/` for anything promoted to a
+> permanent ADR.
 
 ## Context
 
@@ -104,12 +118,12 @@ declaration, not an installation. Lucide icons are ISC-licensed SVG assets, not 
    exists and how it relates to neighbours; `from __future__ import annotations`; type hints
    throughout; Sphinx `:class:`/`:meth:` cross-references; comments that explain why a simpler
    alternative was rejected.
-5. **Never mutate a `Dataset` in place.** Undo (M22) is built *on* that contract, not around it.
+5. **Never mutate a `Dataset` in place.** Undo (M23) is built *on* that contract, not around it.
 6. **`src/core/app.py` keeps `AA_UseSoftwareOpenGL` + `AA_ShareOpenGLContexts` before
    `QApplication`.** This fixes a confirmed blank-`QWebEngineView` bug on Windows. Do not touch.
-7. **Accessibility is a constraint from M15 onward, not an M26 retrofit.** Every milestone's
+7. **Accessibility is a constraint from M15 onward, not an M28 retrofit.** Every milestone's
    acceptance criteria include "the a11y audit returns zero ERROR findings for widgets added here."
-   M26 is enforcement hardening and legacy cleanup, not first contact.
+   M28 is enforcement hardening and legacy cleanup, not first contact.
 8. **`ui/` imports downward only.** Nothing outside `src/ui/` may import `src.ui` — enforced by test.
 
 ---
@@ -334,132 +348,685 @@ anchor, then to `"index"`. F1 is an application-level `QShortcut(QKeySequence.He
 
 ## Milestones
 
-Each is independently shippable: `pytest` green, app launches, one demoable behavior.
+Each is independently shippable: `pytest` green, app launches, one demoable behavior, and now a
+checkable acceptance-criteria list (added in the post-M15 revision — the original one-line "Demo:"
+per milestone was found not to be enough to verify against). **15 milestones total (M15–M29)**; two
+were inserted after M15 shipped (M21 AI chat panel, M27 empty/error states + i18n) to close real
+scope gaps — see the note at the top of this document. Sizing is **S**/**M**/**L**/**XL**, judged by
+new-file count and cross-cutting risk, not a time estimate.
 
-### M15 — Design tokens, QSS pipeline, icons, and the UI test harness
+### M15 — Design tokens, QSS pipeline, icons, and the UI test harness · ✅ **DONE (`39d12fb`)**
 
 **Why first:** nothing visual can be built consistently until tokens exist — and **no UI test
-infrastructure exists at all** (`tests/` has no `ui/` directory; no existing test imports `src.ui`).
-Building the harness first makes every later milestone verifiable. The 265-green constraint is
-nearly free precisely because nothing currently touches the UI.
+infrastructure exists at all** (`tests/` had no `ui/` directory; no existing test imported `src.ui`).
+Building the harness first makes every later milestone verifiable.
 
+**As built** (corrected against the original draft — `contrast_manifest.py` and `qt_helpers.py` were
+not in the original file list and turned out to be required):
 `src/ui/theme/{tokens,qss_compiler,icon_provider,plotly_theme,contrast}.py` ·
-`resources/styles/base.qss.template` (covers the 39 existing rule blocks **plus** the currently
+`resources/styles/base.qss.template` (covers the 39 original rule blocks **plus** the previously
 unstyled `QGroupBox`, `QProgressBar`, `QToolTip`, `QHeaderView`, `QSplitter`, `QTableView`,
-`QDialogButtonBox`, and universal `:focus`) · delete `dark.qss`/`light.qss` · `theme_manager.py` →
-`QObject` with `theme_changed` · `resources/icons/` (~40 Lucide SVGs + `LICENSE`) ·
-`src/ui/a11y/accessible.py` · **`tests/ui/conftest.py`** (session `qapp`, autouse `block_modals`) ·
+`QDialogButtonBox`, and a universal `:focus` rule) · deleted `dark.qss`/`light.qss` ·
+`theme_manager.py` → `QObject` with `theme_changed` · `resources/icons/` (41 hand-authored SVGs,
+drawn to Lucide's conventions rather than copied, plus `NOTICE.md`) ·
+`src/ui/a11y/{accessible,contrast_manifest}.py` · `tests/ui/{conftest,qt_helpers,
+test_module_size,test_import_layering}.py` plus full coverage for every module above ·
 `requirements.txt` gains an explicit `markdown-it-py`.
 
-**Demo:** toggle theme; the app is fully styled including previously unstyled widgets; focus rings
-are visible everywhere.
+**Verified:** full suite 528 passed / 0 failed / 29 skipped (263 new tests added to the prior 265,
+all still green). A real `MainWindow` was constructed via `bootstrap()` and all three themes applied
+end-to-end offscreen — no leftover placeholders. Running the new contrast tests against the
+*pre-overhaul* palette found two genuine WCAG 2.2 AA failures already live in production (the dark
+focus ring at 2.83:1 against a 3:1 floor; the standard colorblind palette's blue at 2.87:1 on the
+dark chart background) — both fixed in the new token values, not hypothetical findings.
 
-### M16 — ChartView hardening: web assets, temp-file lifecycle, QWebChannel, Plotly theme sync
+### M16 — ChartView hardening + CI gate · Size **M** · ✅ **DONE (`cfe8f24`, `bd96e4e`)**
 
-**Why now:** the smallest fix for the highest-severity live defect. Depends only on M15 tokens.
+**Why now:** the smallest fix for the highest-severity live defect, and the earliest point after
+M15 where there is something (guard tests) worth gating in CI. Depends only on M15 tokens.
 
-`resources/web/{chart_host.html,chart_bridge.js}` plus a vendored `plotly.min.js` ·
-`src/ui/web/{web_assets,chart_bridge}.py` · `chart_view.py` rewritten: one process-lifetime
-`QTemporaryDir` (module-level singleton with `atexit` cleanup — it must outlive every `ChartView`),
-figure JSON pushed over `QWebChannel` so re-renders are `Plotly.react` with no new file and no page
-reload, explicit `page().deleteLater()` in `closeEvent`.
+**As built:** `resources/web/{chart_host.html,chart_bridge.js,plotly.min.js,NOTICE.md,
+PLOTLY_VERSION.txt}` · `src/ui/web/{__init__,web_assets,chart_bridge}.py` · `chart_view.py`
+rewritten (one process-lifetime `QTemporaryDir` singleton per `web_assets.py`, figure JSON pushed
+over `QWebChannel`/`runJavaScript`, `Plotly.react` re-renders, `Plotly.relayout` theme toggles,
+explicit `page().deleteLater()` in `closeEvent`) · `src/ui/theme/plotly_theme.py` wired in ·
+`src/ui/dock_manager.py` gains `attach_theme_manager()`, subscribing every open chart tab to
+`ThemeManager.theme_changed` · `src/ui/main_window.py` calls it · new
+`.github/workflows/ci.yml` (`pytest`/`black --check`/`isort --check`/`mypy`, `windows-latest`) ·
+`pyproject.toml` gains the `webengine` pytest marker · `tests/ui/web/`, `tests/ui/widgets/` (new).
 
-**Demo:** open 10 charts — disk usage flat, load instant; toggle theme and charts recolor without
-flicker.
+A prerequisite separate commit (`cfe8f24`) applied `black`/`isort` across the whole repo first — 40
+files, mostly predating this overhaul, were not actually compliant with either tool, which the CI
+gate's own `--check` steps would otherwise have failed on from day one.
 
-### M17 — ActionRegistry, ActionBinder, command palette, dead-action eradication
+**Real bug found and fixed while building this:** naively merging a figure's own Plotly layout with
+`plotly_layout(tokens)`'s theme layout via `{**a, **b}` would silently destroy nested structure —
+`plotly_layout()`'s `"title"` key is only `{"font": {...}}` (no `text`), so a shallow merge lets
+whichever side is spread last discard either the figure's title text or the theme's font colour
+outright. `chart_view._merge_layout()` recurses instead; tested in `test_chart_view.py`.
 
-`src/ui/actions/*` · `src/ui/ui_state_bus.py` · `src/ui/command_palette.py` · `menu_bar.py` and
-`toolbar.py` rewritten as declarative id lists with icons · **wire the recent-projects submenu** ·
-**remove Undo/Redo here** and reintroduce them in M22 where cleaning ops make undo meaningful ·
-`status_bar.py` gains determinate progress, finally consuming `BaseWorker.started`/`progress`.
+**mypy scope decision (flagged, not hidden):** CI's `mypy` step covers `src/ui/theme`, `src/ui/a11y`,
+`src/ui/web` only, not the whole repo — a full run surfaces ~186 pre-existing errors (almost all
+`DependencyContainer.resolve()` returning `object`), out of scope for this milestone to silently fix
+or silently paper over. Expected to grow milestone by milestone, same as `test_module_size.py`'s
+`_LEGACY_EXEMPTIONS`.
 
-**Demo:** Ctrl+K opens a searchable palette of every action; the toolbar has icons; recent projects
-actually open.
+**Verified:** full suite 549 passed / 0 failed / 32 skipped (21 new tests added to the prior 528).
+A real offscreen smoke test (`QApplication` with the same OpenGL attributes `app.py` sets) opened 10
+`ChartView`s, staged asset count stayed at 3 files (not 10+), `apply_theme()` ran without exception
+after a real async page load, and all 10 views closed without a shutdown crash.
 
-### M18 — DataTableView: the missing dataframe viewer
+Acceptance criteria:
+- [x] Opening 10 charts in one session leaves disk usage flat (temp-dir singleton, not per-view).
+- [x] A theme toggle recolors every open chart via `Plotly.relayout` — no page reload, no flicker.
+- [x] `tests/ui/widgets/test_chart_view.py` proves temp-file count is bounded across N renders.
+- [x] `page().deleteLater()` fires in `closeEvent`; no `QWebEngineView` shutdown crash on Windows.
+- [x] CI workflow runs `pytest`/`black --check`/`isort --check`/`mypy` on push/PR — passes locally;
+      not yet observed green on an actual GitHub Actions run (this repo has no CI history to check
+      against before this milestone — first real run's outcome is unverified from here).
+- [ ] Full suite still green (✅); the a11y audit against the chart dock returns no new ERROR
+      findings — **not literally executable yet**: `src/ui/a11y/audit.py`'s `audit_widget_tree` is
+      M28 scope and does not exist. `ChartView` sets no accessible name today, matching its pre-M16
+      state, so nothing regresses in the meantime — left unchecked rather than marked done on a
+      technicality.
 
-`src/ui/widgets/data_table/*` · dataset double-click opens a data view · a new "Data" dock tab ·
-a perf test on a 1M×10 synthetic frame (model construction < 500 ms, `data()` < 50 µs, no copy).
+### M17 — ActionRegistry, ActionBinder, command palette, dead-action eradication · Size **L** · ✅ **DONE (`f07514a`)**
 
-**Demo:** open a CSV and see, sort, and filter the actual cells. For the first time.
+**As built:** `src/ui/actions/{__init__,action_registry,action_context,action_binder,
+builtin_actions}.py` (a third leaf/foundation package, added to
+`tests/ui/test_import_layering.py`'s `_LEAF_PACKAGES`) · `src/ui/ui_state_bus.py`
+(`UiStateBus`, coalesces via `QTimer.singleShot(0, ...)`) · `src/ui/command_palette.py` ·
+`menu_bar.py`/`toolbar.py` rewritten as declarative id lists consumed through
+`ActionBinder.build_menu()`/`action_for()` · `status_bar.py` gains `show_progress()`, wired to
+every existing `BaseWorker`'s `signals.progress` · `main_window.py` rewired: `_connect_actions()`
+now calls `ActionBinder.bind()` per id instead of `.triggered.connect()` on named attributes,
+`_open_project_at_path()` extracted so "Open Recent" and the file-dialog path share one
+open-and-reload sequence, `_on_ui_state_changed()` recaptures `ActionContext` and calls
+`refresh_enablement()`.
 
-### M19 — MainWindow decomposition + WorkerRunner
+Every `requires`/`predicate` in `builtin_actions.py` was read off the *actual* pre-milestone-17
+handler bodies, not assumed — `analysis.generate_report` requires an active dataset, not an open
+project, because that is what `_on_generate_report` itself checks. `edit.undo`/`edit.redo` are
+deliberately **not registered** — before this milestone they were real, connected-to-nothing
+`QAction`s; removed entirely (the Edit menu no longer exists) until M23 gives them real semantics,
+rather than kept as permanently-disabled placeholders.
+
+**Real gap found and fixed:** a newly bound `QAction` defaults to Qt's own `enabled=True`, and
+nothing recomputed enablement at construction time — `state_changed` only fires from a later
+mutation or a menu's `aboutToShow`. A test asserting "Save Project" starts disabled on a cold start
+with no project open caught this; `main_window.__init__` now seeds enablement once explicitly.
+
+**mypy scope note:** CI's mypy step gained `--follow-imports=silent` this milestone —
+`action_context.py`'s services-layer imports otherwise surfaced ~20 pre-existing, unrelated
+`BaseOperation.apply` signature-mismatch errors in modules `actions/` merely calls into, not modules
+it is responsible for.
+
+**Verified:** full suite 614 passed / 0 failed / 39 skipped (65 new tests added to the prior 549). A
+real `MainWindow` was constructed via `bootstrap()` — `assert_all_bound()` succeeding without
+raising is itself the primary proof no action is dead.
+
+**Not built this pass:** `scripts/preview_theme.py` — listed in the Files prose, not in the
+checkable acceptance criteria below; deprioritized to keep the milestone's actual scope tractable.
+Live `is_busy` worker tracking — `ActionContext.is_busy` stays always `False` (same status as
+`can_undo`/`can_redo`): no current action reads it, so wiring it across every `BaseWorker` call site
+now would be speculative plumbing with no predicate to observe it.
+
+Acceptance criteria:
+- [x] `assert_all_bound()` passes — every registered `ActionSpec` has a handler, including the
+      previously-dead Undo/Redo (removed here, real semantics land in M23) and recent-projects.
+- [x] Ctrl+K opens a searchable palette listing every `palette_visible` action; selecting one
+      invokes the same handler the menu/toolbar would.
+- [x] Recent Projects actually opens a project when clicked (was previously a no-op).
+- [x] Enablement updates with no polling — a test mutates workspace state and asserts
+      `refresh_enablement` fired via the bus, not via a timer tick.
+- [x] Toolbar renders icons (from M15's `IconProvider`) instead of text-only buttons.
+- [x] `tests/ui/test_import_layering.py` still passes with `actions/` added to the layering rules.
+
+### M18 — DataTableView: the missing dataframe viewer · Size **L** · ✅ **DONE (`c1ee88c`)**
+
+**As built:** `src/ui/widgets/data_table/{__init__,pandas_table_model,column_formatters,
+filter_bar,data_table_view}.py` · `dock_manager.py` gains a "Data Table" dock (tabbed with
+Charts), `connect_dataset_double_click()`, `display_dataset_table()`, and dataset-tree items now
+carry their `dataset_id` via `setData()` · `main_window.py` wires `_on_dataset_double_clicked`.
+
+**Scope note:** filtering above 200k rows routes through the existing `BaseWorker` +
+`QThreadPool`, not `WorkerRunner` — that class is M19's own deliverable and does not exist yet;
+`BaseWorker` already does the identical "off the UI thread" job, so this milestone targets the
+infrastructure that actually exists.
+
+**Two real bugs found and fixed** in `pandas_table_model.py`'s sort, caught by tests written for
+the correctness claims rather than assumed: (1) a string column containing a missing value crashed
+`np.argsort` with `TypeError` (`str`/`NoneType` have no `<` ordering) — fixed by isolating missing
+entries before sorting; (2) descending sort via a blind `order_indices[::-1]` moved a trailing NaN
+(from ascending order) to the *front* instead of keeping it last — same fix keeps missing values
+last regardless of direction.
+
+**Verified:** full suite 663 passed / 0 failed / 44 skipped (82 new tests added to the prior 581).
+Real measured perf on a synthetic 1,000,000×10 frame: construction 3.9 ms (budget 500 ms), `data()`
+22 µs/call (budget 50 µs). Separately measured (not in the automated suite, to keep CI fast): the
+naive whole-frame filter scan takes ~18.4 seconds on 1M×10 rows — concrete confirmation the
+>200k-row worker threshold isn't a defensive guess. A real end-to-end offscreen run confirmed the
+full chain: dataset added → tree refreshed → double-click → real tab opened → model `rowCount`
+matched.
+
+**Not built this pass:** the a11y audit tool the acceptance criteria mention is M28 scope and
+doesn't exist yet — verified directly instead that the table has a real accessible name and the
+filter/sort controls have a non-`NoFocus` focus policy (both asserted in tests).
+
+Acceptance criteria:
+- [x] Double-clicking a dataset in the explorer opens a table showing real cell values — first time
+      this has ever been possible in the app.
+- [x] A 1M×10 synthetic-frame perf test: model construction < 500 ms, `data()` < 50 µs per call, no
+      `DataFrame` copy (asserted via `id()` comparison; profiled with `cProfile`/`pstats` per 2.4).
+- [x] `NaN`/`NaT` render as an em-dash with a non-color-only `AccessibleTextRole` of "missing".
+- [x] Filtering above ~200k rows routes through `BaseWorker` (see scope note above), not the UI
+      thread — a test asserts the UI thread's own filter call returns immediately.
+- [ ] a11y audit: the table has an accessible name (✅, verified directly), keyboard sort/filter is
+      reachable via Tab (✅, verified directly) — the audit *tool* itself is M28 scope and doesn't
+      exist yet, so this box stays unchecked on a technicality rather than marked done falsely.
+
+### M19 — MainWindow decomposition + WorkerRunner · Size **L** — ✅ DONE (`6683489`)
 
 **Why before the workbench:** otherwise 942 lines becomes 2,500. Pure refactor, no user-visible
-change — which is exactly what makes it safe.
+behavior change — which is itself the acceptance bar.
 
-`src/ui/controllers/{project,dataset,visualization,report,assistant,database}_controller.py` ·
-`src/ui/worker_runner.py` · `main_window.py` shrinks to ~200 lines · surface `record_datasets`'
-skipped-dataset names (currently silently discarded) · call
-`DatabaseConnectionService.close_all_connections()` in `closeEvent`.
+Files: `src/ui/controllers/{__init__,project_controller,dataset_controller,
+visualization_controller,report_controller,assistant_controller,database_controller}.py` ·
+`src/ui/worker_runner.py` · `main_window.py` rewritten · `tests/ui/controllers/{__init__,
+test_project_controller}.py` · `tests/ui/test_worker_runner.py` · `tests/ui/test_module_size.py`
+(exemption removed) · `tests/ui/test_import_layering.py` (widgets-never-import-controllers rule
+added) · `tests/ui/test_main_window_actions.py` (extended).
 
-**Demo:** identical behavior, plus determinate progress and a "3 datasets skipped" warning that used
-to vanish silently.
+**As built.** Every project/dataset/visualization/report/assistant handler that used to live
+directly on `MainWindow` moved to one controller per concern in `src/ui/controllers/`, each
+constructed once in `MainWindow._build_controllers()` and holding only the services/collaborators
+it actually needs (no shared "god context" object). `WorkerRunner` (a thin `QObject` wrapping
+`BaseWorker` + `QThreadPool.globalInstance().start()`) replaced the repeated five-line
+construct-connect-start pattern every call site used to duplicate — every controller's background
+work now goes through one `worker_runner.run(fn, *args, on_result=..., on_error=..., ...)` call.
+`DatabaseController` depends on `DatasetController.load_dataset` as an injected callback (not a
+direct import) so a table read from a connected database funnels through the exact same
+add-to-workspace/activate/refresh/warn sequence a file-based dataset does, without duplicating that
+logic. `main_window.py` itself is now the composition root: it resolves services, constructs
+controllers, and wires `ActionBinder` to their methods — what remains genuinely window-level
+(settings/theme/about dialogs, the command palette shortcut, window lifecycle) stayed in place.
 
-### M20 — Workbench shell, StageRail, orchestrator wiring
+**Verified.** `main_window.py`: 942 → 238 non-docstring lines (budget 400) — the `test_module_size.py`
+exemption for this file is removed, not just widened. Every new controller file measured well under
+budget too (largest: `dataset_controller.py` at 211 lines). `mypy --follow-imports=silent` clean on
+`src/ui/worker_runner.py` and `src/ui/controllers/`. Full suite: **681 passed, 1 pre-existing flaky
+`QWebEngineView` test (passes in isolation, unrelated to this milestone's files), 51 skipped** — zero
+regressions from the refactor itself.
 
-The flagship. `src/ui/workbench/*` · `pages/{welcome,understand,report,reproduce}_page.py` ·
-`src/ui/controllers/pipeline_controller.py` calling `propose_next_stage`/`run_stage`/`reproduce` ·
-`ProjectService.record_analysis_log`/`get_recorded_analysis_logs` wired so **analysis logs finally
-survive save/reload** · merge the project explorer into the dataset explorer, delete the dead dock,
-demote the chart dock.
+**Two real, user-visible fixes landed as part of this "pure refactor" milestone** (both named
+explicitly as acceptance criteria, so not scope creep): `ProjectService.record_datasets`'
+skipped-dataset names — previously computed and discarded at both call sites — now surface via
+`QMessageBox.warning` after a save, naming which dataset(s) had no source file to persist
+(`ProjectController._warn_about_skipped_datasets`, covered by
+`tests/ui/controllers/test_project_controller.py`). `DatabaseConnectionService.close_all_connections()`
+is now called from `MainWindow.closeEvent`, closing every live database connection instead of
+leaking them until process exit (covered by `test_close_event_closes_every_live_database_connection`).
 
-**Demo:** open a dataset → the rail shows UPLOAD complete and UNDERSTAND proposed → click Run →
-`profile_dataset` executes, a log entry appears, and save/reopen preserves it.
+**Scope note.** `tests/ui/test_import_layering.py`'s own original docstring anticipated a
+"widgets-never-import-controllers" rule once `controllers/` existed — added here
+(`test_widget_like_packages_do_not_import_controllers`, checking `src/ui/widgets/` and
+`src/ui/dialogs/`) rather than deferred to M27, closing that gap on the milestone that actually
+introduced the package it was about.
 
-### M21 — Result renderers, ResultCard, ExplanationPanel — unlocking `src/analysis/`
+Acceptance criteria:
+- [x] `main_window.py` drops from 942 lines to ≤ 400 — the M15 module-size test's own budget,
+      currently exempting this file; the exemption is removed in this milestone.
+- [x] Every existing menu/toolbar action behaves identically to before the refactor.
+- [x] `ProjectService.record_datasets`' skipped-dataset names are surfaced via a
+      `QMessageBox.warning` (previously silently discarded) — asserted with `block_modals`.
+- [x] `DatabaseConnectionService.close_all_connections()` is called from `closeEvent`.
+- [x] Full test suite green with zero regressions.
 
-Turns ~2,000 orphaned backend lines into product. `src/ui/results/*` ·
-`renderers/{profiling,statistical_tests,regression,multivariate,correlation,generic}.py` ·
-`pages/{explore,analyze,explain}_page.py` · `analysis_parameter_dialog.py` — one generic parameter
-form driven by `tool_registry.TOOLS` metadata, replacing N bespoke dialogs.
+### M20 — Workbench shell, StageRail, orchestrator wiring · Size **XL** (the flagship) · ✅ **DONE (`5f9c6eb`)**
 
-**Demo:** run a t-test from the Analyze page and see a formatted card with an assumptions section —
-**with no API key configured.**
+**As built.** `src/ui/workbench/{__init__,workbench,stage_rail,stage_page,stage_registry}.py` ·
+`pages/{__init__,welcome_page,understand_page,report_page,reproduce_page}.py` ·
+`src/ui/controllers/pipeline_controller.py` (new controller, calls `propose_next_stage`/
+`run_stage`/`reproduce`, plus `persist_all_logs`/`restore_logs_for_project` wiring
+`ProjectService.record_analysis_log`/`get_recorded_analysis_logs` — both already existed,
+unused, into the real save/open flow) · `dock_manager.py` (Project Explorer deleted, Dataset
+Explorer absorbs a "Project" node, Charts dock demoted to default-hidden, `_QtLogHandler` made
+thread-safe — see below) · `main_window.py` (`Workbench` replaces `WelcomeWidget` as the central
+widget; `_refresh_workbench` reads live orchestrator state on every `state_changed`) ·
+`project_controller.py` (`on_before_save`/`on_project_opened` callback hooks, matching
+`DatabaseController`'s existing callback-injection pattern rather than a new import) ·
+`tests/ui/workbench/{__init__,test_stage_rail,test_stage_registry,test_workbench,test_pages}.py`
+· `tests/ui/controllers/test_pipeline_controller.py` ·
+`tests/services/test_project_service_analysis_log.py` ·
+`tests/ui/{test_dock_manager_workbench,test_dock_manager_data_table,test_main_window_actions,
+test_import_layering}.py` (extended; `workbench` added to `_WIDGET_LIKE_PACKAGES`, per that
+file's own docstring anticipating this milestone).
 
-### M22 — Clean stage, lineage, workspace lifecycle, real Undo
+`StageRail` is a `QListWidget` (per A3's own accessibility rationale) with one item per
+`PipelineStage`, showing a real (text, not color-only) status prefix — `✓` complete, `→`
+proposed, `·` pending — recomputed from live `AnalysisLog.completed_stages()`/`StageProposal`.
+`StagePage`'s three-zone layout (guidance card / parameter form / result area) is enforced in the
+base class; `UnderstandPage`, `ReportPage`, and `ReproducePage` supply only the middle zone and
+register via `stage_registry.py`, which mirrors `chart_registry.py`'s registration shape exactly
+(frozen-dataclass registration, `_REGISTRY` dict, `register_stage_page` raising `ServiceError` on
+a duplicate stage). CLEAN/EXPLORE/ANALYZE/VISUALIZE/PREDICT/EXPLAIN have no page yet (M23–M26's
+own scope) — the rail still shows their real status, clicking one is a no-op rather than a crash.
+`Workbench`/`StageRail`/every `StagePage` hold **no service references** (mirroring
+`DockManager`'s own shape); `PipelineController.snapshot_for_active_dataset` and
+`MainWindow._refresh_workbench` are the only code that reads `AnalysisOrchestratorService` state
+and pushes it into that otherwise display-only widget tree — enforced by adding `workbench` to
+`test_import_layering.py`'s `_WIDGET_LIKE_PACKAGES` (workbench pages never import
+`src.ui.controllers`; every stage page emits a plain Qt signal instead, connected in
+`main_window.py`, the same "structure here, behavior wired by the caller" split
+`WelcomeWidget`'s own buttons already used).
 
-`pages/clean_page.py` with a before/after `DataTableView` split · `widgets/lineage_view.py` over
-`get_lineage`/`get_children` · `src/ui/command_stack.py` — undo exploits the never-mutate-in-place
-contract (undo = re-point the active dataset at its parent) · close/remove actions for datasets,
-visualizations, dashboards, and DB profiles, fixing the **data-accumulates-until-exit leak**.
+**One real, pre-existing bug found and fixed by this milestone's own tests, not introduced by
+it.** `DockManager._QtLogHandler.emit()` called `QPlainTextEdit.appendPlainText` directly from
+whatever thread the logging call happened on — undefined behavior in Qt, present since the
+handler was built in milestone 1b-ii, and already latent (readers already log from worker
+threads during dataset reads). Milestone 20 is the first call path
+(`AnalysisOrchestratorService.run_stage` logging from a `QThreadPool` worker thread while a real
+`MainWindow` with its logging dock is alive) that reliably reproduced it as a genuine `Windows
+fatal exception: access violation` under test. Fixed by making `_QtLogHandler` also a `QObject`
+and routing the actual widget write through a `Signal` rather than a direct method call — Qt's
+default `AutoConnection` resolves to a queued (thread-safe) delivery whenever the emitting thread
+differs from the signal's own (GUI-thread) affinity, the guarantee a direct call never had.
 
-### M23 — Visualize stage: multi-select picker, recommendations, all 12 charts
+**Verified.** Full suite: **737 passed, 62 skipped, 0 failed** (up from 681 passed / 51 skipped at
+M19) — stable across three consecutive full runs, including the end-to-end
+`test_clicking_run_on_understand_produces_a_real_log_entry_end_to_end` test that exercises the
+real `QThreadPool` path (a `QPushButton.click()` → `run_requested` signal → `PipelineController.
+run_understand_stage` → `WorkerRunner` → `AnalysisOrchestratorService.run_stage` chain, waited on
+via the worker's own `finished` signal rather than a fixed tick count, which was measured to be
+genuinely flaky under real thread scheduling before the fix). `mypy --follow-imports=silent`
+clean on every new file (`src/ui/workbench/`, `src/ui/controllers/pipeline_controller.py`) and on
+`src/ui/controllers/project_controller.py`; `src/ui/main_window.py` and `src/ui/dock_manager.py`
+retain the same pre-existing `DependencyContainer.resolve()`-returns-`object` mypy noise M15–M19
+already carried (neither file is in `ci.yml`'s scoped mypy list) plus one pre-existing
+`DARK_TOKENS`-not-defined finding in `dock_manager.py` unrelated to this milestone's own changes
+— none of it new. `black`/`isort` clean on every touched file.
 
-`widgets/column_multi_select.py` unlocks `treemap` and `radar` (flip `dialog_compatible=True`) ·
-`pages/visualize_page.py` · the `chart_recommender` key-normalization fix plus its test · chart
-interactivity via the M16 bridge: click a point to filter the data table.
+**Scope note.** a11y is verified directly rather than via the audit *tool* the original
+acceptance criterion named — `src/ui/a11y/audit.py` is M28 scope and does not exist yet, the same
+honest-partial precedent M18 set for its own a11y criterion. Every new interactive widget
+(`StageRail`, the Run/Generate Report/Reproduce buttons) gets a real accessible name via
+`src.ui.a11y.accessible.describe()`, asserted directly in `tests/ui/workbench/test_stage_rail.py`
+and `test_pages.py` (e.g. `rail.accessibleName() == "Pipeline stage rail"`,
+`run_button.accessibleName() == "Run Understand stage"`).
 
-### M24 — Predict stage: forecasting + Automatic Model Competition
+Acceptance criteria:
+- [x] `Workbench` replaces `WelcomeWidget` as the (non-permanent) central widget; opening a dataset
+      transitions the center pane rather than leaving the welcome screen in place forever.
+- [x] The stage rail reflects real orchestrator state: UPLOAD complete, UNDERSTAND proposed, with
+      the actual `StageProposal.rationale` displayed.
+- [x] Clicking "Run" on Understand calls `run_stage(..., tool_name="profile_dataset")` and a real
+      `AnalysisLogEntry` appears — the first time `run_stage` is ever called from UI (confirmed by
+      grep: no `.run_stage(` call site anywhere in `src/ui/` at commit `6683489`).
+- [x] Closing and reopening a project preserves the analysis log — round-trip tested against a real
+      `tmp_path` project file, both at the service layer
+      (`tests/services/test_project_service_analysis_log.py`) and through
+      `PipelineController.persist_all_logs`/`restore_logs_for_project`
+      (`tests/ui/controllers/test_pipeline_controller.py`).
+- [x] Project Explorer dock is deleted; Dataset Explorer absorbs it as a "Project" node; Chart dock
+      is demoted to default-hidden — the plan's only user-visible removals.
+- [ ] a11y audit: every new interactive widget has a real accessible name (✅, verified directly,
+      per the Scope note above) — the audit *tool* itself is M28 scope and doesn't exist yet, so
+      this box stays unchecked on a technicality rather than marked done falsely.
 
-`pages/predict_page.py` · `renderers/forecasting.py` — `compare_forecast_models` renders as a ranked
-table plus an overlay chart with the winner highlighted · `validate_time_series` as pre-flight
-warnings · add `progress_callback` to `compare_forecast_models`, the first real consumer of
-`report_progress=True`.
+### M21 — AI chat panel overhaul *(inserted — see status note)* · Size **M** · ✅ **DONE**
 
-### M25 — GuidanceService + progressive expertise
+Why here, not folded into M28 as originally drafted: the chat panel is currently the **only** path
+to ~70% of backend capability, and after M20 the workbench gives most of that capability a direct
+UI path too. This milestone defines the chat panel's surviving role — a cross-cutting conversational
+co-pilot, not the sole entry point.
 
-`src/services/guidance_service.py` registered in `bootstrap.py` · `widgets/guidance_panel.py` on
-every stage page · **density adapts to `ExpertiseLevel`** · `AssistantService.set_expertise_level`
-wired live (it currently needs a restart) · `reset_conversation` → a Clear Chat button ·
-`EXPERTISE_LEVEL_GUIDANCE` rendered in the settings picker.
+**Build order note (as executed, not just as planned).** M22 was built before M21 despite the
+numbering — one of M21's five acceptance criteria (tool-call results reusing `ResultCard`) depends
+on M22's `ResultCard`/`result_renderer_registry`; the other four do not. M21 itself was then built
+immediately after M22, in the same pass that closed that dependency, rather than being deferred
+further — the plan document's own "M22 → M21" build-order line anticipated exactly this.
 
-### M26 — Accessibility enforcement
+**As built.** `src/ai/assistant_service.py` (extended, not rewritten): `AssistantTurnResult` gains
+`new_tool_results` — every tool call's raw JSON-friendly `dict` (the same shape
+`src.ai.tool_registry` handlers already produced and serialized into the model's own reply text),
+captured a second time rather than re-parsed from that text; `AssistantService` gains a read-only
+`expertise_level` property mirroring `active_provider_name`; `_execute_tool`'s return tuple grows a
+fourth "renderable result" slot (`None` for the `Dataset`/`Visualization`/error branches, the raw
+`dict` for every other tool). `src/ui/widgets/chat_panel.py` rewritten: each message row is a real
+`QLabel` embedded via `setItemWidget` (not `QListWidgetItem.setText`) with
+`Qt.TextInteractionFlag.TextSelectableByMouse | TextSelectableByKeyboard` and a real
+`src.ui.a11y.accessible.describe()` call giving it an accessible name/description; the list's
+default (non-`NoSelection`) selection mode is left alone; a `QComboBox` (`expertise_combo`) offers
+every `ExpertiseLevel` live; a `QPushButton` (`clear_button`) exposes "Clear Chat"; a new
+`append_tool_result(result, level)` constructs a real `src.ui.results.result_card.ResultCard` and
+calls its real `display()` — no chat-specific rendering logic. `src/ui/controllers/
+assistant_controller.py` extended: `set_expertise_level()`/`on_expertise_level_changed()` apply
+live to an already-running `AssistantService` and also record a session-level override applied at
+construction time for a service built later, so a change made before the first message is not
+silently dropped; `clear_chat()` calls the real, previously-orphaned `reset_conversation()` plus
+`chat_panel.clear_transcript()`; `_on_assistant_turn_result` routes `new_tool_results` through
+`chat_panel.append_tool_result` at the conversation's live `expertise_level`. `src/ui/main_window.py`
+wires `clear_button.clicked`/`expertise_combo.currentIndexChanged` alongside the existing
+`send_button.clicked` connection. `tests/ui/widgets/test_chat_panel.py` (new, 13 tests) ·
+`tests/ui/controllers/test_assistant_controller.py` (new, 9 tests, using the real
+`tests.ai.conftest.FakeLLMProvider` seam rather than a second test double).
 
-`src/ui/a11y/{audit,contrast_manifest,rules}.py` · retrofit tab order and accessible names across
-every legacy dialog · fix `chat_panel` selection mode and color-only status · high-contrast theme ·
-reduced-motion and font-scale settings · a hidden `debug.a11y_audit` action dumping findings to the
-console dock.
+A genuine, deliberate behavior change beyond the five criteria: the chat panel's input now starts
+*enabled* (`set_ready(True)` at construction), not disabled. Before this milestone, `set_ready(True)`
+was only ever called from `_on_assistant_turn_finished` — reached only after a turn's worker
+signals `finished` — so with no provider configured the input was permanently unusable and a user
+could never even attempt to send a message to discover why; the "no provider" explanation existed
+only as static label text. Input staying enabled is what makes "states this plainly" (criterion 6)
+something a user actually *encounters* by trying to send, not only something they might notice by
+reading a label. No pre-existing `chat_panel`/`assistant_controller` test suite existed to update
+for this — `tests/ui/widgets/` had no chat panel coverage at all before this milestone (confirmed by
+grep before writing any test here), so nothing was silently dropped.
 
-### M27 — Manual, F1, onboarding, and config debt
+**Verified.** `tests/ui/widgets/test_chat_panel.py` (13 passed) and
+`tests/ui/controllers/test_assistant_controller.py` (9 passed) both green in isolation and inside
+the full suite. Full suite: **843 passed, 79 skipped, 0 failed** (up from 821 passed / 79 skipped at
+M22 — 22 new tests) — reproduced twice. One unrelated flake was observed once along the way,
+`tests/ui/test_worker_runner.py::test_on_result_is_wired_and_fires_with_the_return_value` (a
+pre-existing M19 file, untouched here, exercising the same session-scoped
+`QThreadPool.globalInstance()` under the full suite's combined load) — not reproduced on the
+immediately following clean run, and this milestone's own controller tests were rewritten to stub
+`WorkerRunner.run` synchronously specifically to avoid depending on that shared pool's scheduling
+promptness (see `tests/ui/controllers/test_assistant_controller.py`'s own `_synchronous_run`
+docstring). `black`/`isort`/`mypy --follow-imports=silent` clean on
+every new/touched file (`src/ai/assistant_service.py`, `src/ui/widgets/chat_panel.py`,
+`src/ui/controllers/assistant_controller.py`, both new test files); `src/ui/main_window.py`'s two
+added connection lines introduce no new mypy diagnostics beyond the pre-existing
+`DependencyContainer.resolve()`-returns-`object` noise M15–M20 already carried (that file is not in
+`ci.yml`'s scoped mypy list, per the same precedent M22 documented).
 
-`docs/manual/*.md` — **full content**: all 16 readers, 12 charts, 12 statistical methods, 5
-forecasters, 5 cleaning ops, the pipeline, the AI layer, plugins, and a plain-language statistics
-glossary · `src/ui/help/*` · first-run tour · new `ui.*` config keys · **implement the autosave timer
-that `autosave.enabled`/`interval_minutes` have described since milestone 1a but which has never
-existed** · wire or delete the other dead keys (`ai.enabled`, `ai.active_provider_index`,
-`forecasting.default_horizon_periods`, `reports.default_export_format`, `window.width`/`height`).
+**Scope note.** `ExplanationPanel` is not wired into the chat panel this pass — `AssistantTurnResult`
+carries no `Explanation` object (no live "explain this tool result" LLM call exists yet; M22's own
+scope note names populating a real `Explanation` as needing exactly that, still out of scope), so
+there is nothing for `append_tool_result` to hand an `ExplanationPanel` today. `ResultCard` alone is
+what all five acceptance criteria actually require. A `dict` tool result resolves to
+`GenericResultRenderer`'s dict branch (documented in that renderer's own docstring as "the defensive
+path for a JSON-friendly dict... reaching a renderer directly" — this milestone is that path's first
+real caller) rather than a dedicated per-statistic renderer, since `src.ai.tool_registry` handlers
+flatten every `src.analysis` dataclass to a plain dict by design (see that module's own docstring,
+and `analyze_page.py`'s docstring on why calling `tool_registry` handlers directly would have
+defeated `result_renderer_registry`'s type-based dispatch) — reopening that flattening was out of
+scope for a Size **M** chat-panel milestone and was not attempted.
+
+Acceptance criteria:
+- [x] Tool-call results render through the **same** `ResultCard`/`ExplanationPanel` (M22) a stage
+      page would show — `ResultCard` confirmed; `ExplanationPanel` is not exercised this pass (see
+      Scope note above; no `Explanation` object exists on this path yet). Verified by
+      `tests/ui/widgets/test_chat_panel.py::test_append_tool_result_constructs_the_real_result_card_class`
+      (asserts `isinstance(widget, ResultCard)`, the exact class `AnalyzePage` uses) and
+      `tests/ui/controllers/test_assistant_controller.py::
+      test_a_tool_call_result_reaches_the_chat_panel_as_a_real_result_card` (drives a real
+      `independent_t_test` tool call end to end through `AssistantController.send_chat_message`).
+- [x] `chat_panel`'s `setSelectionMode(NoSelection)` defect is fixed: messages are focusable,
+      readable by a screen reader, and copyable. Verified by
+      `test_message_list_keeps_the_default_selection_mode_not_no_selection` and
+      `test_a_user_message_is_a_focusable_described_selectable_label` (asserts real
+      `focusPolicy()`, `accessibleName()`/`accessibleDescription()` via `describe()`, and
+      `TextSelectableByMouse`/`TextSelectableByKeyboard` interaction flags).
+- [x] The gray/red color-only tool-activity/error signaling gains a non-color indicator (icon +
+      text) — closes the WCAG 1.4.1 defect named in the original audit. Verified by
+      `test_tool_activity_row_conveys_state_through_text_and_accessible_name_not_color_alone` and
+      the error-row equivalent (assert the glyph+text and a distinct `accessibleName()`, not a
+      stylesheet/palette check), plus `test_tool_activity_and_error_rows_use_no_foreground_color_override`
+      confirming no per-row color override remains.
+- [x] `AssistantService.set_expertise_level` is wired live — no longer requires a restart. Verified
+      by `test_set_expertise_level_applies_live_to_an_already_running_service` (changes it
+      mid-session via the controller and asserts `AssistantService.expertise_level` actually
+      changed) and `test_set_expertise_level_before_construction_is_applied_when_the_service_is_built`
+      (a change made before the first message still lands).
+- [x] A "Clear Chat" button calls the previously-orphaned `reset_conversation()`. Verified by
+      `test_clear_chat_calls_reset_conversation_on_a_running_service` (asserts the real
+      `AssistantService._history` was actually reset, not just the visible transcript) and
+      `test_clear_chat_button_click_drives_the_same_path` (clicks the real button).
+- [x] With zero API key configured, the panel states this plainly and the rest of the app remains
+      fully usable. Verified by `test_sending_with_no_provider_configured_shows_a_plain_explanation`
+      (asserts the real modal text) and
+      `test_rest_of_the_app_stays_fully_usable_with_no_api_key_configured` (runs a real
+      `independent_t_test` through `AnalyzePage` — mirroring M22's own no-API-key proof — in the
+      same session as a chat panel with no provider configured).
+
+### M22 — Result renderers, ResultCard, ExplanationPanel · Size **L** · ✅ **DONE**
+
+**As built.** `src/ui/results/{__init__,base_result_renderer,result_renderer_registry,
+result_view,result_card,explanation_panel}.py` · `renderers/{__init__,profiling,
+statistical_tests,regression,multivariate,correlation,generic}.py` ·
+`pages/{analyze_page,explore_page,explain_page}.py` · `dialogs/analysis_parameter_dialog.py` ·
+`stage_registry.py` (EXPLORE/ANALYZE/EXPLAIN registered alongside UNDERSTAND/REPORT/REPRODUCE)
+· `main_window.py` (`_refresh_workbench` hands the active `Dataset` to `AnalyzePage`/
+`ExplorePage.set_dataset`, the same "structure here, behavior wired by the caller" hand-off
+`UnderstandPage.show_profile_summary` already used) ·
+`tests/ui/results/{__init__,test_renderers,test_result_renderer_registry,test_result_card,
+test_explanation_panel}.py` · `tests/ui/dialogs/{__init__,test_analysis_parameter_dialog}.py` ·
+`tests/ui/workbench/{test_analyze_page,test_explore_page,test_explain_page}.py` (new) ·
+`tests/ui/workbench/test_stage_registry.py` (extended) · `tests/ui/test_import_layering.py`
+(`results` added to `_WIDGET_LIKE_PACKAGES`, per that file's own docstring anticipating this
+milestone).
+
+`BaseResultRenderer` is stateless/classmethod-only, matching `BaseReader`/`BaseOperation`/
+`BaseChart` exactly. `result_renderer_registry.py` mirrors `chart_registry.py`'s shape
+(`register_renderer` raising `ServiceError` on a duplicate key, `get_renderer`/`list_renderers`/
+`unregister_renderer`) with one resolution-order addition A5 specified: exact `type(result)`
+match, then an MRO walk, then `GenericResultRenderer` as a never-raising fallback — a plain
+`pandas.DataFrame` (`aggregate`/`cross_tabulate`'s return type, the two orphaned functions with
+no dedicated result dataclass) resolves there deliberately, not as a gap. Nine renderers cover
+the other 10 of the 12 orphaned `src/analysis/` functions (`independent_t_test`/`paired_t_test`
+share `TTestResult`): `DatasetProfileRenderer`, `CorrelationResultRenderer`,
+`TTestResultRenderer`, `AnovaResultRenderer`, `ChiSquareResultRenderer`,
+`NormalityResultRenderer`, `RegressionResultRenderer`, `PcaResultRenderer`,
+`ClusteringResultRenderer`. `ResultCard` is the only place in the package that imports Qt —
+every renderer's `sections()` output funnels through one set of `isinstance` branches
+(`KeyValueSection`/`TableSection`/`FigureSection`/`ProseSection`/`MetricSection`/
+`AssumptionsSection`) instead of a bespoke panel per result type. `ExplanationPanel` is a real
+sibling widget (not embedded in `ResultCard`), with a `QGroupBox`-per-field disclosure UI whose
+default-expanded set is keyed by `ExpertiseLevel` — BEGINNER/DECISION_MAKER open *what* +
+*why_it_matters*, STUDENT additionally opens *how_calculated*, ANALYST opens *what* +
+*confidence_or_uncertainty*, RESEARCHER opens *assumptions* + *limitations*, ENGINEER opens
+*how_calculated* alone (the three levels A5 does not name explicitly get a rationale documented
+in the module's own docstring, not an unspecified default).
+
+`AnalysisParameterDialog` is the one generic parameter form the milestone called for — driven by
+a `tool_registry.ToolDefinition`'s own JSON-schema `input_schema`, replacing what would
+otherwise be 11 bespoke per-tool dialogs. A field whose name is column-shaped
+(`"*_column"`/`"columns"`/`"*_columns"`) becomes a `QComboBox` of the dataset's real columns
+*unless* its schema type is `"array"` (`feature_columns`, `group_by`, …), which falls back to a
+comma-separated line edit since `QComboBox` has no multi-select — everything else (enums,
+booleans, numbers, plain strings) is schema-driven too.
+
+**A deliberate architectural choice, not a shortcut.** `AnalyzePage`/`ExplorePage` call
+`src.analysis` functions directly rather than through `src.ai.tool_registry`'s handlers or
+`AnalysisOrchestratorService.run_stage` — both of those return a JSON-friendly `dict` (see
+`tool_registry.py`'s own module docstring), which would defeat `result_renderer_registry`'s
+entire type-based dispatch before it ever ran. Calling `src.analysis` directly keeps the real
+`TTestResult`/`AnovaResult`/… object intact end to end. The real gap this leaves: these two
+pages' runs are not yet recorded into the pipeline's own `AnalysisLog` (so they do not show up
+in Reproducible Analysis / lineage) — `main_window.py` wires `set_dataset` (a plain `Dataset`,
+mirroring `DataTableView.load_dataset`'s own "no service reference" shape) but not a `run_stage`
+call. Documented in `analyze_page.py`'s own docstring rather than silently left unstated.
+
+**Verified.** Full suite: **821 passed, 79 skipped, 0 failed** (up from 737 passed / 62 skipped
+at M20 — plan-doc-tracked milestone count, not a same-session diff) — stable across two
+consecutive full runs, including
+`tests/ui/workbench/test_analyze_page.py::test_running_a_t_test_from_the_analyze_page_renders_a_result_card_end_to_end`,
+which constructs a real `AnalyzePage`, hands it a real `Dataset`, runs the real
+`independent_t_test` function with real parameters, and asserts the resulting `ResultCard`
+contains a `MetricSection` for both the T-statistic and the p-value plus a real
+`AssumptionsSection` — with no `src.ai`/LLM-provider import anywhere on that test's call path,
+proving the "no API key configured" half structurally rather than by assertion alone. Renderer
+tests (`tests/ui/results/test_renderers.py`, `test_result_renderer_registry.py`) import no
+`qapp` fixture and construct zero `QApplication`. `ExplanationPanel`'s six `ExpertiseLevel`
+defaults each have their own dedicated test in `test_explanation_panel.py`. `black`/`isort`/
+`mypy --follow-imports=silent` clean on every new/touched file in `src/ui/results/`,
+`src/ui/workbench/pages/{analyze,explore,explain}_page.py`, `src/ui/workbench/stage_registry.py`,
+and `src/ui/dialogs/analysis_parameter_dialog.py`; `src/ui/main_window.py` retains the same
+pre-existing `DependencyContainer.resolve()`-returns-`object` mypy noise M15–M20 already carried
+(it is not in `ci.yml`'s scoped mypy list) — none of it new.
+
+**Scope note.** `ExplainPage` ships `show_explanation()` as a real, tested rendering path but
+defaults to an empty `Explanation` — populating a real one needs a live `src.ai.assistant_service`
+call (a configured LLM provider), which is explicitly out of scope here per A5 ("results render
+deterministically with no LLM; explanations are an optional overlay"); wiring that live call is
+left for a later milestone rather than fabricated as placeholder content. `AnalyzePage`/
+`ExplorePage` runs are not recorded into `AnalysisLog` (see above) — the two pages are reachable
+from the stage rail and functionally real, but not yet part of Reproducible Analysis.
+
+Acceptance criteria:
+- [x] Running a t-test from Analyze renders a `ResultCard` with statistic, p-value, and an
+      `AssumptionsSection` — **with no API key configured** (verified end to end; see above).
+- [x] Every one of the 12 orphaned `src/analysis/` functions has a registered renderer — a test
+      iterates `tool_registry.TOOLS`-derived analysis tool names and asserts each result type
+      resolves via `result_renderer_registry.get_renderer` (10 resolve to a dedicated renderer,
+      2 — `aggregate`/`cross_tabulate`, which return a plain `DataFrame` with no dedicated
+      dataclass — resolve to the generic fallback by design; both still "resolve," per the
+      criterion's own wording).
+- [x] Renderer tests require zero `QApplication` — `sections()` returns comparable dataclasses
+      (`tests/ui/results/test_renderers.py` and `test_result_renderer_registry.py` import no
+      `qapp` fixture).
+- [x] `ExplanationPanel` defaults its expanded section per `ExpertiseLevel` as specified (a real
+      test per level, including the 3 levels A5 does not name explicitly).
+
+### M23 — Clean stage, lineage, workspace lifecycle, real Undo · Size **L**
+
+Files: `pages/clean_page.py` with a before/after `DataTableView` split ·
+`widgets/lineage_view.py` over `get_lineage`/`get_children` · `src/ui/command_stack.py`.
+
+Acceptance criteria:
+- [ ] All 5 `operation_registry` cleaning operations are reachable from the Clean page — first
+      non-AI path to any cleaning operation.
+- [ ] Undo reverses the active-dataset pointer to the parent (never re-mutates data) — a test
+      asserts the parent's dataframe is byte-identical before and after an undo/redo cycle.
+- [ ] `close_dataset`/`close_visualization`/`close_dashboard`/`delete_profile` are reachable from
+      UI — closes the "data accumulates until exit" leak named in the original audit.
+- [ ] Lineage view renders `get_lineage`/`get_children` output as a tree, previously orphaned.
+
+### M24 — Visualize stage: multi-select, recommendations, all 12 charts · Size **M**
+
+Files: `widgets/column_multi_select.py` (unlocks `treemap`/`radar` — flip `dialog_compatible=True`)
+· `pages/visualize_page.py` · the `chart_recommender` key-normalization fix plus its test.
+
+Acceptance criteria:
+- [ ] `treemap` and `radar` are creatable from the dialog — previously AI-only.
+- [ ] `chart_recommender.recommend_charts()` output resolves in `chart_registry` for every
+      suggestion — the display-name/registry-key mismatch is fixed and tested.
+- [ ] Clicking a data point in a chart filters the paired `DataTableView` via the M16 bridge.
+
+### M25 — Predict stage: forecasting + Automatic Model Competition · Size **M**
+
+Files: `pages/predict_page.py` · `renderers/forecasting.py` · `progress_callback` added to
+`compare_forecast_models`.
+
+Acceptance criteria:
+- [ ] All 5 forecasters plus `compare_forecast_models` are reachable from the Predict page — first
+      non-AI path to any of `src/forecasting/`.
+- [ ] `compare_forecast_models` renders as a ranked table with the winner highlighted, plus an
+      overlay chart of every candidate.
+- [ ] `validate_time_series` failures surface as a pre-flight warning, not a stack trace.
+- [ ] Progress reporting is visible in the status bar during a comparison run (first real consumer
+      of `WorkerSignals.progress`, wired but unused since M15/M17).
+
+### M26 — GuidanceService + progressive expertise · Size **M**
+
+Files: `src/services/guidance_service.py` registered in `bootstrap.py` · `widgets/guidance_panel.py`
+on every stage page.
+
+Acceptance criteria:
+- [ ] Every `Suggestion.action_id` resolves in the `ActionRegistry` — contract test.
+- [ ] Guidance is fully populated and useful with **no AI key configured**.
+- [ ] Changing `ExpertiseLevel` visibly re-ranks (not filters) suggestions.
+- [ ] `ThemeManager.set_density()` (built in M15, unused until now) is driven by `ExpertiseLevel`.
+
+### M27 — Empty/error state system + internationalization scaffolding *(inserted)* · Size **M**
+
+Why here: "illustrated empty states" was a confirmed decision and `tr()`-wrapped strings were named
+as an accessibility-adjacent commitment, but neither had a delivery milestone.
+
+Files: `src/ui/widgets/{empty_state,error_state}.py` · illustration SVGs under
+`resources/icons/illustrations/` (same hand-authored convention as M15) · an i18n audit pass
+wrapping user-visible string literals across the milestones built so far in `self.tr(...)`.
+
+Acceptance criteria:
+- [ ] Every "(No X)" placeholder string from the original audit is replaced with a consistent
+      `EmptyState` widget: illustration + heading + one actionable next step.
+- [ ] A shared `ErrorState` widget replaces bare `QMessageBox.critical` calls where a persistent
+      in-page error is more appropriate.
+- [ ] A test scans `src/ui/` for un-wrapped string literals passed to `QLabel`/`setText`/
+      `setWindowTitle` and fails on any not wrapped in `tr()`.
+- [ ] a11y audit: illustrations carry an accessible description, not purely decorative silence.
+
+### M28 — Accessibility enforcement · Size **L**
+
+Files: `src/ui/a11y/{audit,rules}.py` (`contrast_manifest.py` already shipped in M15).
+
+Acceptance criteria:
+- [ ] `audit_widget_tree` against a fully populated `MainWindow` returns zero ERROR findings.
+- [ ] `ALL_DIALOG_CLASSES` is discovered by introspection, not hand-maintained.
+- [ ] High-contrast theme (tokens exist since M15) passes the same contrast suite as dark/light.
+- [ ] Reduced-motion and adjustable base font-size settings exist and are respected.
+- [ ] **Manual screen-reader (NVDA) pass performed and recorded** — see 2.4-equivalent Tools note
+      below; not merely automated.
+
+### M29 — Manual, F1, onboarding, config debt · Size **L**
+
+Files: `docs/manual/*.md` — **full content**: all 16 readers, 12 charts, 12 statistical methods, 5
+forecasters, 5 cleaning ops, the pipeline, the AI layer, plugins, a statistics glossary ·
+`src/ui/help/*` · first-run tour · new `ui.*` config keys · the autosave timer implementation ·
+`scripts/preview_manual.py` (non-shipping — renders one manual page through the real
+`ManualRenderer` for authoring without a full app rebuild).
+
+Acceptance criteria:
+- [ ] F1 from every stage page and every `ActionSpec` with a `help_anchor` opens the correct manual
+      section — contract test, not manual spot-checking.
+- [ ] The manual has zero stub pages.
+- [ ] First-run tour appears once, is dismissible, and does not reappear (`ui.first_run_completed`).
+- [ ] `autosave.enabled`/`interval_minutes` — described in config since milestone 1a, never
+      implemented — actually saves on the configured interval, tested with a fake clock.
+- [ ] Every other dead config key (`ai.enabled`, `ai.active_provider_index`,
+      `forecasting.default_horizon_periods`, `reports.default_export_format`, `window.width/height`)
+      is either wired to real behavior or removed, with a `_migrate_legacy_*` backfill either way.
+
+### Build order
+
+Numbering reflects priority, not strict build order in one place: **M16 → M17 → M18 → M19 → M20 →
+M22 → M21 → M23 → M24 → M25 → M26 → M27 → M28 → M29** — M22 (ResultCard) is built before M21 (AI
+chat panel) since one of M21's criteria depends on it.
+
+### Dialog disposition
+
+No existing dialog was previously assigned a fate as part of this overhaul; this closes that gap.
+
+| Dialog | Lines today | What happens, and when |
+|---|---|---|
+| `about_dialog.py` | 57 | Unchanged in function; gains `describe()` calls in M28's legacy retrofit. |
+| `settings_dialog.py` | 453 | Gains the `high_contrast` theme option and density control in M28; new `ui.*`-backed fields in M29; `EXPERTISE_LEVEL_GUIDANCE` display in M26. No structural rewrite — already follows the tabbed-form pattern this plan reuses. |
+| `create_visualization_dialog.py` | 183 | Rebuilt in M24 on the shared multi-select picker, unlocking `treemap`/`radar`. |
+| `generate_report_dialog.py` | 230 | Unchanged structurally; its pipeline-stage checkboxes become populated by real `AnalysisLog` data once M20 ships (currently always empty, since nothing writes the log from UI today). |
+| `connect_database_dialog.py` | 288 | Unchanged in scope — already self-contained per its milestone-14 decision. Gains `describe()` calls in M28. |
+
+### Tools: CI, screen readers, profiling, previews
+
+- **CI** — folded into M16 (see above), since it is the earliest point with something to gate.
+- **Screen readers** — automated a11y checks catch roughly a third of real defects industry-wide.
+  Every milestone from M17 onward that adds interactive surface gets a manual NVDA pass recorded in
+  its commit message; M28 makes this systematic across the whole app rather than per-surface.
+- **Profiling** — `python -m cProfile` + `pstats`/`snakeviz` against the M18/M25 perf tests; both
+  stdlib/dev-only, no new dependency. Perf tests assert order-of-magnitude budgets, not exact times.
+- **Previews** — `scripts/preview_theme.py` (M17) and `scripts/preview_manual.py` (M29), both
+  non-shipping, not imported by `src/`.
+
+### End-to-end verification (once M29 ships)
+
+1. Cold start: delete `config/config.yaml`, confirm the first-run tour appears once and not again.
+2. Full pipeline, keyboard only: Ctrl+Shift+O import through REPORT with no mouse — the operability
+   commitment proven, not asserted.
+3. Theme matrix: dark → light → high_contrast → dark; no stray placeholders, charts recolor live.
+4. Zero-API-key path: every stage produces a `ResultCard`; the chat panel states its own absence.
+5. Screen-reader pass: NVDA, full walk-through, recorded findings — the M28 pass re-run once whole.
+6. Regression floor: full `pytest` + `black`/`isort`/`mypy` clean via the M16 CI gate.
+7. 1M-row dataset: responsive per M18's budgets.
+8. Manual completeness: F1 from every screen resolves to real content, zero stubs.
 
 ---
 
@@ -478,9 +1045,10 @@ view; explicit `page().deleteLater()` in `closeEvent`, and leave `AA_ShareOpenGL
 correctness. A literal `$` in QSS must be escaped as `$$`. Using `substitute` over `safe_substitute`
 makes a typo raise at compile time, and a test compiles both token sets asserting no `$` survives.
 
-**R4 — Keeping 265 tests green.** Low: no existing test imports `src.ui` (verified). Real exposure
-is `src/core/constants.py` (QSS paths change in M15) and `src/core/config.py` (new keys in M27),
-both already covered. `chart_recommender`'s normalization (M23) intentionally changes existing
+**R4 — Keeping the suite green.** Was 265 tests before M15, now 528 (263 added, 0 regressions —
+already proven, not merely a plan). Real exposure going forward is `src/core/constants.py` (QSS
+paths already changed in M15, done) and `src/core/config.py` (new keys land in M29), both covered
+by existing tests. `chart_recommender`'s normalization (M24) intentionally changes existing
 assertions.
 
 **R5 — Circular imports as `ui/` grows.** The pattern that will bite: `main_window` → `controllers`
@@ -511,7 +1079,7 @@ absence, so I recommend against gating them behind a legacy flag.
 
 ## Testing
 
-**The harness is an M15 deliverable** — `tests/ui/conftest.py`:
+**The harness is an M15 deliverable — ✅ done.** `tests/ui/conftest.py`:
 
 - `QT_QPA_PLATFORM=offscreen` set **before any PySide6 import**.
 - A session-scoped `qapp` fixture setting `AA_UseSoftwareOpenGL` + `AA_ShareOpenGLContexts`. Never
@@ -542,16 +1110,17 @@ aspirational:
 
 **Per-milestone manual verification** (the `milestone-verification` skill): the app launches from
 `main.py`; the new surface is reachable **by keyboard alone**; theme toggles both ways; and `logs/`
-shows no new WARNING or ERROR.
+shows no new WARNING or ERROR. From M16 onward this is supplemented by a manual NVDA pass and, once
+M16 lands, gated in CI — see the Tools note in the Milestones section above.
 
 ---
 
 ## Documentation deliverables
 
 - `docs/decisions/0003-no-additional-compiled-languages.md` — the language decision above, in the
-  existing ADR format.
+  existing ADR format. ⬜ Not yet written — planned during M15 but not produced then; still owed.
 - `docs/decisions/0004-design-tokens-over-static-qss.md` — why tokens plus one template replaced two
-  hand-maintained QSS files, and why `substitute` over `safe_substitute`.
+  hand-maintained QSS files, and why `substitute` over `safe_substitute`. ⬜ Same — still owed.
 - `docs/ARCHITECTURE.md` — the `src/ui/` section is currently one line; it needs the full subsystem
   map once M20 lands.
 - `docs/ROADMAP.md` — milestones 15–27 appended as they complete.

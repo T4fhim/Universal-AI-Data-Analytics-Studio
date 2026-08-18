@@ -277,6 +277,13 @@ class MainWindow(QMainWindow):
         self._dock_manager.chat_panel.send_button.clicked.connect(
             self._assistant_controller.send_chat_message
         )
+        # Milestone 21: "Clear Chat" and the live expertise-level selector.
+        self._dock_manager.chat_panel.clear_button.clicked.connect(
+            self._assistant_controller.clear_chat
+        )
+        self._dock_manager.chat_panel.expertise_combo.currentIndexChanged.connect(
+            self._assistant_controller.on_expertise_level_changed
+        )
 
         # Milestone 18: the first time double-clicking a dataset has ever
         # done anything in this application -- see DockManager.

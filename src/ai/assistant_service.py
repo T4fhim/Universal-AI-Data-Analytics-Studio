@@ -90,11 +90,31 @@ class AssistantTurnResult:
             for the same reason: a caller (the future chat panel, or a
             test) needs to know what got created without re-querying
             the whole workspace.
+        new_tool_results: Any other tool call's raw return value from
+            this turn — milestone 21's addition, one per call to a
+            tool that produced neither a ``Dataset`` nor a
+            ``go.Figure`` (every :mod:`src.analysis` tool wrapped by
+            :mod:`src.ai.tool_registry`: profiling, correlation,
+            t-tests, ANOVA, forecasting, …). These are the same
+            JSON-friendly ``dict`` objects :meth:`_execute_tool`
+            already serializes into the model's own tool-result text
+            — captured here too, unmodified, so
+            :class:`~src.ui.widgets.chat_panel.ChatPanel` can hand
+            each one to :class:`~src.ui.results.result_card.ResultCard`
+            via :func:`~src.ui.results.result_renderer_registry.
+            get_renderer` — the *same* rendering path a stage page
+            uses, not a second one built for the chat panel. Per
+            :mod:`src.ui.results.renderers.generic`'s own docstring,
+            a plain ``dict`` reaching that registry resolves to
+            ``GenericResultRenderer``'s dedicated dict branch — this
+            is that "defensive path" actually being exercised, not
+            dead code.
     """
 
     reply_text: str
     new_datasets: list[Dataset] = field(default_factory=list)
     new_visualizations: list[Visualization] = field(default_factory=list)
+    new_tool_results: list[Any] = field(default_factory=list)
 
 
 class AssistantService:
@@ -195,6 +215,18 @@ class AssistantService:
         self._expertise_level = ExpertiseLevel(expertise_level)
 
     @property
+    def expertise_level(self) -> ExpertiseLevel:
+        """The expertise level currently guiding the system prompt and (via milestone 21's chat
+        panel) tool-result rendering — exposed as a read-only property, mirroring
+        :attr:`active_provider_name`, so a caller (a test, or
+        :class:`~src.ui.controllers.assistant_controller.AssistantController` rendering a
+        tool-call's result at the level the conversation is actually running at) can read the
+        live value :meth:`set_expertise_level` last wrote without reaching into ``_expertise_level``
+        directly.
+        """
+        return self._expertise_level
+
+    @property
     def active_provider_name(self) -> str:
         """The currently active provider profile's user-facing name.
 
@@ -228,6 +260,7 @@ class AssistantService:
         self._history = provider.append_user_message(self._history, user_message)
         new_datasets: list[Dataset] = []
         new_visualizations: list[Visualization] = []
+        new_tool_results: list[Any] = []
         tool_schemas = get_anthropic_tool_schemas()
 
         while True:
@@ -240,18 +273,24 @@ class AssistantService:
                     reply_text=turn.text,
                     new_datasets=new_datasets,
                     new_visualizations=new_visualizations,
+                    new_tool_results=new_tool_results,
                 )
 
             results: list[tuple[PendingToolCall, str]] = []
             for call in turn.tool_calls:
-                result_text, produced_dataset, produced_visualization = (
-                    self._execute_tool(call.name, call.arguments, active_dataset)
-                )
+                (
+                    result_text,
+                    produced_dataset,
+                    produced_visualization,
+                    renderable_result,
+                ) = self._execute_tool(call.name, call.arguments, active_dataset)
                 if produced_dataset is not None:
                     new_datasets.append(produced_dataset)
                     active_dataset = produced_dataset
                 if produced_visualization is not None:
                     new_visualizations.append(produced_visualization)
+                if renderable_result is not None:
+                    new_tool_results.append(renderable_result)
                 results.append((call, result_text))
 
             self._history = provider.append_tool_results(self._history, results)
@@ -330,16 +369,24 @@ class AssistantService:
 
     def _execute_tool(
         self, tool_name: str, tool_input: dict[str, Any], active_dataset: Dataset
-    ) -> tuple[str, Dataset | None, Visualization | None]:
+    ) -> tuple[str, Dataset | None, Visualization | None, Any]:
         """Run one tool call.
 
         Returns:
             ``(result text for the model, new Dataset if any, new
-            Visualization if any)`` — exactly one of the latter two is
+            Visualization if any, renderable result if any)`` — exactly
+            one of the ``Dataset``/``Visualization``/renderable slots is
             ever non-``None`` (a tool either produces a derived
-            dataset, a visualization, or neither; never both), but both
-            are always present in the tuple so every call site
-            unpacks the same shape regardless of which tool ran.
+            dataset, a visualization, a plain renderable result, or
+            (on error) none of the three), but all three are always
+            present in the tuple so every call site unpacks the same
+            shape regardless of which tool ran. The fourth slot
+            (milestone 21) is the same object serialized into the first
+            slot's model-facing text — see
+            :attr:`AssistantTurnResult.new_tool_results`'s own
+            docstring for why it is captured a second time here rather
+            than the chat panel re-parsing the JSON text back into an
+            object.
 
         Errors are caught and reported back to the model as the tool
         result rather than raised, so a mistaken tool call becomes a
@@ -349,17 +396,17 @@ class AssistantService:
         try:
             tool = get_tool_by_name(tool_name)
         except KeyError as exc:
-            return f"Error: {exc}", None, None
+            return f"Error: {exc}", None, None, None
 
         try:
             clean_input = {k: v for k, v in tool_input.items() if k}
             result = tool.handler(active_dataset, **clean_input)
         except ApplicationError as exc:
             _logger.warning("Tool '%s' failed: %s", tool_name, exc)
-            return f"Error: {exc}", None, None
+            return f"Error: {exc}", None, None, None
         except Exception as exc:
             _logger.error("Tool '%s' raised an unexpected error: %s", tool_name, exc)
-            return f"Unexpected error: {exc}", None, None
+            return f"Unexpected error: {exc}", None, None, None
 
         if isinstance(result, Dataset):
             self._workspace_service.add_dataset(result)
@@ -374,6 +421,7 @@ class AssistantService:
                 f"({result.row_count} rows, {result.column_count} cols). "
                 f"{result.derivation_description}",
                 result,
+                None,
                 None,
             )
 
@@ -402,6 +450,12 @@ class AssistantService:
                 f"Success. Created visualization '{visualization.name}'.",
                 None,
                 visualization,
+                None,
             )
 
-        return json.dumps(result, default=str), None, None
+        # Every other tool_registry handler returns a plain JSON-friendly dict (see that
+        # module's own docstring on why it flattens the underlying src.analysis dataclass) --
+        # serialized here for the model exactly as before milestone 21, and returned a second
+        # time, unmodified, as the renderable result so AssistantTurnResult.new_tool_results
+        # carries the real object rather than the chat panel re-parsing this JSON string.
+        return json.dumps(result, default=str), None, None, result
