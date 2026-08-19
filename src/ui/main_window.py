@@ -53,6 +53,7 @@ from src.services.analysis_orchestrator_service import (
     PipelineStage,
 )
 from src.services.database_connection_service import DatabaseConnectionService
+from src.services.guidance_service import GuidanceService
 from src.services.project_service import ProjectService
 from src.services.report_service import ReportService
 from src.services.settings_service import SettingsService
@@ -64,12 +65,12 @@ from src.ui.command_stack import CommandStack
 from src.ui.controllers.assistant_controller import AssistantController
 from src.ui.controllers.database_controller import DatabaseController
 from src.ui.controllers.dataset_controller import DatasetController
+from src.ui.controllers.guidance_controller import GuidanceController
 from src.ui.controllers.pipeline_controller import PipelineController
 from src.ui.controllers.project_controller import ProjectController
 from src.ui.controllers.report_controller import ReportController
+from src.ui.controllers.theme_controller import ThemeController
 from src.ui.controllers.visualization_controller import VisualizationController
-from src.ui.dialogs.about_dialog import AboutDialog
-from src.ui.dialogs.settings_dialog import SettingsDialog
 from src.ui.dock_manager import DockManager
 from src.ui.menu_bar import ApplicationMenuBar
 from src.ui.status_bar import ApplicationStatusBar
@@ -255,6 +256,16 @@ class MainWindow(QMainWindow):
         self._database_controller = DatabaseController(
             self, self._database_service, self._dataset_controller.load_dataset
         )
+        self._guidance_controller = GuidanceController(
+            self._context.container.resolve(GuidanceService),
+            self._settings_service,
+            self._workbench,
+            self._dock_manager,
+            self._binder,
+        )
+        self._theme_controller = ThemeController(
+            self, self._settings_service, self._plugin_manager
+        )
 
     def _populate_view_menu(self) -> None:
         for toggle_action in self._dock_manager.view_menu_toggle_actions():
@@ -271,10 +282,10 @@ class MainWindow(QMainWindow):
         bind("analysis.generate_report", self._report_controller.generate_report)
         bind("project.save", self._project_controller.save_project)
         bind("project.save_as", self._project_controller.save_project_as)
-        bind("project.settings", self._on_open_settings)
+        bind("project.settings", self._theme_controller.open_settings)
         bind("project.exit", self.close)
-        bind("view.toggle_theme", self._on_toggle_theme)
-        bind("help.about", self._on_open_about)
+        bind("view.toggle_theme", self._theme_controller.toggle_theme)
+        bind("help.about", self._theme_controller.open_about)
         bind("edit.undo", self._pipeline_controller.undo)
         bind("edit.redo", self._pipeline_controller.redo)
 
@@ -461,31 +472,12 @@ class MainWindow(QMainWindow):
         if isinstance(predict_page, PredictPage):
             predict_page.set_dataset(active_dataset)
 
+        self._guidance_controller.refresh_suggestions(active_dataset)
+
     # -- Settings / theme / about -----------------------------------------------
-
-    def _on_open_settings(self) -> None:
-        dialog = SettingsDialog(
-            self._settings_service, self, plugin_manager=self._plugin_manager
-        )
-        if dialog.exec() == SettingsDialog.DialogCode.Accepted:
-            self._apply_theme_from_settings()
-
-    def _on_toggle_theme(self) -> None:
-        current = self._settings_service.get("theme", default="dark")
-        new_theme = "light" if current == "dark" else "dark"
-        self._settings_service.set("theme", value=new_theme)
-        self._settings_service.save()
-        self._apply_theme_from_settings()
-
-    def _apply_theme_from_settings(self) -> None:
-        theme_manager: ThemeManager = self.property("theme_manager")
-        if theme_manager is None:
-            _logger.warning(
-                "No ThemeManager attached to main window; cannot apply theme change."
-            )
-            return
-        theme_name = self._settings_service.get("theme", default="dark")
-        theme_manager.apply_theme(theme_name)
+    # Milestone 26: the handlers themselves moved to ThemeController (see that module's own
+    # docstring for why) -- attach_theme_manager stays here since src/core/app.py calls it
+    # externally and it mutates __init__-only state (self._icon_provider/self._dock_manager).
 
     def attach_theme_manager(self, theme_manager: ThemeManager) -> None:
         """Attach the running application's :class:`~src.ui.theme_manager.ThemeManager`.
@@ -494,13 +486,14 @@ class MainWindow(QMainWindow):
         ``QApplication`` and this window exist, since ``ThemeManager``
         wraps the live application instance and cannot be constructed
         before it. Stored via ``QWidget.setProperty`` rather than a plain
-        attribute purely so :meth:`_apply_theme_from_settings` has a
-        single, explicit way to check "has this been attached yet" via
-        ``property()`` returning ``None`` -- a plain attribute would need
-        a separate ``hasattr`` check or an ``Optional`` instance
-        attribute initialized in ``__init__`` before this method could
-        ever run, and ``ThemeManager`` genuinely cannot exist that early
-        (see above).
+        attribute purely so :meth:`~src.ui.controllers.theme_controller.
+        ThemeController.apply_theme_from_settings` has a single, explicit
+        way to check "has this been attached yet" via ``property()``
+        returning ``None`` -- a plain attribute would need a separate
+        ``hasattr`` check or an ``Optional`` instance attribute
+        initialized in ``__init__`` before this method could ever run,
+        and ``ThemeManager`` genuinely cannot exist that early (see
+        above).
         """
         self.setProperty("theme_manager", theme_manager)
         # Milestone 16: the dock manager's open chart tabs need to hear
@@ -524,9 +517,7 @@ class MainWindow(QMainWindow):
             lambda _name: self._icon_provider.set_tokens(theme_manager.current_tokens())
         )
 
-    def _on_open_about(self) -> None:
-        dialog = AboutDialog(self)
-        dialog.exec()
+        self._guidance_controller.set_theme_manager(theme_manager)
 
     # -- Window lifecycle --------------------------------------------------------
 

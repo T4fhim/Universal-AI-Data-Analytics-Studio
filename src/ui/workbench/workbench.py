@@ -75,6 +75,18 @@ class Workbench(QWidget):
         """Return the constructed page for ``stage``, or ``None`` if it has no page yet."""
         return self._pages.get(stage)
 
+    def all_pages(self) -> tuple[StagePage, ...]:
+        """Return every constructed stage page, in :class:`PipelineStage` declaration order.
+
+        Milestone 26: what :mod:`src.ui.main_window` iterates to wire each page's
+        :class:`~src.ui.widgets.guidance_panel.GuidancePanel` -- one is embedded on every
+        :class:`StagePage` (see that class's own docstring) -- to a single shared handler,
+        rather than main_window.py needing a hand-written ``if isinstance`` per concrete
+        page class the way the *stage-specific* signal wiring in
+        ``MainWindow._connect_actions`` still does.
+        """
+        return tuple(self._pages.values())
+
     def _on_stage_selected(self, stage: PipelineStage) -> None:
         page = self._pages.get(stage)
         if page is not None:

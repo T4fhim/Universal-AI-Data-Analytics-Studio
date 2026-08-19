@@ -1,13 +1,13 @@
 # Universal AI Data Analytics Studio — UI Overhaul (Milestones 15–29)
 
 > **Status.** M15 (`39d12fb`), M16 (`cfe8f24`, `bd96e4e`), M17 (`f07514a`), M18 (`c1ee88c`), M19
-> (`6683489`), M20 (`5f9c6eb`), M22 (`0991f74`), M21, M23 (`40c0eb5`), M24 (`c7d1195`), and M25 are
-> complete and committed — see the Milestones section for as-built file lists and verification
-> results. M22 was built before M21 despite the numbering, per that milestone's own "Build order
-> note" (one of M21's five acceptance criteria depends on M22's `ResultCard`/`ExplanationPanel`;
-> the other four do not) — M21 itself was then built immediately after M22, closing that dependency
-> the same session it was introduced.
-> M26–M29 remain. This revision
+> (`6683489`), M20 (`5f9c6eb`), M22 (`0991f74`), M21 (`ec67eae`), M23 (`40c0eb5`), M24 (`c7d1195`),
+> M25 (`29fd627`), and M26 are complete and committed — see the Milestones section for as-built
+> file lists and verification results. M22 was built before M21 despite the numbering, per that
+> milestone's own "Build order note" (one of M21's five acceptance criteria depends on M22's
+> `ResultCard`/`ExplanationPanel`; the other four do not) — M21 itself was then built immediately
+> after M22, closing that dependency the same session it was introduced.
+> M27–M29 remain. This revision
 > (renumbered from the original 15–27 draft) closes gaps a self-review found after M15 shipped: two
 > inserted milestones (M21 AI chat panel, M27 empty/error states + i18n), acceptance criteria and
 > sizing on every milestone, a CI gate, a screen-reader verification protocol, a dialog-disposition
@@ -1179,16 +1179,122 @@ Acceptance criteria:
       of `WorkerSignals.progress`, wired but unused since M15/M17) — verified against a real
       `QThreadPool` worker and a real `ApplicationStatusBar`, not a mocked signal.
 
-### M26 — GuidanceService + progressive expertise · Size **M**
+### M26 — GuidanceService + progressive expertise · Size **M** · ✅ **DONE**
 
-Files: `src/services/guidance_service.py` registered in `bootstrap.py` · `widgets/guidance_panel.py`
-on every stage page.
+**As built.** `src/services/guidance_service.py` (new: `GuidanceService`, `Suggestion`,
+`SuggestionCategory`) registered in `bootstrap.py` immediately after
+`AnalysisOrchestratorService` · `src/ui/widgets/guidance_panel.py` (new: `GuidancePanel`, a
+`QListWidget`-based ranked suggestion list, embedded once per `StagePage` — see below) ·
+`src/ui/workbench/stage_page.py` (`StagePage.__init__` gains a `guidance_panel` attribute in
+its Zone 1, plus `update_suggestions()`) · `src/ui/workbench/workbench.py`
+(`Workbench.all_pages()`, the accessor `MainWindow`/`GuidanceController` iterate) ·
+`src/ui/actions/action_registry.py` (`ActionCategory.PIPELINE`, new) ·
+`src/ui/actions/builtin_actions.py` (nine `workbench.go_to_<stage>` actions, one per
+`PipelineStage` with a registered `stage_registry` page — UPLOAD excluded, matching
+`Workbench._on_stage_selected`'s own silent no-op for it) · `src/ui/theme/tokens.py`
+(`DENSITY_BY_EXPERTISE_LEVEL`, the mapping `Density`'s own docstring anticipated since M15) ·
+`src/ui/controllers/guidance_controller.py` (new: `GuidanceController`) ·
+`src/ui/controllers/theme_controller.py` (new: `ThemeController` — see below for why) ·
+`src/ui/main_window.py` (wires both new controllers) · `src/core/bootstrap.py`. Tests:
+`tests/services/test_guidance_service.py` (new, 8 tests) ·
+`tests/ui/widgets/test_guidance_panel.py` (new, 7 tests) ·
+`tests/ui/controllers/test_theme_controller.py` (new, 3 tests) ·
+`tests/ui/actions/test_builtin_actions.py`,
+`tests/ui/theme/test_tokens.py`, `tests/ui/workbench/test_workbench.py`,
+`tests/ui/test_main_window_actions.py` (all extended).
+
+`GuidanceService.get_suggestions` merges exactly the plan's four deterministic sources and
+never imports `src.ui`: (1) `AnalysisOrchestratorService.propose_next_stage` → one PIPELINE
+suggestion, mapped onto `f"workbench.go_to_{stage.value}"`; (2)
+`chart_recommender.recommend_charts` → CHART suggestions, all pointing at the existing
+`"analysis.visualize"` action (no per-chart-type action exists or is needed — "create a
+chart" is the one real next step regardless of which type is named); (3) a data-quality scan
+built on the **existing** `src.analysis.dataset_profile.profile_dataset` (duplicate rows,
+per-column missing-value percentage ≥5%, mixed-type columns), all pointing at
+`"workbench.go_to_clean"` — reusing `profile_dataset` rather than re-deriving null-fraction/
+duplicate detection independently, the same "one place this computation lives" reasoning
+`chart_recommender.py`'s own docstring already states; (4) `ExpertiseLevel` re-ranking via a
+per-(level, stage) multiplier table (`_EXPERTISE_STAGE_WEIGHT`) applied to each suggestion's
+`base_score` in the final sort — every multiplier stays strictly positive, so re-ranking can
+never remove a candidate, only reorder it.
+
+`GuidancePanel` is embedded once per `StagePage` (not a single shared dock) — a suggestion is
+most useful exactly where a user already is, next to the stage-specific guidance text
+`StagePage` already renders. `MainWindow`/`GuidanceController` push the same ranked list into
+every page via `Workbench.all_pages()`, unlike the proposal-only `set_guidance` call that only
+reaches the currently-*proposed* stage's page.
+
+**A real, working navigation feature landed as an unavoidable consequence of criterion 1**,
+not scope creep: for `PIPELINE`-source suggestions to resolve in `ActionRegistry` at all, nine
+`workbench.go_to_<stage>` actions had to exist and be genuinely wired — each delegates to
+`Workbench.show_stage`, the same method `StageRail`'s own item-click handler already uses, so
+these actions are now real, reachable from the command palette (`Ctrl+K`) too, not merely
+guidance-internal plumbing.
+
+**Two controllers, not one, and a mid-milestone architecture note.** `GuidanceController`
+holds `GuidanceService`/`SettingsService`/`Workbench`/`DockManager`/`ActionBinder` and wires
+its own signals **in `__init__`** rather than exposing a separate `wire()` call site the way
+every prior milestone-19-era controller defers to `MainWindow._connect_actions` — documented
+explicitly in the class's own docstring as a deliberate, scoped exception: every collaborator
+those connections need is already fully constructed by the time `_build_controllers`
+instantiates it, so there is no ordering hazard to defer for, and it is what kept
+`main_window.py`'s net line growth small enough to fit under `tests.ui.test_module_size`'s
+400-line budget — which M25 had already left at **exactly** 400/400 non-docstring lines, zero
+headroom. Even after that consolidation, the milestone's genuinely necessary wiring (one
+controller construction call, three lifecycle call sites) still didn't fit, so
+`ThemeController` (new) absorbs `_on_open_settings`/`_on_toggle_theme`/
+`_apply_theme_from_settings`/`_on_open_about` — four handlers moved **verbatim**, unchanged in
+behavior, the same "same logic, new home" extraction M19 itself established as this
+codebase's answer to the module-size test's own stated purpose ("a hard ceiling is what
+actually prevents 'one more handler' additions from silently recreating the problem"). This
+is flagged here explicitly as a wider-than-M26-strictly-required change, made only because the
+alternative (widening the 400-line budget, or re-adding `main_window.py` to
+`_LEGACY_EXEMPTIONS`) would have reversed M19's own documented fix.
+
+**`ThemeManager.set_density()`** (built in M15, unused since) is now driven from
+`DENSITY_BY_EXPERTISE_LEVEL` — BEGINNER/STUDENT → COMFORTABLE, ANALYST/DECISION_MAKER → COZY,
+RESEARCHER/ENGINEER → COMPACT — applied once at `MainWindow.attach_theme_manager` (so a
+session that starts at "engineer" gets COMPACT immediately, not only after the user first
+touches the expertise combo) and again on every future chat-panel expertise-combo change, via
+a second slot on the same `currentIndexChanged` signal `AssistantController` already
+subscribes to.
+
+**Verified.** Full suite: **966 passed, 0 failed, 90 skipped** (up from 938 passed / 0 failed /
+87 skipped at M25 — 28 net new tests). `black`/`isort` clean on every touched/new file. CI's
+scoped `mypy` run (`src/ui/theme src/ui/a11y src/ui/web src/ui/actions`) stays clean; this
+milestone's `src/ui/actions/{action_registry,builtin_actions}.py` and `src/ui/theme/tokens.py`
+changes fall inside that scope and were checked directly — the first time an M26-touched file
+has been in CI's mypy scope since M17. `src/services/guidance_service.py`,
+`src/ui/widgets/guidance_panel.py`, and `src/ui/controllers/{guidance_controller,
+theme_controller}.py` are outside CI's scope (services/widgets/controllers are not scoped
+today) but were checked directly anyway: clean, after fixing one real `mypy` finding
+(`Cannot infer type of lambda`) by replacing an inline default-argument lambda inside a `for`
+loop with a real `_make_navigate_handler(stage)` method — the same late-binding-closure
+concern `ApplicationMenuBar.update_recent_projects_menu`'s own `path=path_str` comment already
+documents, solved here without a default argument. A real, offscreen `bootstrap()` →
+`MainWindow` → `attach_theme_manager` run confirmed end to end: a freshly loaded dataset
+populates every stage page's `GuidancePanel` with real suggestions, activating a suggestion
+via its real `suggestion_activated` signal navigates the workbench through the real, shared
+`QAction`, and toggling the chat panel's expertise combo to "Engineer" visibly changes
+`ThemeManager`'s applied density from COMFORTABLE to COMPACT — none of this asserted only
+against a mock.
 
 Acceptance criteria:
-- [ ] Every `Suggestion.action_id` resolves in the `ActionRegistry` — contract test.
-- [ ] Guidance is fully populated and useful with **no AI key configured**.
-- [ ] Changing `ExpertiseLevel` visibly re-ranks (not filters) suggestions.
-- [ ] `ThemeManager.set_density()` (built in M15, unused until now) is driven by `ExpertiseLevel`.
+- [x] Every `Suggestion.action_id` resolves in the `ActionRegistry` — contract test
+      (`test_every_suggestion_action_id_is_registered`, walking every `ExpertiseLevel` across
+      every stage `propose_next_stage` can reach for a real dataset).
+- [x] Guidance is fully populated and useful with **no AI key configured** — no
+      `AssistantService`/provider is constructed anywhere in `test_guidance_service.py`; a
+      freshly imported (messy, multi-issue) dataset gets suggestions from all three
+      deterministic sources at once.
+- [x] Changing `ExpertiseLevel` visibly re-ranks (not filters) suggestions — the same
+      candidate title set appears at every expertise level in
+      `test_expertise_level_reranks_but_never_filters_the_candidate_set`, only reordered; a
+      concrete case (`test_beginner_ranks_visualize_stage_suggestions_above_predict_stage`)
+      checks the plan's own quoted claim about PREDICT de-prioritisation.
+- [x] `ThemeManager.set_density()` (built in M15, unused until now) is driven by
+      `ExpertiseLevel` — verified via a real `ThemeManager`, both at initial attach and on a
+      live combo change (`test_changing_expertise_level_updates_theme_density`).
 
 ### M27 — Empty/error state system + internationalization scaffolding *(inserted)* · Size **M**
 

@@ -32,11 +32,31 @@ predicate rather than forcing a boolean ``Requirement`` to fit.
 
 from __future__ import annotations
 
+from src.services.analysis_orchestrator_service import PipelineStage
 from src.ui.actions.action_registry import (
     ActionCategory,
     ActionSpec,
     Requirement,
     register_action,
+)
+
+# Milestone 26: one "jump to this stage" action per PipelineStage that has a
+# real registered workbench page (src.ui.workbench.stage_registry) -- UPLOAD
+# is excluded, matching Workbench._on_stage_selected's own silent-no-op
+# handling of it (there is no page to jump to; the welcome page represents
+# it instead). (label, icon_name) per stage -- icon names are real files
+# under resources/icons/ (asserted by tests.ui.actions.test_builtin_actions.
+# test_every_icon_name_exists_on_disk).
+_STAGE_NAV_ACTIONS: tuple[tuple[PipelineStage, str, str], ...] = (
+    (PipelineStage.UNDERSTAND, "Go to &Understand Stage", "eye"),
+    (PipelineStage.CLEAN, "Go to &Clean Stage", "brush-cleaning"),
+    (PipelineStage.EXPLORE, "Go to E&xplore Stage", "search"),
+    (PipelineStage.ANALYZE, "Go to &Analyze Stage", "sliders"),
+    (PipelineStage.VISUALIZE, "Go to &Visualize Stage", "chart-bar"),
+    (PipelineStage.PREDICT, "Go to &Predict Stage", "trending-up"),
+    (PipelineStage.EXPLAIN, "Go to E&xplain Stage", "sparkles"),
+    (PipelineStage.REPORT, "Go to &Report Stage", "file-text"),
+    (PipelineStage.REPRODUCE, "Go to Re&produce Stage", "refresh"),
 )
 
 
@@ -218,6 +238,32 @@ def _register_builtins() -> None:
             help_anchor="index",
         )
     )
+
+    # Milestone 26: stage-navigation actions -- see _STAGE_NAV_ACTIONS above.
+    # Each requires an active dataset (matching StagePage's own reason for
+    # existing -- there is nothing to show a stage page for otherwise) and
+    # carries `stage` so GuidanceService.get_suggestions can map a
+    # PIPELINE-source Suggestion straight onto a real, resolvable action id
+    # (`f"workbench.go_to_{stage.value}"`) without importing anything from
+    # src.ui itself.
+    for stage, label, icon_name in _STAGE_NAV_ACTIONS:
+        register_action(
+            ActionSpec(
+                action_id=f"workbench.go_to_{stage.value}",
+                label=label,
+                category=ActionCategory.PIPELINE,
+                icon_name=icon_name,
+                status_tip=f"Jump to the {stage.value.title()} stage",
+                requires=frozenset({Requirement.ACTIVE_DATASET}),
+                # Matches each StagePage subclass's own help_anchor
+                # ("pipeline.<stage>") exactly -- see e.g.
+                # src/ui/workbench/pages/understand_page.py -- so F1 from
+                # either this action or the page it jumps to opens the same
+                # manual section (both are M29 scope; unvalidated today).
+                help_anchor=f"pipeline.{stage.value}",
+                stage=stage,
+            )
+        )
 
 
 _register_builtins()

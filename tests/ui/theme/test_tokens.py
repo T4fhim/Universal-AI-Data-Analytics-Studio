@@ -11,7 +11,14 @@ from __future__ import annotations
 import pytest
 
 from src.core.constants import AVAILABLE_THEMES
-from src.ui.theme.tokens import DARK_TOKENS, LIGHT_TOKENS, TOKENS_BY_NAME, Density
+from src.core.expertise_level import ExpertiseLevel
+from src.ui.theme.tokens import (
+    DARK_TOKENS,
+    DENSITY_BY_EXPERTISE_LEVEL,
+    LIGHT_TOKENS,
+    TOKENS_BY_NAME,
+    Density,
+)
 
 
 def test_available_themes_matches_tokens() -> None:
@@ -82,6 +89,23 @@ def test_with_density_returns_a_new_instance_and_does_not_mutate() -> None:
 def test_tokens_are_frozen() -> None:
     with pytest.raises(Exception):  # dataclasses.FrozenInstanceError is a TypeError
         DARK_TOKENS.accent = "#000000"  # type: ignore[misc]
+
+
+def test_density_by_expertise_level_covers_every_expertise_level() -> None:
+    """Milestone 26: every ExpertiseLevel maps to a real Density -- no gap that would fall
+    through to a caller's own default and silently never change density for that level.
+    """
+    assert set(DENSITY_BY_EXPERTISE_LEVEL) == set(ExpertiseLevel)
+    for density in DENSITY_BY_EXPERTISE_LEVEL.values():
+        assert isinstance(density, Density)
+
+
+def test_beginner_and_engineer_map_to_different_densities() -> None:
+    """The concrete claim the plan makes: a beginner gets a less dense layout than an engineer."""
+    assert (
+        DENSITY_BY_EXPERTISE_LEVEL[ExpertiseLevel.BEGINNER]
+        != DENSITY_BY_EXPERTISE_LEVEL[ExpertiseLevel.ENGINEER]
+    )
 
 
 def test_dark_and_light_use_the_same_accent_for_brand_continuity() -> None:

@@ -28,9 +28,9 @@ def test_every_icon_name_exists_on_disk() -> None:
         for spec in list_actions().values()
         if spec.icon_name is not None and spec.icon_name not in available
     }
-    assert (
-        not missing
-    ), f"ActionSpec.icon_name references a missing icon file: {missing}"
+    assert not missing, (
+        f"ActionSpec.icon_name references a missing icon file: {missing}"
+    )
 
 
 def test_every_action_has_a_non_empty_label() -> None:
@@ -105,3 +105,25 @@ def test_exit_is_not_palette_visible() -> None:
 
 def test_project_new_is_palette_visible() -> None:
     assert list_actions()["project.new"].palette_visible is True
+
+
+def test_every_pipeline_stage_with_a_registered_workbench_page_has_a_go_to_action() -> (
+    None
+):
+    """Milestone 26: one "jump to this stage" action per PipelineStage that
+    src.ui.workbench.stage_registry actually registers a page for -- see
+    builtin_actions.py's own _STAGE_NAV_ACTIONS comment on why UPLOAD is excluded.
+    """
+    from src.services.analysis_orchestrator_service import PipelineStage
+    from src.ui.actions.action_registry import Requirement
+    from src.ui.workbench.stage_registry import list_registered_stages
+
+    registered_stages = list_registered_stages()
+    assert PipelineStage.UPLOAD not in registered_stages  # sanity: no page for it
+
+    for stage in registered_stages:
+        action_id = f"workbench.go_to_{stage.value}"
+        spec = list_actions()[action_id]
+        assert spec.stage is stage
+        assert Requirement.ACTIVE_DATASET in spec.requires
+        assert spec.palette_visible is True

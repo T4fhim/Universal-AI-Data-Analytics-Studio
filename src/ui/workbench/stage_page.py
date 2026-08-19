@@ -23,7 +23,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from src.services.analysis_orchestrator_service import PipelineStage
+from src.services.guidance_service import Suggestion
 from src.ui.a11y.accessible import describe
+from src.ui.widgets.guidance_panel import GuidancePanel
 
 
 class StagePage(QWidget):
@@ -60,6 +62,15 @@ class StagePage(QWidget):
             focusable=False,  # a label with text, not a control to tab to
         )
         layout.addWidget(self._guidance_label)
+
+        # Milestone 26: one GuidancePanel per stage page, in the guidance-card zone
+        # alongside the static rationale label above -- see GuidancePanel's own docstring
+        # for why this lives here rather than as a single shared dock. Populated by
+        # update_suggestions below; starts empty (its own "No suggestions right now."
+        # placeholder) until the first real MainWindow._refresh_workbench call pushes a
+        # ranked list in.
+        self.guidance_panel = GuidancePanel(self)
+        layout.addWidget(self.guidance_panel)
 
         # Zone 3's widget is constructed here, ahead of Zone 2's form, but
         # not yet added to the layout -- a subclass's _build_form (called
@@ -114,3 +125,15 @@ class StagePage(QWidget):
     def set_result_text(self, text: str) -> None:
         """Replace the result area's text."""
         self._result_label.setText(text)
+
+    def update_suggestions(self, suggestions: list[Suggestion]) -> None:
+        """Push a freshly ranked suggestion list into this page's :attr:`guidance_panel`.
+
+        Called by :mod:`src.ui.main_window` (via :meth:`~src.ui.workbench.workbench.
+        Workbench.all_pages`) with the same ranked list on every page -- unlike
+        :meth:`set_guidance`, which only the *proposed* stage's page receives (see
+        :meth:`~src.ui.workbench.workbench.Workbench.update_pipeline_state`), suggestions are
+        genuinely useful regardless of which stage a user is currently looking at (a chart
+        suggestion is relevant even while reading the Clean stage's page).
+        """
+        self.guidance_panel.set_suggestions(suggestions)

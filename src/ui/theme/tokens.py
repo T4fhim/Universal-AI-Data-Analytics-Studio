@@ -40,6 +40,8 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from enum import Enum
 
+from src.core.expertise_level import ExpertiseLevel
+
 
 class Density(str, Enum):
     """How tightly the UI packs content.
@@ -49,11 +51,14 @@ class Density(str, Enum):
     through ``config.yaml`` as a plain string with no conversion at the
     config boundary.
 
-    Milestone 25 maps :class:`~src.core.expertise_level.ExpertiseLevel` onto
+    Milestone 26 maps :class:`~src.core.expertise_level.ExpertiseLevel` onto
     these so a beginner gets large targets and generous spacing while an
-    engineer gets compact rows. The enum ships now, in milestone 15, because
-    the spacing scale has to be derived from *something* and hard-coding one
-    density would mean re-deriving every spacing value later.
+    engineer gets compact rows -- see :data:`DENSITY_BY_EXPERTISE_LEVEL` and
+    :meth:`~src.ui.theme_manager.ThemeManager.set_density` (built in
+    milestone 15, unused until this milestone actually drives it from
+    something). The enum ships now, in milestone 15, because the spacing
+    scale has to be derived from *something* and hard-coding one density
+    would mean re-deriving every spacing value later.
     """
 
     COMFORTABLE = "comfortable"
@@ -64,6 +69,27 @@ class Density(str, Enum):
     def scale(self) -> float:
         """Multiplier applied to the base spacing scale."""
         return {"comfortable": 1.25, "cozy": 1.0, "compact": 0.75}[self.value]
+
+
+# Milestone 26: the mapping Density's own docstring anticipated since milestone 15.
+# Lives here (src.ui.theme), not in src.core.expertise_level, because Density is a
+# UI-theming concept -- src.core must never import from src.ui (see this repo's layered
+# architecture), so the mapping has to live on the UI side of that boundary, importing
+# ExpertiseLevel (the core-side vocabulary) rather than the other way around.
+#
+# BEGINNER/STUDENT get COMFORTABLE (larger targets, more generous spacing -- a new user
+# benefits from a less dense, easier-to-scan layout). ANALYST/DECISION_MAKER get COZY, the
+# existing default density every theme already shipped with. RESEARCHER/ENGINEER get
+# COMPACT (more information on screen at once, matching how EXPERTISE_LEVEL_GUIDANCE already
+# describes both as wanting precise, unpadded detail over explanatory scaffolding).
+DENSITY_BY_EXPERTISE_LEVEL: dict[ExpertiseLevel, Density] = {
+    ExpertiseLevel.BEGINNER: Density.COMFORTABLE,
+    ExpertiseLevel.STUDENT: Density.COMFORTABLE,
+    ExpertiseLevel.ANALYST: Density.COZY,
+    ExpertiseLevel.DECISION_MAKER: Density.COZY,
+    ExpertiseLevel.RESEARCHER: Density.COMPACT,
+    ExpertiseLevel.ENGINEER: Density.COMPACT,
+}
 
 
 @dataclass(frozen=True)

@@ -37,6 +37,26 @@ def test_workbench_has_a_page_for_every_registered_stage(qapp: QApplication) -> 
     assert workbench.page_for(PipelineStage.UPLOAD) is None
 
 
+def test_all_pages_returns_every_constructed_page_and_each_has_a_guidance_panel(
+    qapp: QApplication,
+) -> None:
+    """Milestone 26: Workbench.all_pages() is what main_window.py iterates to wire every
+    page's GuidancePanel -- confirms both that the accessor returns everything
+    page_for() can, and that every one of those pages really does carry a GuidancePanel
+    (StagePage's own construction, not something a subclass has to remember to add).
+    """
+    from src.ui.widgets.guidance_panel import GuidancePanel
+
+    workbench = Workbench()
+    all_pages = workbench.all_pages()
+
+    assert len(all_pages) == len(
+        [s for s in PipelineStage if workbench.page_for(s) is not None]
+    )
+    for page in all_pages:
+        assert isinstance(page.guidance_panel, GuidancePanel)
+
+
 def test_opening_a_dataset_transitions_the_center_pane_off_welcome(
     qapp: QApplication,
 ) -> None:

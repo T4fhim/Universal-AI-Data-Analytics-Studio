@@ -42,6 +42,7 @@ from src.core.logger import configure_logging, get_logger
 from src.plugins.plugin_manager import PluginManager
 from src.services.analysis_orchestrator_service import AnalysisOrchestratorService
 from src.services.database_connection_service import DatabaseConnectionService
+from src.services.guidance_service import GuidanceService
 from src.services.project_service import ProjectService
 from src.services.report_service import ReportService
 from src.services.settings_service import SettingsService
@@ -170,6 +171,16 @@ def bootstrap(
     logger.debug(
         "Registered AnalysisOrchestratorService into the dependency container."
     )
+
+    # Milestone 26: depends on the AnalysisOrchestratorService instance just
+    # registered above (reads its propose_next_stage() as one of
+    # GuidanceService's own four deterministic suggestion sources), for the
+    # same "construct in dependency order" reasoning already documented
+    # above -- registered here, immediately after it, per the plan's own
+    # "Registered in bootstrap() after AnalysisOrchestratorService" note.
+    guidance_service = GuidanceService(analysis_orchestrator_service)
+    container.register(GuidanceService, lambda: guidance_service, singleton=True)
+    logger.debug("Registered GuidanceService into the dependency container.")
 
     # Milestone 13: depends on both WorkspaceService and
     # AnalysisOrchestratorService instances just registered above, for

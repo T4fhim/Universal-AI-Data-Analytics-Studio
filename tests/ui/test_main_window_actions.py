@@ -203,3 +203,83 @@ def test_clicking_run_on_understand_produces_a_real_log_entry_end_to_end(
         "1,204" not in understand_page._result_label.text()
     )  # sanity: real data, not a stub
     assert "3" in understand_page._result_label.text()  # 3 rows, profiled for real
+
+
+def test_opening_a_dataset_populates_every_stage_pages_guidance_panel(
+    main_window: MainWindow, qapp: QApplication
+) -> None:
+    """Milestone 26 acceptance criterion 2, driven end to end through the real
+    GuidanceService/AnalysisOrchestratorService/chart_recommender chain -- no AI provider is
+    configured anywhere in this test's fixture chain (bootstrap() reads the isolated test
+    config, which has no providers set).
+    """
+    import pandas as pd
+
+    from src.services.workspace_service import Dataset
+    from tests.ui.qt_helpers import process_events
+
+    dataset = Dataset(
+        name="test",
+        dataframe=pd.DataFrame(
+            {"category": ["a", "b", "a", "b"], "value": [1.0, 2.0, 3.0, 4.0]}
+        ),
+        source_format="csv",
+    )
+    main_window._dataset_controller.load_dataset(dataset)
+    process_events()
+
+    for page in main_window._workbench.all_pages():
+        assert page.guidance_panel.suggestion_count() >= 1
+
+
+def test_activating_a_guidance_suggestion_navigates_the_workbench(
+    main_window: MainWindow, qapp: QApplication
+) -> None:
+    """Milestone 26: GuidancePanel.suggestion_activated -> GuidanceController.
+    on_suggestion_activated -> the real, shared workbench.go_to_visualize QAction -- emitted
+    from a real page's real GuidancePanel, not called directly, so this exercises the actual
+    signal connection GuidanceController wires in its own __init__, not just the handler.
+    """
+    import pandas as pd
+
+    from src.services.analysis_orchestrator_service import PipelineStage
+    from src.services.workspace_service import Dataset
+    from tests.ui.qt_helpers import process_events
+
+    dataset = Dataset(
+        name="test", dataframe=pd.DataFrame({"a": [1, 2, 3]}), source_format="csv"
+    )
+    main_window._dataset_controller.load_dataset(dataset)
+    process_events()
+
+    understand_page = main_window._workbench.page_for(PipelineStage.UNDERSTAND)
+    understand_page.guidance_panel.suggestion_activated.emit(
+        "workbench.go_to_visualize"
+    )
+
+    visualize_page = main_window._workbench.page_for(PipelineStage.VISUALIZE)
+    assert main_window._workbench.stack.currentWidget() is visualize_page
+
+
+def test_changing_expertise_level_updates_theme_density(
+    main_window: MainWindow, qapp: QApplication
+) -> None:
+    """Milestone 26 acceptance criterion 4: ThemeManager.set_density() (built in milestone
+    15, unused until now) is actually driven by a live ExpertiseLevel change.
+    """
+    from src.ui.theme.tokens import Density
+    from src.ui.theme_manager import ThemeManager
+    from tests.ui.qt_helpers import process_events
+
+    theme_manager = ThemeManager(qapp)
+    theme_manager.apply_theme("dark")
+    main_window.attach_theme_manager(theme_manager)
+    assert theme_manager._density is Density.COMFORTABLE  # default "beginner" config
+
+    combo = main_window._dock_manager.chat_panel.expertise_combo
+    engineer_index = combo.findData("engineer")
+    assert engineer_index != -1
+    combo.setCurrentIndex(engineer_index)
+    process_events()
+
+    assert theme_manager._density is Density.COMPACT

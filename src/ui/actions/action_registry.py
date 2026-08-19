@@ -45,6 +45,14 @@ class ActionCategory(Enum):
     VIEW = "view"
     EDIT = "edit"
     HELP = "help"
+    # Milestone 26: "jump to this pipeline stage" navigation actions --
+    # kept separate from ANALYSIS rather than folded into it, since these
+    # are pure workbench navigation (Workbench.show_stage) with no
+    # service call of their own, and because ActionSpec.stage (set on
+    # every action in this category) is what GuidanceService.get_suggestions
+    # maps a PIPELINE-source Suggestion onto without src.services.guidance_service
+    # ever importing src.ui.
+    PIPELINE = "pipeline"
 
 
 class Requirement(Enum):
