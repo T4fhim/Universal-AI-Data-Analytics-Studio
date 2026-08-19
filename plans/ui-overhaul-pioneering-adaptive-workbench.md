@@ -1,13 +1,13 @@
 # Universal AI Data Analytics Studio — UI Overhaul (Milestones 15–29)
 
 > **Status.** M15 (`39d12fb`), M16 (`cfe8f24`, `bd96e4e`), M17 (`f07514a`), M18 (`c1ee88c`), M19
-> (`6683489`), M20 (`5f9c6eb`), M22 (`0991f74`), M21, M23 (`40c0eb5`), and M24 are complete and
-> committed — see the Milestones section for as-built file lists and verification results. M22
-> was built before M21 despite the numbering, per that milestone's own "Build order note" (one of
-> M21's five acceptance criteria depends on M22's `ResultCard`/`ExplanationPanel`; the other four
-> do not) — M21 itself was then built immediately after M22, closing that dependency the same
-> session it was introduced.
-> M25–M29 remain. This revision
+> (`6683489`), M20 (`5f9c6eb`), M22 (`0991f74`), M21, M23 (`40c0eb5`), M24 (`c7d1195`), and M25 are
+> complete and committed — see the Milestones section for as-built file lists and verification
+> results. M22 was built before M21 despite the numbering, per that milestone's own "Build order
+> note" (one of M21's five acceptance criteria depends on M22's `ResultCard`/`ExplanationPanel`;
+> the other four do not) — M21 itself was then built immediately after M22, closing that dependency
+> the same session it was introduced.
+> M26–M29 remain. This revision
 > (renumbered from the original 15–27 draft) closes gaps a self-review found after M15 shipped: two
 > inserted milestones (M21 AI chat panel, M27 empty/error states + i18n), acceptance criteria and
 > sizing on every milestone, a CI gate, a screen-reader verification protocol, a dialog-disposition
@@ -1099,19 +1099,85 @@ Acceptance criteria:
       model's narrowed `rowCount()`) and the manual runtime smoke test's real 4-row-to-2-row
       narrowing.
 
-### M25 — Predict stage: forecasting + Automatic Model Competition · Size **M**
+### M25 — Predict stage: forecasting + Automatic Model Competition · Size **M** · ✅ **DONE**
 
-Files: `pages/predict_page.py` · `renderers/forecasting.py` · `progress_callback` added to
-`compare_forecast_models`.
+**As built.** `src/ui/workbench/pages/predict_page.py` (new) · `src/ui/results/renderers/
+forecasting.py` (new: `ForecastResultRenderer`, `ModelComparisonResultRenderer`) ·
+`src/visualization/forecast_charts.py` (new: `ForecastChart`, a genuine `BaseChart` subclass —
+see its own docstring for why it is not registered in `chart_registry`, whose column-picker
+shape does not fit a chart whose real input is already-fitted `ForecastResult` objects) ·
+`src/forecasting/model_comparison.py` (`compare_forecast_models` gains `progress_callback`) ·
+`src/ui/results/result_renderer_registry.py` (registers both new renderers) ·
+`src/ui/workbench/stage_registry.py` (registers `PredictPage` for `PipelineStage.PREDICT`) ·
+`src/ui/main_window.py` (`predict_page.set_dataset`/`set_worker_collaborators` wiring) ·
+`src/ui/workbench/workbench.py` (stale comment updated: UPLOAD is now the only stage with no
+page) · tests: `tests/ui/workbench/test_predict_page.py`,
+`tests/ui/results/test_forecasting_renderer.py`, `tests/visualization/test_forecast_charts.py`
+(all new) · `tests/forecasting/test_model_comparison.py` (progress-callback coverage added) ·
+`tests/ui/workbench/{test_stage_registry,test_workbench}.py` (updated: PREDICT moved from "no
+page yet" to registered, UPLOAD is now the sole example of an unregistered stage).
+
+Like `AnalyzePage`/`ExplorePage`, `PredictPage` calls `src.forecasting`'s five `forecast_*`
+functions and `compare_forecast_models` directly rather than through `src.ai.tool_registry`'s
+handlers (which flatten the typed `ForecastResult`/`ModelComparisonResult` into a JSON dict) —
+it still reuses each tool's `ToolDefinition.input_schema` via the existing
+`AnalysisParameterDialog` purely for the parameter form. Single forecasters run synchronously on
+the UI thread, matching every prior stage page's "fast enough not to need a worker" shape;
+`compare_forecast_models` (up to five models, fit twice each) is genuinely slow, so it is the
+first `src.forecasting` operation this page offloads to `WorkerRunner`, wired to
+`ApplicationStatusBar.show_progress` via the new `progress_callback` parameter —
+`status_bar.py`'s own docstring named this exact milestone as where its long-unused
+`show_progress` would gain a real caller, and it now does. `PredictPage` is the first stage page
+to hold direct `WorkerRunner`/`ApplicationStatusBar` references (via `set_worker_collaborators`,
+set from `main_window.py`) rather than routing through a controller — see the page's own
+docstring for why neither object is a `src.services` service or a `src.ui.controllers`
+controller, so this does not violate the "stage pages hold no service references" rule the rest
+of `src/ui/workbench/` follows.
+
+The ranked table marks the winning row with a literal `" (Winner)"` text suffix rather than
+color/bold alone (this overhaul's A7 "never color alone" rule) — verified directly in both the
+pure-Python renderer tests and the Qt `PredictPage` test, which finds the winner's cell in the
+real `QTableWidget` `ResultCard` builds. The overlay chart's winner trace is also visibly
+thicker, a second non-color-only signal layered on top of the text, not a replacement for it.
+
+**Verified.** Full suite: **938 passed, 0 failed, 87 skipped** (up from 913 passed / 0 failed / 85
+skipped at M24 — 25 net new tests; reproduced twice, once at 293 s and once at 2640 s under
+background load, both with identical pass/fail/skip counts). `black`/`isort` clean on every
+touched file (after one auto-format pass — the quality-check hook's `ruff format` and this
+project's own `black` disagree on a handful of wrap decisions, resolved by running `black`
+directly per this milestone's own verification, not by re-deriving a third style). CI's scoped
+`mypy` run (`src/ui/theme src/ui/a11y src/ui/web src/ui/actions`) stays clean — none of this
+milestone's files fall inside that scope, matching the M16–M24 precedent of not silently
+expanding it. Manually confirmed end to end via a real `compare_forecast_models` run against a
+15-point synthetic series outside the test suite: all 5 candidates fit, ranked
+`['arima', 'prophet', 'linear_regression', 'exponential_smoothing', 'random_forest']`, progress
+events `0% → 20% → 40% → 60% → 80% → 100%`, and the resulting `ModelComparisonResultRenderer`
+output inspected directly (ranked table rows, `"Arima (Winner)"` marked, six overlay-chart
+traces).
+
+**Real bug caught by the quality-check hook, not introduced silently.** Two `Edit` calls in
+`src/ui/main_window.py` and `src/ui/results/result_renderer_registry.py` each added an import
+before any usage of it existed yet in the file; the hook's `ruff --fix` pass (which runs after
+every `Edit`/`Write`, per this repo's own tooling) correctly flagged those as unused and removed
+them before the follow-up edit adding the actual usage landed — silently producing a `NameError`
+at import time (`PredictPage`, `ForecastResult`) that a plain `pytest tests/` run would have
+caught immediately but a narrower single-file test run initially missed. Both were caught by
+running the full `tests/ui/workbench/` and `tests/ui/test_main_window_actions.py` suites before
+declaring this milestone done, and fixed by re-adding each import once its usage was already
+present in the same edit.
 
 Acceptance criteria:
-- [ ] All 5 forecasters plus `compare_forecast_models` are reachable from the Predict page — first
-      non-AI path to any of `src/forecasting/`.
-- [ ] `compare_forecast_models` renders as a ranked table with the winner highlighted, plus an
+- [x] All 5 forecasters plus `compare_forecast_models` are reachable from the Predict page — first
+      non-AI path to any of `src/forecasting/` (confirmed by grep: no `src/ui/` file imported
+      `src.forecasting` before this milestone).
+- [x] `compare_forecast_models` renders as a ranked table with the winner highlighted, plus an
       overlay chart of every candidate.
-- [ ] `validate_time_series` failures surface as a pre-flight warning, not a stack trace.
-- [ ] Progress reporting is visible in the status bar during a comparison run (first real consumer
-      of `WorkerSignals.progress`, wired but unused since M15/M17).
+- [x] `validate_time_series` failures surface as a pre-flight warning, not a stack trace — an
+      inline `QLabel` in the page itself (not only a modal), covered for both a single forecaster
+      and `compare_forecast_models`.
+- [x] Progress reporting is visible in the status bar during a comparison run (first real consumer
+      of `WorkerSignals.progress`, wired but unused since M15/M17) — verified against a real
+      `QThreadPool` worker and a real `ApplicationStatusBar`, not a mocked signal.
 
 ### M26 — GuidanceService + progressive expertise · Size **M**
 

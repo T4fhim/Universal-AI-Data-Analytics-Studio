@@ -43,8 +43,14 @@ from src.analysis.regression import RegressionResult
 from src.analysis.t_test import TTestResult
 from src.core.exceptions import ServiceError
 from src.core.logger import get_logger
+from src.forecasting.exponential_smoothing import ForecastResult
+from src.forecasting.model_comparison import ModelComparisonResult
 from src.ui.results.base_result_renderer import BaseResultRenderer
 from src.ui.results.renderers.correlation import CorrelationResultRenderer
+from src.ui.results.renderers.forecasting import (
+    ForecastResultRenderer,
+    ModelComparisonResultRenderer,
+)
 from src.ui.results.renderers.generic import GenericResultRenderer
 from src.ui.results.renderers.multivariate import (
     ClusteringResultRenderer,
@@ -143,6 +149,9 @@ def _register_builtins() -> None:
     register_renderer(RegressionResult, RegressionResultRenderer)
     register_renderer(PcaResult, PcaResultRenderer)
     register_renderer(ClusteringResult, ClusteringResultRenderer)
+    # Milestone 25: the PREDICT stage's two result types.
+    register_renderer(ForecastResult, ForecastResultRenderer)
+    register_renderer(ModelComparisonResult, ModelComparisonResultRenderer)
 
 
 _register_builtins()

@@ -32,8 +32,9 @@ def test_workbench_has_a_page_for_every_registered_stage(qapp: QApplication) -> 
     assert workbench.page_for(PipelineStage.REPORT) is not None
     assert workbench.page_for(PipelineStage.REPRODUCE) is not None
     assert workbench.page_for(PipelineStage.VISUALIZE) is not None
-    # PREDICT has no page yet (milestone 25's own scope) -- returns None, not a crash.
-    assert workbench.page_for(PipelineStage.PREDICT) is None
+    assert workbench.page_for(PipelineStage.PREDICT) is not None
+    # UPLOAD has no page, by design -- see stage_registry.py's own docstring for why.
+    assert workbench.page_for(PipelineStage.UPLOAD) is None
 
 
 def test_opening_a_dataset_transitions_the_center_pane_off_welcome(

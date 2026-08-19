@@ -79,9 +79,10 @@ class Workbench(QWidget):
         page = self._pages.get(stage)
         if page is not None:
             self.stack.setCurrentWidget(page)
-        # A rail click on a stage with no page yet (CLEAN/EXPLORE/ANALYZE/
-        # VISUALIZE/PREDICT/EXPLAIN -- milestones 23-26) is a silent no-op
-        # rather than an error dialog: the rail still shows the stage's real
+        # A rail click on UPLOAD -- the only PipelineStage with no registered page, by
+        # design, since it is represented by the welcome page instead (see
+        # stage_registry.py's own docstring) -- is a silent no-op rather than an error
+        # dialog: the rail still shows the stage's real
         # status for orientation, it just isn't clickable-through yet, the
         # same "reachable but not yet interactive" state a disabled menu
         # action would represent, without needing a QAction-shaped mechanism

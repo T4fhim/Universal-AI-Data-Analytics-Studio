@@ -151,6 +151,7 @@ def compare_forecast_models(
     value_column: str,
     periods: int,
     holdout_periods: int | None = None,
+    progress_callback: Callable[[int, str], None] | None = None,
 ) -> ModelComparisonResult:
     """Fit every candidate forecasting model and rank them by holdout accuracy.
 
@@ -166,6 +167,21 @@ def compare_forecast_models(
             not given — an arbitrary but standard train/test split
             ratio for a series too short to justify a more elaborate
             cross-validation scheme.
+        progress_callback: Optional ``(percent, message)`` callable
+            invoked once per candidate model as it finishes being
+            evaluated (whether it succeeded or was skipped) —
+            matching :class:`~src.workers.base_worker.WorkerSignals.
+            progress`'s own ``(int, str)`` contract, so a caller can
+            pass :class:`~src.workers.base_worker.BaseWorker`'s own
+            generated ``progress_callback`` straight through unchanged
+            (see :class:`~src.ui.worker_runner.WorkerRunner`). This is
+            milestone 25's first real caller of that plumbing: fitting
+            up to five models (two fits each, one against the holdout
+            split and one against the full series) is the first
+            genuinely slow operation :mod:`src.forecasting` exposes,
+            unlike a single ``forecast_*`` call. ``None`` by default so
+            every pre-existing caller (the AI tool wrapper, direct
+            calls in tests) is unaffected.
 
     Raises:
         ServiceError: If the series fails
@@ -200,8 +216,22 @@ def compare_forecast_models(
         drop=True
     )
 
+    total_candidates = len(_CANDIDATE_FORECASTERS)
+    if progress_callback is not None:
+        progress_callback(0, "Starting model comparison…")
+
+    def _report_progress(index: int, method_name: str) -> None:
+        if progress_callback is None:
+            return
+        percent = round((index + 1) / total_candidates * 100)
+        progress_callback(
+            percent,
+            f"Evaluated {method_name.replace('_', ' ')} "
+            f"({index + 1}/{total_candidates}).",
+        )
+
     candidates: list[ModelCandidateResult] = []
-    for method_name, forecaster in _CANDIDATE_FORECASTERS:
+    for index, (method_name, forecaster) in enumerate(_CANDIDATE_FORECASTERS):
         try:
             holdout_forecast = forecaster(
                 train, date_column, value_column, holdout_periods
@@ -212,6 +242,7 @@ def compare_forecast_models(
                 method_name,
                 exc,
             )
+            _report_progress(index, method_name)
             continue
 
         predicted = _forecast_values_as_series(holdout_forecast).reset_index(drop=True)
@@ -236,6 +267,7 @@ def compare_forecast_models(
                 method_name,
                 exc,
             )
+            _report_progress(index, method_name)
             continue
 
         candidates.append(
@@ -243,6 +275,7 @@ def compare_forecast_models(
                 method=method_name, mape=mape, rmse=rmse, result=full_result
             )
         )
+        _report_progress(index, method_name)
 
     if not candidates:
         raise ServiceError(

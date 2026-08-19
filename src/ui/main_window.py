@@ -81,6 +81,7 @@ from src.ui.ui_state_bus import UiStateBus
 from src.ui.workbench.pages.analyze_page import AnalyzePage
 from src.ui.workbench.pages.clean_page import CleanPage
 from src.ui.workbench.pages.explore_page import ExplorePage
+from src.ui.workbench.pages.predict_page import PredictPage
 from src.ui.workbench.pages.report_page import ReportPage
 from src.ui.workbench.pages.reproduce_page import ReproducePage
 from src.ui.workbench.pages.understand_page import UnderstandPage
@@ -344,6 +345,13 @@ class MainWindow(QMainWindow):
                 self._visualization_controller.register_built_visualization
             )
 
+        # Milestone 25: PredictPage runs Automatic Model Competition off the UI thread with
+        # live status-bar progress -- see its own docstring for why it holds these two
+        # directly rather than through a controller, unlike every signal connection above.
+        predict_page = self._workbench.page_for(PipelineStage.PREDICT)
+        if isinstance(predict_page, PredictPage):
+            predict_page.set_worker_collaborators(self._worker_runner, self._status_bar)
+
         # Milestone 23: "genuinely reachable" close actions -- see
         # DockManager.connect_dataset_close_requested/connect_chart_closed's own
         # docstrings for why these are wired as callbacks rather than QActions
@@ -447,6 +455,11 @@ class MainWindow(QMainWindow):
         visualize_page = self._workbench.page_for(PipelineStage.VISUALIZE)
         if isinstance(visualize_page, VisualizePage):
             visualize_page.set_dataset(active_dataset)
+
+        # Milestone 25: same hand-off as AnalyzePage/ExplorePage/VisualizePage above.
+        predict_page = self._workbench.page_for(PipelineStage.PREDICT)
+        if isinstance(predict_page, PredictPage):
+            predict_page.set_dataset(active_dataset)
 
     # -- Settings / theme / about -----------------------------------------------
 

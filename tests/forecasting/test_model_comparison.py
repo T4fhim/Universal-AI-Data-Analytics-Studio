@@ -89,3 +89,51 @@ def test_compare_forecast_models_default_holdout_is_reasonable_fraction() -> Non
     # should succeed without the caller needing to reason about the split.
     result = compare_forecast_models(_trending_series(n=40), "date", "value", periods=5)
     assert result.winner is not None
+
+
+# -- progress_callback (milestone 25) --------------------------------------------------------
+
+
+def test_compare_forecast_models_reports_progress_once_per_candidate() -> None:
+    """Milestone 25's own new parameter — the first genuinely slow src.forecasting operation
+    reports incremental progress, matching WorkerSignals.progress's (int, str) contract exactly
+    (see that class's own docstring) so a caller can hand this straight to WorkerRunner.
+    """
+    events: list[tuple[int, str]] = []
+
+    result = compare_forecast_models(
+        _trending_series(),
+        "date",
+        "value",
+        periods=5,
+        progress_callback=lambda percent, message: events.append((percent, message)),
+    )
+
+    # One 0% "starting" event, plus one event per registered candidate forecaster.
+    assert events[0] == (0, "Starting model comparison…")
+    assert len(events) == 1 + len(_CANDIDATE_FORECASTER_NAMES)
+    # Percentages are monotonically non-decreasing and the final one reaches 100.
+    percentages = [percent for percent, _message in events]
+    assert percentages == sorted(percentages)
+    assert percentages[-1] == 100
+    # Every candidate's name appears in some progress message.
+    for name in _CANDIDATE_FORECASTER_NAMES:
+        assert any(name.replace("_", " ") in message for _percent, message in events)
+    assert (
+        len(result.candidates) >= 1
+    )  # the callback did not interfere with the real result
+
+
+def test_compare_forecast_models_with_no_progress_callback_is_unaffected() -> None:
+    # Every pre-existing call site omits progress_callback -- must remain a true no-op.
+    result = compare_forecast_models(_trending_series(), "date", "value", periods=5)
+    assert result.winner is not None
+
+
+_CANDIDATE_FORECASTER_NAMES = (
+    "exponential_smoothing",
+    "prophet",
+    "linear_regression",
+    "arima",
+    "random_forest",
+)

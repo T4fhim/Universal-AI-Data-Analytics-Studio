@@ -10,10 +10,9 @@ dataclass registration, a module-level ``_REGISTRY`` dict, ``register_stage_page
 Only stages with an actually-built page register here. :class:`~src.services.
 analysis_orchestrator_service.PipelineStage` has ten members; milestone 20 shipped pages for
 UNDERSTAND, REPORT, and REPRODUCE, milestone 22 added EXPLORE/ANALYZE/EXPLAIN, milestone 23 added
-CLEAN, and milestone 24 adds VISUALIZE (PREDICT remains milestone 25's own scope, and UPLOAD has
-no page at all -- it is represented by the welcome page, which is not itself a stage page since
-"no dataset yet" has no :class:`~src.services.analysis_orchestrator_service.PipelineStage` value
-that fits it).
+CLEAN, milestone 24 added VISUALIZE, and milestone 25 adds PREDICT (UPLOAD has no page at all --
+it is represented by the welcome page, which is not itself a stage page since "no dataset yet"
+has no :class:`~src.services.analysis_orchestrator_service.PipelineStage` value that fits it).
 :class:`~src.ui.workbench.workbench.Workbench` asks this registry which stages have real
 content and simply does not switch its stack to a stage with none -- see
 :meth:`~src.ui.workbench.workbench.Workbench._on_stage_selected`.
@@ -123,11 +122,16 @@ def _register_builtins() -> None:
 
     Milestone 24 adds VISUALIZE -- see :mod:`~src.ui.workbench.pages.visualize_page`'s own
     docstring for its column-picker/recommendation/chart+table-split shape.
+
+    Milestone 25 adds PREDICT -- see :mod:`~src.ui.workbench.pages.predict_page`'s own docstring
+    for why it is the first stage page to hold a direct ``WorkerRunner``/``ApplicationStatusBar``
+    reference.
     """
     from src.ui.workbench.pages.analyze_page import AnalyzePage
     from src.ui.workbench.pages.clean_page import CleanPage
     from src.ui.workbench.pages.explain_page import ExplainPage
     from src.ui.workbench.pages.explore_page import ExplorePage
+    from src.ui.workbench.pages.predict_page import PredictPage
     from src.ui.workbench.pages.report_page import ReportPage
     from src.ui.workbench.pages.reproduce_page import ReproducePage
     from src.ui.workbench.pages.understand_page import UnderstandPage
@@ -138,6 +142,7 @@ def _register_builtins() -> None:
     register_stage_page(PipelineStage.EXPLORE, ExplorePage)
     register_stage_page(PipelineStage.ANALYZE, AnalyzePage)
     register_stage_page(PipelineStage.VISUALIZE, VisualizePage)
+    register_stage_page(PipelineStage.PREDICT, PredictPage)
     register_stage_page(PipelineStage.EXPLAIN, ExplainPage)
     register_stage_page(PipelineStage.REPORT, ReportPage)
     register_stage_page(PipelineStage.REPRODUCE, ReproducePage)

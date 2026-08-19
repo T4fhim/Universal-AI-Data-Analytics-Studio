@@ -17,15 +17,17 @@ def test_builtin_stages_are_registered() -> None:
     assert PipelineStage.EXPLORE in registered
     assert PipelineStage.ANALYZE in registered
     assert PipelineStage.VISUALIZE in registered
+    assert PipelineStage.PREDICT in registered
     assert PipelineStage.EXPLAIN in registered
     assert PipelineStage.REPORT in registered
     assert PipelineStage.REPRODUCE in registered
 
 
 def test_get_stage_page_class_returns_none_for_an_unregistered_stage() -> None:
-    # PREDICT has no page yet (milestone 25's own scope) -- VISUALIZE gained one in
-    # milestone 24.
-    assert stage_registry.get_stage_page_class(PipelineStage.PREDICT) is None
+    # UPLOAD is the only stage with no page, by design -- see stage_registry.py's own
+    # docstring (it is represented by the welcome page instead). Milestone 25 gave PREDICT a
+    # real page, closing what used to be this test's own example of an unregistered stage.
+    assert stage_registry.get_stage_page_class(PipelineStage.UPLOAD) is None
 
 
 def test_register_stage_page_rejects_a_duplicate_stage() -> None:
