@@ -135,9 +135,26 @@ class ProjectController:
     # -- Project actions --------------------------------------------------------
 
     def new_project(self) -> None:
+        """Create a fresh, empty project and make it active.
+
+        Milestone-28 remediation: before this, the only feedback was a transient
+        status-bar message plus a small status-bar label change -- both easy to miss
+        entirely (no dialog, no page transition; the Welcome page correctly stays put
+        since :meth:`~src.ui.workbench.workbench.Workbench.update_pipeline_state` only
+        navigates off it once a *dataset* becomes active, not a project). A user's real
+        log from this session showed exactly that confusion: seven "New Project"
+        creations in about a minute, four of them within the same second -- consistent
+        with rage-clicking a button that gave no visible confirmation it had worked.
+        The console message below gives a second, persistent, more visible channel
+        alongside the existing (still-kept) status-bar ones.
+        """
         project = self._project_service.new_project("Untitled Project")
         self._status_bar.set_active_project_label(project.name)
         self._status_bar.show_message(f"Created new project: {project.name}")
+        self._dock_manager.append_console_message(
+            f"Created new project '{project.name}'. Use File > Open Dataset "
+            f"to import your first file."
+        )
         _logger.info("New project created via UI: %s", project.name)
         self._state_bus.request_refresh()  # has_project just became True
 

@@ -205,6 +205,74 @@ def test_clicking_run_on_understand_produces_a_real_log_entry_end_to_end(
     assert "3" in understand_page._result_label.text()  # 3 rows, profiled for real
 
 
+def test_open_dataset_through_the_real_worker_thread_updates_the_ui(
+    main_window: MainWindow, qapp: QApplication, tmp_path, monkeypatch
+) -> None:
+    """Regression test for a real, previously-undetected defect: opening a dataset
+    logged "Dataset opened via UI: ..." successfully but nothing else visibly changed
+    -- no row in the Dataset Explorer, the workbench stuck on the welcome page.
+
+    Root cause: ``WorkerRunner.run()`` connected ``worker.signals.result`` (etc.) to
+    plain bound methods -- ``DatasetController.load_dataset`` is not a ``QObject``
+    slot -- with the default ``Qt.AutoConnection``. PySide6 cannot determine thread
+    affinity for a non-``QObject`` receiver, so it falls back to a direct call *on the
+    emitting thread*, and ``BaseWorker.run()`` emits from a ``QThreadPool`` worker
+    thread. Every ``on_result``/``on_error``/``on_finished``/``on_progress`` callback
+    routed through ``WorkerRunner`` since milestone 19 therefore actually ran on a
+    background thread: ``_logger.info(...)`` is thread-safe so the log line appeared,
+    but the ``QTreeWidget`` rebuild and the ``QTimer.singleShot(0, ...)``-driven
+    workbench transition silently misbehaved instead.
+
+    Every *other* dataset-loading test in this suite calls
+    ``DatasetController.load_dataset`` directly from the test's own (UI) thread --
+    that bypasses ``WorkerRunner`` entirely and is exactly why this defect went
+    undetected. This test drives the real ``open_dataset()`` -> ``WorkerRunner`` ->
+    ``QThreadPool`` -> queued-callback path instead, the same path a real
+    File > Open Dataset click takes.
+    """
+    from PySide6.QtWidgets import QFileDialog
+
+    from tests.ui.qt_helpers import process_events, wait_for_signal
+
+    csv_path = tmp_path / "regression.csv"
+    csv_path.write_text("a,b\n1,2\n3,4\n", encoding="utf-8")
+    monkeypatch.setattr(
+        QFileDialog,
+        "getOpenFileName",
+        staticmethod(lambda *a, **k: (str(csv_path), "")),
+    )
+
+    started_workers: list = []
+    original_run = main_window._dataset_controller._worker_runner.run
+
+    def _capturing_run(*args, **kwargs):
+        worker = original_run(*args, **kwargs)
+        started_workers.append(worker)
+        return worker
+
+    main_window._dataset_controller._worker_runner.run = _capturing_run
+
+    main_window._dataset_controller.open_dataset()
+
+    assert started_workers, "open_dataset() did not start a worker"
+    wait_for_signal(started_workers[0].signals.finished)
+    process_events()  # let the queued on_result callback itself run
+
+    datasets = main_window._workspace_service.list_datasets()
+    assert len(datasets) == 1
+    assert datasets[0].row_count == 2
+
+    # The exact reported symptom, part 1: the Dataset Explorer tree actually shows it.
+    tree = main_window._dock_manager._dataset_explorer.tree
+    assert tree.topLevelItemCount() >= 2  # the "Project" node + the one dataset row
+
+    # The exact reported symptom, part 2: the workbench transitioned off welcome.
+    assert (
+        main_window._workbench.stack.currentWidget()
+        is not main_window._workbench.welcome_page
+    )
+
+
 def test_opening_a_dataset_populates_every_stage_pages_guidance_panel(
     main_window: MainWindow, qapp: QApplication
 ) -> None:

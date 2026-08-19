@@ -26,9 +26,22 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from PySide6.QtCore import QObject, QThreadPool
+from PySide6.QtCore import QObject, Qt, QThreadPool
 
 from src.workers import BaseWorker
+
+# Explicit rather than relying on the default Qt.AutoConnection: on_result/on_error/
+# on_finished/on_progress are almost always plain bound methods on a controller (e.g.
+# DatasetController.load_dataset), not QObject slots, and PySide6's own connection-type
+# resolution for a non-QObject receiver is undocumented behavior worth not depending on
+# implicitly. WorkerSignals (constructed by BaseWorker.__init__, called synchronously
+# here on the UI thread) has UI-thread affinity; QueuedConnection guarantees delivery
+# is posted through that thread's event loop even though signals.result/etc. are
+# emitted from BaseWorker.run() on a QThreadPool worker thread -- making explicit what
+# was previously implicit, not a behavior change (verified: default AutoConnection
+# already delivered on the UI thread in this PySide6 version; this removes the
+# undocumented-behavior dependency rather than fixing an observed defect).
+_CROSS_THREAD_SAFE = Qt.ConnectionType.QueuedConnection
 
 
 class WorkerRunner(QObject):
@@ -76,12 +89,12 @@ class WorkerRunner(QObject):
         """
         worker = BaseWorker(fn, *args, report_progress=report_progress, **kwargs)
         if on_result is not None:
-            worker.signals.result.connect(on_result)
+            worker.signals.result.connect(on_result, _CROSS_THREAD_SAFE)
         if on_error is not None:
-            worker.signals.error.connect(on_error)
+            worker.signals.error.connect(on_error, _CROSS_THREAD_SAFE)
         if on_finished is not None:
-            worker.signals.finished.connect(on_finished)
+            worker.signals.finished.connect(on_finished, _CROSS_THREAD_SAFE)
         if on_progress is not None:
-            worker.signals.progress.connect(on_progress)
+            worker.signals.progress.connect(on_progress, _CROSS_THREAD_SAFE)
         QThreadPool.globalInstance().start(worker)
         return worker
