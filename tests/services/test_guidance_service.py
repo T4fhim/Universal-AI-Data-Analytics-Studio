@@ -195,9 +195,9 @@ def test_fresh_dataset_gets_at_least_one_suggestion_with_no_ai_configured(
     assert SuggestionCategory.DATA_QUALITY in categories_seen
 
     for suggestion in suggestions:
-        assert suggestion.rationale, (
-            "every suggestion must explain itself (Explain Everything)"
-        )
+        assert (
+            suggestion.rationale
+        ), "every suggestion must explain itself (Explain Everything)"
         assert suggestion.title
 
 
@@ -241,9 +241,9 @@ def test_expertise_level_reranks_but_never_filters_the_candidate_set(
     # a whole suggestion were dropped, as long as another with the same action_id remained.
     reference_titles = {s.title for s in result_by_level[ExpertiseLevel.BEGINNER]}
     for level, suggestions in result_by_level.items():
-        assert {s.title for s in suggestions} == reference_titles, (
-            f"expertise level {level!r} changed the candidate set instead of only its order"
-        )
+        assert {
+            s.title for s in suggestions
+        } == reference_titles, f"expertise level {level!r} changed the candidate set instead of only its order"
 
     # And the order genuinely does change: BEGINNER should rank the (VISUALIZE-stage) chart
     # suggestion at least as high as ENGINEER does, and ENGINEER should rank an

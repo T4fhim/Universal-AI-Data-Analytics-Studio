@@ -40,6 +40,7 @@ from PySide6.QtWidgets import (
 from src.core.exceptions import ApplicationError
 from src.core.logger import get_logger
 from src.ui.widgets.column_multi_select import ColumnMultiSelect
+from src.visualization.base_chart import BaseChart
 from src.visualization.chart_registry import display_name_for, list_dialog_charts
 
 _logger = get_logger(__name__)
@@ -54,7 +55,9 @@ _logger = get_logger(__name__)
 # list_dialog_charts()'s entries appear here — as of milestone 24
 # that is every registered chart type (see this module's own
 # docstring for why Treemap/Radar are no longer excluded).
-_CHART_REGISTRY: dict[str, tuple[type, list[str], list[str], frozenset[str]]] = {
+_CHART_REGISTRY: dict[
+    str, tuple[type[BaseChart], list[str], list[str], frozenset[str]]
+] = {
     display_name_for(name): (
         registration.chart_class,
         list(registration.required_fields),

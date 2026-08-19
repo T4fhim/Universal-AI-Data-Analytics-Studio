@@ -79,7 +79,12 @@ def _make_figure() -> go.Figure:
     )
 
 
-def _pump_until(app: QApplication, condition, timeout_seconds: float = 8.0) -> bool:
+def _pump_until(app: QApplication, condition, timeout_seconds: float = 25.0) -> bool:
+    """Pump the event loop until ``condition()`` is true, or ``timeout_seconds`` elapses.
+
+    25s, not the original 8s -- see this class's own docstring/root-cause note below for
+    the measured evidence behind that specific number.
+    """
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
         if condition():
@@ -92,11 +97,75 @@ def _pump_until(app: QApplication, condition, timeout_seconds: float = 8.0) -> b
 @_webengine
 @_skip_webengine
 class TestChartViewRealWidget:
+    """Root-caused, with measured evidence, during the M27 remediation pass.
+
+    This class's tests were a confirmed intermittent flake in full-suite runs
+    (never in isolation, nor in a small isolated subset that included its
+    heaviest neighboring test) -- ``test_figure_renders_and_host_becomes_ready``
+    occasionally timed out waiting for ``ChartView._rendered`` at the original
+    8s ``_pump_until`` budget. Two candidate causes were ruled out with real
+    evidence before landing on the actual one:
+
+    - **Not** a leaked ``QWebEngineView`` from the immediately preceding test
+      in this class: a settle-the-event-loop step added to ``teardown_method``
+      (pumping briefly after every test, so a next test never starts while a
+      prior one's ``deleteLater()``-scheduled page teardown is still in
+      flight) did not eliminate the flake across two subsequent full-suite
+      runs -- both still failed at this exact class.
+    - **Not** localized to this file's own immediate neighbors: running just
+      ``tests/ui/widgets/data_table/test_pandas_table_model.py`` (whose own
+      1M-row construction/timing-budget test runs immediately before this
+      file in full-suite collection order) together with this file passed
+      cleanly in 14.55s, 26/26 -- the same tests that fail in a 1172-test
+      full run do not fail in a small subset that includes their heaviest
+      neighbor.
+
+    What actually reproduced it, with numbers: instrumenting ``_pump_until``
+    with a much larger (60s) ceiling and timing how long each real load
+    actually took, under genuine full-suite conditions (a ~9-minute, 1172-
+    test run with cumulative widget/thread/native-library state built up
+    across everything that ran before this class), showed real completion
+    times of 14.02s, 6.48s, and 6.88s -- consistently well past the original
+    8s budget on the slowest of the three, never remotely close to hanging.
+    This is genuine cumulative full-suite resource pressure (memory, CPU,
+    and OS-level Chromium-process-launch contention built up over roughly a
+    thousand preceding tests, not something specific to this file's own
+    immediate neighbors), which is also why an isolated or small-subset run
+    never reproduces it. 25s (roughly 2x the worst measured 14.02s) is the
+    justified budget this class now uses -- generous enough to absorb that
+    measured full-suite variance without masking a genuine hang the way an
+    unbounded or very large timeout would.
+
+    The teardown_method settle-step from the (disproven) leaked-widget theory
+    is kept below regardless -- pumping the event loop briefly after each
+    test so a prior test's scheduled page teardown gets a chance to run is
+    still a reasonable hygiene practice on its own merits, it simply was not
+    sufficient by itself to be *the* fix.
+
+    A related, separate flake was also observed in this same investigation:
+    ``tests/ui/workbench/test_predict_page.py::
+    test_comparison_run_reports_progress_to_a_real_status_bar`` (a genuine
+    ``QThreadPool`` worker fitting all 5 forecasters twice each) missed even
+    its own considerably more generous 30s ``wait_for_signal`` budget in two
+    of three full-suite runs during this investigation -- the same
+    "cumulative full-suite resource pressure" mechanism, in a different file,
+    unrelated to ``QWebEngineView`` specifically. Left unfixed here: out of
+    this class's scope, flagged for whoever next touches that test/file.
+    """
+
     def setup_method(self) -> None:
         web_assets.reset_staged_assets_for_tests()
 
     def teardown_method(self) -> None:
         web_assets.reset_staged_assets_for_tests()
+        # See this class's own docstring for why this alone does not fix the
+        # flake (kept anyway: still a reasonable settle point on its own).
+        app = QApplication.instance()
+        if app is not None:
+            deadline = time.time() + 1.0
+            while time.time() < deadline:
+                app.processEvents()
+                time.sleep(0.01)
 
     def test_opening_ten_charts_leaves_staged_asset_count_flat(
         self, qapp: QApplication

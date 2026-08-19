@@ -136,3 +136,25 @@ is recorded here only as SPECIFICATION.md's own stated scope — it is explicitl
 what exists in `src/` today (per CLAUDE.md's own
 instruction not to assume something described there already exists), and nothing in this
 document should be read as a committed timeline for building it.
+
+## Visual verification
+
+Prior milestones were verified either by informally running `python main.py` and looking at it,
+or by trusting the test suite alone — neither leaves an artifact a reviewer (or another agent, in
+a later session with no memory of what the screen actually looked like) can inspect after the
+fact. `scripts/screenshot_app_state.py` (added in the M27 remediation pass) closes that gap: it
+boots the real `Application`/`bootstrap()`/`MainWindow` composition path offscreen
+(`QT_QPA_PLATFORM=offscreen`) and saves a PNG via `QWidget.grab()`.
+
+```powershell
+python scripts/screenshot_app_state.py --output out.png
+python scripts/screenshot_app_state.py --output out.png --new-project
+python scripts/screenshot_app_state.py --output out.png --open-dataset path/to/file.csv
+```
+
+See that script's own module docstring for the full rationale (why it mirrors
+`Application.run()`'s construction sequence rather than a simplified stand-in, why
+`--open-dataset` stubs `QFileDialog` rather than skipping `DatasetController.open_dataset()`
+entirely, and why it never calls `QApplication.exec()`). The coordinator should run this after
+any future milestone that changes what the application looks like, the same way it already runs
+the test suite and `mypy`/`black`/`isort` after every milestone.
