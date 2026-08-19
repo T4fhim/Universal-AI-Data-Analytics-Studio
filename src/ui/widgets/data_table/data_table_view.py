@@ -125,7 +125,7 @@ class DataTableView(QWidget):
 
         self._sort_descending_button = QToolButton(self)
         self._sort_descending_button.setCheckable(True)
-        self._sort_descending_button.setText("↓")
+        self._sort_descending_button.setText(self.tr("↓"))
         describe(
             self._sort_descending_button,
             name="Sort descending",

@@ -22,7 +22,7 @@ def test_project_explorer_dock_no_longer_exists(qapp: QApplication) -> None:
 def test_dataset_explorer_shows_a_project_node_by_default(qapp: QApplication) -> None:
     window = QMainWindow()
     manager = DockManager(window)
-    top_item = manager._dataset_tree_widget.topLevelItem(0)
+    top_item = manager._dataset_explorer.tree.topLevelItem(0)
     assert top_item.text(0) == "(No project open)"
 
 
@@ -34,7 +34,7 @@ def test_set_project_label_updates_the_absorbed_project_node(
 
     manager.set_project_label("My Analysis")
 
-    top_item = manager._dataset_tree_widget.topLevelItem(0)
+    top_item = manager._dataset_explorer.tree.topLevelItem(0)
     assert top_item.text(0) == "Project: My Analysis"
 
 
@@ -57,9 +57,9 @@ def test_set_project_label_preserves_already_loaded_datasets(
     # Project node at 0, the dataset still at 1 -- rebuilding to show the
     # new project label must not drop the dataset list.
     assert (
-        manager._dataset_tree_widget.topLevelItem(0).text(0) == "Project: My Analysis"
+        manager._dataset_explorer.tree.topLevelItem(0).text(0) == "Project: My Analysis"
     )
-    assert manager._dataset_tree_widget.topLevelItemCount() == 2
+    assert manager._dataset_explorer.tree.topLevelItemCount() == 2
 
 
 def test_chart_dock_starts_hidden(qapp: QApplication) -> None:

@@ -25,6 +25,7 @@ from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from src.services.analysis_orchestrator_service import PipelineStage
 from src.services.guidance_service import Suggestion
 from src.ui.a11y.accessible import describe
+from src.ui.widgets.error_state import ErrorState
 from src.ui.widgets.guidance_panel import GuidancePanel
 
 
@@ -91,6 +92,19 @@ class StagePage(QWidget):
             description="Shows this stage's most recent result.",
         )
 
+        # Milestone 27: a persistent, in-page ErrorState -- see this class's own module
+        # docstring reference and src/ui/widgets/error_state.py's own docstring for why a
+        # stage-page tool-call failure gets an in-page home rather than a QMessageBox.critical
+        # dialog. Hidden until show_error() is called; constructed here (Zone 3, alongside
+        # _result_label) so every StagePage subclass gets it for free rather than each page
+        # wiring its own.
+        self._error_state = ErrorState(
+            heading=f"{self.stage.value.title()} stage error",
+            message="",
+            parent=self,
+        )
+        self._error_state.setVisible(False)
+
         # Zone 2: the parameter form, supplied entirely by the subclass.
         self._form_container = QWidget(self)
         self._form_layout = QVBoxLayout(self._form_container)
@@ -99,6 +113,7 @@ class StagePage(QWidget):
         self._build_form(self._form_layout)
 
         layout.addWidget(self._result_label)
+        layout.addWidget(self._error_state)
         layout.addStretch(1)
 
     def _build_form(self, layout: QVBoxLayout) -> None:
@@ -125,6 +140,22 @@ class StagePage(QWidget):
     def set_result_text(self, text: str) -> None:
         """Replace the result area's text."""
         self._result_label.setText(text)
+
+    def show_error(self, heading: str, message: str) -> None:
+        """Show a persistent, in-page :class:`~src.ui.widgets.error_state.ErrorState`.
+
+        Replaces the ``QMessageBox.critical(self, heading, message)`` calls every stage page's
+        tool-call exception handler used before milestone 27 -- see
+        :mod:`~src.ui.widgets.error_state`'s own docstring for why a stage-page failure (the
+        page itself stays visible and reusable afterward) is a persistent in-page state rather
+        than a one-shot modal interruption.
+        """
+        self._error_state.set_error(heading, message)
+        self._error_state.setVisible(True)
+
+    def clear_error(self) -> None:
+        """Hide the error state -- called at the start of a fresh run, before it can fail again."""
+        self._error_state.setVisible(False)
 
     def update_suggestions(self, suggestions: list[Suggestion]) -> None:
         """Push a freshly ranked suggestion list into this page's :attr:`guidance_panel`.

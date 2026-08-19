@@ -82,7 +82,7 @@ class CreateVisualizationDialog(QDialog):
         self._built_chart_type: str | None = None
         self._built_parameters: dict = {}
 
-        self.setWindowTitle("Create Visualization")
+        self.setWindowTitle(self.tr("Create Visualization"))
         self.setModal(True)
         self.setMinimumWidth(360)
 

@@ -64,7 +64,7 @@ class CommandPalette(QDialog):
         self._binder = binder
         self._state_bus = state_bus
 
-        self.setWindowTitle("Command Palette")
+        self.setWindowTitle(self.tr("Command Palette"))
         self.setModal(True)
         self.setMinimumWidth(480)
 

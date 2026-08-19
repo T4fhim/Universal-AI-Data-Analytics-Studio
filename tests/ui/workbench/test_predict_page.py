@@ -37,6 +37,26 @@ def _make_dataset(n: int = 20) -> Dataset:
 # -- Acceptance criterion 1: all 5 forecasters + compare are reachable ------------------------
 
 
+def test_run_forecast_reports_a_service_error_via_the_in_page_error_state(
+    qapp: QApplication, block_modals
+) -> None:
+    # Milestone 27: a failed forecast is shown via the page's own in-page ErrorState, not a
+    # QMessageBox.critical -- see StagePage.show_error's own docstring.
+    page = PredictPage()
+    dataset = _make_dataset()
+
+    # No date_column/value_column keys at all -- skips the pre-flight validate_time_series
+    # check entirely (see run_forecast's own "if date_column and value_column" guard) and
+    # reaches forecast_arima itself with missing required kwargs, a real exception.
+    page.run_forecast(
+        dataset, "forecast_arima", {"periods": 5}, ExpertiseLevel.BEGINNER
+    )
+
+    assert not any(call.kind == "critical" for call in block_modals)
+    assert page._error_state.isHidden() is False
+    assert page._error_state._heading_label.text() == "Forecast Failed"
+
+
 def test_all_five_forecasters_plus_compare_are_offered(qapp: QApplication) -> None:
     page = PredictPage()
     tool_names = {page._tool_combo.itemData(i) for i in range(page._tool_combo.count())}

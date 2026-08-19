@@ -62,3 +62,24 @@ def test_run_with_no_active_dataset_shows_an_informative_message(
     page._on_run_clicked()
 
     assert any(call.kind == "information" for call in block_modals)
+
+
+def test_run_exploration_reports_a_service_error_via_the_in_page_error_state(
+    qapp: QApplication, block_modals
+) -> None:
+    # Milestone 27: a failed exploration is shown via the page's own in-page ErrorState, not a
+    # QMessageBox.critical -- see StagePage.show_error's own docstring.
+    page = ExplorePage()
+    dataset = _make_dataset()
+
+    # cross_tabulate against a column that does not exist raises a real ApplicationError.
+    page.run_exploration(
+        dataset,
+        "cross_tabulate",
+        {"row_column": "not_a_column", "col_column": "group"},
+        ExpertiseLevel.BEGINNER,
+    )
+
+    assert not any(call.kind == "critical" for call in block_modals)
+    assert page._error_state.isHidden() is False
+    assert page._error_state._heading_label.text() == "Exploration Failed"

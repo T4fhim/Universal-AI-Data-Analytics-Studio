@@ -34,7 +34,7 @@ class ApplicationStatusBar(QStatusBar):
     def __init__(self, parent_window: QMainWindow) -> None:
         super().__init__(parent_window)
 
-        self._project_label = QLabel("No project open")
+        self._project_label = QLabel(self.tr("No project open"))
         self.addPermanentWidget(self._project_label)
 
         # Busy indicator (milestone 6): indeterminate (0/0 range) rather

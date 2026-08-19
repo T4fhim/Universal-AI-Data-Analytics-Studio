@@ -208,18 +208,19 @@ class CleanPage(StagePage):
             _logger.warning("Unknown cleaning operation requested: %s", exc)
             return None
 
+        self.clear_error()
         try:
             derived = operation_class.apply(dataset, **parameters)
         except ApplicationError as exc:
-            QMessageBox.critical(self, "Cleaning Operation Failed", str(exc))
+            # Milestone 27: an in-page ErrorState, not QMessageBox.critical -- see
+            # StagePage.show_error's own docstring.
+            self.show_error("Cleaning Operation Failed", str(exc))
             _logger.warning("Cleaning operation '%s' failed: %s", tool_name, exc)
             return None
         except (
             Exception
         ) as exc:  # noqa: BLE001 -- shown to the user, not swallowed silently
-            QMessageBox.critical(
-                self, "Cleaning Operation Failed", f"Unexpected error: {exc}"
-            )
+            self.show_error("Cleaning Operation Failed", f"Unexpected error: {exc}")
             _logger.error(
                 "Cleaning operation '%s' failed unexpectedly: %s", tool_name, exc
             )

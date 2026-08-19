@@ -241,6 +241,7 @@ class PredictPage(StagePage):
         self._expertise_level = level
         date_column = parameters.get("date_column")
         value_column = parameters.get("value_column")
+        self.clear_error()
 
         # Pre-flight validation (milestone 25 acceptance criterion): validate_time_series
         # failures must surface as a warning in the page, not an unhandled stack trace or a
@@ -269,13 +270,15 @@ class PredictPage(StagePage):
         try:
             result = handler(dataset.dataframe, **parameters)
         except ApplicationError as exc:
-            QMessageBox.critical(self, "Forecast Failed", str(exc))
+            # Milestone 27: an in-page ErrorState, not QMessageBox.critical -- see
+            # StagePage.show_error's own docstring.
+            self.show_error("Forecast Failed", str(exc))
             _logger.warning("Forecast '%s' failed: %s", tool_name, exc)
             return None
         except (
             Exception
         ) as exc:  # noqa: BLE001 -- shown to the user, not swallowed silently
-            QMessageBox.critical(self, "Forecast Failed", f"Unexpected error: {exc}")
+            self.show_error("Forecast Failed", f"Unexpected error: {exc}")
             _logger.error("Forecast '%s' failed unexpectedly: %s", tool_name, exc)
             return None
 
@@ -301,7 +304,7 @@ class PredictPage(StagePage):
             try:
                 result = compare_forecast_models(dataset.dataframe, **parameters)
             except ApplicationError as exc:
-                QMessageBox.critical(self, "Forecast Comparison Failed", str(exc))
+                self.show_error("Forecast Comparison Failed", str(exc))
                 _logger.warning("Forecast comparison failed: %s", exc)
                 return None
             self._display_result(result, level, "Ran Automatic Model Competition.")
@@ -327,7 +330,7 @@ class PredictPage(StagePage):
 
     def _on_comparison_error(self, exc: Exception, traceback_text: str) -> None:
         _logger.error("Forecast comparison failed: %s\n%s", exc, traceback_text)
-        QMessageBox.critical(self, "Forecast Comparison Failed", str(exc))
+        self.show_error("Forecast Comparison Failed", str(exc))
 
     def _on_comparison_finished(self) -> None:
         if self._status_bar is not None:

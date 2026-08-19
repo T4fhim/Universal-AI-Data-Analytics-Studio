@@ -97,10 +97,14 @@ def test_run_analysis_with_unknown_tool_name_sets_an_error_result_text(
 def test_run_analysis_reports_a_service_error_without_crashing(
     qapp: QApplication, block_modals
 ) -> None:
+    # Milestone 27: a failed analysis is shown via the page's own in-page ErrorState now, not
+    # a QMessageBox.critical -- see StagePage.show_error's own docstring.
     page = AnalyzePage()
     dataset = _make_dataset()
 
     # Missing required parameters triggers a real ServiceError from independent_t_test.
     page.run_analysis(dataset, "independent_t_test", {}, ExpertiseLevel.BEGINNER)
 
-    assert any(call.kind == "critical" for call in block_modals)
+    assert not block_modals
+    assert page._error_state.isHidden() is False
+    assert page._error_state._heading_label.text() == "Analysis Failed"

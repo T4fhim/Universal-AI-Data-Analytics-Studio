@@ -33,11 +33,12 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QMainWindow, QMenuBar
+from PySide6.QtWidgets import QMainWindow, QMenuBar, QWidgetAction
 
 from src.core.logger import get_logger
 from src.ui.actions.action_binder import ActionBinder
 from src.ui.ui_state_bus import UiStateBus
+from src.ui.widgets.empty_state import EmptyState
 
 _logger = get_logger(__name__)
 
@@ -169,7 +170,22 @@ class ApplicationMenuBar(QMenuBar):
         self.actions_recent_projects: list[QAction] = []
 
         if not recent_paths:
-            empty_action = QAction("(No recent projects)", self)
+            # Milestone 27: the old disabled "(No recent projects)" QAction is replaced by a
+            # real EmptyState, hosted via QWidgetAction -- a QMenu entry cannot show an
+            # arbitrary widget any other way. illustration_size is reduced from EmptyState's
+            # dock/page-sized default so the illustration does not dominate one menu row; no
+            # action_text button, since the message itself already names the next step and
+            # there is no clean callback path from this menu-only widget back to the File
+            # menu's own "Open Project" action.
+            empty_state = EmptyState(
+                heading=self.tr("No Recent Projects"),
+                message=self.tr("Use File > Open Project to get started."),
+                illustration="empty-box",
+                illustration_size=24,
+                parent=self.menu_recent_projects,
+            )
+            empty_action = QWidgetAction(self.menu_recent_projects)
+            empty_action.setDefaultWidget(empty_state)
             empty_action.setEnabled(False)
             self.menu_recent_projects.addAction(empty_action)
             return

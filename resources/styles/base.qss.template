@@ -208,6 +208,24 @@ QWidget#welcomeWidget {
     background-color: ${surface_0};
 }
 
+/* -- Empty/error state (milestone 27) -------------------------------------- */
+
+QLabel#emptyStateHeading, QLabel#errorStateHeading {
+    font-size: ${font_size_lg};
+    font-weight: 600;
+    color: ${text_primary};
+}
+
+QLabel#emptyStateMessage {
+    color: ${text_secondary};
+    font-size: ${font_size_sm};
+}
+
+QLabel#errorStateMessage {
+    color: ${danger};
+    font-size: ${font_size_sm};
+}
+
 /* -- Buttons -------------------------------------------------------------- */
 
 /* min-height 24px satisfies WCAG 2.2 2.5.8 Target Size (Minimum). */

@@ -50,6 +50,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
+    QStackedWidget,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -60,6 +61,7 @@ from src.core.expertise_level import ExpertiseLevel
 from src.core.logger import get_logger
 from src.plugins.plugin_manager import PluginManager
 from src.services.settings_service import SettingsService
+from src.ui.widgets.empty_state import EmptyState
 
 _logger = get_logger(__name__)
 
@@ -89,7 +91,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self._settings_service = settings_service
         self._plugin_manager = plugin_manager
-        self.setWindowTitle("Settings")
+        self.setWindowTitle(self.tr("Settings"))
         self.setModal(True)
         self.setMinimumWidth(420)
 
@@ -247,11 +249,27 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(tab)
 
         self._plugin_list = QListWidget(tab)
+        # Milestone 27: the old "(No plugins found...)" QListWidgetItem placeholder is
+        # replaced by a real EmptyState, shown via a QStackedWidget page swap -- see
+        # DockManager._build_dataset_explorer_dock's own comment for why an illustrated
+        # empty state cannot live inside a single list item.
+        self._plugin_list_empty_state = EmptyState(
+            heading=self.tr("No Plugins Found"),
+            message=self.tr(
+                "No plugins were discovered in the configured search paths -- see "
+                "Settings > Plugins in the manual for how to add one."
+            ),
+            illustration="empty-search",
+            parent=tab,
+        )
+        self._plugin_list_stack = QStackedWidget(tab)
+        self._plugin_list_stack.addWidget(self._plugin_list)
+        self._plugin_list_stack.addWidget(self._plugin_list_empty_state)
         self._refresh_plugin_list()
-        layout.addWidget(self._plugin_list)
+        layout.addWidget(self._plugin_list_stack)
 
         buttons_row = QHBoxLayout()
-        toggle_button = QPushButton("Enable/Disable Selected", tab)
+        toggle_button = QPushButton(self.tr("Enable/Disable Selected"), tab)
         toggle_button.clicked.connect(self._on_toggle_plugin)
         buttons_row.addWidget(toggle_button)
         layout.addLayout(buttons_row)
@@ -263,10 +281,9 @@ class SettingsDialog(QDialog):
         assert self._plugin_manager is not None  # guarded by the caller
         plugins = self._plugin_manager.list_plugins()
         if not plugins:
-            self._plugin_list.addItem(
-                "(No plugins found in the configured search paths)"
-            )
+            self._plugin_list_stack.setCurrentWidget(self._plugin_list_empty_state)
             return
+        self._plugin_list_stack.setCurrentWidget(self._plugin_list)
         for loaded in plugins:
             manifest = loaded.manifest
             disabled = self._plugin_manager.is_disabled(manifest.name)
@@ -399,7 +416,7 @@ class _ProviderProfileDialog(QDialog):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Add AI Provider Profile")
+        self.setWindowTitle(self.tr("Add AI Provider Profile"))
         self.setModal(True)
 
         layout = QFormLayout(self)

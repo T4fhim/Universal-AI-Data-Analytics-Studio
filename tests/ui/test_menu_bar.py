@@ -8,11 +8,12 @@ infrastructure at all" gap milestone 15's harness closed.
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QApplication, QMainWindow
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidgetAction
 
 import src.ui.actions.builtin_actions  # noqa: F401 -- populates the real registry
 from src.ui.actions.action_binder import ActionBinder
 from src.ui.menu_bar import ApplicationMenuBar
+from src.ui.widgets.empty_state import EmptyState
 
 
 def _menu_titles(menu_bar: ApplicationMenuBar) -> set[str]:
@@ -44,6 +45,9 @@ def test_expected_menus_exist(qapp: QApplication) -> None:
 def test_recent_projects_menu_shows_placeholder_when_empty(
     qapp: QApplication,
 ) -> None:
+    """Milestone 27: the old disabled "(No recent projects)" QAction text is replaced by a
+    real EmptyState hosted in a QWidgetAction -- see update_recent_projects_menu's own comment.
+    """
     window = QMainWindow()
     binder = ActionBinder(window)
     menu_bar = ApplicationMenuBar(window, binder)
@@ -52,8 +56,11 @@ def test_recent_projects_menu_shows_placeholder_when_empty(
 
     actions = menu_bar.menu_recent_projects.actions()
     assert len(actions) == 1
-    assert actions[0].text() == "(No recent projects)"
     assert actions[0].isEnabled() is False
+    assert isinstance(actions[0], QWidgetAction)
+    empty_state = actions[0].defaultWidget()
+    assert isinstance(empty_state, EmptyState)
+    assert empty_state.accessibleName() == "No Recent Projects"
 
 
 def test_recent_project_click_calls_on_open_with_its_path(

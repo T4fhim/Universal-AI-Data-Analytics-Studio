@@ -399,18 +399,19 @@ class VisualizePage(StagePage):
         if title:
             parameters["title"] = title
 
+        self.clear_error()
         try:
             figure = registration.chart_class.build(dataset.dataframe, **parameters)
         except ApplicationError as exc:
-            QMessageBox.critical(self, "Failed to Build Chart", str(exc))
+            # Milestone 27: an in-page ErrorState, not QMessageBox.critical -- see
+            # StagePage.show_error's own docstring.
+            self.show_error("Failed to Build Chart", str(exc))
             _logger.warning("Chart build failed: %s", exc)
             return
         except (
             Exception
         ) as exc:  # noqa: BLE001 -- shown to the user, not swallowed silently
-            QMessageBox.critical(
-                self, "Failed to Build Chart", f"Unexpected error: {exc}"
-            )
+            self.show_error("Failed to Build Chart", f"Unexpected error: {exc}")
             _logger.error("Chart build failed unexpectedly: %s", exc)
             return
 

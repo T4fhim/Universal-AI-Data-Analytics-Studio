@@ -76,7 +76,7 @@ class ConnectDatabaseDialog(QDialog):
         self._active_profile: ConnectionProfile | None = None
         self._built_dataset: Dataset | None = None
 
-        self.setWindowTitle("Connect to Database")
+        self.setWindowTitle(self.tr("Connect to Database"))
         self.setModal(True)
         self.setMinimumWidth(420)
 

@@ -161,16 +161,19 @@ class AnalyzePage(StagePage):
             self.set_result_text(f"Unknown analysis tool: {tool_name!r}.")
             return
 
+        self.clear_error()
         try:
             result = handler(dataset.dataframe, **parameters)
         except ApplicationError as exc:
-            QMessageBox.critical(self, "Analysis Failed", str(exc))
+            # Milestone 27: an in-page ErrorState, not QMessageBox.critical -- see
+            # StagePage.show_error's own docstring.
+            self.show_error("Analysis Failed", str(exc))
             _logger.warning("Analysis '%s' failed: %s", tool_name, exc)
             return
         except (
             Exception
         ) as exc:  # noqa: BLE001 -- shown to the user, not swallowed silently
-            QMessageBox.critical(self, "Analysis Failed", f"Unexpected error: {exc}")
+            self.show_error("Analysis Failed", f"Unexpected error: {exc}")
             _logger.error("Analysis '%s' failed unexpectedly: %s", tool_name, exc)
             return
 

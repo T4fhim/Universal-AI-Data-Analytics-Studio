@@ -135,16 +135,20 @@ class ExplorePage(StagePage):
             self.set_result_text(f"Unknown exploration tool: {tool_name!r}.")
             return
 
+        self.clear_error()
         try:
             result = handler(dataset.dataframe, **parameters)
         except ApplicationError as exc:
-            QMessageBox.critical(self, "Exploration Failed", str(exc))
+            # Milestone 27: an in-page ErrorState, not QMessageBox.critical -- this page stays
+            # visible and re-runnable afterward, so the failure is persistent page state, not a
+            # one-shot interruption. See StagePage.show_error's own docstring.
+            self.show_error("Exploration Failed", str(exc))
             _logger.warning("Exploration '%s' failed: %s", tool_name, exc)
             return
         except (
             Exception
         ) as exc:  # noqa: BLE001 -- shown to the user, not swallowed silently
-            QMessageBox.critical(self, "Exploration Failed", f"Unexpected error: {exc}")
+            self.show_error("Exploration Failed", f"Unexpected error: {exc}")
             _logger.error("Exploration '%s' failed unexpectedly: %s", tool_name, exc)
             return
 

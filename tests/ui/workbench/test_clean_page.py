@@ -135,6 +135,8 @@ def test_apply_operation_with_unknown_tool_name_returns_none_and_sets_result_tex
 def test_apply_operation_reports_a_service_error_without_crashing(
     qapp: QApplication, block_modals
 ) -> None:
+    # Milestone 27: a failed cleaning operation is shown via the page's own in-page ErrorState
+    # now, not a QMessageBox.critical -- see StagePage.show_error's own docstring.
     page = CleanPage()
     dataset = _make_dataset()
 
@@ -144,7 +146,9 @@ def test_apply_operation_reports_a_service_error_without_crashing(
     )
 
     assert result is None
-    assert any(call.kind == "critical" for call in block_modals)
+    assert not block_modals
+    assert page._error_state.isHidden() is False
+    assert page._error_state._heading_label.text() == "Cleaning Operation Failed"
 
 
 def test_run_with_no_active_dataset_shows_an_informative_message(

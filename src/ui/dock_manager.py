@@ -51,7 +51,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QPlainTextEdit,
     QTabWidget,
-    QTreeWidget,
     QTreeWidgetItem,
 )
 
@@ -61,6 +60,7 @@ from src.ui.theme.tokens import DARK_TOKENS
 from src.ui.widgets.chart_view import ChartView
 from src.ui.widgets.chat_panel import ChatPanel
 from src.ui.widgets.data_table.data_table_view import DataTableView
+from src.ui.widgets.dataset_explorer_view import DatasetExplorerView
 
 if TYPE_CHECKING:
     # A previous edit's ruff auto-fix pass stripped this import as
@@ -156,15 +156,6 @@ class DockManager:
         # _on_data_table_tab_close_requested() when their tab closes.
         self._dataset_table_views: dict[str, DataTableView] = {}
 
-        # Milestone 20: the "(No project open)" Project Explorer dock never
-        # worked (its QListWidget was never wired to anything -- see this
-        # milestone's plan entry, A3's dock-disposition table) and is
-        # deleted outright rather than kept as a second, still-broken dock.
-        # Dataset Explorer absorbs its role as a top-level "Project" node --
-        # see _build_dataset_explorer_dock/set_project_label below.
-        self._project_label = "(No project open)"
-        self._last_datasets: list = []
-
         # Milestone 23: see connect_chart_closed below (dataset closing is handled by
         # DatasetCloseMenu itself -- constructed in _build_dataset_explorer_dock).
         self._chart_closed_handler: Callable[[str, str], None] | None = None
@@ -237,25 +228,14 @@ class DockManager:
     def _build_dataset_explorer_dock(self) -> QDockWidget:
         dock = QDockWidget("Dataset Explorer", self._parent_window)
         dock.setObjectName("dockDatasetExplorer")
-        # Stored as self._dataset_tree_widget (not just a local
-        # variable) because milestone 2's "Open Dataset" action needs to
-        # push live updates into this dock after this constructor has
-        # already returned — see refresh_dataset_list below, which
-        # main_window.py calls whenever WorkspaceService's set of
-        # loaded datasets changes.
-        #
-        # Milestone 10: a QTreeWidget rather than the original flat
-        # QListWidget, so a cleaned/derived dataset nests under the
-        # dataset it came from instead of appearing as an unrelated
-        # sibling — this is the same parent_dataset_id lineage
-        # WorkspaceService.get_lineage/get_children already expose,
-        # just made visible rather than only queryable in code.
-        self._dataset_tree_widget = QTreeWidget(dock)
-        self._dataset_tree_widget.setHeaderHidden(True)
+        # Milestone 27: DatasetExplorerView owns the tree + EmptyState page switch -- see that
+        # module's own docstring for why this was extracted out of DockManager. Stored as
+        # self._dataset_explorer (not just a local variable) since refresh_dataset_list/
+        # set_project_label below need to reach it after this constructor returns.
+        self._dataset_explorer = DatasetExplorerView(dock)
         # Milestone 23: right-click "Close Dataset" -- see dataset_close_menu.py.
-        self._dataset_close_menu = DatasetCloseMenu(self._dataset_tree_widget)
-        self._rebuild_dataset_tree([])
-        dock.setWidget(self._dataset_tree_widget)
+        self._dataset_close_menu = DatasetCloseMenu(self._dataset_explorer.tree)
+        dock.setWidget(self._dataset_explorer)
         return dock
 
     def connect_dataset_close_requested(self, handler: Callable[[str], None]) -> None:
@@ -269,31 +249,12 @@ class DockManager:
         """Update the "Project" top-level node's text and rebuild the tree to show it.
 
         Milestone 20: the deleted Project Explorer dock's one job -- naming the open project
-        (or "(No project open)") -- is absorbed here as a top-level node in Dataset Explorer,
-        per A3's dock-disposition table ("Dataset Explorer... absorb the project explorer as a
-        top-level 'Project' node"). Called by :mod:`src.ui.main_window` alongside
+        (or "(No project open)") -- is absorbed as a top-level node in Dataset Explorer, per
+        A3's dock-disposition table. Called by :mod:`src.ui.main_window` alongside
         :meth:`refresh_dataset_list`, from the same call sites that used to only update the
         status bar's project label (new/open/save-as).
         """
-        self._project_label = (
-            f"Project: {project_name}" if project_name else "(No project open)"
-        )
-        self._rebuild_dataset_tree(self._last_datasets)
-
-    def _rebuild_dataset_tree(self, datasets: list) -> None:
-        """Clear and repopulate the tree: the Project node first, then datasets or a placeholder.
-
-        Split out of :meth:`refresh_dataset_list` so :meth:`set_project_label` can trigger the
-        same rebuild without needing a fresh dataset list passed in -- it reuses whatever
-        :attr:`_last_datasets` the most recent :meth:`refresh_dataset_list` call recorded.
-        """
-        self._last_datasets = datasets
-        self._dataset_tree_widget.clear()
-        QTreeWidgetItem(self._dataset_tree_widget, [self._project_label])
-        if not datasets:
-            QTreeWidgetItem(self._dataset_tree_widget, ["(No datasets loaded)"])
-            return
-        self._populate_dataset_items(datasets)
+        self._dataset_explorer.set_project_label(project_name)
 
     def refresh_dataset_list(self, datasets: list) -> None:
         """Rebuild the Dataset Explorer dock's contents from the current dataset list.
@@ -334,39 +295,16 @@ class DockManager:
         right now.
 
         Milestone 20: a top-level "Project" node (see :meth:`set_project_label`) is always the
-        tree's first item now, ahead of either the dataset items below or the "(No datasets
-        loaded)" placeholder -- the absorbed Project Explorer dock's one job, made visible here
-        instead.
+        tree's first item now, ahead of either the dataset items below or (milestone 27) the
+        :class:`~src.ui.widgets.empty_state.EmptyState` page -- the absorbed Project Explorer
+        dock's one job, made visible here instead.
+
+        Milestone 27: the actual tree-building/nesting logic (including the "(No datasets
+        loaded)" -> ``EmptyState`` page switch) lives in
+        :class:`~src.ui.widgets.dataset_explorer_view.DatasetExplorerView` -- see that class's
+        own docstring for why it was extracted out of this method.
         """
-        self._rebuild_dataset_tree(datasets)
-
-    def _populate_dataset_items(self, datasets: list) -> None:
-        by_id = {dataset.dataset_id: dataset for dataset in datasets}
-        items_by_id: dict[str, QTreeWidgetItem] = {}
-
-        def _label(dataset) -> str:
-            return f"{dataset.name} ({dataset.row_count} rows × {dataset.column_count} cols)"
-
-        def _build_item(dataset) -> QTreeWidgetItem:
-            if dataset.dataset_id in items_by_id:
-                return items_by_id[dataset.dataset_id]
-            parent_id = dataset.parent_dataset_id
-            if parent_id is not None and parent_id in by_id:
-                parent_item = _build_item(by_id[parent_id])
-                item = QTreeWidgetItem(parent_item, [_label(dataset)])
-            else:
-                item = QTreeWidgetItem(self._dataset_tree_widget, [_label(dataset)])
-            # Milestone 18: the item's dataset_id, read back out by
-            # connect_dataset_double_click's handler. Before this, an
-            # item carried only its display label -- there was no way for
-            # a double-click handler to know *which* dataset was clicked.
-            item.setData(0, Qt.ItemDataRole.UserRole, dataset.dataset_id)
-            items_by_id[dataset.dataset_id] = item
-            return item
-
-        for dataset in datasets:
-            _build_item(dataset)
-        self._dataset_tree_widget.expandAll()
+        self._dataset_explorer.rebuild(datasets)
 
     def _build_console_dock(self) -> QDockWidget:
         dock = QDockWidget("Console", self._parent_window)
@@ -375,7 +313,7 @@ class DockManager:
         # a local variable, since nothing wrote to it after
         # construction) — append_console_message below needs to reach
         # it from outside __init__, the same reason
-        # self._dataset_tree_widget and self._chart_tabs are retained.
+        # self._dataset_explorer and self._chart_tabs are retained.
         self._console_text_widget = QPlainTextEdit(dock)
         self._console_text_widget.setReadOnly(True)
         self._console_text_widget.setPlaceholderText(
@@ -511,7 +449,7 @@ class DockManager:
             if dataset_id is not None:
                 handler(dataset_id)
 
-        self._dataset_tree_widget.itemDoubleClicked.connect(_on_item_double_clicked)
+        self._dataset_explorer.tree.itemDoubleClicked.connect(_on_item_double_clicked)
 
     def display_dataset_table(self, dataset) -> None:
         """Open (or bring to front) a :class:`DataTableView` tab for ``dataset``.

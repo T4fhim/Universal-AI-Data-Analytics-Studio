@@ -43,7 +43,7 @@ class WelcomeWidget(QWidget):
         layout.addWidget(title_label)
 
         subtitle_label = QLabel(
-            "Create a new project or open an existing one to get started."
+            self.tr("Create a new project or open an existing one to get started.")
         )
         subtitle_label.setObjectName("welcomeSubtitle")
         subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)

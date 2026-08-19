@@ -99,7 +99,7 @@ class GenerateReportDialog(QDialog):
         self._available_stages = available_stages
         self._output_path: Path | None = None
 
-        self.setWindowTitle("Generate Report")
+        self.setWindowTitle(self.tr("Generate Report"))
         self.setModal(True)
         self.setMinimumWidth(420)
 
