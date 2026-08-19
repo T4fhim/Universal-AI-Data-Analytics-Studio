@@ -37,7 +37,8 @@ from src.services.analysis_orchestrator_service import (
     StageProposal,
 )
 from src.services.project_service import ProjectService
-from src.services.workspace_service import WorkspaceService
+from src.services.workspace_service import Dataset, WorkspaceService
+from src.ui.command_stack import CommandStack, DatasetPointerCommand
 from src.ui.dock_manager import DockManager
 from src.ui.status_bar import ApplicationStatusBar
 from src.ui.ui_state_bus import UiStateBus

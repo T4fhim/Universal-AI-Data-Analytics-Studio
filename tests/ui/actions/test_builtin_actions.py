@@ -28,9 +28,9 @@ def test_every_icon_name_exists_on_disk() -> None:
         for spec in list_actions().values()
         if spec.icon_name is not None and spec.icon_name not in available
     }
-    assert not missing, (
-        f"ActionSpec.icon_name references a missing icon file: {missing}"
-    )
+    assert (
+        not missing
+    ), f"ActionSpec.icon_name references a missing icon file: {missing}"
 
 
 def test_every_action_has_a_non_empty_label() -> None:

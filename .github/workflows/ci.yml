@@ -48,30 +48,49 @@ jobs:
       - name: isort --check-only
         run: python -m isort --check-only src/ tests/
 
-      - name: mypy (foundation packages)
-        # Scoped, not repo-wide: a from-scratch mypy run against the full
-        # src/ tree currently surfaces ~186 pre-existing errors (almost all
-        # DependencyContainer.resolve() returning `object`, an
-        # architecture-level typing gap predating this overhaul), which is
-        # out of scope for a "ChartView hardening + CI gate" milestone to
-        # silently fix or silently ignore. src/ui/theme, src/ui/a11y,
-        # src/ui/web, and (as of milestone 17) src/ui/actions are the
-        # Qt-free-or-Qt-isolated foundation packages this overhaul has
-        # built so far and kept genuinely mypy-clean; this list is
-        # expected to grow as later milestones make each new package
-        # clean, the same way tests/ui/test_module_size.py's
-        # _LEGACY_EXEMPTIONS shrinks rather than one big repo-wide fix now.
+      - name: mypy (clean packages)
+        # Scoped, not repo-wide: this scope was frozen at four foundation
+        # packages from milestone 16 through the remediation pass that added
+        # this comment, even though later milestones (19-27) built whole new
+        # packages -- controllers, workbench, widgets, results -- that were
+        # never folded in, so mypy stopped meaning anything for roughly a
+        # third of src/ui/. The remediation pass re-ran a from-scratch
+        # `mypy --follow-imports=silent` against the full src/ tree, found 79
+        # errors (fixed 7 genuine, narrowly-scoped bugs along the way -- see
+        # git history for this comment's commit -- leaving 72), and widened
+        # this list to every package/module that is now genuinely clean:
+        # src/core, src/services, src/analysis, src/database, src/workers,
+        # and (within src/ui/) theme, a11y, web, actions, controllers,
+        # workbench, widgets, results, dialogs, and every standalone
+        # top-level src/ui/*.py module except main_window.py. What's
+        # deliberately still excluded -- src/ui/main_window.py itself (the
+        # DependencyContainer.resolve() -> object gap), src/ai, src/reports,
+        # src/visualization, src/forecasting, src/cleaning, src/readers,
+        # src/plugins -- is real, categorized, pre-existing debt, not
+        # forgotten scope: see docs/MYPY_DEBT.md for exactly what's excluded
+        # and why, so the next milestone that makes one of those clean knows
+        # to add it here rather than this list silently going stale again.
+        # This list is still expected to grow the same way
+        # tests/ui/test_module_size.py's _LEGACY_EXEMPTIONS shrinks, rather
+        # than one big repo-wide fix landing all at once.
         #
-        # --follow-imports=silent: action_context.py imports the services
+        # --follow-imports=silent: several of these modules (e.g.
+        # controllers/*, actions/action_context.py) import the services
         # layer (ProjectService/WorkspaceService/SettingsService/
-        # PipelineStage) to build its snapshot, and without this flag
-        # mypy also emits diagnostics for *those* modules' own pre-
-        # existing errors (a handful of BaseOperation.apply signature
-        # mismatches, unrelated to anything this milestone touches) --
-        # this flag keeps mypy using their type signatures for checking
-        # actions/ itself while not holding actions/ responsible for
-        # fixing debt in modules it merely calls into.
-        run: python -m mypy src/ui/theme src/ui/a11y src/ui/web src/ui/actions --ignore-missing-imports --follow-imports=silent
+        # PipelineStage) and src/ui/main_window.py to build snapshots/wire
+        # collaborators, and without this flag mypy also emits diagnostics
+        # for *those* modules' own pre-existing errors -- this flag keeps
+        # mypy using their type signatures for checking the modules listed
+        # here while not holding them responsible for fixing debt in modules
+        # they merely call into.
+        run: python -m mypy src/core src/services src/analysis src/database
+          src/workers src/ui/theme src/ui/a11y src/ui/web src/ui/actions
+          src/ui/controllers src/ui/workbench src/ui/widgets src/ui/results
+          src/ui/dialogs src/ui/command_stack.py src/ui/command_palette.py
+          src/ui/dataset_close_menu.py src/ui/dock_manager.py
+          src/ui/menu_bar.py src/ui/status_bar.py src/ui/theme_manager.py
+          src/ui/toolbar.py src/ui/ui_state_bus.py src/ui/worker_runner.py
+          src/ui/__init__.py --ignore-missing-imports --follow-imports=silent
 
       - name: pytest
         run: python -m pytest tests/ -q

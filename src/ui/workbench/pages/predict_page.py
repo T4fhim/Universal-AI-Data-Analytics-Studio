@@ -46,6 +46,25 @@ out to a controller and back into this page would add a layer of indirection wit
 it -- this page is the one place that both knows a comparison run is in progress and needs to
 show that on screen, so :meth:`set_worker_collaborators` hands it what it needs directly, the same
 way ``PipelineController`` itself already receives both as plain constructor arguments.
+
+**Resolved (M27 remediation pass): this is a deliberate, bounded one-off, not a pattern for a
+future page to copy freely.** The question was whether to leave it as-is or introduce a
+``PredictController`` purely to hold these two references and forward calls back into this page.
+Rejected: such a controller would own no business logic of its own -- ``run_forecast`` already
+calls straight into :mod:`src.forecasting` (see this docstring's own reasoning above for why,
+matching :class:`~src.ui.workbench.pages.analyze_page.AnalyzePage`), so the controller's entire
+job would be relaying a constructor-injected ``WorkerRunner``/``ApplicationStatusBar`` back out to
+the one page that already has direct access to both via ``set_worker_collaborators`` -- a pass-
+through layer with no behavior of its own, the exact shape :class:`~src.ui.controllers` package's
+own docstring says a controller earns its existence by *not* being. The boundary that keeps this
+from being a precedent for scope creep: it is licensed **only** for plain UI infrastructure
+objects that are (a) not resolved from the ``DependencyContainer`` (i.e. not a ``src.services``
+service) and (b) not a ``src.ui.controllers`` controller -- ``WorkerRunner`` and
+``ApplicationStatusBar`` are the only two objects in the codebase that currently qualify. A future
+page reaching for a real service (``WorkspaceService``, ``ProjectService``, anything resolved from
+the container) or calling into another page's controller directly must still go through its own
+controller -- this exception does not extend to either of those, and citing this docstring as
+license for one would be a misreading of it.
 """
 
 from __future__ import annotations

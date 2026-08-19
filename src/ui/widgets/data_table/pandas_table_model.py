@@ -33,7 +33,13 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt
+from PySide6.QtCore import (
+    QAbstractTableModel,
+    QModelIndex,
+    QObject,
+    QPersistentModelIndex,
+    Qt,
+)
 
 from src.ui.widgets.data_table.column_formatters import (
     MISSING_ACCESSIBLE_TEXT,
@@ -109,17 +115,25 @@ class PandasTableModel(QAbstractTableModel):
         """The wrapped frame -- the identical object passed to ``__init__``."""
         return self._frame
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(
+        self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()
+    ) -> int:
         if parent.isValid():
             return 0
         return len(self._visible)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(
+        self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()
+    ) -> int:
         if parent.isValid():
             return 0
         return len(self._column_names)
 
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):
+    def data(
+        self,
+        index: QModelIndex | QPersistentModelIndex,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ):
         if not index.isValid():
             return None
         source_row = int(self._visible[index.row()])
