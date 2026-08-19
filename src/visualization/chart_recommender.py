@@ -45,10 +45,18 @@ class ChartSuggestion:
     """One recommended chart type.
 
     Attributes:
-        chart_type: Matches a key in
-            :mod:`~src.ai.tool_registry`'s ``_CHART_BUILDERS`` /
-            :mod:`~src.ui.dialogs.create_visualization_dialog`'s
-            ``_CHART_REGISTRY`` naming.
+        chart_type: A :mod:`~src.visualization.chart_registry` key
+            (lowercase, underscore-separated -- e.g. ``"box_plot"``),
+            resolvable via :func:`~src.visualization.chart_registry.get_chart`.
+            Milestone 24 fixed this to be the registry key rather than a
+            title-cased display string (``"Box Plot"``) -- the mismatch
+            meant every caller that tried to actually build a suggested
+            chart (rather than just display its name) had to re-derive
+            the registry key from the display text itself, a
+            normalization :func:`~src.visualization.chart_registry.
+            display_name_for` already exists to do in the other
+            direction. Callers that want the human-readable label call
+            ``display_name_for(suggestion.chart_type)``.
         columns: Which column(s) this suggestion is for, in the order
             the corresponding chart builder expects them.
         reason: Human-readable explanation of why this chart type fits
@@ -120,7 +128,7 @@ def recommend_charts(
     if datetime_columns and numeric_columns:
         suggestions.append(
             ChartSuggestion(
-                chart_type="Line",
+                chart_type="line",
                 columns=[datetime_columns[0], numeric_columns[0]],
                 reason=(
                     f"'{datetime_columns[0]}' is a date/time column and "
@@ -134,7 +142,7 @@ def recommend_charts(
     if len(numeric_columns) >= 2:
         suggestions.append(
             ChartSuggestion(
-                chart_type="Scatter",
+                chart_type="scatter",
                 columns=[numeric_columns[0], numeric_columns[1]],
                 reason=(
                     f"'{numeric_columns[0]}' and '{numeric_columns[1]}' are "
@@ -147,7 +155,7 @@ def recommend_charts(
     if len(numeric_columns) >= 2:
         suggestions.append(
             ChartSuggestion(
-                chart_type="Heatmap",
+                chart_type="heatmap",
                 columns=numeric_columns,
                 reason=(
                     f"{len(numeric_columns)} numeric columns are available — "
@@ -162,7 +170,7 @@ def recommend_charts(
         cat = low_cardinality_categorical[0]
         suggestions.append(
             ChartSuggestion(
-                chart_type="Bar",
+                chart_type="bar",
                 columns=[cat, numeric_columns[0]],
                 reason=(
                     f"'{cat}' has {profiles[cat].unique_count} distinct "
@@ -177,7 +185,7 @@ def recommend_charts(
         cat = low_cardinality_categorical[0]
         suggestions.append(
             ChartSuggestion(
-                chart_type="Pie",
+                chart_type="pie",
                 columns=[cat],
                 reason=(
                     f"'{cat}' has {profiles[cat].unique_count} distinct "
@@ -192,7 +200,7 @@ def recommend_charts(
     if numeric_columns:
         suggestions.append(
             ChartSuggestion(
-                chart_type="Histogram",
+                chart_type="histogram",
                 columns=[numeric_columns[0]],
                 reason=(
                     f"'{numeric_columns[0]}' is numeric — a histogram "
@@ -206,7 +214,7 @@ def recommend_charts(
         cat = low_cardinality_categorical[0]
         suggestions.append(
             ChartSuggestion(
-                chart_type="Box Plot",
+                chart_type="box_plot",
                 columns=[numeric_columns[0], cat],
                 reason=(
                     f"'{numeric_columns[0]}' broken down by '{cat}' — a "

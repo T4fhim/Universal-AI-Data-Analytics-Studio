@@ -178,6 +178,20 @@ class DataTableView(QWidget):
             description=(f"{dataset.row_count} rows by {dataset.column_count} columns"),
         )
 
+    def filter_by_text(self, text: str) -> None:
+        """Programmatically apply ``text`` to the filter bar -- the paired-chart hook.
+
+        Milestone 24's :class:`~src.ui.workbench.pages.visualize_page.VisualizePage`
+        connects a :class:`~src.ui.widgets.chart_view.ChartView`'s
+        :attr:`~src.ui.web.chart_bridge.ChartBridge.point_clicked` to this method, using
+        the clicked point's category/x label as the filter text -- reusing this widget's
+        existing whole-row substring filter (:class:`~src.ui.widgets.data_table.
+        filter_bar.FilterBar`) rather than building a column-aware exact-match filter
+        just for chart clicks, since the filter bar's own docstring already establishes
+        substring/case-insensitive matching as this table's one filtering contract.
+        """
+        self._filter_bar.set_text(text)
+
     @property
     def dataset_id(self) -> str | None:
         return self._dataset_id

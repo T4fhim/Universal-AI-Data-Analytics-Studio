@@ -74,21 +74,82 @@ class VisualizationController:
             return
 
         figure, chart_type, parameters = dialog.get_result()
+        visualization = self._register_visualization(
+            active_dataset.dataset_id,
+            active_dataset.name,
+            figure,
+            chart_type,
+            parameters,
+        )
+        self._dock_manager.display_chart(
+            figure,
+            name=visualization.name,
+            closable_ref=("visualization", visualization.visualization_id),
+        )
 
+    def register_built_visualization(
+        self, figure: object, chart_type: str, parameters: dict
+    ) -> None:
+        """Register an already-built figure into the workspace -- milestone 24's
+        :class:`~src.ui.workbench.pages.visualize_page.VisualizePage` builds its own figure
+        inline (see that page's own docstring for why) rather than opening
+        :class:`~src.ui.dialogs.create_visualization_dialog.CreateVisualizationDialog`, but
+        the two paths otherwise need identical workspace bookkeeping -- create a
+        :class:`~src.services.workspace_service.Visualization`, add it, set it active, and
+        refresh dependent UI. This method is that shared tail, called with the dialog-built
+        tuple's exact ``(figure, chart_type, parameters)`` shape so :meth:`create_visualization`
+        and this method never drift into two different bookkeeping sequences.
+
+        Unlike :meth:`create_visualization`, this does **not** call
+        :meth:`~src.ui.dock_manager.DockManager.display_chart` -- ``VisualizePage`` already
+        renders the figure inline in its own :class:`~src.ui.widgets.chart_view.ChartView`
+        (see :meth:`~src.ui.dock_manager.DockManager.display_chart`'s own docstring on the
+        Charts dock's demotion to secondary/default-hidden as of milestone 20), so opening a
+        second chart dock tab for the same figure would be a redundant, unrequested extra
+        window rather than genuinely new information.
+        """
+        active_dataset = self._workspace_service.get_active_dataset()
+        if (
+            active_dataset is None
+        ):  # pragma: no cover -- defensive; VisualizePage requires
+            # an active dataset before its build button is reachable at all (see
+            # VisualizePage._on_build_clicked's own "No Active Dataset" guard), so this
+            # path is not normally reachable, but a signal-connected slot must not assume
+            # the state that produced its signal is still true by the time it runs.
+            _logger.warning(
+                "register_built_visualization called with no active dataset; dropped."
+            )
+            return
+        self._register_visualization(
+            active_dataset.dataset_id,
+            active_dataset.name,
+            figure,
+            chart_type,
+            parameters,
+        )
+
+    def _register_visualization(
+        self,
+        dataset_id: str,
+        dataset_name: str,
+        figure: object,
+        chart_type: str,
+        parameters: dict,
+    ) -> Visualization:
+        """Shared tail of :meth:`create_visualization`/:meth:`register_built_visualization`:
+        build the :class:`~src.services.workspace_service.Visualization`, add it, activate
+        it, and refresh dependent UI -- see :meth:`register_built_visualization`'s own
+        docstring for why this exists as a separate method rather than being inlined into
+        each caller."""
         visualization = Visualization(
-            name=parameters.get("title") or f"{chart_type} of {active_dataset.name}",
-            dataset_id=active_dataset.dataset_id,
+            name=parameters.get("title") or f"{chart_type} of {dataset_name}",
+            dataset_id=dataset_id,
             figure=figure,
             chart_type=chart_type,
             chart_parameters=parameters,
         )
         self._workspace_service.add_visualization(visualization)
         self._workspace_service.set_active_visualization(visualization.visualization_id)
-        self._dock_manager.display_chart(
-            figure,
-            name=visualization.name,
-            closable_ref=("visualization", visualization.visualization_id),
-        )
         self._state_bus.request_refresh()  # visualization_count just changed
 
         self._status_bar.show_message(f"Created visualization: {visualization.name}")
@@ -98,6 +159,7 @@ class VisualizationController:
         _logger.info(
             "Visualization created via UI: %s (%s)", visualization.name, chart_type
         )
+        return visualization
 
     def create_dashboard(self) -> None:
         """Combine every currently tracked visualization into one auto-arranged dashboard.

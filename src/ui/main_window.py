@@ -84,6 +84,7 @@ from src.ui.workbench.pages.explore_page import ExplorePage
 from src.ui.workbench.pages.report_page import ReportPage
 from src.ui.workbench.pages.reproduce_page import ReproducePage
 from src.ui.workbench.pages.understand_page import UnderstandPage
+from src.ui.workbench.pages.visualize_page import VisualizePage
 from src.ui.workbench.workbench import Workbench
 from src.ui.worker_runner import WorkerRunner
 
@@ -332,6 +333,17 @@ class MainWindow(QMainWindow):
                 self._pipeline_controller.register_clean_operation
             )
 
+        # Milestone 24: VisualizePage builds its own figure and renders it inline (see its
+        # own docstring for why it holds no WorkspaceService reference), then hands the
+        # built (figure, chart_type, parameters) off in the same shape
+        # CreateVisualizationDialog.get_result() returns, so the existing
+        # VisualizationController registration logic can be reused rather than duplicated.
+        visualize_page = self._workbench.page_for(PipelineStage.VISUALIZE)
+        if isinstance(visualize_page, VisualizePage):
+            visualize_page.visualization_built.connect(
+                self._visualization_controller.register_built_visualization
+            )
+
         # Milestone 23: "genuinely reachable" close actions -- see
         # DockManager.connect_dataset_close_requested/connect_chart_closed's own
         # docstrings for why these are wired as callbacks rather than QActions
@@ -430,6 +442,11 @@ class MainWindow(QMainWindow):
                 clean_page.show_lineage(ancestors, active_dataset, descendants)
             else:
                 clean_page.show_lineage([], None, [])
+
+        # Milestone 24: same hand-off as AnalyzePage/ExplorePage above.
+        visualize_page = self._workbench.page_for(PipelineStage.VISUALIZE)
+        if isinstance(visualize_page, VisualizePage):
+            visualize_page.set_dataset(active_dataset)
 
     # -- Settings / theme / about -----------------------------------------------
 

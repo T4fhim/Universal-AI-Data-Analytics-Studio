@@ -48,6 +48,20 @@ class FilterBar(QWidget):
     def text(self) -> str:
         return self._search.text()
 
+    def set_text(self, text: str) -> None:
+        """Set the search text programmatically, triggering :attr:`filter_changed`.
+
+        Milestone 24's own reason for this: filtering a paired
+        :class:`~src.ui.widgets.data_table.data_table_view.DataTableView` from a chart
+        click (:attr:`~src.ui.web.chart_bridge.ChartBridge.point_clicked`) needs to drive
+        this widget's existing whole-row substring filter, not build a second,
+        column-aware filtering mechanism just for that one caller -- ``QLineEdit.setText``
+        already emits ``textChanged``, so this exists only so a caller does not need to
+        reach into the private ``_search`` widget itself, matching :meth:`clear`'s own
+        reasoning.
+        """
+        self._search.setText(text)
+
     def clear(self) -> None:
         """Clear the search text without emitting an extra spurious signal.
 

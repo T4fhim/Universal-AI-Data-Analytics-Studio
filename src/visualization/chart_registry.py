@@ -49,24 +49,36 @@ class ChartRegistration:
             in the order a picker UI should present them.
         optional_fields: Column-parameter names ``build()`` accepts
             but does not require.
-        dialog_compatible: ``False`` for chart types whose fields
-            include a ``list[str]`` parameter (e.g. Treemap's
-            ``path_columns``, Radar's ``value_columns``) —
+        dialog_compatible: Milestone 12 defaulted this to ``False`` for
+            chart types whose fields include a ``list[str]`` parameter
+            (e.g. Treemap's ``path_columns``, Radar's ``value_columns``)
+            because :class:`~src.ui.dialogs.create_visualization_dialog.
+            CreateVisualizationDialog`'s column picker built one
+            ``QComboBox`` per field and had no multi-select variant.
+            Milestone 24 added :class:`~src.ui.widgets.
+            column_multi_select.ColumnMultiSelect` and wired the dialog
+            to use it for any field named in :attr:`list_fields`, so
+            Treemap/Radar are dialog-compatible again — this flag stays
+            for the general mechanism (a future plugin chart with, say,
+            a non-column list parameter the picker genuinely cannot
+            represent) rather than being removed outright.
+        list_fields: Which of :attr:`required_fields`/
+            :attr:`optional_fields` take a ``list[str]`` of column names
+            rather than a single column name — read by
             :class:`~src.ui.dialogs.create_visualization_dialog.
-            CreateVisualizationDialog`'s column picker builds one
-            ``QComboBox`` per field and has no multi-select variant
-            yet, so those chart types are excluded from the dialog's
-            list but remain fully available to the AI assistant, whose
-            JSON-schema tool parameters handle arrays natively. A
-            plugin chart with a list-type field must set this to
-            ``False`` itself (see :meth:`register_chart`) for the same
-            reason.
+            CreateVisualizationDialog` and
+            :class:`~src.ui.workbench.pages.visualize_page.VisualizePage`
+            to decide whether a field gets a single :class:`QComboBox`
+            or a :class:`~src.ui.widgets.column_multi_select.
+            ColumnMultiSelect`. Empty by default — most chart types take
+            only single-column fields.
     """
 
     chart_class: type[BaseChart]
     required_fields: tuple[str, ...]
     optional_fields: tuple[str, ...] = ()
     dialog_compatible: bool = True
+    list_fields: tuple[str, ...] = ()
 
 
 _REGISTRY: dict[str, ChartRegistration] = {}
@@ -186,7 +198,9 @@ def _register_builtins() -> None:
     register_chart(
         "treemap",
         ChartRegistration(
-            TreemapChart, ("path_columns", "value_column"), dialog_compatible=False
+            TreemapChart,
+            ("path_columns", "value_column"),
+            list_fields=("path_columns",),
         ),
     )
     register_chart(
@@ -194,7 +208,7 @@ def _register_builtins() -> None:
         ChartRegistration(
             RadarChart,
             ("category_column", "value_columns"),
-            dialog_compatible=False,
+            list_fields=("value_columns",),
         ),
     )
     register_chart(

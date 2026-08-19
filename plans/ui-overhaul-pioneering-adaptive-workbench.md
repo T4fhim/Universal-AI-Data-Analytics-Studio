@@ -1,13 +1,13 @@
 # Universal AI Data Analytics Studio — UI Overhaul (Milestones 15–29)
 
 > **Status.** M15 (`39d12fb`), M16 (`cfe8f24`, `bd96e4e`), M17 (`f07514a`), M18 (`c1ee88c`), M19
-> (`6683489`), M20 (`5f9c6eb`), M22 (`0991f74`), M21, and M23 are complete and committed — see
-> the Milestones section for as-built file lists and verification results. M22 was built before
-> M21 despite the numbering, per that milestone's own "Build order note" (one of M21's five
-> acceptance criteria depends on M22's `ResultCard`/`ExplanationPanel`; the other four do not) —
-> M21 itself was then built immediately after M22, closing that dependency the same session it was
-> introduced.
-> M24–M29 remain. This revision
+> (`6683489`), M20 (`5f9c6eb`), M22 (`0991f74`), M21, M23 (`40c0eb5`), and M24 are complete and
+> committed — see the Milestones section for as-built file lists and verification results. M22
+> was built before M21 despite the numbering, per that milestone's own "Build order note" (one of
+> M21's five acceptance criteria depends on M22's `ResultCard`/`ExplanationPanel`; the other four
+> do not) — M21 itself was then built immediately after M22, closing that dependency the same
+> session it was introduced.
+> M25–M29 remain. This revision
 > (renumbered from the original 15–27 draft) closes gaps a self-review found after M15 shipped: two
 > inserted milestones (M21 AI chat panel, M27 empty/error states + i18n), acceptance criteria and
 > sizing on every milestone, a CI gate, a screen-reader verification protocol, a dialog-disposition
@@ -991,16 +991,113 @@ Acceptance criteria:
       `WorkspaceService.get_lineage()`/`get_children()` output (not hand-built `Dataset`
       stand-ins).
 
-### M24 — Visualize stage: multi-select, recommendations, all 12 charts · Size **M**
+### M24 — Visualize stage: multi-select, recommendations, all 12 charts · Size **M** · ✅ **DONE**
 
-Files: `widgets/column_multi_select.py` (unlocks `treemap`/`radar` — flip `dialog_compatible=True`)
-· `pages/visualize_page.py` · the `chart_recommender` key-normalization fix plus its test.
+**As built.** `src/ui/widgets/column_multi_select.py` (new): a `QListWidget` of checkable rows
+(`ItemIsUserCheckable`, not `QAbstractItemView.SelectionMode.MultiSelection` — see the module's
+own docstring for why a highlight-based multi-select is neither keyboard-discoverable nor
+screen-reader-legible). `set_columns()`/`selected_columns()`/`set_selected_columns()` plus a
+`selection_changed` signal that always reports checked columns in dataset-column order, not
+check order, matching `ChartSuggestion.columns`'s own "in the order the corresponding chart
+builder expects them" contract. `src/visualization/chart_registry.py`: `ChartRegistration`
+gained `list_fields: tuple[str, ...]` (which required/optional fields take a `list[str]` of
+columns), and `treemap`/`radar` flipped back to `dialog_compatible=True` (the default) now that
+`CreateVisualizationDialog`/`VisualizePage` can actually represent a list-typed field.
+`src/ui/dialogs/create_visualization_dialog.py` (rebuilt): each field is now either a
+`QComboBox` (single column) or a `ColumnMultiSelect` (per `ChartRegistration.list_fields`), and
+`_on_accept` gained a "Missing Required Fields" guard for an empty required multi-select, the
+same shape `AnalysisParameterDialog` already uses for its own required-field validation.
+`src/ui/workbench/pages/visualize_page.py` (new): a `StagePage` with a `ColumnMultiSelect` +
+"Get Recommendations" button feeding a `QListWidget` of `chart_recommender.recommend_charts()`
+suggestions (double-click loads a suggestion's chart type/columns into the manual builder below
+without auto-building — the same "form fills in, Run button commits" shape every other stage
+page uses), a chart-type combo over all 12 registered types, dynamic per-field widgets identical
+in shape to `CreateVisualizationDialog`'s (duplicated rather than shared — see the page's own
+docstring for why extracting a dialog-independent field-form widget is a reasonable follow-up
+but not one this milestone's scope forces), and a chart+table split (`ChartView` +
+`DataTableView`) rather than a modal result. `chart_view.bridge.point_clicked` is connected to a
+new `DataTableView.filter_by_text()` (backed by a new `FilterBar.set_text()`) — the clicked
+point's `x` value becomes the table's existing whole-row substring filter text, reusing
+`FilterBar`'s established filtering contract rather than building a second, column-aware exact
+filter. `src/ui/workbench/stage_registry.py`/`main_window.py` register `VisualizePage` for
+`PipelineStage.VISUALIZE` and wire `set_dataset`/`visualization_built` the same way M23 wired
+`CleanPage`. `src/ui/controllers/visualization_controller.py`: `create_visualization`'s
+workspace-registration tail (`Visualization` construction, `add_visualization`,
+`set_active_visualization`, status/console messages) was factored into a shared
+`_register_visualization` method, and a new `register_built_visualization(figure, chart_type,
+parameters)` reuses it for `VisualizePage`'s signal — deliberately *not* calling
+`DockManager.display_chart` for that path, since `VisualizePage` already renders the figure
+inline in its own `ChartView` and a second chart-dock tab for the same figure would be
+redundant, not new information.
+
+**The bug found and fixed.** `chart_recommender.ChartSuggestion.chart_type` returned title-cased
+display strings (`"Line"`, `"Box Plot"`) rather than `chart_registry` keys (`"line"`,
+`"box_plot"`) — every one of `recommend_charts()`'s seven suggestion branches was wrong the same
+way. Any caller that tried to actually *build* a suggested chart (not just display its name) had
+to re-derive the registry key itself; `chart_registry.get_chart()` raised `ServiceError` on the
+display string directly. Fixed by changing all seven `chart_type=` literals to real registry
+keys; `ChartSuggestion.chart_type`'s own docstring now says so explicitly, and
+`display_name_for()` is the documented way to get the human-readable label back. A second, more
+subtle finding while wiring `VisualizePage.apply_recommendation()`: `ChartSuggestion.columns`'s
+claimed "in the order the corresponding chart builder expects them" is true for six of the seven
+suggestion kinds but not Line, whose suggestion returns `[date_column, numeric_column]` (x before
+y) while `LineChart.build`'s signature — and `chart_registry`'s own
+`required_fields=("y_column",)` — puts `y_column` first. Rather than silently swapping Line's
+x/y on every recommendation-driven build, `visualize_page.py` uses an explicit
+`_RECOMMENDATION_FIELD_ORDER` map built directly from `chart_recommender`'s own seven branches
+instead of trusting a positional match against `required_fields`.
+
+**Verified.** New test files: `tests/ui/widgets/test_column_multi_select.py` (6 tests),
+`tests/ui/dialogs/test_create_visualization_dialog.py` (5), `tests/ui/workbench/
+test_visualize_page.py` (9) — including `test_every_possible_recommendation_can_be_applied_and_
+built`, which drives every suggestion `recommend_charts()` produces for a 5-column dataset
+through `apply_recommendation()` + `build_chart()` end to end, not just `get_chart()`
+resolution. `tests/visualization/test_chart_recommender.py` gained
+`test_every_recommendation_resolves_in_the_chart_registry` (parametrized over five dataframes
+built to exercise each of `recommend_charts`'s seven branches) plus a fixture-coverage sanity
+test, and its three pre-existing display-name assertions (`"Line"`, `"Scatter"`, `"Bar"`) were
+updated to registry keys per this milestone's own intentionally-changes-existing-assertions note
+in the Risks section below. `tests/visualization/test_chart_registry.py`'s stale
+`test_list_dialog_charts_excludes_list_field_charts` was replaced with the inverse assertion
+(Treemap/Radar now *included*) plus a new `list_fields` declaration test.
+`tests/ui/widgets/data_table/test_data_table_view.py` gained two `filter_by_text` tests.
+`tests/ui/workbench/test_stage_registry.py`/`test_workbench.py` updated their
+VISUALIZE-has-no-page assertions to PREDICT (milestone 25's own remaining scope). Full suite:
+**913 passed, 85 skipped, 0 failed**, reproduced twice in a row (up from 882 passed / 83 skipped
+at M23). `black`/`isort` clean on `src/` and `tests/` repo-wide; `mypy --follow-imports=silent`
+clean on `ci.yml`'s scoped packages (`src/ui/theme src/ui/a11y src/ui/web src/ui/actions`,
+untouched by this milestone) and, individually, on every new/changed file this milestone touched
+except `create_visualization_dialog.py`'s pre-existing `builder_class.build(...)` "type has no
+attribute build" (present before this milestone too, from the same bare `type` annotation
+`_CHART_REGISTRY` already used) and `main_window.py`'s pre-existing `DependencyContainer.
+resolve()`-returns-`object` debt the CI comment names as out of scope for any single milestone.
+Manual runtime verification: a real `bootstrap()` + `MainWindow` + `WorkspaceService`, an
+active dataset, `VisualizePage` receiving it through the live `_on_ui_state_changed` wiring,
+building a real Treemap from a `ColumnMultiSelect` selection, the built visualization landing in
+`WorkspaceService.list_visualizations()` with real `chart_parameters`, and a real
+`chart_view.bridge.point_clicked.emit(...)` narrowing the paired table from 4 rows to 2 —
+end-to-end, not simulated.
 
 Acceptance criteria:
-- [ ] `treemap` and `radar` are creatable from the dialog — previously AI-only.
-- [ ] `chart_recommender.recommend_charts()` output resolves in `chart_registry` for every
-      suggestion — the display-name/registry-key mismatch is fixed and tested.
-- [ ] Clicking a data point in a chart filters the paired `DataTableView` via the M16 bridge.
+- [x] `treemap` and `radar` are creatable from the dialog — previously AI-only. Verified by
+      `test_create_visualization_dialog.py::test_treemap_builds_a_real_figure_from_a_multi_
+      column_selection`/`test_radar_builds_a_real_figure_from_a_multi_column_selection`
+      (real `ColumnMultiSelect` selections, real `_on_accept()`, a real `go.Figure` asserted
+      back), plus the manual runtime smoke test above building a real Treemap through
+      `VisualizePage`.
+- [x] `chart_recommender.recommend_charts()` output resolves in `chart_registry` for every
+      suggestion — the display-name/registry-key mismatch is fixed and tested. Verified by
+      `test_chart_recommender.py::test_every_recommendation_resolves_in_the_chart_registry`
+      (parametrized across five dataframes covering all seven suggestion branches, each
+      suggestion's `chart_type` passed straight to `get_chart()`) and, one level stronger,
+      `test_visualize_page.py::test_every_possible_recommendation_can_be_applied_and_built`
+      (every suggestion actually built into a real `go.Figure` through the page, not just
+      resolved).
+- [x] Clicking a data point in a chart filters the paired `DataTableView` via the M16 bridge.
+      Verified by `test_visualize_page.py::test_clicking_a_chart_point_filters_the_paired_table`
+      (a real `ChartBridge.point_clicked.emit()`, asserting both the filter bar's text and the
+      model's narrowed `rowCount()`) and the manual runtime smoke test's real 4-row-to-2-row
+      narrowing.
 
 ### M25 — Predict stage: forecasting + Automatic Model Competition · Size **M**
 

@@ -24,11 +24,21 @@ def test_builtin_charts_are_registered() -> None:
     assert len(charts) >= 12
 
 
-def test_list_dialog_charts_excludes_list_field_charts() -> None:
+def test_list_dialog_charts_includes_every_builtin_including_list_field_charts() -> (
+    None
+):
+    # Milestone 24: ColumnMultiSelect gave CreateVisualizationDialog a real multi-select
+    # widget, so Treemap/Radar (both list_fields-typed) are no longer excluded from the
+    # dialog -- see ChartRegistration.dialog_compatible's own docstring for the history.
     dialog_charts = list_dialog_charts()
-    assert "treemap" not in dialog_charts
-    assert "radar" not in dialog_charts
+    assert "treemap" in dialog_charts
+    assert "radar" in dialog_charts
     assert "bar" in dialog_charts
+
+
+def test_treemap_and_radar_declare_their_list_typed_fields() -> None:
+    assert get_chart("treemap").list_fields == ("path_columns",)
+    assert get_chart("radar").list_fields == ("value_columns",)
 
 
 def test_get_chart_returns_registration() -> None:

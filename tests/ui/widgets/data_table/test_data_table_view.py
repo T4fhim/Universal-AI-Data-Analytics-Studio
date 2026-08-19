@@ -160,6 +160,29 @@ def test_table_has_a_real_accessible_name(qapp: QApplication) -> None:
     assert "test" in view._table_view.accessibleName()
 
 
+# -- filter_by_text (M24's chart-click-filters-table acceptance criterion) --------------
+
+
+def test_filter_by_text_narrows_the_visible_rows(qapp: QApplication) -> None:
+    view = DataTableView()
+    frame = pd.DataFrame({"region": ["east", "east", "west", "west"]})
+    view.load_dataset(Dataset(name="t", dataframe=frame, source_format="csv"))
+
+    view.filter_by_text("east")
+
+    assert view.model is not None
+    assert view.model.rowCount() == 2
+
+
+def test_filter_by_text_updates_the_filter_bar_text(qapp: QApplication) -> None:
+    view = DataTableView()
+    view.load_dataset(_make_dataset(3))
+
+    view.filter_by_text("row-1")
+
+    assert view._filter_bar.text() == "row-1"
+
+
 def test_filter_and_sort_controls_are_keyboard_reachable(qapp: QApplication) -> None:
     """The M18 acceptance criterion this backs: "keyboard sort/filter is
     reachable via Tab." QHeaderView sections have no default keyboard
