@@ -23,12 +23,68 @@ consistency with how every other collaborator in this package is held.
 
 from __future__ import annotations
 
+import traceback
 from collections.abc import Callable
 from typing import Any
 
 from PySide6.QtCore import QObject, Qt, QThreadPool
+from PySide6.QtWidgets import QMessageBox
 
+from src.core.logger import get_logger
 from src.workers import BaseWorker
+
+_logger = get_logger(__name__)
+
+
+def _guarded(label: str, callback: Callable[..., None]) -> Callable[..., None]:
+    """Wrap a ``WorkerRunner.run()`` callback so it can never fail silently.
+
+    Real, previously-undetected defect this fixes: a dataset load's own reader
+    logged success (``src.readers.csv_reader | Read CSV file ...``), but
+    neither of ``DatasetController.load_dataset``'s own log lines
+    (``Added dataset to workspace`` from :class:`~src.services.workspace_service.
+    WorkspaceService`, then ``Dataset opened via UI``) ever appeared -- meaning
+    ``on_result`` started running and then stopped, silently, partway through.
+    :class:`~src.workers.base_worker.BaseWorker`'s own docstring already names
+    this exact failure mode: "an exception escaping run() on a QThreadPool
+    worker thread is silently lost (Qt does not propagate it back to the
+    caller)". That comment was written about exceptions from the wrapped
+    callable ``fn`` (which *is* caught, by ``run()``'s own try/except) -- but
+    nothing ever caught the *equivalent* failure in the signal's connected
+    slot (``on_result``/``on_error``/``on_finished``/``on_progress`` -- i.e.
+    ``DatasetController.load_dataset`` itself), whether that slot runs via a
+    direct call folded into ``run()`` or via a queued call dispatched later on
+    the UI thread. Either way, a raised exception there had no guaranteed path
+    to the user or the log -- exactly the reported "it logs success but then
+    nothing visible happens" symptom, whatever specifically threw inside
+    ``load_dataset`` for the real file that triggered it. This wrapper closes
+    that gap generically, for every ``WorkerRunner`` call site, not just
+    dataset loads: any exception is logged with its full traceback and shown
+    to the user via a blocking dialog, rather than able to vanish again.
+    """
+
+    def _wrapped(*args: Any) -> None:
+        try:
+            callback(*args)
+        except Exception as exc:  # noqa: BLE001 -- deliberately broad, see docstring:
+            # the whole point is to catch whatever the caller's callback raises,
+            # not a known subset of it.
+            _logger.error(
+                "WorkerRunner callback %r (%s) raised: %s\n%s",
+                callback,
+                label,
+                exc,
+                traceback.format_exc(),
+            )
+            QMessageBox.critical(
+                None,
+                "Unexpected Error",
+                f"An unexpected error occurred while handling a background "
+                f"task's {label}:\n\n{exc}\n\nSee the log for full details.",
+            )
+
+    return _wrapped
+
 
 # Explicit rather than relying on the default Qt.AutoConnection: on_result/on_error/
 # on_finished/on_progress are almost always plain bound methods on a controller (e.g.
@@ -89,12 +145,20 @@ class WorkerRunner(QObject):
         """
         worker = BaseWorker(fn, *args, report_progress=report_progress, **kwargs)
         if on_result is not None:
-            worker.signals.result.connect(on_result, _CROSS_THREAD_SAFE)
+            worker.signals.result.connect(
+                _guarded("result handler", on_result), _CROSS_THREAD_SAFE
+            )
         if on_error is not None:
-            worker.signals.error.connect(on_error, _CROSS_THREAD_SAFE)
+            worker.signals.error.connect(
+                _guarded("error handler", on_error), _CROSS_THREAD_SAFE
+            )
         if on_finished is not None:
-            worker.signals.finished.connect(on_finished, _CROSS_THREAD_SAFE)
+            worker.signals.finished.connect(
+                _guarded("finished handler", on_finished), _CROSS_THREAD_SAFE
+            )
         if on_progress is not None:
-            worker.signals.progress.connect(on_progress, _CROSS_THREAD_SAFE)
+            worker.signals.progress.connect(
+                _guarded("progress handler", on_progress), _CROSS_THREAD_SAFE
+            )
         QThreadPool.globalInstance().start(worker)
         return worker
