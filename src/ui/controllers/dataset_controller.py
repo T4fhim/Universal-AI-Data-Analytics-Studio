@@ -219,24 +219,31 @@ class DatasetController:
         )
 
         if dataset.read_warnings:
-            # Informational, not an error dialog -- the load succeeded;
-            # these are non-fatal issues the reader flagged along the way
-            # (a skipped malformed row, an encoding fallback, an
-            # ambiguous-type column -- see the individual readers in
-            # src.readers for what each one can report here). Surfaced as
-            # a dialog rather than folded into the transient status bar
-            # message (which times out and could be missed entirely) or
-            # left purely in the log (which a user would never see
-            # without deliberately opening the Log dock) -- these
-            # warnings represent real, specific data-quality information
-            # the reader worked out, and discarding that silently after a
-            # successful load would waste it.
-            warnings_text = "\n".join(f"• {w}" for w in dataset.read_warnings)
-            QMessageBox.information(
-                self._parent,
-                "Dataset Loaded with Warnings",
-                f"'{dataset.name}' was loaded successfully, but the "
-                f"following was noted while reading it:\n\n{warnings_text}",
+            # Milestone-28 remediation: this used to be a blocking
+            # QMessageBox.information() call. Real, confirmed defect found while
+            # investigating a reported "opens a dataset but the UI never updates" bug:
+            # load_dataset() is the on_result callback of a WorkerRunner-driven
+            # background read (see open_dataset()) -- a blocking modal .exec()'d from
+            # inside that callback chain has no guaranteed way to get focus or even
+            # visibility depending on window state, and while it waits for a click
+            # that may never come, nothing downstream can proceed either: the
+            # status bar's "Loading..." busy indicator (hidden by the worker's
+            # on_finished, a *separate* queued callback that cannot run until this
+            # one returns) stays stuck indefinitely -- indistinguishable from a hang.
+            # Reproduced directly: an offscreen run with a dataset that has read
+            # warnings blocks forever exactly this way; the identical dataset with
+            # zero warnings returns instantly. Non-fatal, informational content
+            # (a skipped malformed row, an encoding fallback, an ambiguous-type
+            # column -- see the individual readers in src.readers for what each can
+            # report here) does not need a blocking dialog to avoid being discarded
+            # silently -- the Console dock (persistent until cleared, unlike the
+            # transient status-bar message) already serves exactly this "don't lose
+            # it, but don't block on it" role for every other post-load notice in
+            # this method.
+            warnings_text = "; ".join(dataset.read_warnings)
+            self._dock_manager.append_console_message(
+                f"'{dataset.name}' was loaded with {len(dataset.read_warnings)} "
+                f"warning(s): {warnings_text}"
             )
 
     def close_dataset(self, dataset_id: str) -> None:
