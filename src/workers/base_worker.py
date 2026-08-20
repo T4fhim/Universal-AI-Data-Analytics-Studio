@@ -111,6 +111,20 @@ class BaseWorker(QRunnable):
         self.signals.progress.emit(percent, message)
 
     def run(self) -> None:
+        # Milestone-28 remediation: temporary bracketing INFO logs (not DEBUG --
+        # this app's default log level is INFO, and these need to actually appear
+        # in a real run's log without requiring a config change) around every
+        # emit() call, added while chasing a reported defect where a background
+        # dataset read logs its own success but the UI never reflects it, on a real
+        # windowed session this project's offscreen test harness cannot reproduce
+        # (every offscreen repro -- including through a real MainWindow/QThreadPool --
+        # delivered correctly). These logs exist to answer one question definitively
+        # from the next real occurrence's log file: does emit() ever get reached and
+        # return on the worker thread at all? If "about to emit result" appears with
+        # no matching entry in WorkerRunner._guarded's own log (src/ui/worker_runner.py),
+        # the break is in Qt's queued delivery to the UI thread, not in this class or
+        # the connected callback itself. Remove once that root cause is confirmed and
+        # fixed -- not meant to be permanent noise.
         self.signals.started.emit()
         try:
             value = self._fn(*self._args, **self._kwargs)
@@ -123,8 +137,26 @@ class BaseWorker(QRunnable):
             # caller wrote — swallowing it here and forwarding it explicitly is
             # the only way the caller ever learns the task failed.
             _logger.warning("Background task %r failed: %s", self._fn, exc)
+            _logger.info(
+                "[diag] BaseWorker.run(): about to emit error for %r", self._fn
+            )
             self.signals.error.emit(exc, traceback.format_exc())
+            _logger.info(
+                "[diag] BaseWorker.run(): error emit() returned for %r", self._fn
+            )
         else:
+            _logger.info(
+                "[diag] BaseWorker.run(): about to emit result for %r", self._fn
+            )
             self.signals.result.emit(value)
+            _logger.info(
+                "[diag] BaseWorker.run(): result emit() returned for %r", self._fn
+            )
         finally:
+            _logger.info(
+                "[diag] BaseWorker.run(): about to emit finished for %r", self._fn
+            )
             self.signals.finished.emit()
+            _logger.info(
+                "[diag] BaseWorker.run(): finished emit() returned for %r", self._fn
+            )

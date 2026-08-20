@@ -64,6 +64,16 @@ def _guarded(label: str, callback: Callable[..., None]) -> Callable[..., None]:
     """
 
     def _wrapped(*args: Any) -> None:
+        # Milestone-28 remediation: temporary [diag] log, paired with
+        # BaseWorker.run()'s own "about to emit result"/"result emit() returned"
+        # entries -- see that method's docstring for why. If a real run's log shows
+        # "result emit() returned" from BaseWorker but no matching "_guarded entered"
+        # line here for the same callback, delivery from the worker thread to the UI
+        # thread's event loop silently failed -- Qt's queued-connection machinery, not
+        # this wrapper or the connected callback. Remove once root-caused and fixed.
+        _logger.info(
+            "[diag] WorkerRunner._guarded entered for %s (%r)", label, callback
+        )
         try:
             callback(*args)
         except Exception as exc:  # noqa: BLE001 -- deliberately broad, see docstring:
