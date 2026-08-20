@@ -154,6 +154,31 @@ class ThemeTokens:
         """
         return replace(self, density=density)
 
+    def with_base_font_size(self, base_font_size: int) -> ThemeTokens:
+        """Return a copy whose ``font_size_sm/md/lg`` are re-derived from a new base.
+
+        Milestone 28's adjustable-base-font-size accessibility setting
+        (WCAG 1.4.4, text resize). ``font_size_md`` becomes
+        ``base_font_size`` exactly; ``font_size_sm``/``font_size_lg`` are
+        shifted by *this instance's own* current sm/lg-to-md deltas (``-1``
+        and ``+3`` for every token set defined in this module, none of
+        which overrides the dataclass defaults) rather than by hardcoded
+        constants, so a theme that ever did override those defaults would
+        still scale proportionally instead of silently losing its own
+        offsets. ``font_size_sm`` is floored at 8px -- Qt still renders
+        smaller sizes, but text below that is not legible on a standard
+        display regardless of what the user requested, and floors are more
+        useful than a broken-looking result.
+        """
+        offset_sm = self.font_size_sm - self.font_size_md
+        offset_lg = self.font_size_lg - self.font_size_md
+        return replace(
+            self,
+            font_size_md=base_font_size,
+            font_size_sm=max(8, base_font_size + offset_sm),
+            font_size_lg=base_font_size + offset_lg,
+        )
+
     def space(self, step: int) -> int:
         """Return spacing step ``step`` (1-5) in pixels, scaled by density.
 

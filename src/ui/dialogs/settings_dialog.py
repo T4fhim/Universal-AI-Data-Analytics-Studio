@@ -150,6 +150,33 @@ class SettingsDialog(QDialog):
         )
         layout.addRow("Autosave interval:", self._autosave_interval_spinbox)
 
+        # Milestone 28: reduced-motion and base-font-size are read/applied
+        # live by ThemeController.apply_theme_from_settings once this
+        # dialog is accepted -- see that method and
+        # src/ui/theme_manager.py's set_reduced_motion/set_base_font_size.
+        self._reduced_motion_checkbox = QCheckBox(tab)
+        self._reduced_motion_checkbox.setChecked(
+            self._settings_service.get("accessibility", "reduced_motion", default=False)
+        )
+        self._reduced_motion_checkbox.toggled.connect(self._on_reduced_motion_changed)
+        layout.addRow("Reduce motion:", self._reduced_motion_checkbox)
+
+        self._base_font_size_spinbox = QSpinBox(tab)
+        # Floor of 10px matches ThemeTokens.with_base_font_size's own
+        # smallest-legible floor minus the -1 sm offset it derives from
+        # this value; ceiling of 24px is this application's own
+        # ThemeTokens.font_size_lg default doubled, a generous but not
+        # unbounded upper end for "text resize to 200%" (WCAG 1.4.4).
+        self._base_font_size_spinbox.setRange(10, 24)
+        self._base_font_size_spinbox.setSuffix(" px")
+        self._base_font_size_spinbox.setValue(
+            self._settings_service.get("accessibility", "base_font_size", default=13)
+        )
+        self._base_font_size_spinbox.valueChanged.connect(
+            self._on_base_font_size_changed
+        )
+        layout.addRow("Base font size:", self._base_font_size_spinbox)
+
         return tab
 
     def _build_ai_tab(self) -> QWidget:
@@ -376,6 +403,12 @@ class SettingsDialog(QDialog):
 
     def _on_autosave_interval_changed(self, minutes: int) -> None:
         self._settings_service.set("autosave", "interval_minutes", value=minutes)
+
+    def _on_reduced_motion_changed(self, checked: bool) -> None:
+        self._settings_service.set("accessibility", "reduced_motion", value=checked)
+
+    def _on_base_font_size_changed(self, size: int) -> None:
+        self._settings_service.set("accessibility", "base_font_size", value=size)
 
     def _on_save(self) -> None:
         self._settings_service.save()

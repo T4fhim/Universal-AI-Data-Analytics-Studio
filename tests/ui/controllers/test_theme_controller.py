@@ -68,3 +68,27 @@ def test_apply_theme_from_settings_applies_the_persisted_theme(
     controller.apply_theme_from_settings()
 
     assert theme_manager.current_theme() == "light"
+
+
+def test_apply_theme_from_settings_applies_accessibility_settings(
+    qapp: QApplication, config_path: Path, log_dir: Path, reset_logging_state
+) -> None:
+    """Milestone 28: reduced_motion/base_font_size are pushed into the live
+    ThemeManager the same call that applies the theme name does -- see
+    ThemeController.apply_theme_from_settings's own comment for why both are
+    set before, not after, the apply_theme() call."""
+    context = bootstrap(config_path=config_path, log_dir=log_dir)
+    settings_service = context.container.resolve(SettingsService)
+    plugin_manager = context.container.resolve(PluginManager)
+    parent = QWidget()
+    theme_manager = ThemeManager(qapp)
+    theme_manager.apply_theme("dark")
+    parent.setProperty("theme_manager", theme_manager)
+    controller = ThemeController(parent, settings_service, plugin_manager)
+
+    settings_service.set("accessibility", "reduced_motion", value=True)
+    settings_service.set("accessibility", "base_font_size", value=18)
+    controller.apply_theme_from_settings()
+
+    assert theme_manager.reduced_motion() is True
+    assert theme_manager.current_tokens().font_size_md == 18

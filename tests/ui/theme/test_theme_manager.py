@@ -89,3 +89,73 @@ def test_set_density_to_the_same_value_is_a_noop(manager: ThemeManager) -> None:
 def test_high_contrast_theme_applies_successfully(manager: ThemeManager) -> None:
     manager.apply_theme("high_contrast")
     assert manager.current_tokens().name == "high_contrast"
+
+
+# -- Milestone 28: base font size and reduced motion ---------------------------------------------
+
+
+def test_set_base_font_size_reapplies_and_scales_tokens(manager: ThemeManager) -> None:
+    manager.apply_theme("dark")
+    received: list[str] = []
+    manager.theme_changed.connect(received.append)
+
+    manager.set_base_font_size(18)
+
+    assert received == ["dark"]
+    tokens = manager.current_tokens()
+    assert tokens.font_size_md == 18
+    assert (
+        tokens.font_size_sm == 17
+    )  # -1 delta preserved from the dark theme's defaults
+    assert tokens.font_size_lg == 21  # +3 delta preserved
+
+
+def test_set_base_font_size_before_any_apply_does_not_raise(
+    manager: ThemeManager,
+) -> None:
+    manager.set_base_font_size(16)
+    assert manager.current_theme() is None
+
+
+def test_set_base_font_size_to_the_same_value_is_a_noop(manager: ThemeManager) -> None:
+    manager.apply_theme("dark")
+    manager.set_base_font_size(18)
+    received: list[str] = []
+    manager.theme_changed.connect(received.append)
+
+    manager.set_base_font_size(18)
+
+    assert received == []
+
+
+def test_set_reduced_motion_emits_reduced_motion_changed(manager: ThemeManager) -> None:
+    received: list[bool] = []
+    manager.reduced_motion_changed.connect(received.append)
+
+    manager.set_reduced_motion(True)
+
+    assert received == [True]
+    assert manager.reduced_motion() is True
+
+
+def test_set_reduced_motion_to_the_same_value_is_a_noop(manager: ThemeManager) -> None:
+    manager.set_reduced_motion(True)
+    received: list[bool] = []
+    manager.reduced_motion_changed.connect(received.append)
+
+    manager.set_reduced_motion(True)
+
+    assert received == []
+
+
+def test_set_reduced_motion_does_not_touch_the_stylesheet(
+    manager: ThemeManager,
+) -> None:
+    """Motion has no QSS representation -- see ThemeManager's own module docstring."""
+    manager.apply_theme("dark")
+    received: list[str] = []
+    manager.theme_changed.connect(received.append)
+
+    manager.set_reduced_motion(True)
+
+    assert received == []

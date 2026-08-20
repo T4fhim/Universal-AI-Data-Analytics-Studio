@@ -22,6 +22,14 @@ would have worked too, and was rejected because every consumer here is
 already a ``QObject`` living on the UI thread -- a Qt signal gives automatic
 disconnection on destruction, which a hand-rolled callback list would have to
 reimplement badly.
+
+**Milestone 28** adds two accessibility axes alongside colour/density:
+:meth:`ThemeManager.set_base_font_size` scales
+``ThemeTokens.font_size_sm/md/lg`` together (WCAG 1.4.4, text resize) the same
+way :meth:`set_density` scales spacing -- re-deriving and re-applying the
+current theme -- and :meth:`set_reduced_motion` is a plain, theme-independent
+flag consumers read directly (see :attr:`reduced_motion_changed`'s own
+comment for why it is not folded into a token at all).
 """
 
 from __future__ import annotations
@@ -57,6 +65,16 @@ class ThemeManager(QObject):
     """
 
     theme_changed = Signal(str)
+    # Milestone 28: motion is orthogonal to colour/density and has no QSS
+    # representation at all (Qt Style Sheets cannot express "skip this
+    # animation") -- so unlike font size, which is folded into the applied
+    # ThemeTokens, reduced-motion is a plain bool a consumer (currently
+    # ApplicationStatusBar's busy indicator) reads directly. Emitted as its
+    # own signal, not bundled into theme_changed, since a reduced-motion
+    # toggle in Settings does not itself change any colour token and should
+    # not force every theme_changed listener (icon re-render, chart
+    # re-theme) to run for no reason.
+    reduced_motion_changed = Signal(bool)
 
     def __init__(
         self, application: QApplication, parent: QObject | None = None
@@ -65,6 +83,15 @@ class ThemeManager(QObject):
         self._application = application
         self._current_theme: str | None = None
         self._density: Density = Density.COZY
+        # None means "use the theme's own default sizes" -- distinct from
+        # any real pixel value, so a caller that never touches this setting
+        # (every test that constructs a bare ThemeManager, for instance)
+        # gets exactly the token set it always did rather than a
+        # ThemeTokens.with_base_font_size(13) call that happens to be a
+        # no-op today but would silently start doing something the moment
+        # the default in src/core/config.py ever changed.
+        self._base_font_size: int | None = None
+        self._reduced_motion: bool = False
 
     def apply_theme(self, theme_name: str) -> None:
         """Compile ``theme_name``'s tokens and apply the stylesheet.
@@ -104,6 +131,44 @@ class ThemeManager(QObject):
         if self._current_theme is not None:
             self.apply_theme(self._current_theme)
 
+    def set_base_font_size(self, base_font_size: int) -> None:
+        """Change the base font size and re-apply the current theme.
+
+        Args:
+            base_font_size: Passed straight to
+                :meth:`~src.ui.theme.tokens.ThemeTokens.with_base_font_size`
+                -- see that method for how the small/large sizes are
+                derived from it.
+
+        Same no-op-when-unchanged shape as :meth:`set_density`, and for the
+        same reason: this is driven by a Settings-dialog value that gets
+        re-applied on every save/theme-toggle (see
+        :meth:`~src.ui.controllers.theme_controller.ThemeController.
+        apply_theme_from_settings`), and a real toggle should not force an
+        extra stylesheet recompile when the value did not actually change.
+        """
+        if base_font_size == self._base_font_size:
+            return
+        self._base_font_size = base_font_size
+        if self._current_theme is not None:
+            self.apply_theme(self._current_theme)
+
+    def set_reduced_motion(self, enabled: bool) -> None:
+        """Set whether motion-sensitive UI should skip animation, and notify listeners.
+
+        Unlike :meth:`set_density`/:meth:`set_base_font_size`, this never
+        re-applies the theme -- see :attr:`reduced_motion_changed`'s own
+        comment for why it is not folded into ``theme_changed`` at all.
+        """
+        if enabled == self._reduced_motion:
+            return
+        self._reduced_motion = enabled
+        self.reduced_motion_changed.emit(enabled)
+
+    def reduced_motion(self) -> bool:
+        """Return whether reduced motion is currently enabled."""
+        return self._reduced_motion
+
     def current_theme(self) -> str | None:
         """Return the applied theme's name, or ``None`` before the first apply.
 
@@ -134,8 +199,7 @@ class ThemeManager(QObject):
         """
         if theme_name not in AVAILABLE_THEMES:
             raise ServiceError(
-                f"Unknown theme: '{theme_name}'. Available themes: "
-                f"{AVAILABLE_THEMES}."
+                f"Unknown theme: '{theme_name}'. Available themes: {AVAILABLE_THEMES}."
             )
         tokens = TOKENS_BY_NAME.get(theme_name)
         if tokens is None:
@@ -143,4 +207,7 @@ class ThemeManager(QObject):
                 f"Theme '{theme_name}' is listed in AVAILABLE_THEMES but has "
                 f"no token set in src.ui.theme.tokens.TOKENS_BY_NAME."
             )
-        return tokens.with_density(self._density)
+        tokens = tokens.with_density(self._density)
+        if self._base_font_size is not None:
+            tokens = tokens.with_base_font_size(self._base_font_size)
+        return tokens

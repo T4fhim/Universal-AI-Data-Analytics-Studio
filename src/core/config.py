@@ -127,6 +127,19 @@ def _default_config_dict() -> dict[str, Any]:
             # is never written to this plain-text config file.
             "profiles": [],
         },
+        "accessibility": {
+            # Milestone 28: both keys are read by ThemeManager
+            # (src/ui/theme_manager.py) — reduced_motion skips the
+            # status bar's indeterminate busy-indicator animation in
+            # favor of a static filled bar (see
+            # ApplicationStatusBar.set_reduced_motion), and
+            # base_font_size scales ThemeTokens.font_size_sm/md/lg
+            # together (see ThemeTokens.with_base_font_size) rather
+            # than being a literal pixel override, so every themed
+            # surface resizes consistently instead of just one label.
+            "reduced_motion": False,
+            "base_font_size": 13,
+        },
     }
 
 
@@ -144,6 +157,7 @@ _TOP_LEVEL_SCHEMA: dict[str, type] = {
     "forecasting": dict,
     "reports": dict,
     "database": dict,
+    "accessibility": dict,
 }
 
 _NESTED_SCHEMA: dict[str, dict[str, type]] = {
@@ -165,6 +179,7 @@ _NESTED_SCHEMA: dict[str, dict[str, type]] = {
     "forecasting": {"default_horizon_periods": int},
     "reports": {"default_export_format": str},
     "database": {"profiles": list},
+    "accessibility": {"reduced_motion": bool, "base_font_size": int},
 }
 
 
@@ -276,6 +291,33 @@ def _migrate_legacy_database_section(data: dict[str, Any]) -> None:
         )
     elif "profiles" not in data["database"]:
         data["database"]["profiles"] = []
+
+
+def _migrate_legacy_accessibility_section(data: dict[str, Any]) -> None:
+    """Back-fill milestone 28's ``accessibility`` section into a config saved before it existed, in place.
+
+    Same shape as :func:`_migrate_legacy_database_section`: a
+    ``config.yaml`` saved before this milestone has no ``accessibility``
+    key at all (whole-section back-fill), while one saved *during* this
+    milestone's own development could in principle have the section but be
+    missing one of its two keys (per-key back-fill) — both branches exist
+    so neither case fails :func:`validate_config_structure` on the next
+    startup.
+    """
+    if "accessibility" not in data or not isinstance(data.get("accessibility"), dict):
+        data["accessibility"] = {"reduced_motion": False, "base_font_size": 13}
+        _bootstrap_logger.warning(
+            "config.yaml predates milestone 28's 'accessibility' section — "
+            "added one with default values in memory. Save settings once "
+            "to persist this change."
+        )
+        return
+
+    section = data["accessibility"]
+    if "reduced_motion" not in section:
+        section["reduced_motion"] = False
+    if "base_font_size" not in section:
+        section["base_font_size"] = 13
 
 
 def validate_config_structure(data: dict[str, Any]) -> None:
@@ -397,6 +439,7 @@ def load_config(path: Path = CONFIG_FILE_PATH) -> dict[str, Any]:
     _migrate_legacy_ai_section(loaded)
     _migrate_legacy_plugins_section(loaded)
     _migrate_legacy_database_section(loaded)
+    _migrate_legacy_accessibility_section(loaded)
     validate_config_structure(loaded)
     return loaded
 
@@ -438,6 +481,8 @@ class AppConfig:
     forecasting_default_horizon_periods: int
     reports_default_export_format: str
     database_profiles: list[dict[str, Any]]
+    accessibility_reduced_motion: bool
+    accessibility_base_font_size: int
 
     _raw: dict[str, Any] = field(repr=False, compare=False)
 
@@ -473,6 +518,8 @@ class AppConfig:
             ],
             reports_default_export_format=data["reports"]["default_export_format"],
             database_profiles=list(data["database"]["profiles"]),
+            accessibility_reduced_motion=data["accessibility"]["reduced_motion"],
+            accessibility_base_font_size=data["accessibility"]["base_font_size"],
             _raw=data,
         )
 

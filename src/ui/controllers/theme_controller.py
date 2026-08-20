@@ -73,6 +73,17 @@ class ThemeController:
         theme_manager: ThemeManager = self._parent.property("theme_manager")
         if theme_manager is None:
             return  # not yet attached -- see MainWindow.attach_theme_manager's own docstring
+        # Milestone 28: set before apply_theme() below, not after -- both
+        # setters only re-apply the theme when it changes an already-current
+        # one, so setting them first means apply_theme() below does the one
+        # stylesheet compile this call needs, instead of compiling once here
+        # and again inside set_base_font_size if it were called last.
+        theme_manager.set_base_font_size(
+            self._settings_service.get("accessibility", "base_font_size", default=13)
+        )
+        theme_manager.set_reduced_motion(
+            self._settings_service.get("accessibility", "reduced_motion", default=False)
+        )
         theme_name = self._settings_service.get("theme", default="dark")
         theme_manager.apply_theme(theme_name)
 

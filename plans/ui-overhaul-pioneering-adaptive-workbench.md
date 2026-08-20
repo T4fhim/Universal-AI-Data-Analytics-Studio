@@ -425,10 +425,13 @@ Acceptance criteria:
       not yet observed green on an actual GitHub Actions run (this repo has no CI history to check
       against before this milestone — first real run's outcome is unverified from here).
 - [ ] Full suite still green (✅); the a11y audit against the chart dock returns no new ERROR
-      findings — **not literally executable yet**: `src/ui/a11y/audit.py`'s `audit_widget_tree` is
-      M28 scope and does not exist. `ChartView` sets no accessible name today, matching its pre-M16
-      state, so nothing regresses in the meantime — left unchecked rather than marked done on a
-      technicality.
+      findings — **M28 update:** `audit_widget_tree` now exists and does run clean (zero ERROR
+      findings) against a fully populated `MainWindow`, but its current rule set (`src/ui/a11y/
+      rules.py`) checks `QAbstractButton`/`QLineEdit`/`QComboBox`/`QAbstractSpinBox`/
+      `QAbstractSlider`/`QTabBar`/dialogs/docks/shortcuts/illustrations/contrast — not
+      `QWebEngineView`. `ChartView` still sets no accessible name (confirmed unchanged since M16),
+      and no rule here would catch that if it did — left unchecked rather than marked done on a
+      technicality, now for a narrower, disclosed reason than "the tool doesn't exist."
 
 ### M17 — ActionRegistry, ActionBinder, command palette, dead-action eradication · Size **L** · ✅ **DONE (`f07514a`)**
 
@@ -521,9 +524,12 @@ Acceptance criteria:
 - [x] `NaN`/`NaT` render as an em-dash with a non-color-only `AccessibleTextRole` of "missing".
 - [x] Filtering above ~200k rows routes through `BaseWorker` (see scope note above), not the UI
       thread — a test asserts the UI thread's own filter call returns immediately.
-- [ ] a11y audit: the table has an accessible name (✅, verified directly), keyboard sort/filter is
-      reachable via Tab (✅, verified directly) — the audit *tool* itself is M28 scope and doesn't
-      exist yet, so this box stays unchecked on a technicality rather than marked done falsely.
+- [x] a11y audit: the table has an accessible name (✅, verified directly at the time), keyboard
+      sort/filter is reachable via Tab (✅, verified directly at the time) — **M28 update:**
+      `audit_widget_tree` now exists and confirms this for real: `DataTableView`/`FilterBar` appear
+      in a fully populated `MainWindow`'s widget tree (via the Clean/Visualize stage pages) and
+      produce zero ERROR findings from the `interactive-name`/`input-buddy`/`focus-reachable` rules
+      (see `tests/ui/a11y/test_audit.py`).
 
 ### M19 — MainWindow decomposition + WorkerRunner · Size **L** — ✅ DONE (`6683489`)
 
@@ -669,9 +675,11 @@ Acceptance criteria:
       (`tests/ui/controllers/test_pipeline_controller.py`).
 - [x] Project Explorer dock is deleted; Dataset Explorer absorbs it as a "Project" node; Chart dock
       is demoted to default-hidden — the plan's only user-visible removals.
-- [ ] a11y audit: every new interactive widget has a real accessible name (✅, verified directly,
-      per the Scope note above) — the audit *tool* itself is M28 scope and doesn't exist yet, so
-      this box stays unchecked on a technicality rather than marked done falsely.
+- [x] a11y audit: every new interactive widget has a real accessible name (✅, verified directly at
+      the time, per the Scope note above) — **M28 update:** `audit_widget_tree` now exists and
+      confirms this for real against a fully populated `MainWindow` (`StageRail`, and every stage
+      page's Run/Generate Report/Reproduce buttons among them): zero ERROR findings from the
+      `interactive-name` rule (see `tests/ui/a11y/test_audit.py`).
 
 ### M21 — AI chat panel overhaul *(inserted — see status note)* · Size **M** · ✅ **DONE**
 
@@ -1421,17 +1429,36 @@ Acceptance criteria:
 - [x] a11y audit: illustrations carry an accessible description, not purely decorative silence --
       every `EmptyState`/`ErrorState` illustration is `describe()`-d.
 
-### M28 — Accessibility enforcement · Size **L**
+### M28 — Accessibility enforcement · Size **L** · ✅ **DONE, one box open (see below)**
 
 Files: `src/ui/a11y/{audit,rules}.py` (`contrast_manifest.py` already shipped in M15).
 
+**As built:** `audit_widget_tree` walks a real widget tree via eight rules in `src/ui/a11y/rules.py`
+(`interactive-name`, `input-buddy`, `focus-reachable`, `dialog-focus-trap`, `duplicate-shortcut`,
+`dock-title`, `decorative-illustration`, `tab-order`), plus a `contrast_findings` function reusing
+`src.ui.theme.contrast`'s math against `CONTRAST_REQUIREMENTS` rather than reimplementing it. Two
+real defects found by running it against a real, dataset-loaded `MainWindow` and fixed (not
+suppressed): `CommandPalette`'s search field had no accessible name; three Qt-implementation-chrome
+false positives (`QLineEdit`'s built-in clear button, `QAbstractScrollArea`'s scrollbars, toolbar
+buttons that duplicate menu-bar-reachable actions per `ActionBinder`'s own shared-`QAction`
+guarantee) were identified and excluded with documented rationale, not blanket-suppressed. See
+`docs/M28_MANUAL_VERIFICATION.md` for the full account, including the one item that stays open.
+
 Acceptance criteria:
-- [ ] `audit_widget_tree` against a fully populated `MainWindow` returns zero ERROR findings.
-- [ ] `ALL_DIALOG_CLASSES` is discovered by introspection, not hand-maintained.
-- [ ] High-contrast theme (tokens exist since M15) passes the same contrast suite as dark/light.
-- [ ] Reduced-motion and adjustable base font-size settings exist and are respected.
-- [ ] **Manual screen-reader (NVDA) pass performed and recorded** — see 2.4-equivalent Tools note
-      below; not merely automated.
+- [x] `audit_widget_tree` against a fully populated `MainWindow` returns zero ERROR findings.
+- [x] `ALL_DIALOG_CLASSES` is discovered by introspection, not hand-maintained — currently resolves
+      to the 8 `QDialog` subclasses in `src/ui/`.
+- [x] High-contrast theme (tokens exist since M15) passes the same contrast suite as dark/light —
+      confirmed both by the existing `test_contrast.py` (already parametrized over `TOKENS_BY_NAME`)
+      and by `audit_widget_tree`'s own contrast rule.
+- [x] Reduced-motion and adjustable base font-size settings exist and are respected —
+      `accessibility.reduced_motion`/`accessibility.base_font_size` in `config.yaml`, applied at
+      startup and live from Settings; reduced motion swaps the status bar's animated busy indicator
+      for a static one, base font size scales `ThemeTokens.font_size_sm/md/lg` together.
+- [ ] **Manual screen-reader (NVDA) pass performed and recorded** — **not done.** No agent in this
+      environment has a screen reader to drive; requires a human at a real Windows machine. See
+      `docs/M28_MANUAL_VERIFICATION.md`, which stays the single source of truth for this box until a
+      dated finding is recorded there.
 
 ### M29 — Manual, F1, onboarding, config debt · Size **L**
 

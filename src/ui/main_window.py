@@ -519,6 +519,13 @@ class MainWindow(QMainWindow):
 
         self._guidance_controller.set_theme_manager(theme_manager)
 
+        # Milestone 28: seed, then subscribe -- same shape as the icon
+        # provider wiring above, for reduced_motion instead of tokens.
+        self._status_bar.set_reduced_motion(theme_manager.reduced_motion())
+        theme_manager.reduced_motion_changed.connect(
+            self._status_bar.set_reduced_motion
+        )
+
     # -- Window lifecycle --------------------------------------------------------
 
     def closeEvent(self, event) -> None:

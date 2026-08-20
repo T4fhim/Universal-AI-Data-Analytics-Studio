@@ -86,6 +86,27 @@ def test_with_density_returns_a_new_instance_and_does_not_mutate() -> None:
     assert scaled.density is Density.COMPACT
 
 
+def test_with_base_font_size_returns_a_new_instance_and_does_not_mutate() -> None:
+    original_md = DARK_TOKENS.font_size_md
+    scaled = DARK_TOKENS.with_base_font_size(20)
+    assert scaled is not DARK_TOKENS
+    assert DARK_TOKENS.font_size_md == original_md
+    assert scaled.font_size_md == 20
+
+
+def test_with_base_font_size_preserves_the_sm_lg_deltas() -> None:
+    base_delta_sm = DARK_TOKENS.font_size_sm - DARK_TOKENS.font_size_md
+    base_delta_lg = DARK_TOKENS.font_size_lg - DARK_TOKENS.font_size_md
+    scaled = DARK_TOKENS.with_base_font_size(20)
+    assert scaled.font_size_sm - scaled.font_size_md == base_delta_sm
+    assert scaled.font_size_lg - scaled.font_size_md == base_delta_lg
+
+
+def test_with_base_font_size_floors_the_small_size_at_8px() -> None:
+    scaled = DARK_TOKENS.with_base_font_size(8)  # sm would be 7 without the floor
+    assert scaled.font_size_sm == 8
+
+
 def test_tokens_are_frozen() -> None:
     with pytest.raises(Exception):  # dataclasses.FrozenInstanceError is a TypeError
         DARK_TOKENS.accent = "#000000"  # type: ignore[misc]

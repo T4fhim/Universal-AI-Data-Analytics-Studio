@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.core.logger import get_logger
+from src.ui.a11y.accessible import describe
 from src.ui.actions.action_binder import ActionBinder
 from src.ui.actions.action_registry import list_actions
 from src.ui.ui_state_bus import UiStateBus
@@ -71,6 +72,15 @@ class CommandPalette(QDialog):
         layout = QVBoxLayout(self)
         self._search = QLineEdit(self)
         self._search.setPlaceholderText("Type to search actions…")
+        # Milestone 28: found by audit_widget_tree's "input-buddy" rule --
+        # this field had a placeholder (visible only while empty, and not a
+        # substitute for an accessible name) but no describe() call and no
+        # buddy label, so a screen reader announced it only as "edit".
+        describe(
+            self._search,
+            name="Search actions",
+            description="Type to filter the list of application actions below",
+        )
         layout.addWidget(self._search)
 
         self._list = QListWidget(self)

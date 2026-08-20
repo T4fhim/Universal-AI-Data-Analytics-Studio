@@ -53,11 +53,71 @@ class ApplicationStatusBar(QStatusBar):
         self._busy_indicator.setVisible(False)
         self.addPermanentWidget(self._busy_indicator)
 
+        # Milestone 28: an indeterminate QProgressBar is Qt's own built-in
+        # "marquee" animation -- the one piece of real, continuous motion
+        # this application had before this milestone (see this module's own
+        # audit-count note in the M28 commit for how that was discovered:
+        # nothing else in src/ui/ animates at all). reduced_motion swaps it
+        # for a static, fully-filled bar instead of removing the busy
+        # indicator entirely -- "something is happening" must still be
+        # visible, only the continuous motion goes away.
+        self._reduced_motion = False
+        # Whether show_busy() is the last of show_busy/show_progress/
+        # hide_busy that ran -- tracked explicitly rather than read back via
+        # QProgressBar.isVisible(), because isVisible() reflects whether the
+        # widget is actually painted on screen (false for the entire life of
+        # an offscreen-platform test that never calls window.show(), and
+        # briefly false in real usage too, between construction and the
+        # main window's own first show()). A setting toggle must take
+        # effect the moment a busy operation is logically in progress, not
+        # only once Qt's own screen-visibility machinery agrees it is.
+        self._busy = False
+
         self.showMessage("Ready")
         _logger.debug("Status bar constructed.")
 
+    def set_reduced_motion(self, enabled: bool) -> None:
+        """Enable or disable the reduced-motion busy-indicator style.
+
+        Args:
+            enabled: Mirrors ``accessibility.reduced_motion`` in
+                ``config.yaml`` -- see
+                :meth:`~src.ui.theme_manager.ThemeManager.set_reduced_motion`,
+                whose :attr:`~src.ui.theme_manager.ThemeManager.
+                reduced_motion_changed` signal :class:`~src.ui.main_window.
+                MainWindow` connects directly to this method.
+
+        Applied immediately to a currently-visible indicator (not only to
+        the next :meth:`show_busy` call) so toggling the setting while a
+        long operation is already running takes effect right away, rather
+        than only from the next operation onward.
+        """
+        if enabled == self._reduced_motion:
+            return
+        self._reduced_motion = enabled
+        # A determinate, real-percentage report from show_progress() clears
+        # self._busy (see that method) and is left alone here -- it already
+        # carries genuine information (how far along the operation is) that
+        # switching ranges out from under it would destroy.
+        if self._busy:
+            self._set_busy_range()
+
+    def _set_busy_range(self) -> None:
+        """Set the indicator's range for the current busy state, honoring reduced motion.
+
+        A static ``(0, 1)`` range with ``value=1`` renders as a fully-filled,
+        motionless bar -- still visually distinct from "idle" (the indicator
+        is hidden entirely when idle, via :meth:`hide_busy`), just without
+        Qt's continuous marquee animation.
+        """
+        if self._reduced_motion:
+            self._busy_indicator.setRange(0, 1)
+            self._busy_indicator.setValue(1)
+        else:
+            self._busy_indicator.setRange(0, 0)
+
     def show_busy(self, message: str = "Working…") -> None:
-        """Show the indeterminate busy indicator and a transient status message.
+        """Show the busy indicator and a transient status message.
 
         Args:
             message: Shown via :meth:`show_message` alongside the
@@ -66,12 +126,15 @@ class ApplicationStatusBar(QStatusBar):
                 since a busy operation's duration isn't known in
                 advance.
 
-        Resets the indicator to indeterminate (0/0) range even if a
-        previous :meth:`show_progress` call left it determinate — a new
-        busy operation starting should not inherit a stale percentage from
-        whatever the last one reported.
+        Resets the indicator's range even if a previous
+        :meth:`show_progress` call left it determinate — a new busy
+        operation starting should not inherit a stale percentage from
+        whatever the last one reported. Indeterminate (0/0, Qt's animated
+        marquee) unless reduced motion is enabled, in which case it is a
+        static, fully-filled bar — see :meth:`_set_busy_range`.
         """
-        self._busy_indicator.setRange(0, 0)
+        self._busy = True
+        self._set_busy_range()
         self._busy_indicator.setVisible(True)
         self.show_message(message, timeout_ms=0)
 
@@ -101,6 +164,11 @@ class ApplicationStatusBar(QStatusBar):
         ``progress_callback`` parameter. Calling this method before that
         lands is harmless — it simply never happens.
         """
+        # Milestone 28: a real, determinate percentage is not the
+        # reduced-motion-sensitive state _busy tracks -- see
+        # set_reduced_motion's own comment for why a live toggle leaves a
+        # determinate report untouched.
+        self._busy = False
         self._busy_indicator.setRange(0, 100)
         self._busy_indicator.setValue(max(0, min(100, percent)))
         if message:
@@ -113,6 +181,7 @@ class ApplicationStatusBar(QStatusBar):
         follow this with their own ``show_message`` reporting the
         operation's outcome (e.g. "Loaded dataset: ...").
         """
+        self._busy = False
         self._busy_indicator.setVisible(False)
 
     def show_message(
