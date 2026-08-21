@@ -124,6 +124,57 @@ scope this milestone was supposed to close it at.
 found — pass or fail). Do not check it off, and do not let a future milestone assume it happened,
 until a real entry exists here.
 
+## Tier 2 script — the fixed 15-minute pass
+
+This is deliberately not an open-ended audit. Tier 1 above already proves the accessibility *tree*
+is structurally sound (names, roles, live tab order); what's left is judging whether NVDA's actual
+spoken narration of that tree makes sense to someone who cannot see the screen. Run these 8 steps in
+order, in a real Windows session — no NVDA scripting knowledge needed beyond the keys named below.
+
+1. **Install NVDA** (free, nvaccess.org) if not already present. Launch it (`Ctrl+Alt+N` or the
+   desktop shortcut). Confirm it's speaking (e.g. it announces itself starting).
+2. **Launch the app** (`python main.py`) with NVDA already running. Tab through the menu bar and
+   toolbar from a cold start. *Listen for*: each item announces a real name and role (e.g. "File,
+   menu" / "New Project, button"), not silence or a bare "button".
+3. **File > New Project**, then **File > Open Dataset** on any sample CSV under `tests/` or
+   `resources/`. *Listen for*: NVDA announces the confirmation feedback M27 added (a console message,
+   not just a silent status-bar change) — this is the exact "logs success but nothing visible happens"
+   class of bug M27/M28 were built to close; confirm it's actually audible, not just logged.
+4. **Tab into the stage rail**, then **run the Understand stage**. *Listen for*: the stage's name and
+   state (proposed/running/complete) is announced, and the resulting `AnalysisLogEntry`/result is
+   reachable and announced once it appears — not a silent update only sighted users would notice.
+5. **Open one on-demand dialog** — Ctrl+Shift+P for the command palette, or Help > About. *Listen
+   for*: focus lands inside the dialog immediately (not left behind on the trigger control), Tab
+   cycles through its controls in a sane order, and Escape closes it and returns focus to where you'd
+   expect, not to the top of the window.
+6. **Open Settings**, toggle **High Contrast** theme on, then off. *Listen for*: NVDA doesn't go
+   silent or lose track of focus during the theme swap (a real risk if a widget gets recreated rather
+   than restyled).
+7. **In the same Settings dialog, toggle Reduced Motion and change the base font size.** *Listen
+   for*: both controls announce their current state/value correctly (not just "checkbox" / "slider"
+   with no value), and the change is confirmed audibly, not just visually.
+8. **Record what you heard** in the Findings log below — a dated entry, plain language, verbatim
+   wording for anything that sounded wrong or confusing. Pass/fail per step is enough; you don't need
+   to write an essay per step.
+
+If something sounds broken, that's a real M28 finding — flag it back rather than silently marking the
+box checked anyway.
+
 ## Findings log
 
-*(empty — no manual pass has been recorded yet)*
+*(empty — no manual pass has been recorded yet. Copy this template for the first entry:)*
+
+```
+### YYYY-MM-DD — <your name>, NVDA <version>, Windows <build>
+
+1. Menu/toolbar tab-through: pass/fail — notes
+2. New Project / Open Dataset feedback: pass/fail — notes
+3. Stage rail + Understand run: pass/fail — notes
+4. Dialog focus/tab-order/Escape: pass/fail — notes
+5. High-contrast toggle: pass/fail — notes
+6. Reduced-motion + font-size controls: pass/fail — notes
+
+Overall: pass / pass with issues / fail
+Issues found (verbatim NVDA wording where relevant):
+-
+```
