@@ -22,6 +22,11 @@ pytesseract
 beautifulsoup4
 lxml
 sqlalchemy
+pymysql
+psycopg2-binary
+pyodbc
+oracledb
+duckdb_engine
 pyarrow
 fastparquet
 python-magic
@@ -43,6 +48,11 @@ openai
 google-genai
 python-dotenv
 rich
+# Explicit rather than relying on it arriving transitively via rich: the
+# milestone-27 in-app manual (src/ui/help/) compiles docs/manual/*.md through
+# markdown_it. It has been importable in this venv only as rich's own
+# dependency, which is fragile -- a future rich upgrade could drop it.
+markdown-it-py
 joblib
 numba
 dask
@@ -53,3 +63,11 @@ mypy
 ruff==0.16.3
 
 bandit==1.9.4
+# Milestone 28 follow-up (Tier 1 UIA verification, tests/ui/a11y/
+# test_uia_integration.py): the real Windows UI Automation driver. Windows-
+# only by nature of what it wraps (win32com/comtypes underneath) -- this
+# project's own verified dev/CI environment is windows-latest (see
+# .github/workflows/ci.yml's own comment), so an unconditional entry here
+# matches how every other dependency in this file is listed, rather than a
+# platform marker no other line uses.
+pywinauto

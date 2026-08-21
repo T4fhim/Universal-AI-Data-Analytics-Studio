@@ -92,7 +92,9 @@ def forecast_exponential_smoothing(
     if trend not in _VALID_TREND:
         raise ServiceError(f"Invalid trend: {trend!r}. Must be 'add', 'mul', or None.")
     if seasonal not in _VALID_SEASONAL:
-        raise ServiceError(f"Invalid seasonal: {seasonal!r}. Must be 'add', 'mul', or None.")
+        raise ServiceError(
+            f"Invalid seasonal: {seasonal!r}. Must be 'add', 'mul', or None."
+        )
     if seasonal is not None and seasonal_periods is None:
         raise ServiceError("seasonal_periods is required when seasonal is set.")
 

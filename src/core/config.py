@@ -30,11 +30,16 @@ from typing import Any
 
 import yaml
 
-from src.core.constants import (AVAILABLE_THEMES, CONFIG_FILE_PATH,
-                                DEFAULT_LOG_FILE_BACKUP_COUNT,
-                                DEFAULT_LOG_FILE_MAX_BYTES, DEFAULT_LOG_LEVEL,
-                                DEFAULT_THEME, DEFAULT_WINDOW_HEIGHT,
-                                DEFAULT_WINDOW_WIDTH)
+from src.core.constants import (
+    AVAILABLE_THEMES,
+    CONFIG_FILE_PATH,
+    DEFAULT_LOG_FILE_BACKUP_COUNT,
+    DEFAULT_LOG_FILE_MAX_BYTES,
+    DEFAULT_LOG_LEVEL,
+    DEFAULT_THEME,
+    DEFAULT_WINDOW_HEIGHT,
+    DEFAULT_WINDOW_WIDTH,
+)
 from src.core.exceptions import ConfigError
 
 # Bootstrap-time-only logger. Deliberately not src.core.logger.get_logger
@@ -71,18 +76,69 @@ def _default_config_dict() -> dict[str, Any]:
         },
         "ai": {
             "enabled": False,
-            "provider": None,
-            "api_key_env_var": "ANTHROPIC_API_KEY",
+            # Milestone 7: a list of provider profiles rather than one
+            # provider/api_key_env_var pair — lets the user configure
+            # several Groq keys (or a mix of providers) and have
+            # AssistantService fail over between them, and delivers
+            # provider-agnostic AI (including local-first Ollama, which
+            # needs no api_key_env_var at all) rather than hardcoding a
+            # single active provider. Each profile:
+            #   name: user-facing label, e.g. "Groq key 1".
+            #   provider_type: "anthropic" | "gemini" | "groq" | "ollama".
+            #   api_key_env_var: name of the environment variable holding
+            #     the key; None for providers that need no key (ollama).
+            #   model: provider-specific model override, or None to use
+            #     that provider class's own default.
+            "providers": [],
+            "active_provider_index": 0,
+            "rotation_enabled": False,
+            # Milestone 8: drives both the AI system prompt's register
+            # (see assistant_service._SYSTEM_PROMPT) and, once milestone
+            # 10 builds result panels, their density/vocabulary — see
+            # src.core.expertise_level.ExpertiseLevel for the full set
+            # of valid values. Stored as a plain string (not the enum
+            # itself) for the same reason every other config value is a
+            # plain string/int/bool: config.yaml is plain YAML.
+            "expertise_level": "beginner",
         },
         "plugins": {
             "enabled": True,
             "search_paths": [],
+            # Milestone 12: names the user has chosen to disable via
+            # the Plugins settings panel — plain plugin-manifest
+            # names, not paths, so a plugin stays disabled even if its
+            # directory moves within a search path.
+            "disabled_plugin_names": [],
         },
         "forecasting": {
             "default_horizon_periods": 30,
         },
         "reports": {
             "default_export_format": "pdf",
+        },
+        "database": {
+            # Milestone 14: saved "Connect to Database" profiles.
+            # Deliberately metadata-only — name/db_type/host/port/
+            # database/username. No password field exists anywhere in
+            # this list on purpose: a password typed into the "Connect
+            # to Database" dialog lives only in
+            # DatabaseConnectionService's in-memory session state (see
+            # that module's own docstring for the full reasoning) and
+            # is never written to this plain-text config file.
+            "profiles": [],
+        },
+        "accessibility": {
+            # Milestone 28: both keys are read by ThemeManager
+            # (src/ui/theme_manager.py) — reduced_motion skips the
+            # status bar's indeterminate busy-indicator animation in
+            # favor of a static filled bar (see
+            # ApplicationStatusBar.set_reduced_motion), and
+            # base_font_size scales ThemeTokens.font_size_sm/md/lg
+            # together (see ThemeTokens.with_base_font_size) rather
+            # than being a literal pixel override, so every themed
+            # surface resizes consistently instead of just one label.
+            "reduced_motion": False,
+            "base_font_size": 13,
         },
     }
 
@@ -100,15 +156,168 @@ _TOP_LEVEL_SCHEMA: dict[str, type] = {
     "plugins": dict,
     "forecasting": dict,
     "reports": dict,
+    "database": dict,
+    "accessibility": dict,
 }
 
 _NESTED_SCHEMA: dict[str, dict[str, type]] = {
     "window": {"width": int, "height": int},
     "autosave": {"enabled": bool, "interval_minutes": int},
     "logging": {"level": str, "max_bytes": int, "backup_count": int},
+    "ai": {
+        "enabled": bool,
+        "providers": list,
+        "active_provider_index": int,
+        "rotation_enabled": bool,
+        "expertise_level": str,
+    },
+    "plugins": {
+        "enabled": bool,
+        "search_paths": list,
+        "disabled_plugin_names": list,
+    },
     "forecasting": {"default_horizon_periods": int},
     "reports": {"default_export_format": str},
+    "database": {"profiles": list},
+    "accessibility": {"reduced_motion": bool, "base_font_size": int},
 }
+
+
+def _migrate_legacy_ai_section(data: dict[str, Any]) -> None:
+    """Rewrite a pre-milestone-7 ``ai`` section into the current provider-list shape, in place.
+
+    Before milestone 7, ``ai`` held a single ``provider``/
+    ``api_key_env_var`` pair instead of a ``providers`` list. Without
+    this step, any ``config.yaml`` written before this milestone would
+    fail :func:`validate_config_structure` on the very next startup —
+    breaking this module's own documented self-healing promise ("a
+    missing *or invalid* config is repaired, not fatal"). Detected by
+    the absence of the ``providers`` key rather than a version number,
+    since no config schema version field exists in this project; if
+    that changes later, prefer switching this check to it.
+
+    Does nothing if ``data["ai"]`` is missing entirely or already has
+    the current shape — safe to call unconditionally from
+    :func:`load_config` before validation runs.
+    """
+    ai_section = data.get("ai")
+    if not isinstance(ai_section, dict):
+        return  # missing/malformed entirely; validation will catch it
+
+    if "providers" not in ai_section:
+        legacy_provider = ai_section.get("provider")
+        legacy_api_key_env_var = ai_section.get("api_key_env_var")
+        providers = (
+            [
+                {
+                    "name": f"{legacy_provider} (migrated)",
+                    "provider_type": legacy_provider,
+                    "api_key_env_var": legacy_api_key_env_var,
+                    "model": None,
+                }
+            ]
+            if legacy_provider
+            else []
+        )
+        data["ai"] = {
+            "enabled": ai_section.get("enabled", False),
+            "providers": providers,
+            "active_provider_index": 0,
+            "rotation_enabled": False,
+            "expertise_level": "beginner",
+        }
+        _bootstrap_logger.warning(
+            "config.yaml's 'ai' section used the pre-milestone-7 single-provider "
+            "shape — migrated it to the new provider-list shape in memory. Save "
+            "settings once (e.g. via the Settings dialog) to persist this change."
+        )
+        return
+
+    # Separately: a config.yaml saved between milestones 7 and 8 has the
+    # current providers-list shape but predates 'expertise_level' —
+    # back-fill just that one key rather than routing through the
+    # legacy-migration branch above, which would incorrectly discard an
+    # already-current providers list.
+    if "expertise_level" not in ai_section:
+        ai_section["expertise_level"] = "beginner"
+        _bootstrap_logger.warning(
+            "config.yaml's 'ai' section predates milestone 8's "
+            "'expertise_level' key — defaulted it to 'beginner' in memory. "
+            "Save settings once to persist this change."
+        )
+
+
+def _migrate_legacy_plugins_section(data: dict[str, Any]) -> None:
+    """Back-fill milestone 12's ``disabled_plugin_names`` key into an older ``plugins`` section, in place.
+
+    Same reasoning and shape as
+    :func:`_migrate_legacy_ai_section`'s ``expertise_level`` back-fill:
+    a ``config.yaml`` saved before this milestone has ``plugins.enabled``
+    and ``plugins.search_paths`` (both existed since milestone 1)
+    but predates ``disabled_plugin_names`` — without this, such a file
+    would fail :func:`validate_config_structure` on the very next
+    startup, breaking this module's self-healing promise.
+    """
+    plugins_section = data.get("plugins")
+    if not isinstance(plugins_section, dict):
+        return  # missing/malformed entirely; validation will catch it
+
+    if "disabled_plugin_names" not in plugins_section:
+        plugins_section["disabled_plugin_names"] = []
+        _bootstrap_logger.warning(
+            "config.yaml's 'plugins' section predates milestone 12's "
+            "'disabled_plugin_names' key — defaulted it to an empty list "
+            "in memory. Save settings once to persist this change."
+        )
+
+
+def _migrate_legacy_database_section(data: dict[str, Any]) -> None:
+    """Back-fill milestone 14's ``database`` section into a config saved before it existed, in place.
+
+    Unlike :func:`_migrate_legacy_ai_section`/
+    :func:`_migrate_legacy_plugins_section` (which back-fill one key
+    within an already-present section), a ``config.yaml`` saved before
+    this milestone has no ``database`` key at all — this adds the whole
+    section, empty, so :func:`validate_config_structure` does not fail
+    on the very next startup for a user upgrading from an older
+    version.
+    """
+    if "database" not in data or not isinstance(data.get("database"), dict):
+        data["database"] = {"profiles": []}
+        _bootstrap_logger.warning(
+            "config.yaml predates milestone 14's 'database' section — "
+            "added an empty one in memory. Save settings once to "
+            "persist this change."
+        )
+    elif "profiles" not in data["database"]:
+        data["database"]["profiles"] = []
+
+
+def _migrate_legacy_accessibility_section(data: dict[str, Any]) -> None:
+    """Back-fill milestone 28's ``accessibility`` section into a config saved before it existed, in place.
+
+    Same shape as :func:`_migrate_legacy_database_section`: a
+    ``config.yaml`` saved before this milestone has no ``accessibility``
+    key at all (whole-section back-fill), while one saved *during* this
+    milestone's own development could in principle have the section but be
+    missing one of its two keys (per-key back-fill) — both branches exist
+    so neither case fails :func:`validate_config_structure` on the next
+    startup.
+    """
+    if "accessibility" not in data or not isinstance(data.get("accessibility"), dict):
+        data["accessibility"] = {"reduced_motion": False, "base_font_size": 13}
+        _bootstrap_logger.warning(
+            "config.yaml predates milestone 28's 'accessibility' section — "
+            "added one with default values in memory. Save settings once "
+            "to persist this change."
+        )
+        return
+
+    section = data["accessibility"]
+    if "reduced_motion" not in section:
+        section["reduced_motion"] = False
+    if "base_font_size" not in section:
+        section["base_font_size"] = 13
 
 
 def validate_config_structure(data: dict[str, Any]) -> None:
@@ -148,8 +357,7 @@ def validate_config_structure(data: dict[str, Any]) -> None:
         for nested_key, expected_type in nested_schema.items():
             if nested_key not in parent_value:
                 raise ConfigError(
-                    f"config.yaml key '{parent_key}.{nested_key}' is "
-                    f"missing."
+                    f"config.yaml key '{parent_key}.{nested_key}' is missing."
                 )
             if not isinstance(parent_value[nested_key], expected_type):
                 raise ConfigError(
@@ -178,7 +386,9 @@ def _write_default_config(path: Path) -> dict[str, Any]:
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         with path.open("w", encoding="utf-8") as handle:
-            yaml.safe_dump(default_data, handle, default_flow_style=False, sort_keys=False)
+            yaml.safe_dump(
+                default_data, handle, default_flow_style=False, sort_keys=False
+            )
     except OSError as exc:
         raise ConfigError(
             f"Failed to write default configuration to {path}: {exc}"
@@ -226,6 +436,10 @@ def load_config(path: Path = CONFIG_FILE_PATH) -> dict[str, Any]:
         )
         return _write_default_config(path)
 
+    _migrate_legacy_ai_section(loaded)
+    _migrate_legacy_plugins_section(loaded)
+    _migrate_legacy_database_section(loaded)
+    _migrate_legacy_accessibility_section(loaded)
     validate_config_structure(loaded)
     return loaded
 
@@ -257,12 +471,18 @@ class AppConfig:
     log_max_bytes: int
     log_backup_count: int
     ai_enabled: bool
-    ai_provider: str | None
-    ai_api_key_env_var: str
+    ai_providers: list[dict[str, Any]]
+    ai_active_provider_index: int
+    ai_rotation_enabled: bool
+    ai_expertise_level: str
     plugins_enabled: bool
     plugin_search_paths: list[str]
+    plugin_disabled_names: list[str]
     forecasting_default_horizon_periods: int
     reports_default_export_format: str
+    database_profiles: list[dict[str, Any]]
+    accessibility_reduced_motion: bool
+    accessibility_base_font_size: int
 
     _raw: dict[str, Any] = field(repr=False, compare=False)
 
@@ -286,14 +506,20 @@ class AppConfig:
             log_max_bytes=data["logging"]["max_bytes"],
             log_backup_count=data["logging"]["backup_count"],
             ai_enabled=data["ai"]["enabled"],
-            ai_provider=data["ai"].get("provider"),
-            ai_api_key_env_var=data["ai"]["api_key_env_var"],
+            ai_providers=list(data["ai"]["providers"]),
+            ai_active_provider_index=data["ai"]["active_provider_index"],
+            ai_rotation_enabled=data["ai"]["rotation_enabled"],
+            ai_expertise_level=data["ai"]["expertise_level"],
             plugins_enabled=data["plugins"]["enabled"],
             plugin_search_paths=list(data["plugins"]["search_paths"]),
+            plugin_disabled_names=list(data["plugins"]["disabled_plugin_names"]),
             forecasting_default_horizon_periods=data["forecasting"][
                 "default_horizon_periods"
             ],
             reports_default_export_format=data["reports"]["default_export_format"],
+            database_profiles=list(data["database"]["profiles"]),
+            accessibility_reduced_motion=data["accessibility"]["reduced_motion"],
+            accessibility_base_font_size=data["accessibility"]["base_font_size"],
             _raw=data,
         )
 

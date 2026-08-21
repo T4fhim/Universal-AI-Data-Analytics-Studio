@@ -1,103 +1,96 @@
 # File: src/ui/main_window.py
 """The application's main window.
 
-:class:`MainWindow` assembles every piece built in milestone 1b-ii —
-menu bar, toolbar, status bar, dock manager, theme manager, and the
-welcome widget as initial central content — and wires the menu/toolbar
-actions to real calls against the services resolved from the
-dependency container (``SettingsService``, ``ProjectService``,
-``WorkspaceService``, all registered in :mod:`src.core.bootstrap`).
+:class:`MainWindow` assembles every piece built in milestone 1b-ii --
+menu bar, toolbar, status bar, dock manager, theme manager, and (since
+milestone 20) the workbench as initial central content -- and, since
+milestone 19, constructs the per-concern controllers in
+:mod:`src.ui.controllers` and wires
+:class:`~src.ui.actions.action_binder.ActionBinder` to their methods rather
+than holding every handler itself. This class does not construct its own
+service instances: it resolves what it needs from ``context.container``,
+the same container every other part of the running application resolves
+from, and hands those services to whichever controller owns the concern
+they belong to.
 
-This class does not construct its own service instances. It receives
-the :class:`~src.core.bootstrap.BootstrapContext` and resolves what it
-needs from ``context.container`` — the same container every other part
-of the running application resolves from — so that, for example, a
-project opened through this window's File > Open action updates the
-one ``ProjectService`` instance the rest of the application shares,
-rather than a private instance only this window would know about.
+Milestone 19 note: before this milestone, this file held every project/
+dataset/visualization/report/assistant handler directly and had grown to
+942 lines -- exactly the "one more handler" growth
+:mod:`tests.ui.test_module_size`'s own docstring warns about. This is a
+pure refactor: every controller method in :mod:`src.ui.controllers` is
+the same logic that used to live here, moved verbatim. What remains here
+is genuinely window-level: settings/theme/about, the command palette
+shortcut, and window lifecycle.
+
+Milestone 20 note: :class:`~src.ui.workbench.workbench.Workbench` replaces
+``WelcomeWidget`` as the central widget (see :meth:`__init__`'s own
+comment on that call site), and :meth:`_refresh_workbench` -- reached via
+``state_changed`` alongside the existing enablement recompute -- is the one
+place this file reads live :class:`~src.services.analysis_orchestrator_service.
+AnalysisOrchestratorService` state and pushes it into that otherwise
+service-free widget tree.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
+from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtWidgets import QMainWindow
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QFileDialog, QInputDialog, QMainWindow,
-                               QMessageBox, QWidget)
-
+# Import-time registration side effect, matching how src.visualization.
+# chart_registry's own built-ins are seeded -- this module must be imported
+# somewhere before ActionBinder.assert_all_bound() runs below, or the
+# registry it populates would simply be empty. main_window.py is the
+# composition root for the UI's action-consuming side, so it is the
+# natural place for this import to live rather than a scattered import in
+# menu_bar.py/toolbar.py, which only *consume* the registry, not populate it.
+import src.ui.actions.builtin_actions  # noqa: F401
 from src.core.bootstrap import BootstrapContext
-from src.core.constants import (APP_NAME, DEFAULT_WINDOW_HEIGHT,
-                                DEFAULT_WINDOW_WIDTH)
-from src.core.exceptions import ApplicationError
+from src.core.constants import APP_NAME, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH
 from src.core.logger import get_logger
-from src.readers.reader_registry import get_reader_for_path
+from src.plugins.plugin_manager import PluginManager
+from src.services.analysis_orchestrator_service import (
+    AnalysisOrchestratorService,
+    PipelineStage,
+)
+from src.services.database_connection_service import DatabaseConnectionService
+from src.services.guidance_service import GuidanceService
 from src.services.project_service import ProjectService
+from src.services.report_service import ReportService
 from src.services.settings_service import SettingsService
-from src.services.workspace_service import (Dashboard, DashboardTile,
-                                            Visualization, WorkspaceService)
-from src.ui.dialogs.about_dialog import AboutDialog
-from src.ui.dialogs.create_visualization_dialog import \
-    CreateVisualizationDialog
-from src.ui.dialogs.settings_dialog import SettingsDialog
+from src.services.workspace_service import WorkspaceService
+from src.ui.actions.action_binder import ActionBinder
+from src.ui.actions.action_context import ActionContext
+from src.ui.command_palette import CommandPalette
+from src.ui.command_stack import CommandStack
+from src.ui.controllers.assistant_controller import AssistantController
+from src.ui.controllers.database_controller import DatabaseController
+from src.ui.controllers.dataset_controller import DatasetController
+from src.ui.controllers.guidance_controller import GuidanceController
+from src.ui.controllers.pipeline_controller import PipelineController
+from src.ui.controllers.project_controller import ProjectController
+from src.ui.controllers.report_controller import ReportController
+from src.ui.controllers.theme_controller import ThemeController
+from src.ui.controllers.visualization_controller import VisualizationController
 from src.ui.dock_manager import DockManager
 from src.ui.menu_bar import ApplicationMenuBar
 from src.ui.status_bar import ApplicationStatusBar
+from src.ui.theme.icon_provider import IconProvider
+from src.ui.theme.tokens import DARK_TOKENS
 from src.ui.theme_manager import ThemeManager
 from src.ui.toolbar import ApplicationToolBar
-from src.ui.widgets.welcome_widget import WelcomeWidget
-from src.visualization.dashboard_renderer import render_dashboard
+from src.ui.ui_state_bus import UiStateBus
+from src.ui.workbench.pages.analyze_page import AnalyzePage
+from src.ui.workbench.pages.clean_page import CleanPage
+from src.ui.workbench.pages.explore_page import ExplorePage
+from src.ui.workbench.pages.predict_page import PredictPage
+from src.ui.workbench.pages.report_page import ReportPage
+from src.ui.workbench.pages.reproduce_page import ReproducePage
+from src.ui.workbench.pages.understand_page import UnderstandPage
+from src.ui.workbench.pages.visualize_page import VisualizePage
+from src.ui.workbench.workbench import Workbench
+from src.ui.worker_runner import WorkerRunner
 
 _logger = get_logger(__name__)
-
-_PROJECT_FILE_FILTER = "Universal AI Data Analytics Studio Project (*.uads.json)"
-
-# Mirrors the extensions each reader in src.readers declares via its
-# own SUPPORTED_EXTENSIONS class attribute (see
-# src.readers.base_reader.BaseReader). Not built dynamically from
-# those attributes at import time — Qt's file-dialog filter syntax
-# groups extensions under one human-readable label per format, which
-# doesn't map cleanly onto a flat set union the way
-# reader_registry.get_reader_for_path's own error-message construction
-# does; a hardcoded filter string here is clearer than deriving one
-# generically. Extended in milestone 2b to include Excel and SQLite
-# alongside 2a's original three formats — this constant needs a
-# manual update whenever a new reader is added to src.readers, since
-# nothing enforces the two staying in sync automatically.
-_DATASET_FILE_FILTER = (
-    "All Supported Datasets (*.csv *.tsv *.json *.txt *.xlsx *.xls "
-    "*.db *.sqlite *.sqlite3 *.pdf *.docx *.xml *.png *.jpg *.jpeg "
-    "*.bmp *.tiff *.tif);;"
-    "CSV Files (*.csv *.tsv);;"
-    "JSON Files (*.json);;"
-    "Text Files (*.txt);;"
-    "Excel Files (*.xlsx *.xls);;"
-    "SQLite Databases (*.db *.sqlite *.sqlite3);;"
-    "PDF Files (*.pdf);;"
-    "Word Documents (*.docx);;"
-    "XML Files (*.xml);;"
-    "Images (*.png *.jpg *.jpeg *.bmp *.tiff *.tif)"
-)
-
-# Sentinel distinct from None: None is already a legitimate return
-# value from _resolve_table_name (meaning "single-table file, no
-# selection was needed"), so the user cancelling the table-picker
-# dialog needs its own, different marker — conflating the two would
-# mean a cancelled dialog silently proceeds as if the file only had
-# one table, which is a real, distinct bug from simply not offering a
-# picker at all.
-_TABLE_SELECTION_CANCELLED = object()
-
-# A second, separately distinct sentinel: zero tables available at
-# all. Added in milestone 2c-i, when PDF and Word readers introduced a
-# case 2a/2b's readers never faced — a genuinely valid, unremarkable
-# document (a text-only PDF; a Word doc with no tables) that simply
-# has nothing tabular in it. This is not an error (the document isn't
-# malformed) and it is not the same as "exactly one table" (there is
-# nothing to read at all) — see
-# src.readers.base_reader.BaseReader.list_tables's own docstring for
-# how readers report this, and _resolve_table_name below for how the
-# UI distinguishes it from both None and cancellation.
-_NO_TABLES_AVAILABLE = object()
 
 
 class MainWindow(QMainWindow):
@@ -106,12 +99,11 @@ class MainWindow(QMainWindow):
     Args:
         context: The result of a successful
             :func:`~src.core.bootstrap.bootstrap` call. Services this
-            window needs (``SettingsService``, ``ProjectService``,
-            ``WorkspaceService``) are resolved from
-            ``context.container`` during construction, and
-            ``ThemeManager`` is constructed fresh here (it wraps the
-            live ``QApplication`` instance, which does not exist until
-            :mod:`src.core.app` constructs it — see that module's
+            window needs are resolved from ``context.container`` during
+            construction and handed to whichever controller owns them;
+            ``ThemeManager`` is constructed fresh here (it wraps the live
+            ``QApplication`` instance, which does not exist until
+            :mod:`src.core.app` constructs it -- see that module's
             extended ``run()`` for where this window is built).
     """
 
@@ -121,14 +113,36 @@ class MainWindow(QMainWindow):
         self._settings_service = context.container.resolve(SettingsService)
         self._project_service = context.container.resolve(ProjectService)
         self._workspace_service = context.container.resolve(WorkspaceService)
+        self._plugin_manager = context.container.resolve(PluginManager)
+        self._orchestrator_service = context.container.resolve(
+            AnalysisOrchestratorService
+        )
+        self._report_service = context.container.resolve(ReportService)
+        self._database_service = context.container.resolve(DatabaseConnectionService)
 
         self.setWindowTitle(APP_NAME)
         self.resize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
 
-        self._menu_bar = ApplicationMenuBar(self)
+        # Milestone 17: IconProvider needs a ThemeTokens instance at
+        # construction, but ThemeManager (which knows the real, configured
+        # theme) is not constructed until after this window is, by
+        # src/core/app.py -- see attach_theme_manager below for where this
+        # gets corrected to the real theme. DARK_TOKENS here is a safe,
+        # visible-either-way placeholder for the brief window before that
+        # call, not a real theme decision.
+        self._icon_provider = IconProvider(DARK_TOKENS, parent=self)
+        self._state_bus = UiStateBus(self)
+        self._binder = ActionBinder(self, self._icon_provider)
+        self._worker_runner = WorkerRunner(self)
+        # Milestone 23: constructed directly here, not resolved from the
+        # DependencyContainer -- see src/ui/command_stack.py's own docstring for why it
+        # follows UiStateBus/WorkerRunner's construction pattern rather than bootstrap.py's.
+        self._command_stack = CommandStack(self._workspace_service)
+
+        self._menu_bar = ApplicationMenuBar(self, self._binder, self._state_bus)
         self.setMenuBar(self._menu_bar)
 
-        self._tool_bar = ApplicationToolBar(self, self._menu_bar)
+        self._tool_bar = ApplicationToolBar(self, self._binder)
         self.addToolBar(self._tool_bar)
 
         self._status_bar = ApplicationStatusBar(self)
@@ -137,401 +151,333 @@ class MainWindow(QMainWindow):
         self._dock_manager = DockManager(self)
         self._populate_view_menu()
 
-        self._welcome_widget = WelcomeWidget(self)
-        self.setCentralWidget(self._welcome_widget)
+        # Milestone 20: Workbench replaces WelcomeWidget as the central
+        # widget -- unlike WelcomeWidget (setCentralWidget called exactly
+        # once, forever, before this milestone), Workbench itself IS the
+        # permanent central widget, and internally switches from its
+        # welcome page to a pipeline stage page once a dataset becomes
+        # active -- see _refresh_workbench, called from _on_ui_state_changed.
+        self._workbench = Workbench(self)
+        self.setCentralWidget(self._workbench)
 
+        self._command_palette = CommandPalette(self, self._binder, self._state_bus)
+        self._command_palette_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
+        self._command_palette_shortcut.activated.connect(self._command_palette.exec)
+
+        self._build_controllers()
         self._connect_actions()
-        self._menu_bar.update_recent_projects_menu(self._project_service.get_recent_projects())
+        self._binder.assert_all_bound()
+        self._state_bus.state_changed.connect(self._on_ui_state_changed)
+        # Seed enablement once immediately -- every QAction defaults to
+        # Qt's own enabled=True, and state_changed only fires from
+        # request_refresh() (a later mutation) or a menu's aboutToShow.
+        # Without this call, "Save Project" would show enabled on a cold
+        # start with no project open until the user first did something.
+        self._on_ui_state_changed()
+
+        self._menu_bar.update_recent_projects_menu(
+            self._project_service.get_recent_projects(),
+            on_open=self._project_controller.open_recent_project,
+        )
 
         _logger.info("Main window constructed.")
 
     # -- Setup helpers --------------------------------------------------------
+
+    def _build_controllers(self) -> None:
+        """Construct every controller, each holding only what it needs.
+
+        One controller per concern rather than a shared "god context"
+        object -- see :mod:`src.ui.controllers`'s own docstring for why.
+        ``PipelineController`` is built first because ``ProjectController``
+        depends on two of its methods (``persist_all_logs``/
+        ``restore_logs_for_project``) as callbacks -- milestone 20's own
+        version of the same "built last/first because it depends on another
+        controller's method" ordering ``DatabaseController`` already
+        established for ``DatasetController.load_dataset``.
+        """
+        self._pipeline_controller = PipelineController(
+            self,
+            self._workspace_service,
+            self._orchestrator_service,
+            self._project_service,
+            self._dock_manager,
+            self._status_bar,
+            self._state_bus,
+            self._worker_runner,
+            self._command_stack,
+            on_changed=self._refresh_workbench,
+        )
+        self._project_controller = ProjectController(
+            self,
+            self._project_service,
+            self._workspace_service,
+            self._dock_manager,
+            self._status_bar,
+            self._state_bus,
+            self._worker_runner,
+            self._menu_bar,
+            on_before_save=self._pipeline_controller.persist_all_logs,
+            on_project_opened=self._pipeline_controller.restore_logs_for_project,
+        )
+        self._dataset_controller = DatasetController(
+            self,
+            self._workspace_service,
+            self._dock_manager,
+            self._status_bar,
+            self._state_bus,
+            self._worker_runner,
+        )
+        self._visualization_controller = VisualizationController(
+            self,
+            self._workspace_service,
+            self._dock_manager,
+            self._status_bar,
+            self._state_bus,
+            self._worker_runner,
+        )
+        self._report_controller = ReportController(
+            self,
+            self._workspace_service,
+            self._orchestrator_service,
+            self._report_service,
+            self._dock_manager,
+            self._status_bar,
+            self._worker_runner,
+        )
+        self._assistant_controller = AssistantController(
+            self,
+            self._settings_service,
+            self._workspace_service,
+            self._dock_manager,
+            self._status_bar,
+            self._worker_runner,
+        )
+        self._database_controller = DatabaseController(
+            self, self._database_service, self._dataset_controller.load_dataset
+        )
+        self._guidance_controller = GuidanceController(
+            self._context.container.resolve(GuidanceService),
+            self._settings_service,
+            self._workbench,
+            self._dock_manager,
+            self._binder,
+        )
+        self._theme_controller = ThemeController(
+            self, self._settings_service, self._plugin_manager
+        )
 
     def _populate_view_menu(self) -> None:
         for toggle_action in self._dock_manager.view_menu_toggle_actions():
             self._menu_bar.menu_view.addAction(toggle_action)
 
     def _connect_actions(self) -> None:
-        self._menu_bar.action_new_project.triggered.connect(self._on_new_project)
-        self._menu_bar.action_open_project.triggered.connect(self._on_open_project)
-        self._menu_bar.action_open_dataset.triggered.connect(self._on_open_dataset)
-        self._menu_bar.action_create_visualization.triggered.connect(self._on_create_visualization)
-        self._menu_bar.action_create_dashboard.triggered.connect(self._on_create_dashboard)
-        self._menu_bar.action_save_project.triggered.connect(self._on_save_project)
-        self._menu_bar.action_save_project_as.triggered.connect(self._on_save_project_as)
-        self._menu_bar.action_settings.triggered.connect(self._on_open_settings)
-        self._menu_bar.action_exit.triggered.connect(self.close)
-        self._menu_bar.action_toggle_theme.triggered.connect(self._on_toggle_theme)
-        self._menu_bar.action_about.triggered.connect(self._on_open_about)
+        bind = self._binder.bind
+        bind("project.new", self._project_controller.new_project)
+        bind("project.open", self._project_controller.open_project)
+        bind("dataset.open", self._dataset_controller.open_dataset)
+        bind("dataset.connect_database", self._database_controller.connect_database)
+        bind("analysis.visualize", self._visualization_controller.create_visualization)
+        bind("analysis.dashboard", self._visualization_controller.create_dashboard)
+        bind("analysis.generate_report", self._report_controller.generate_report)
+        bind("project.save", self._project_controller.save_project)
+        bind("project.save_as", self._project_controller.save_project_as)
+        bind("project.settings", self._theme_controller.open_settings)
+        bind("project.exit", self.close)
+        bind("view.toggle_theme", self._theme_controller.toggle_theme)
+        bind("help.about", self._theme_controller.open_about)
+        bind("edit.undo", self._pipeline_controller.undo)
+        bind("edit.redo", self._pipeline_controller.redo)
 
-        self._welcome_widget.button_new_project.clicked.connect(self._on_new_project)
-        self._welcome_widget.button_open_project.clicked.connect(self._on_open_project)
-
-    # -- Project actions --------------------------------------------------------
-
-    def _on_new_project(self) -> None:
-        project = self._project_service.new_project("Untitled Project")
-        self._status_bar.set_active_project_label(project.name)
-        self._status_bar.show_message(f"Created new project: {project.name}")
-        _logger.info("New project created via UI: %s", project.name)
-
-    def _on_open_project(self) -> None:
-        file_path_str, _selected_filter = QFileDialog.getOpenFileName(
-            self, "Open Project", "", _PROJECT_FILE_FILTER
+        self._workbench.welcome_page.button_new_project.clicked.connect(
+            self._project_controller.new_project
         )
-        if not file_path_str:
-            return  # user cancelled the dialog
+        self._workbench.welcome_page.button_open_project.clicked.connect(
+            self._project_controller.open_project
+        )
 
-        try:
-            project = self._project_service.open_project(Path(file_path_str))
-        except ApplicationError as exc:
-            QMessageBox.critical(self, "Failed to Open Project", str(exc))
-            _logger.warning("Failed to open project from %s: %s", file_path_str, exc)
-            return
+        self._dock_manager.chat_panel.send_button.clicked.connect(
+            self._assistant_controller.send_chat_message
+        )
+        # Milestone 21: "Clear Chat" and the live expertise-level selector.
+        self._dock_manager.chat_panel.clear_button.clicked.connect(
+            self._assistant_controller.clear_chat
+        )
+        self._dock_manager.chat_panel.expertise_combo.currentIndexChanged.connect(
+            self._assistant_controller.on_expertise_level_changed
+        )
 
-        self._status_bar.set_active_project_label(project.name)
-        self._status_bar.show_message(f"Opened project: {project.name}")
-        self._menu_bar.update_recent_projects_menu(self._project_service.get_recent_projects())
-        self._reload_project_datasets(project)
+        # Milestone 18: the first time double-clicking a dataset has ever
+        # done anything in this application -- see DockManager.
+        # connect_dataset_double_click's own docstring.
+        self._dock_manager.connect_dataset_double_click(
+            self._dataset_controller.on_dataset_double_clicked
+        )
 
-    def _reload_project_datasets(self, project) -> None:
-        """Re-read every dataset recorded in ``project`` and load it into the workspace.
+        # Milestone 20: workbench stage pages emit signals rather than
+        # calling services themselves (see src/ui/workbench/__init__.py's
+        # own docstring) -- this is where those signals meet the
+        # controller methods that actually do the work. isinstance narrows
+        # StagePage down to each concrete subclass so its own signals (not
+        # declared on the StagePage base) are visible to mypy, rather than
+        # an `is not None` check alone.
+        understand_page = self._workbench.page_for(PipelineStage.UNDERSTAND)
+        if isinstance(understand_page, UnderstandPage):
+            understand_page.run_requested.connect(
+                self._pipeline_controller.run_understand_stage
+            )
+        report_page = self._workbench.page_for(PipelineStage.REPORT)
+        if isinstance(report_page, ReportPage):
+            report_page.generate_report_requested.connect(
+                self._report_controller.generate_report
+            )
+        reproduce_page = self._workbench.page_for(PipelineStage.REPRODUCE)
+        if isinstance(reproduce_page, ReproducePage):
+            reproduce_page.reproduce_requested.connect(
+                self._pipeline_controller.reproduce_active_dataset
+            )
+        # Milestone 23: CleanPage computes the derived dataset itself (see its own
+        # docstring for why) and hands it off via a signal, the same "structure here,
+        # behavior wired by the caller" split every other stage page above uses.
+        clean_page = self._workbench.page_for(PipelineStage.CLEAN)
+        if isinstance(clean_page, CleanPage):
+            clean_page.operation_applied.connect(
+                self._pipeline_controller.register_clean_operation
+            )
 
-        Uses the same read-through-the-registry, add-to-workspace,
-        refresh-the-dock sequence as
-        :meth:`_on_open_dataset`'s successful path, since reloading a
-        project's datasets is functionally the same operation
-        (populate the workspace from a file on disk) repeated once per
-        recorded dataset — multi-table sources are not supported here
-        (a saved project records only a name and path, not which
-        table was selected within a multi-table source at the time it
-        was originally loaded), so any recorded dataset that turns out
-        to need a table selection is skipped with a warning rather
-        than guessed at.
+        # Milestone 24: VisualizePage builds its own figure and renders it inline (see its
+        # own docstring for why it holds no WorkspaceService reference), then hands the
+        # built (figure, chart_type, parameters) off in the same shape
+        # CreateVisualizationDialog.get_result() returns, so the existing
+        # VisualizationController registration logic can be reused rather than duplicated.
+        visualize_page = self._workbench.page_for(PipelineStage.VISUALIZE)
+        if isinstance(visualize_page, VisualizePage):
+            visualize_page.visualization_built.connect(
+                self._visualization_controller.register_built_visualization
+            )
+
+        # Milestone 25: PredictPage runs Automatic Model Competition off the UI thread with
+        # live status-bar progress -- see its own docstring for why it holds these two
+        # directly rather than through a controller, unlike every signal connection above.
+        predict_page = self._workbench.page_for(PipelineStage.PREDICT)
+        if isinstance(predict_page, PredictPage):
+            predict_page.set_worker_collaborators(self._worker_runner, self._status_bar)
+
+        # Milestone 23: "genuinely reachable" close actions -- see
+        # DockManager.connect_dataset_close_requested/connect_chart_closed's own
+        # docstrings for why these are wired as callbacks rather than QActions
+        # (there is no fixed, registrable set of "which dataset/chart" ids the way
+        # ActionRegistry's own entries are all parameter-free).
+        self._dock_manager.connect_dataset_close_requested(
+            self._dataset_controller.close_dataset
+        )
+        self._dock_manager.connect_chart_closed(
+            self._visualization_controller.on_chart_closed
+        )
+
+    def _on_ui_state_changed(self) -> None:
+        """Recompute and apply enablement -- the sole consumer of ``state_changed``.
+
+        Rebuilds a fresh :class:`~src.ui.actions.action_context.ActionContext`
+        from the live services on every call rather than tracking one
+        incrementally, per that class's own docstring. ``is_busy`` is
+        always ``False`` here: no current ``ActionSpec`` reads it, so wiring
+        live worker-busy tracking now would be speculative plumbing with no
+        predicate to observe it. ``can_undo``/``can_redo`` (milestone 23) are
+        real, read from :attr:`_command_stack`.
+
+        Milestone 20: also refreshes the Dataset Explorer's "Project" node
+        and the workbench's pipeline state -- ``state_changed`` already
+        fires at exactly the moments either could have changed (a project
+        opened/saved, a dataset activated, a stage ran), so this is the one
+        place both piggyback on rather than each needing their own
+        notification wiring.
         """
-        recorded = self._project_service.get_recorded_dataset_paths(project)
-        if not recorded:
-            return
-
-        failures: list[str] = []
-        for name, source_path in recorded:
-            try:
-                reader_class = get_reader_for_path(source_path)
-                available_tables = reader_class.list_tables(source_path)
-                if len(available_tables) > 1:
-                    failures.append(
-                        f"{name}: has multiple tables; re-open it manually "
-                        f"via Open Dataset and select a table."
-                    )
-                    continue
-                dataset = reader_class.read(source_path)
-            except ApplicationError as exc:
-                failures.append(f"{name}: {exc}")
-                continue
-
-            self._workspace_service.add_dataset(dataset)
-
-        self._dock_manager.refresh_dataset_list(self._workspace_service.list_datasets())
-
-        if failures:
-            failures_text = "\n".join(f"• {f}" for f in failures)
-            QMessageBox.warning(
-                self,
-                "Some Datasets Could Not Be Reloaded",
-                f"The project opened, but the following recorded "
-                f"dataset(s) could not be automatically reloaded:\n\n"
-                f"{failures_text}",
-            )
-
-    def _on_save_project(self) -> None:
-        project = self._project_service.get_active_project()
-        if project is None:
-            self._status_bar.show_message("No project is open to save.")
-            return
-
-        if project.path is None:
-            self._on_save_project_as()
-            return
-
-        self._project_service.record_datasets(
-            project, self._workspace_service.list_datasets()
+        context = ActionContext.capture(
+            project_service=self._project_service,
+            workspace_service=self._workspace_service,
+            settings_service=self._settings_service,
+            can_undo=self._command_stack.can_undo(),
+            can_redo=self._command_stack.can_redo(),
         )
+        self._binder.refresh_enablement(context)
 
-        try:
-            self._project_service.save_project(project)
-        except ApplicationError as exc:
-            QMessageBox.critical(self, "Failed to Save Project", str(exc))
-            _logger.warning("Failed to save project: %s", exc)
-            return
-
-        self._status_bar.show_message(f"Saved project: {project.name}")
-
-    def _on_save_project_as(self) -> None:
-        project = self._project_service.get_active_project()
-        if project is None:
-            self._status_bar.show_message("No project is open to save.")
-            return
-
-        file_path_str, _selected_filter = QFileDialog.getSaveFileName(
-            self, "Save Project As", f"{project.name}.uads.json", _PROJECT_FILE_FILTER
+        active_project = self._project_service.get_active_project()
+        self._dock_manager.set_project_label(
+            active_project.name if active_project is not None else None
         )
-        if not file_path_str:
-            return  # user cancelled the dialog
+        self._refresh_workbench()
 
-        self._project_service.record_datasets(
-            project, self._workspace_service.list_datasets()
-        )
-
-        try:
-            self._project_service.save_project(project, Path(file_path_str))
-        except ApplicationError as exc:
-            QMessageBox.critical(self, "Failed to Save Project", str(exc))
-            _logger.warning("Failed to save project as %s: %s", file_path_str, exc)
-            return
-
-        self._status_bar.show_message(f"Saved project: {project.name}")
-        self._menu_bar.update_recent_projects_menu(self._project_service.get_recent_projects())
-
-    # -- Dataset actions --------------------------------------------------------
-
-    def _on_open_dataset(self) -> None:
-        file_path_str, _selected_filter = QFileDialog.getOpenFileName(
-            self, "Open Dataset", "", _DATASET_FILE_FILTER
-        )
-        if not file_path_str:
-            return  # user cancelled the dialog
-
-        dataset_path = Path(file_path_str)
-
-        try:
-            reader_class = get_reader_for_path(dataset_path)
-        except ApplicationError as exc:
-            QMessageBox.critical(self, "Failed to Open Dataset", str(exc))
-            _logger.warning("No reader available for %s: %s", file_path_str, exc)
-            return
-
-        table_name = self._resolve_table_name(reader_class, dataset_path)
-        if table_name is _TABLE_SELECTION_CANCELLED:
-            return  # user cancelled the table-picker dialog
-        if table_name is _NO_TABLES_AVAILABLE:
-            # Not an error dialog (QMessageBox.critical) — a document
-            # with no detectable tables is not malformed, it simply
-            # has nothing tabular in it (a prose-only PDF; a Word doc
-            # with no tables). QMessageBox.information matches how
-            # this project already distinguishes "something went
-            # wrong" from "nothing to report" elsewhere (see the
-            # read_warnings handling below in this same method).
-            QMessageBox.information(
-                self,
-                "No Tables Found",
-                f"'{dataset_path.name}' does not appear to contain "
-                f"any tables that could be extracted as a dataset.",
-            )
-            _logger.info("No tables found in %s; nothing to load.", file_path_str)
-            return
-
-        try:
-            dataset = reader_class.read(dataset_path, table_name=table_name)
-        except ApplicationError as exc:
-            QMessageBox.critical(self, "Failed to Open Dataset", str(exc))
-            _logger.warning("Failed to open dataset from %s: %s", file_path_str, exc)
-            return
-
-        self._workspace_service.add_dataset(dataset)
-        self._workspace_service.set_active_dataset(dataset.dataset_id)
-        self._dock_manager.refresh_dataset_list(self._workspace_service.list_datasets())
-
-        self._status_bar.show_message(
-            f"Loaded dataset: {dataset.name} "
-            f"({dataset.row_count} rows × {dataset.column_count} cols)"
-        )
-        _logger.info(
-            "Dataset opened via UI: %s (%d rows, %d cols, %d warning(s))",
-            dataset.name,
-            dataset.row_count,
-            dataset.column_count,
-            len(dataset.read_warnings),
-        )
-
-        if dataset.read_warnings:
-            # Informational, not an error dialog — the load succeeded;
-            # these are non-fatal issues the reader flagged along the
-            # way (a skipped malformed row, an encoding fallback, an
-            # ambiguous-type column — see the individual readers in
-            # src.readers for what each one can report here). Surfaced
-            # as a dialog rather than folded into the transient status
-            # bar message (which times out and could be missed
-            # entirely) or left purely in the log (which a user would
-            # never see without deliberately opening the Log dock) —
-            # these warnings represent real, specific data-quality
-            # information the reader worked out, and discarding that
-            # silently after a successful load would waste it.
-            warnings_text = "\n".join(f"• {w}" for w in dataset.read_warnings)
-            QMessageBox.information(
-                self,
-                "Dataset Loaded with Warnings",
-                f"'{dataset.name}' was loaded successfully, but the "
-                f"following was noted while reading it:\n\n{warnings_text}",
-            )
-
-    def _on_create_visualization(self) -> None:
+    def _refresh_workbench(self) -> None:
+        """Push a fresh :class:`~src.ui.controllers.pipeline_controller.PipelineSnapshot`
+        into the workbench -- the sole place that reads
+        :class:`~src.services.analysis_orchestrator_service.AnalysisOrchestratorService`
+        state and translates it into what :class:`~src.ui.workbench.workbench.Workbench`
+        (a display-only widget with no service reference of its own) renders.
+        """
         active_dataset = self._workspace_service.get_active_dataset()
-        if active_dataset is None:
-            QMessageBox.information(
-                self,
-                "No Active Dataset",
-                "Open or select a dataset before creating a visualization.",
-            )
-            return
-
-        dialog = CreateVisualizationDialog(active_dataset.dataframe, self)
-        if dialog.exec() != CreateVisualizationDialog.DialogCode.Accepted:
-            return
-
-        figure, chart_type, parameters = dialog.get_result()
-
-        visualization = Visualization(
-            name=parameters.get("title") or f"{chart_type} of {active_dataset.name}",
-            dataset_id=active_dataset.dataset_id,
-            figure=figure,
-            chart_type=chart_type,
-            chart_parameters=parameters,
-        )
-        self._workspace_service.add_visualization(visualization)
-        self._workspace_service.set_active_visualization(visualization.visualization_id)
-        self._dock_manager.display_chart(figure)
-
-        self._status_bar.show_message(f"Created visualization: {visualization.name}")
-        _logger.info(
-            "Visualization created via UI: %s (%s)", visualization.name, chart_type
+        snapshot = self._pipeline_controller.snapshot_for_active_dataset()
+        log = snapshot.log if snapshot is not None else None
+        proposal = snapshot.proposal if snapshot is not None else None
+        self._workbench.update_pipeline_state(
+            dataset_active=active_dataset is not None, log=log, proposal=proposal
         )
 
-    def _on_create_dashboard(self) -> None:
-        """Combine every currently tracked visualization into one auto-arranged dashboard.
+        understand_page = self._workbench.page_for(PipelineStage.UNDERSTAND)
+        if isinstance(understand_page, UnderstandPage) and log is not None:
+            understand_entries = [
+                entry
+                for entry in log.entries
+                if entry.stage == PipelineStage.UNDERSTAND
+            ]
+            if understand_entries:
+                understand_page.show_profile_summary(understand_entries[-1].outputs)
 
-        A first, bounded version — combines all visualizations rather
-        than offering a picker/layout designer, which is real
-        additional UI work not built yet. Grid arranged 2 columns
-        wide, row-major order, matching how many tiles happen to
-        exist.
-        """
-        visualizations = self._workspace_service.list_visualizations()
-        if len(visualizations) < 2:
-            QMessageBox.information(
-                self,
-                "Not Enough Visualizations",
-                "Create at least 2 visualizations before building a dashboard.",
-            )
-            return
+        # Milestone 22: AnalyzePage/ExplorePage hold a plain Dataset (not a service
+        # reference -- see AnalyzePage's own docstring), so this is the same "structure
+        # here, behavior wired by the caller" hand-off UnderstandPage.show_profile_summary
+        # above already uses, just handing over the dataset itself instead of a log entry.
+        analyze_page = self._workbench.page_for(PipelineStage.ANALYZE)
+        if isinstance(analyze_page, AnalyzePage):
+            analyze_page.set_dataset(active_dataset)
+        explore_page = self._workbench.page_for(PipelineStage.EXPLORE)
+        if isinstance(explore_page, ExplorePage):
+            explore_page.set_dataset(active_dataset)
 
-        columns_per_row = 2
-        tiles = [
-            DashboardTile(
-                visualization_id=viz.visualization_id,
-                row=i // columns_per_row,
-                column=i % columns_per_row,
-            )
-            for i, viz in enumerate(visualizations)
-        ]
-        dashboard = Dashboard(name="Dashboard", tiles=tiles)
+        # Milestone 23: same hand-off, plus feeding the real
+        # get_lineage/get_children output into LineageView -- see
+        # CleanPage.show_lineage's own docstring for why the page itself
+        # never calls WorkspaceService directly.
+        clean_page = self._workbench.page_for(PipelineStage.CLEAN)
+        if isinstance(clean_page, CleanPage):
+            clean_page.set_dataset(active_dataset)
+            if active_dataset is not None:
+                ancestors = self._workspace_service.get_lineage(
+                    active_dataset.dataset_id
+                )
+                descendants = self._workspace_service.get_children(
+                    active_dataset.dataset_id
+                )
+                clean_page.show_lineage(ancestors, active_dataset, descendants)
+            else:
+                clean_page.show_lineage([], None, [])
 
-        try:
-            self._workspace_service.add_dashboard(dashboard)
-            resolved = self._workspace_service.get_dashboard_tiles(dashboard.dashboard_id)
-            combined_figure = render_dashboard(dashboard, resolved)
-        except ApplicationError as exc:
-            QMessageBox.critical(self, "Failed to Create Dashboard", str(exc))
-            _logger.warning("Dashboard creation failed: %s", exc)
-            return
+        # Milestone 24: same hand-off as AnalyzePage/ExplorePage above.
+        visualize_page = self._workbench.page_for(PipelineStage.VISUALIZE)
+        if isinstance(visualize_page, VisualizePage):
+            visualize_page.set_dataset(active_dataset)
 
-        self._dock_manager.display_chart(combined_figure)
-        self._status_bar.show_message(
-            f"Created dashboard with {len(tiles)} visualization(s)."
-        )
-        _logger.info("Dashboard created via UI: %d tile(s).", len(tiles))
+        # Milestone 25: same hand-off as AnalyzePage/ExplorePage/VisualizePage above.
+        predict_page = self._workbench.page_for(PipelineStage.PREDICT)
+        if isinstance(predict_page, PredictPage):
+            predict_page.set_dataset(active_dataset)
 
-    def _resolve_table_name(self, reader_class, dataset_path: Path):
-        """Determine which table to read, prompting the user if more than one exists.
-
-        Calls :meth:`~src.readers.base_reader.BaseReader.list_tables`
-        unconditionally rather than only for readers known to be
-        multi-table — every reader supports this method (single-table
-        readers inherit a default that returns one name derived from
-        the file itself; see ``BaseReader.list_tables``'s own
-        docstring), so this method does not need to know or check
-        which kind of reader it was given.
-
-        Returns:
-            ``None`` if the source has exactly one table (no picker
-            was needed; :meth:`~src.readers.base_reader.BaseReader.read`
-            should be called with ``table_name=None``, which every
-            reader handles correctly for the single-table case).
-            A table name string if the user picked one from a
-            multi-table source.
-            :data:`_TABLE_SELECTION_CANCELLED` if the source has more
-            than one table and the user cancelled the picker dialog.
-            :data:`_NO_TABLES_AVAILABLE` if the source has zero
-            tables — a genuinely valid state for some formats (a
-            text-only PDF, a Word document with no tables; see
-            :mod:`src.readers.pdf_reader` and
-            :mod:`src.readers.word_reader`), not an error condition.
-            Callers must check for both sentinels specifically (not
-            just falsiness) before proceeding, since ``None`` is
-            itself a legitimate, different return value from either.
-
-        If :meth:`list_tables` itself raises (a corrupted file, for
-        instance), this method does not catch that — it propagates to
-        :meth:`_on_open_dataset`'s caller, which already wraps the
-        subsequent :meth:`~src.readers.base_reader.BaseReader.read`
-        call in the same kind of error handling; letting this
-        propagate the same way (rather than duplicating a try/except
-        here) keeps error handling for "this file is unreadable" in
-        one place regardless of which step first discovers it.
-        """
-        available_tables = reader_class.list_tables(dataset_path)
-
-        if len(available_tables) == 0:
-            return _NO_TABLES_AVAILABLE
-
-        if len(available_tables) == 1:
-            return None
-
-        chosen_name, user_confirmed = QInputDialog.getItem(
-            self,
-            "Select Table",
-            f"'{dataset_path.name}' contains {len(available_tables)} "
-            f"tables. Which one would you like to open?",
-            available_tables,
-            0,
-            False,  # editable=False: user must pick from the list, not type a name
-        )
-        if not user_confirmed:
-            return _TABLE_SELECTION_CANCELLED
-        return chosen_name
+        self._guidance_controller.refresh_suggestions(active_dataset)
 
     # -- Settings / theme / about -----------------------------------------------
-
-    def _on_open_settings(self) -> None:
-        dialog = SettingsDialog(self._settings_service, self)
-        if dialog.exec() == SettingsDialog.DialogCode.Accepted:
-            self._apply_theme_from_settings()
-
-    def _on_toggle_theme(self) -> None:
-        current = self._settings_service.get("theme", default="dark")
-        new_theme = "light" if current == "dark" else "dark"
-        self._settings_service.set("theme", value=new_theme)
-        self._settings_service.save()
-        self._apply_theme_from_settings()
-
-    def _apply_theme_from_settings(self) -> None:
-        theme_manager: ThemeManager = self.property("theme_manager")
-        if theme_manager is None:
-            _logger.warning(
-                "No ThemeManager attached to main window; cannot apply theme change."
-            )
-            return
-        theme_name = self._settings_service.get("theme", default="dark")
-        theme_manager.apply_theme(theme_name)
+    # Milestone 26: the handlers themselves moved to ThemeController (see that module's own
+    # docstring for why) -- attach_theme_manager stays here since src/core/app.py calls it
+    # externally and it mutates __init__-only state (self._icon_provider/self._dock_manager).
 
     def attach_theme_manager(self, theme_manager: ThemeManager) -> None:
         """Attach the running application's :class:`~src.ui.theme_manager.ThemeManager`.
@@ -539,33 +485,69 @@ class MainWindow(QMainWindow):
         Called once by :mod:`src.core.app` after both the
         ``QApplication`` and this window exist, since ``ThemeManager``
         wraps the live application instance and cannot be constructed
-        before it. Stored via ``QWidget.setProperty`` rather than a
-        plain attribute purely so :meth:`_apply_theme_from_settings`
-        has a single, explicit way to check "has this been attached
-        yet" via ``property()`` returning ``None`` — a plain attribute
-        would need a separate ``hasattr`` check or an ``Optional``
-        instance attribute initialized in ``__init__`` before this
-        method could ever run, and ``ThemeManager`` genuinely cannot
-        exist that early (see above).
+        before it. Stored via ``QWidget.setProperty`` rather than a plain
+        attribute purely so :meth:`~src.ui.controllers.theme_controller.
+        ThemeController.apply_theme_from_settings` has a single, explicit
+        way to check "has this been attached yet" via ``property()``
+        returning ``None`` -- a plain attribute would need a separate
+        ``hasattr`` check or an ``Optional`` instance attribute
+        initialized in ``__init__`` before this method could ever run,
+        and ``ThemeManager`` genuinely cannot exist that early (see
+        above).
         """
         self.setProperty("theme_manager", theme_manager)
+        # Milestone 16: the dock manager's open chart tabs need to hear
+        # about theme changes too, to recolour via Plotly.relayout -- see
+        # DockManager.attach_theme_manager for why this is a separate call
+        # rather than DockManager reading self.property("theme_manager")
+        # itself (it would need a live QWidget reference to do that, which
+        # this class already is and DockManager deliberately is not).
+        self._dock_manager.attach_theme_manager(theme_manager)
 
-    def _on_open_about(self) -> None:
-        dialog = AboutDialog(self)
-        dialog.exec()
+        # Milestone 17: self._icon_provider was constructed with DARK_TOKENS
+        # as a placeholder in __init__ (ThemeManager did not exist yet) --
+        # correct it to the real, configured theme now, and keep it
+        # current on every future toggle. current_tokens() is not None
+        # here: src/core/app.py always calls apply_theme() before this
+        # method, so a theme has already been applied by this point.
+        current_tokens = theme_manager.current_tokens()
+        if current_tokens is not None:
+            self._icon_provider.set_tokens(current_tokens)
+        theme_manager.theme_changed.connect(
+            lambda _name: self._icon_provider.set_tokens(theme_manager.current_tokens())
+        )
+
+        self._guidance_controller.set_theme_manager(theme_manager)
+
+        # Milestone 28: seed, then subscribe -- same shape as the icon
+        # provider wiring above, for reduced_motion instead of tokens.
+        self._status_bar.set_reduced_motion(theme_manager.reduced_motion())
+        theme_manager.reduced_motion_changed.connect(
+            self._status_bar.set_reduced_motion
+        )
 
     # -- Window lifecycle --------------------------------------------------------
 
-    def closeEvent(self, event) -> None:  # noqa: N802 — Qt's own method naming
-        """Detach the logging-panel handler before the window closes.
+    def closeEvent(self, event) -> None:
+        """Tear down long-lived resources before the window closes.
 
-        Without this, the root logger retains a handler wrapping this
-        window's (about-to-be-destroyed) logging dock widget; any log
-        call after close would raise when the handler tried to write
-        to a widget that no longer exists. See
-        :meth:`~src.ui.dock_manager.DockManager.remove_log_handler`'s
-        own docstring for the same reasoning.
+        Detaches the logging-panel handler first: without this, the root
+        logger retains a handler wrapping this window's
+        (about-to-be-destroyed) logging dock widget, and any log call
+        after close would raise when the handler tried to write to a
+        widget that no longer exists -- see
+        :meth:`~src.ui.dock_manager.DockManager.remove_log_handler`'s own
+        docstring for the same reasoning.
+
+        Milestone 19: also closes every live database connection this
+        session opened. Before this milestone nothing called
+        :meth:`~src.services.database_connection_service.
+        DatabaseConnectionService.close_all_connections` from the UI at
+        all -- a connection opened via Connect to Database stayed open
+        until the process exited rather than being released when the
+        window that opened it closed.
         """
         self._dock_manager.remove_log_handler()
+        self._database_service.close_all_connections()
         _logger.info("Main window closing.")
         super().closeEvent(event)

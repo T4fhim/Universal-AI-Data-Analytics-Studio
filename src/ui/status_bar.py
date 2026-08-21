@@ -15,7 +15,7 @@ permanent messages:
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QLabel, QMainWindow, QStatusBar
+from PySide6.QtWidgets import QLabel, QMainWindow, QProgressBar, QStatusBar
 
 from src.core.logger import get_logger
 
@@ -34,13 +34,159 @@ class ApplicationStatusBar(QStatusBar):
     def __init__(self, parent_window: QMainWindow) -> None:
         super().__init__(parent_window)
 
-        self._project_label = QLabel("No project open")
+        self._project_label = QLabel(self.tr("No project open"))
         self.addPermanentWidget(self._project_label)
+
+        # Busy indicator (milestone 6): indeterminate (0/0 range) rather
+        # than a real percentage, since most background tasks wrapped by
+        # src.workers.BaseWorker (dataset reads, dashboard renders) have
+        # no natural sub-steps to report progress against — this widget
+        # exists to make "something is happening on a worker thread"
+        # visible, not to report exact completion. Retained as an
+        # instance attribute per this repo's Live Widget References
+        # convention (see the pyside6-development skill) so
+        # show_busy/hide_busy can update it without reconstructing it.
+        self._busy_indicator = QProgressBar(self)
+        self._busy_indicator.setRange(0, 0)
+        self._busy_indicator.setMaximumWidth(120)
+        self._busy_indicator.setTextVisible(False)
+        self._busy_indicator.setVisible(False)
+        self.addPermanentWidget(self._busy_indicator)
+
+        # Milestone 28: an indeterminate QProgressBar is Qt's own built-in
+        # "marquee" animation -- the one piece of real, continuous motion
+        # this application had before this milestone (see this module's own
+        # audit-count note in the M28 commit for how that was discovered:
+        # nothing else in src/ui/ animates at all). reduced_motion swaps it
+        # for a static, fully-filled bar instead of removing the busy
+        # indicator entirely -- "something is happening" must still be
+        # visible, only the continuous motion goes away.
+        self._reduced_motion = False
+        # Whether show_busy() is the last of show_busy/show_progress/
+        # hide_busy that ran -- tracked explicitly rather than read back via
+        # QProgressBar.isVisible(), because isVisible() reflects whether the
+        # widget is actually painted on screen (false for the entire life of
+        # an offscreen-platform test that never calls window.show(), and
+        # briefly false in real usage too, between construction and the
+        # main window's own first show()). A setting toggle must take
+        # effect the moment a busy operation is logically in progress, not
+        # only once Qt's own screen-visibility machinery agrees it is.
+        self._busy = False
 
         self.showMessage("Ready")
         _logger.debug("Status bar constructed.")
 
-    def show_message(self, message: str, timeout_ms: int = _DEFAULT_MESSAGE_TIMEOUT_MS) -> None:
+    def set_reduced_motion(self, enabled: bool) -> None:
+        """Enable or disable the reduced-motion busy-indicator style.
+
+        Args:
+            enabled: Mirrors ``accessibility.reduced_motion`` in
+                ``config.yaml`` -- see
+                :meth:`~src.ui.theme_manager.ThemeManager.set_reduced_motion`,
+                whose :attr:`~src.ui.theme_manager.ThemeManager.
+                reduced_motion_changed` signal :class:`~src.ui.main_window.
+                MainWindow` connects directly to this method.
+
+        Applied immediately to a currently-visible indicator (not only to
+        the next :meth:`show_busy` call) so toggling the setting while a
+        long operation is already running takes effect right away, rather
+        than only from the next operation onward.
+        """
+        if enabled == self._reduced_motion:
+            return
+        self._reduced_motion = enabled
+        # A determinate, real-percentage report from show_progress() clears
+        # self._busy (see that method) and is left alone here -- it already
+        # carries genuine information (how far along the operation is) that
+        # switching ranges out from under it would destroy.
+        if self._busy:
+            self._set_busy_range()
+
+    def _set_busy_range(self) -> None:
+        """Set the indicator's range for the current busy state, honoring reduced motion.
+
+        A static ``(0, 1)`` range with ``value=1`` renders as a fully-filled,
+        motionless bar -- still visually distinct from "idle" (the indicator
+        is hidden entirely when idle, via :meth:`hide_busy`), just without
+        Qt's continuous marquee animation.
+        """
+        if self._reduced_motion:
+            self._busy_indicator.setRange(0, 1)
+            self._busy_indicator.setValue(1)
+        else:
+            self._busy_indicator.setRange(0, 0)
+
+    def show_busy(self, message: str = "Working…") -> None:
+        """Show the busy indicator and a transient status message.
+
+        Args:
+            message: Shown via :meth:`show_message` alongside the
+                indicator, with a zero timeout (stays until
+                :meth:`hide_busy` or the next message replaces it)
+                since a busy operation's duration isn't known in
+                advance.
+
+        Resets the indicator's range even if a previous
+        :meth:`show_progress` call left it determinate — a new busy
+        operation starting should not inherit a stale percentage from
+        whatever the last one reported. Indeterminate (0/0, Qt's animated
+        marquee) unless reduced motion is enabled, in which case it is a
+        static, fully-filled bar — see :meth:`_set_busy_range`.
+        """
+        self._busy = True
+        self._set_busy_range()
+        self._busy_indicator.setVisible(True)
+        self.show_message(message, timeout_ms=0)
+
+    def show_progress(self, percent: int, message: str = "") -> None:
+        """Switch the busy indicator to determinate and report ``percent``.
+
+        Args:
+            percent: 0-100, matching
+                :attr:`~src.workers.base_worker.WorkerSignals.progress`'s
+                own contract — connect a worker's ``signals.progress``
+                directly to this method.
+            message: Shown alongside the percentage via
+                :meth:`show_message`, with a zero timeout for the same
+                reason :meth:`show_busy` uses one. Skipped entirely when
+                empty, so a caller reporting bare percentage with no
+                status text does not blank out whatever message
+                :meth:`show_busy` already set.
+
+        Milestone 17: no wrapped callable in this codebase calls its
+        ``progress_callback`` yet (confirmed by grep — every existing
+        ``BaseWorker(..., report_progress=True)`` call site remains
+        ``report_progress=False``), so this method exists and every
+        current worker's ``signals.progress`` is connected to it, but
+        nothing currently emits it. That is deliberate, incremental
+        wiring, not a partial implementation: milestone 25 is where the
+        first real caller (``compare_forecast_models``) gains a
+        ``progress_callback`` parameter. Calling this method before that
+        lands is harmless — it simply never happens.
+        """
+        # Milestone 28: a real, determinate percentage is not the
+        # reduced-motion-sensitive state _busy tracks -- see
+        # set_reduced_motion's own comment for why a live toggle leaves a
+        # determinate report untouched.
+        self._busy = False
+        self._busy_indicator.setRange(0, 100)
+        self._busy_indicator.setValue(max(0, min(100, percent)))
+        if message:
+            self.show_message(message, timeout_ms=0)
+
+    def hide_busy(self) -> None:
+        """Hide the busy indicator.
+
+        Does not clear the transient message area — callers typically
+        follow this with their own ``show_message`` reporting the
+        operation's outcome (e.g. "Loaded dataset: ...").
+        """
+        self._busy = False
+        self._busy_indicator.setVisible(False)
+
+    def show_message(
+        self, message: str, timeout_ms: int = _DEFAULT_MESSAGE_TIMEOUT_MS
+    ) -> None:
         """Show a transient message that clears after ``timeout_ms``.
 
         Args:

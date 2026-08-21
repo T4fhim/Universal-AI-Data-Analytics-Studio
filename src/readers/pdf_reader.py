@@ -224,8 +224,7 @@ class PdfReader(BaseReader):
             )
 
         _logger.info(
-            "Read PDF table '%s' from %s: %d rows, %d columns, "
-            "%d warning(s).",
+            "Read PDF table '%s' from %s: %d rows, %d columns, " "%d warning(s).",
             available_names[selected_index],
             path,
             len(dataframe),

@@ -96,9 +96,7 @@ class DependencyContainer:
         self._factories[key] = factory
         self._singletons[key] = singleton
         self._instances.pop(key, None)
-        _logger.debug(
-            "Registered %s (singleton=%s)", _describe_key(key), singleton
-        )
+        _logger.debug("Registered %s (singleton=%s)", _describe_key(key), singleton)
 
     def resolve(self, key: object) -> object:
         """Resolve and return an instance for ``key``.

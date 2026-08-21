@@ -170,9 +170,7 @@ class JsonReader(BaseReader):
             )
 
         has_nested_values = any(
-            isinstance(value, (dict, list))
-            for item in items
-            for value in item.values()
+            isinstance(value, (dict, list)) for item in items for value in item.values()
         )
 
         if has_nested_values:
@@ -242,9 +240,7 @@ class JsonReader(BaseReader):
             if isinstance(value, dict)
         }
         dataframe_column_names = set(dataframe.columns)
-        shadow_columns = sorted(
-            fields_nested_in_some_row & dataframe_column_names
-        )
+        shadow_columns = sorted(fields_nested_in_some_row & dataframe_column_names)
         if shadow_columns:
             warnings.append(
                 f"Column(s) {', '.join(shadow_columns)} may be "

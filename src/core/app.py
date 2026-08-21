@@ -60,7 +60,7 @@ class Application:
         return cls(context)
 
     @property
-    def config(self):  # noqa: ANN201 — return type is AppConfig; see note below
+    def config(self):
         """Return the application's loaded configuration.
 
         Typed as a property rather than a plain attribute so that
@@ -104,12 +104,25 @@ class Application:
         # correctly in a normal browser but stayed blank inside the app,
         # isolating the failure to Qt's GPU compositing path specifically.
         from PySide6.QtCore import QCoreApplication, Qt
+
         QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_UseSoftwareOpenGL)
         QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
 
         qt_application = QApplication(sys.argv)
 
         theme_manager = ThemeManager(qt_application)
+        # Milestone 28: seed the accessibility settings before the first
+        # apply_theme() call below, not after -- both setters only
+        # re-apply the theme if one is already current (see their own
+        # docstrings), and setting them first means the very first
+        # stylesheet compiled is already correct instead of compiling once
+        # with theme-default sizes and immediately recompiling.
+        theme_manager.set_base_font_size(
+            self._context.config.accessibility_base_font_size
+        )
+        theme_manager.set_reduced_motion(
+            self._context.config.accessibility_reduced_motion
+        )
         theme_manager.apply_theme(self._context.config.theme)
 
         main_window = MainWindow(self._context)

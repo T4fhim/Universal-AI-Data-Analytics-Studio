@@ -153,8 +153,7 @@ class WordReader(BaseReader):
         dataframe, warnings = cls._table_to_dataframe(selected_table, path)
 
         _logger.info(
-            "Read Word table '%s' from %s: %d rows, %d columns, "
-            "%d warning(s).",
+            "Read Word table '%s' from %s: %d rows, %d columns, " "%d warning(s).",
             available_names[selected_index],
             path,
             len(dataframe),
@@ -194,9 +193,7 @@ class WordReader(BaseReader):
             ) from exc
 
     @classmethod
-    def _table_to_dataframe(
-        cls, table, path: Path
-    ) -> tuple[pd.DataFrame, list[str]]:
+    def _table_to_dataframe(cls, table, path: Path) -> tuple[pd.DataFrame, list[str]]:
         """Convert a python-docx Table object into a DataFrame, using row 1 as the header.
 
         Returns a ``(dataframe, warnings)`` pair rather than just a

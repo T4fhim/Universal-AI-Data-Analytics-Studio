@@ -1,0 +1,139 @@
+name: CI
+
+# Milestone 16. black/isort/mypy/pytest were declared dependencies with no
+# committed config and no gate before this -- every guard test the UI
+# overhaul milestones add (test_module_size, test_import_layering, the
+# contrast suite, and future ones: assert_all_bound in M17, the a11y audit
+# in M28) is inert unless something runs it on every change. This is that
+# something.
+#
+# Runs on windows-latest, not a Linux runner: this repository's verified
+# development and test environment is Windows (see CLAUDE.md/README), and
+# QWebEngineView-related tests (tests/ui/widgets/test_chart_view.py's
+# @pytest.mark.webengine class, and the confirmed Windows-specific shutdown
+# crash the pyside6-development skill documents) are exactly the surface
+# this milestone touches -- running CI on the same OS family as the one the
+# original defects were found on is more representative than a Linux
+# runner would be, and avoids an unverified system-package list for
+# QtWebEngine's Linux dependencies (Mesa/EGL/NSS/etc.) that nothing in this
+# environment could confirm is correct before this file's first real run.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    env:
+      # Set once, for the whole job, matching tests/ui/conftest.py's own
+      # requirement that this be set before any PySide6 import happens.
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: black --check
+        run: python -m black --check src/ tests/
+
+      - name: isort --check-only
+        run: python -m isort --check-only src/ tests/
+
+      - name: mypy (clean packages)
+        # Scoped, not repo-wide: this scope was frozen at four foundation
+        # packages from milestone 16 through the remediation pass that added
+        # this comment, even though later milestones (19-27) built whole new
+        # packages -- controllers, workbench, widgets, results -- that were
+        # never folded in, so mypy stopped meaning anything for roughly a
+        # third of src/ui/. The remediation pass re-ran a from-scratch
+        # `mypy --follow-imports=silent` against the full src/ tree, found 79
+        # errors (fixed 7 genuine, narrowly-scoped bugs along the way -- see
+        # git history for this comment's commit -- leaving 72), and widened
+        # this list to every package/module that is now genuinely clean:
+        # src/core, src/services, src/analysis, src/database, src/workers,
+        # and (within src/ui/) theme, a11y, web, actions, controllers,
+        # workbench, widgets, results, dialogs, and every standalone
+        # top-level src/ui/*.py module except main_window.py. What's
+        # deliberately still excluded -- src/ui/main_window.py itself (the
+        # DependencyContainer.resolve() -> object gap), src/ai, src/reports,
+        # src/visualization, src/forecasting, src/cleaning, src/readers,
+        # src/plugins -- is real, categorized, pre-existing debt, not
+        # forgotten scope: see docs/MYPY_DEBT.md for exactly what's excluded
+        # and why, so the next milestone that makes one of those clean knows
+        # to add it here rather than this list silently going stale again.
+        # This list is still expected to grow the same way
+        # tests/ui/test_module_size.py's _LEGACY_EXEMPTIONS shrinks, rather
+        # than one big repo-wide fix landing all at once.
+        #
+        # --follow-imports=silent: several of these modules (e.g.
+        # controllers/*, actions/action_context.py) import the services
+        # layer (ProjectService/WorkspaceService/SettingsService/
+        # PipelineStage) and src/ui/main_window.py to build snapshots/wire
+        # collaborators, and without this flag mypy also emits diagnostics
+        # for *those* modules' own pre-existing errors -- this flag keeps
+        # mypy using their type signatures for checking the modules listed
+        # here while not holding them responsible for fixing debt in modules
+        # they merely call into.
+        run: python -m mypy src/core src/services src/analysis src/database
+          src/workers src/ui/theme src/ui/a11y src/ui/web src/ui/actions
+          src/ui/controllers src/ui/workbench src/ui/widgets src/ui/results
+          src/ui/dialogs src/ui/command_stack.py src/ui/command_palette.py
+          src/ui/dataset_close_menu.py src/ui/dock_manager.py
+          src/ui/menu_bar.py src/ui/status_bar.py src/ui/theme_manager.py
+          src/ui/toolbar.py src/ui/ui_state_bus.py src/ui/worker_runner.py
+          src/ui/__init__.py --ignore-missing-imports --follow-imports=silent
+
+      - name: pytest
+        # -m "not uia_integration" excludes tests/ui/a11y/test_uia_integration.py's
+        # three real-window UIA tests from this blocking gate -- see the
+        # separate uia_integration job below for why they run there instead,
+        # not here.
+        run: python -m pytest tests/ -q -m "not uia_integration"
+
+  uia_integration:
+    # Milestone 28 follow-up (Tier 1 of the NVDA-pass accommodation, see
+    # docs/M28_MANUAL_VERIFICATION.md). A deliberately separate, non-blocking
+    # job, not a step folded into `test` above -- judgment call, recorded
+    # here rather than silently decided:
+    #
+    # tests/ui/a11y/test_uia_integration.py launches a real, visible
+    # top-level window (its own process, forcing QT_QPA_PLATFORM=windows
+    # regardless of this job's own env -- see that test module's docstring)
+    # and drives it with pywinauto's real UIA backend, exactly the kind of
+    # "actually pops a window and does real OS-level input/COM automation"
+    # test this repository's other guarded tiers (see the `webengine`
+    # marker's own comment on test_chart_view.py) have already found more
+    # failure-prone than a plain unit/offscreen-widget test. Manual
+    # verification while building this test (see that module's own
+    # docstring) found individual UI Automation queries occasionally slow,
+    # and on repeated connects to the same long-lived process,
+    # non-deterministically stalling -- mitigated there with per-test bounded
+    # timeouts and a fresh process per test, but not eliminated as a risk
+    # this early. `continue-on-error: true` means a stall or a real-window
+    # limitation specific to a given runner cannot fail the required `test`
+    # job's status check; this job's own pass/fail is still visible on every
+    # run, so a regression here is noticed, just not gate-blocking yet.
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: pytest (UIA integration)
+        run: python -m pytest tests/ui/a11y/test_uia_integration.py -q -m uia_integration

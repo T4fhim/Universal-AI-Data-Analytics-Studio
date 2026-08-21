@@ -3,8 +3,9 @@
 
 Verifies the fixed startup sequence documented in bootstrap.py's own
 module docstring: config load, logging configuration, and registration
-of AppConfig, ApplicationState, SettingsService, ProjectService, and
-WorkspaceService into the returned BootstrapContext's container.
+of AppConfig, ApplicationState, SettingsService, ProjectService,
+WorkspaceService, and (milestone 9) AnalysisOrchestratorService into
+the returned BootstrapContext's container.
 """
 
 from __future__ import annotations
@@ -16,7 +17,10 @@ import yaml
 from src.core.application_state import ApplicationState
 from src.core.bootstrap import BootstrapContext, bootstrap
 from src.core.config import AppConfig, load_config
+from src.plugins.plugin_manager import PluginManager
+from src.services.analysis_orchestrator_service import AnalysisOrchestratorService
 from src.services.project_service import ProjectService
+from src.services.report_service import ReportService
 from src.services.settings_service import SettingsService
 from src.services.workspace_service import WorkspaceService
 
@@ -41,6 +45,7 @@ def test_bootstrap_registers_all_milestone_services(
     assert context.container.is_registered(SettingsService)
     assert context.container.is_registered(ProjectService)
     assert context.container.is_registered(WorkspaceService)
+    assert context.container.is_registered(AnalysisOrchestratorService)
 
     # Each resolves to the expected concrete type and is a singleton
     # (same instance on repeated resolution).
@@ -51,6 +56,25 @@ def test_bootstrap_registers_all_milestone_services(
     assert isinstance(context.container.resolve(WorkspaceService), WorkspaceService)
     assert context.container.resolve(WorkspaceService) is context.container.resolve(
         WorkspaceService
+    )
+    assert isinstance(
+        context.container.resolve(AnalysisOrchestratorService),
+        AnalysisOrchestratorService,
+    )
+    assert context.container.resolve(
+        AnalysisOrchestratorService
+    ) is context.container.resolve(AnalysisOrchestratorService)
+
+    assert context.container.is_registered(PluginManager)
+    assert isinstance(context.container.resolve(PluginManager), PluginManager)
+    assert context.container.resolve(PluginManager) is context.container.resolve(
+        PluginManager
+    )
+
+    assert context.container.is_registered(ReportService)
+    assert isinstance(context.container.resolve(ReportService), ReportService)
+    assert context.container.resolve(ReportService) is context.container.resolve(
+        ReportService
     )
 
 

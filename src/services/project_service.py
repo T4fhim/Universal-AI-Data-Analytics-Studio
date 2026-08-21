@@ -98,13 +98,11 @@ class Project:
         """
         if "name" not in data:
             raise ServiceError(
-                f"Project file at {path} is missing the required "
-                f"'name' field."
+                f"Project file at {path} is missing the required 'name' field."
             )
         if not isinstance(data.get("contents", {}), dict):
             raise ServiceError(
-                f"Project file at {path} has a 'contents' field that "
-                f"is not a mapping."
+                f"Project file at {path} has a 'contents' field that is not a mapping."
             )
         return cls(
             name=data["name"],
@@ -172,7 +170,9 @@ class ProjectService:
             with path.open("r", encoding="utf-8") as handle:
                 data = json.load(handle)
         except json.JSONDecodeError as exc:
-            raise ServiceError(f"Project file at {path} is not valid JSON: {exc}") from exc
+            raise ServiceError(
+                f"Project file at {path} is not valid JSON: {exc}"
+            ) from exc
         except OSError as exc:
             raise ServiceError(f"Failed to read project file at {path}: {exc}") from exc
 
@@ -222,7 +222,9 @@ class ProjectService:
             with destination.open("w", encoding="utf-8") as handle:
                 json.dump(project.to_json_dict(), handle, indent=2)
         except OSError as exc:
-            raise ServiceError(f"Failed to write project file to {destination}: {exc}") from exc
+            raise ServiceError(
+                f"Failed to write project file to {destination}: {exc}"
+            ) from exc
 
         self._add_to_recent(destination)
         _logger.info("Saved project: %s (%s)", project.name, destination)
@@ -319,6 +321,60 @@ class ProjectService:
         """
         raw_records = project.contents.get("datasets", [])
         return [(record["name"], Path(record["source_path"])) for record in raw_records]
+
+    def record_analysis_log(
+        self, project: Project, dataset_id: str, log_dict: dict[str, Any]
+    ) -> None:
+        """Record one dataset's :class:`~src.services.analysis_orchestrator_service.AnalysisLog`.
+
+        Args:
+            project: The project to record into. Mutated in place,
+                matching :meth:`record_datasets`'s own convention.
+            dataset_id: Which dataset this log belongs to — also the
+                key under ``project.contents["analysis_logs"]``, so a
+                project can hold one log per dataset it has ever run
+                pipeline stages against.
+            log_dict: The already-serialized log (typically
+                ``AnalysisLog.to_dict()``'s return value). This method
+                takes a plain dict, not the ``AnalysisLog`` dataclass
+                itself, for the same reason :meth:`record_datasets`
+                takes a plain ``list`` rather than ``list[Dataset]`` —
+                this module deliberately does not import
+                ``src.services.analysis_orchestrator_service`` (or
+                ``src.services.workspace_service``), keeping every
+                service's dependencies as narrow as this module's own
+                docstring already establishes for datasets.
+
+        Does not itself call :meth:`save_project` — same two-step
+        "update contents, then save separately" pattern as
+        :meth:`record_datasets`.
+        """
+        analysis_logs = project.contents.setdefault("analysis_logs", {})
+        analysis_logs[dataset_id] = log_dict
+        _logger.info(
+            "Recorded analysis log for dataset %s into project '%s' (%d entries).",
+            dataset_id,
+            project.name,
+            len(log_dict.get("entries", [])),
+        )
+
+    def get_recorded_analysis_logs(self, project: Project) -> dict[str, dict[str, Any]]:
+        """Return every recorded ``dataset_id -> log dict`` pair from ``project``.
+
+        Mirrors :meth:`get_recorded_dataset_paths`: reads back what
+        :meth:`record_analysis_log` wrote, returning an empty dict for
+        a project saved before milestone 9 (or one with no pipeline
+        history yet) rather than raising. The caller (typically
+        :mod:`src.ui.main_window`, resolving
+        :class:`~src.services.analysis_orchestrator_service.
+        AnalysisOrchestratorService` from the same container) is
+        responsible for turning each dict back into an
+        ``AnalysisLog`` via ``AnalysisLog.from_dict()`` and installing
+        it via ``AnalysisOrchestratorService.load_log()`` — this
+        service only reports what was recorded, matching how it
+        already treats dataset reloading as someone else's job.
+        """
+        return dict(project.contents.get("analysis_logs", {}))
 
     def get_recent_projects(self) -> list[str]:
         """Return the current recent-projects list, most recent first."""

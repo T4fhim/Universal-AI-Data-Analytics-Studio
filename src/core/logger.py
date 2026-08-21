@@ -27,10 +27,13 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from src.core.constants import (DEFAULT_LOG_FILE_BACKUP_COUNT,
-                                DEFAULT_LOG_FILE_MAX_BYTES,
-                                DEFAULT_LOG_FILENAME, DEFAULT_LOG_LEVEL,
-                                LOG_DIR)
+from src.core.constants import (
+    DEFAULT_LOG_FILE_BACKUP_COUNT,
+    DEFAULT_LOG_FILE_MAX_BYTES,
+    DEFAULT_LOG_FILENAME,
+    DEFAULT_LOG_LEVEL,
+    LOG_DIR,
+)
 
 _LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 _DATE_FORMAT = "%Y-%m-%d %H:%M:%S"

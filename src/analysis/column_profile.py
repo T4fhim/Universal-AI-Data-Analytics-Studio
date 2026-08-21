@@ -68,7 +68,9 @@ class ColumnProfile:
 
 
 def profile_column(
-    dataframe: pd.DataFrame, column_name: str, ambiguous_columns: list[str] | None = None
+    dataframe: pd.DataFrame,
+    column_name: str,
+    ambiguous_columns: list[str] | None = None,
 ) -> ColumnProfile:
     """Build a :class:`ColumnProfile` for ``column_name`` in ``dataframe``.
 
@@ -94,7 +96,9 @@ def profile_column(
         ambiguous_columns = find_ambiguous_type_columns(dataframe)
 
     missing_count = int(series.isna().sum())
-    missing_percentage = round((missing_count / total_rows * 100), 1) if total_rows > 0 else 0.0
+    missing_percentage = (
+        round((missing_count / total_rows * 100), 1) if total_rows > 0 else 0.0
+    )
     unique_count = int(series.nunique(dropna=True))
 
     profile = ColumnProfile(
