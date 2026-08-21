@@ -48,18 +48,76 @@ None of the above is a substitute for the item below. It is the floor the plan i
 tooling represents — real, and worth having, but not the same claim as "a screen reader user can
 actually operate this application."
 
-## What remains open
+## Tier 1 follow-up: real Windows UI Automation verification (closed)
+
+`audit_widget_tree` above proves something real but narrower than it sounds: every check it runs reads
+Qt's *in-process* accessible properties (`widget.accessibleName()`, `widget.focusPolicy()`, etc.). It
+never proves Qt actually handed that information to the real Windows UI Automation (UIA) layer — the
+one NVDA, Narrator, and JAWS all actually consume — and a Qt application can have every in-process
+property look correct while UIA itself exposes something else, or nothing, to a real screen reader.
+That gap is exactly what a human NVDA pass would have caught, but a large fraction of it is also
+mechanically checkable without a screen reader: does the real OS accessibility tree expose the names,
+roles, and live keyboard-focus behavior a screen reader's narration would be built from at all.
+
+`tests/ui/a11y/test_uia_integration.py` (plus its out-of-process launch target,
+`tests/ui/a11y/_uia_target_app.py`) is that check, added as a Milestone 28 follow-up. It launches a
+real, visible, OS-level top-level window — genuinely windowed, not `QT_QPA_PLATFORM=offscreen`, since
+offscreen never creates real UIA elements — running the actual `MainWindow` (bootstrapped, themed, with
+a dataset loaded, the same "fully populated" shape `test_audit.py`'s own fixture uses), and drives it
+with `pywinauto`'s real UIA backend from a separate OS process, the same way an actual screen reader
+observes a running application. Concretely, it asserts, against the *real* UI Automation tree, not Qt's
+in-process view of itself:
+
+- Every control `audit.py`'s own name-requiring rules cover (`interactive-name`, `input-buddy`'s
+  explicit-accessible-name case) is not just described in-process but genuinely visible with that exact
+  name in the real UIA tree, for the main window and for two representative on-demand dialogs
+  (`AboutDialog`, `CommandPalette` — chosen because both need no service wiring beyond what
+  `bootstrap()` already provides; this does **not** exhaustively open every dialog
+  `ALL_DIALOG_CLASSES` discovers, a disclosed scope limit, not an oversight — see that test module's
+  own docstring).
+- Roles are sane: `QPushButton`/`QToolButton` expose the UIA `Button` control type, `QLineEdit` exposes
+  `Edit`, `QComboBox` exposes `ComboBox`, `QListWidget` exposes `List`, `QLabel` exposes `Text` — all
+  four empirically confirmed while building this test, not assumed from Qt documentation.
+- `CommandPalette`'s tab order is checked *live*, not statically: `rules._check_tab_order_
+  nondegenerate`'s own docstring explains why a static widget-tree walk cannot verify Tab actually moves
+  focus in a sensible order — it needs "a live event loop and a shown window", which this test is the
+  first thing in the suite to actually provide. It drives a real Tab keypress into the real window and
+  confirms keyboard focus moves from the search field to the results list, via UIA's own
+  `HasKeyboardFocus`, not an assumption.
+
+This is Windows-only (`pytest.mark.skipif(sys.platform != "win32", ...)`) and skips cleanly, not
+silently, if `pywinauto` cannot be imported or a real visible window genuinely cannot be created in a
+given environment (both real `pytest.mark.skipif`/`pytest.skip()` calls, visible in the run's summary).
+It is wired into CI as a separate, non-blocking `uia_integration` job in
+`.github/workflows/ci.yml` (`continue-on-error: true`) rather than folded into the main blocking `test`
+job — manual verification while building it found individual UI Automation queries occasionally slow,
+and on repeated connects to the same long-lived process, non-deterministically stalling (mitigated with
+per-test bounded timeouts and one fresh process per test, but not eliminated as a risk this early); see
+that test module's own docstring and the `uia_integration` job's comment in `ci.yml` for the full
+reasoning behind that judgment call.
+
+**What this still does not, and cannot, prove.** Whether the *sequence and wording* of what a screen
+reader actually speaks is comprehensible — whether "Search actions, edit" said in that order, at that
+moment, with that phrasing, would actually make sense to someone who cannot see the screen — is a
+judgment call about spoken narration, not a structural property of the accessibility tree. No automated
+UIA walk can render that judgment; only a human listening to real NVDA/Narrator/JAWS output can. That is
+Tier 2, and it is exactly the item below: still open, still requiring a human, not narrowed by anything
+in this section.
+
+## What remains open (Tier 2: human NVDA pass)
 
 **A full NVDA (or other Windows screen reader) pass through the running application has not been
 performed.** This requires a human at a real Windows machine with NVDA (or Narrator/JAWS) installed
 and running, driving the actual GUI — cold start, import a dataset, walk every workbench stage with
 Tab and screen-reader-specific navigation keys (not just Tab), open every dialog `ALL_DIALOG_CLASSES`
 now enumerates, toggle the theme (including `high_contrast`) and the two new accessibility settings,
-and record what NVDA actually announces at each step. No agent running in this environment has a
-screen reader available to drive, and no automated substitute (however thorough the widget-tree audit
-above is) can stand in for that walkthrough — this is the same limitation the M16/M17/M18/M20
-milestones already flagged for their own narrower manual-NVDA-pass acceptance boxes, restated here at
-the whole-application scope this milestone was supposed to close it at.
+and record what NVDA actually announces at each step, judging whether that spoken output is
+comprehensible and sanely ordered — the one thing Tier 1 above cannot judge (see that section's closing
+paragraph). No agent running in this environment has a screen reader available to drive, and no
+automated substitute (however thorough the widget-tree audit and the Tier 1 real-UIA checks above are)
+can stand in for that walkthrough — this is the same limitation the M16/M17/M18/M20 milestones already
+flagged for their own narrower manual-NVDA-pass acceptance boxes, restated here at the whole-application
+scope this milestone was supposed to close it at.
 
 **This acceptance box stays open until a human performs that pass and records findings in this file**
 (append a dated section below with what was tested, on what screen reader/version, and what was

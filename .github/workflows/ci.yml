@@ -93,4 +93,47 @@ jobs:
           src/ui/__init__.py --ignore-missing-imports --follow-imports=silent
 
       - name: pytest
-        run: python -m pytest tests/ -q
+        # -m "not uia_integration" excludes tests/ui/a11y/test_uia_integration.py's
+        # three real-window UIA tests from this blocking gate -- see the
+        # separate uia_integration job below for why they run there instead,
+        # not here.
+        run: python -m pytest tests/ -q -m "not uia_integration"
+
+  uia_integration:
+    # Milestone 28 follow-up (Tier 1 of the NVDA-pass accommodation, see
+    # docs/M28_MANUAL_VERIFICATION.md). A deliberately separate, non-blocking
+    # job, not a step folded into `test` above -- judgment call, recorded
+    # here rather than silently decided:
+    #
+    # tests/ui/a11y/test_uia_integration.py launches a real, visible
+    # top-level window (its own process, forcing QT_QPA_PLATFORM=windows
+    # regardless of this job's own env -- see that test module's docstring)
+    # and drives it with pywinauto's real UIA backend, exactly the kind of
+    # "actually pops a window and does real OS-level input/COM automation"
+    # test this repository's other guarded tiers (see the `webengine`
+    # marker's own comment on test_chart_view.py) have already found more
+    # failure-prone than a plain unit/offscreen-widget test. Manual
+    # verification while building this test (see that module's own
+    # docstring) found individual UI Automation queries occasionally slow,
+    # and on repeated connects to the same long-lived process,
+    # non-deterministically stalling -- mitigated there with per-test bounded
+    # timeouts and a fresh process per test, but not eliminated as a risk
+    # this early. `continue-on-error: true` means a stall or a real-window
+    # limitation specific to a given runner cannot fail the required `test`
+    # job's status check; this job's own pass/fail is still visible on every
+    # run, so a regression here is noticed, just not gate-blocking yet.
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: pytest (UIA integration)
+        run: python -m pytest tests/ui/a11y/test_uia_integration.py -q -m uia_integration

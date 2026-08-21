@@ -63,3 +63,11 @@ mypy
 ruff==0.16.3
 
 bandit==1.9.4
+# Milestone 28 follow-up (Tier 1 UIA verification, tests/ui/a11y/
+# test_uia_integration.py): the real Windows UI Automation driver. Windows-
+# only by nature of what it wraps (win32com/comtypes underneath) -- this
+# project's own verified dev/CI environment is windows-latest (see
+# .github/workflows/ci.yml's own comment), so an unconditional entry here
+# matches how every other dependency in this file is listed, rather than a
+# platform marker no other line uses.
+pywinauto
