@@ -35,7 +35,7 @@ def process_events(milliseconds: int = 50) -> None:
     loop.exec()
 
 
-def wait_for_signal(signal: SignalInstance, timeout_ms: int = 5000) -> tuple[Any, ...]:
+def wait_for_signal(signal: SignalInstance, timeout_ms: int = 15000) -> tuple[Any, ...]:
     """Block until ``signal`` fires and return the arguments it carried.
 
     Raises:
@@ -43,16 +43,27 @@ def wait_for_signal(signal: SignalInstance, timeout_ms: int = 5000) -> tuple[Any
             returning a sentinel, so a test that has silently stopped
             exercising its subject fails loudly instead of passing vacuously.
 
-    Default raised from 2000ms to 5000ms: a real CI-only flake (never seen
-    locally) was confirmed via this project's own diagnostic pytest-output-log
-    -- test_worker_runner.py's real-QThreadPool test timed out waiting for
-    ``finished``, but the [diag] logging BaseWorker/WorkerRunner still carry
-    (see their own docstrings) proved the worker actually emitted ``finished``
-    successfully; queued cross-thread delivery simply took longer than 2000ms
-    on that run's (evidently busier/slower) shared CI machine. No test using
-    this helper asserts on delivery speed -- only "eventually, or fail loudly"
-    per the Raises note above -- so widening the margin fixes the flake
-    without weakening any test's actual claim.
+    Default raised twice, 2000ms -> 5000ms -> 15000ms, both times for the
+    same real CI-only flake (never seen locally): test_worker_runner.py's
+    real-QThreadPool tests timed out waiting for ``finished``, but the
+    [diag] logging BaseWorker/WorkerRunner still carry (see their own
+    docstrings) proved the worker actually emitted ``finished``
+    successfully both times -- 5000ms was not a large enough margin either,
+    confirmed by the exact same failure recurring, with a second test
+    (test_a_raising_on_result_is_never_silently_lost) newly affected too.
+    This points at real event-loop backpressure this deep into a single
+    long-lived-QApplication process running 1470+ tests (many of them
+    posting their own queued signals/timers into the same main-thread event
+    loop across the whole session) on CI's more resource-constrained
+    hardware than this project's local dev machine, not a defect in any
+    one test. No test using this helper asserts on delivery speed -- only
+    "eventually, or fail loudly" per the Raises note above -- so widening
+    the margin again fixes the flake without weakening any test's actual
+    claim. If this recurs even at 15000ms, the right fix is no longer a
+    bigger number: it's isolating these tests' event-loop state from the
+    rest of the session (per-test QApplication processEvents() flush, or
+    running test_worker_runner.py in its own pytest invocation) --
+    documented here for whoever hits that next.
     """
     received: list[tuple[Any, ...]] = []
     loop = QEventLoop()
