@@ -67,11 +67,26 @@ class UiStateBus(QObject):
         Safe to call any number of times within one turn -- only the first
         call in a burst schedules the ``singleShot`` timer; subsequent
         calls before it fires are no-ops, which is the coalescing itself.
+
+        Milestone-29 fix: a real, reproduced crash existed here --
+        ``QTimer.singleShot(0, self, self._emit_state_changed)`` (no context
+        object) keeps firing even after this bus's owning window is closed
+        and its C++ object destroyed in between the call and the next
+        event-loop turn, raising ``RuntimeError: Signal source has been
+        deleted`` the next time *anything* calls ``QApplication.
+        processEvents()`` anywhere in the process -- confirmed by a direct
+        ``shiboken6.delete()`` repro before this fix, and confirmed silent
+        afterward. Passing ``self`` as the context argument uses Qt's
+        contextual single-shot overload (Qt 5.7+): the queued call is
+        automatically skipped, not just safely no-op'd, once ``self``'s
+        C++ object no longer exists by the time the timer fires -- the
+        same guarantee a normal signal/slot connection gets for its
+        receiver, extended to ``QTimer.singleShot``'s free-function form.
         """
         if self._pending:
             return
         self._pending = True
-        QTimer.singleShot(0, self._emit_state_changed)
+        QTimer.singleShot(0, self, self._emit_state_changed)
 
     def _emit_state_changed(self) -> None:
         self._pending = False
