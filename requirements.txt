@@ -43,9 +43,20 @@ lightgbm
 catboost
 networkx
 duckdb
-anthropic
-openai
-google-genai
+# Bounded, not left fully unpinned like most of this file: these three SDKs
+# release breaking major versions with no warning (confirmed directly --
+# investigating a real, reproduced CI-only pytest failure found this dev
+# venv frozen at anthropic==0.122.0/openai==2.49.0, while a fresh install of
+# this same unpinned line resolves anthropic==1.0.0/openai==3.3.1, both
+# major-version jumps). src/ai/llm_provider.py's usage (Anthropic()/
+# OpenAI() constructors, .messages.create/.chat.completions.create,
+# APIError/OpenAIError) was verified compatible with the new majors before
+# raising these lower bounds, so this pins the floor to what's proven to
+# work and caps the ceiling so the *next* unannounced major can't silently
+# reach a fresh install (CI or otherwise) unreviewed.
+anthropic>=1.0.0,<2
+openai>=3.0.0,<4
+google-genai>=2.19.0,<3
 python-dotenv
 rich
 # Explicit rather than relying on it arriving transitively via rich: the

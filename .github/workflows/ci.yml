@@ -105,7 +105,36 @@ jobs:
         # three real-window UIA tests from this blocking gate -- see the
         # separate uia_integration job below for why they run there instead,
         # not here.
-        run: python -m pytest tests/ -q -m "not uia_integration"
+        #
+        # Piped through Tee-Object rather than a plain `run:` (this project's
+        # own regression, found investigating a real CI-only `test` job
+        # failure with no local repro and no available log-fetching tool --
+        # gh CLI isn't installed and the GitHub MCP server here has no log
+        # endpoint -- so the failing run's actual traceback was simply
+        # unrecoverable after the fact). $LASTEXITCODE is read explicitly
+        # and re-raised via `exit` since Tee-Object is a cmdlet, not an
+        # external process, so it does not itself clobber the pipeline's
+        # exit code, but the step's own overall exit code still needs to be
+        # set from it for the job to actually fail when pytest does.
+        shell: pwsh
+        run: |
+          python -m pytest tests/ -q -m "not uia_integration" --tb=long 2>&1 | Tee-Object -FilePath pytest-output.log
+          exit $LASTEXITCODE
+
+      - name: Upload pytest log
+        # if: always() -- runs whether the step above passed or failed, so a
+        # failure's full output is always downloadable from the run's own
+        # Summary page (Artifacts section) without needing `gh run view
+        # --log` or any authenticated API access this project's own tooling
+        # may not have. A passing run's log is harmless, low-cost evidence
+        # of what the environment actually looked like at run time --
+        # useful the next time "passes locally, fails in CI" recurs.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-output-log
+          path: pytest-output.log
+          retention-days: 14
 
   uia_integration:
     # Milestone 28 follow-up (Tier 1 of the NVDA-pass accommodation, see
