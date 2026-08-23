@@ -35,13 +35,24 @@ def process_events(milliseconds: int = 50) -> None:
     loop.exec()
 
 
-def wait_for_signal(signal: SignalInstance, timeout_ms: int = 2000) -> tuple[Any, ...]:
+def wait_for_signal(signal: SignalInstance, timeout_ms: int = 5000) -> tuple[Any, ...]:
     """Block until ``signal`` fires and return the arguments it carried.
 
     Raises:
         TimeoutError: If the signal does not fire in time. Raised rather than
             returning a sentinel, so a test that has silently stopped
             exercising its subject fails loudly instead of passing vacuously.
+
+    Default raised from 2000ms to 5000ms: a real CI-only flake (never seen
+    locally) was confirmed via this project's own diagnostic pytest-output-log
+    -- test_worker_runner.py's real-QThreadPool test timed out waiting for
+    ``finished``, but the [diag] logging BaseWorker/WorkerRunner still carry
+    (see their own docstrings) proved the worker actually emitted ``finished``
+    successfully; queued cross-thread delivery simply took longer than 2000ms
+    on that run's (evidently busier/slower) shared CI machine. No test using
+    this helper asserts on delivery speed -- only "eventually, or fail loudly"
+    per the Raises note above -- so widening the margin fixes the flake
+    without weakening any test's actual claim.
     """
     received: list[tuple[Any, ...]] = []
     loop = QEventLoop()
