@@ -22,6 +22,15 @@ openpyxl
 pyxlsb
 odfpy
 pymupdf
+# Real, unconditional runtime dependency of src/readers/pdf_reader.py --
+# missing from this file entirely until now, same class of gap as
+# plotly-resampler above and found the same way (a real, reproduced
+# CI-only failure). pdf_reader.py's own module docstring already admits
+# this: "camelot was already present in this project's environment,
+# unprompted" -- i.e. this was known, at the time that reader was
+# written, to be relying on something never declared here. PyPI package
+# name is camelot-py; it imports as `camelot`.
+camelot-py
 pdfplumber
 python-docx
 python-pptx
