@@ -3,6 +3,15 @@ pandas
 polars
 numpy
 plotly
+# Real, unconditional runtime dependency of src/visualization/continuous_charts.py
+# (LineChart/ScatterChart's automatic large-dataset downsampling, milestone 5a) --
+# missing from this file entirely until now. Found via a real, reproduced CI-only
+# failure: this dev venv has had plotly-resampler installed directly (not via any
+# line in this file) for long enough that nothing here noticed it was never
+# actually declared, so every fresh `pip install -r requirements.txt` -- which is
+# all CI, or any other machine, ever does -- silently lacked it, cascading into 41
+# test-collection errors for every module importing continuous_charts.py.
+plotly-resampler
 kaleido
 scipy
 statsmodels
