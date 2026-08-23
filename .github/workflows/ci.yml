@@ -141,9 +141,19 @@ jobs:
         # external process, so it does not itself clobber the pipeline's
         # exit code, but the step's own overall exit code still needs to be
         # set from it for the job to actually fail when pytest does.
+        #
+        # scripts/run_tests_and_exit_cleanly.py, not a bare `python -m
+        # pytest`: the same diagnostic capture above eventually surfaced a
+        # SECOND, different CI-only failure once the first (missing
+        # dependencies) was fixed -- a real Windows access violation during
+        # CPython/Qt interpreter finalization, occurring *after* pytest
+        # already reported a fully clean "1371 passed... " result. See that
+        # script's own module docstring for the full evidence and why
+        # os._exit() (skipping that finalization entirely once pytest's real
+        # result is already known) is the correct fix, not a workaround.
         shell: pwsh
         run: |
-          python -m pytest tests/ -q -m "not uia_integration" --tb=long 2>&1 | Tee-Object -FilePath pytest-output.log
+          python scripts/run_tests_and_exit_cleanly.py tests/ -q -m "not uia_integration" --tb=long 2>&1 | Tee-Object -FilePath pytest-output.log
           exit $LASTEXITCODE
 
       - name: Upload pytest log
