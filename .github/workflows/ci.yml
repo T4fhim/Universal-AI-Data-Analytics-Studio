@@ -27,6 +27,14 @@ on:
 jobs:
   test:
     runs-on: windows-latest
+    permissions:
+      # Explicit, not left to the repo's default GITHUB_TOKEN scope (which
+      # varies by repo/org setting and can be read-only) -- the "Post
+      # failure log to the PR" step below needs write access to comment;
+      # `contents: read` is the minimum this job also needs for checkout to
+      # behave normally under a restricted default.
+      contents: read
+      pull-requests: write
     env:
       # Set once, for the whole job, matching tests/ui/conftest.py's own
       # requirement that this be set before any PySide6 import happens.
@@ -135,6 +143,39 @@ jobs:
           name: pytest-output-log
           path: pytest-output.log
           retention-days: 14
+
+      - name: Post failure log to the PR
+        # The artifact above still needs an authenticated download (`gh run
+        # download` or the REST API with a token) -- exactly the access this
+        # project's own tooling was confirmed *not* to have when this step
+        # was added (no `gh` CLI installed there, no GitHub MCP log/artifact
+        # endpoint, direct API log fetch returns 403). `gh` IS preinstalled
+        # on every GitHub-hosted runner, and `secrets.GITHUB_TOKEN` is
+        # supplied automatically -- so instead of relying on log/artifact
+        # access from *outside* the run, the run posts its own failure
+        # straight to the PR as a comment, readable by anything that can
+        # read PR comments (which every environment here already can).
+        # Guarded to pull_request runs only: the matching `push`-triggered
+        # run for the same commit has no `github.event.pull_request.number`
+        # to comment on.
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          # Built via [char]96 rather than a literal backtick: PowerShell's
+          # own escape character *is* the backtick, so a literal one inside
+          # a double-quoted string (or here-string interpolation) is
+          # error-prone -- verified directly (`` `t `` silently became a tab
+          # character, not the intended literal backtick-t, in an earlier
+          # draft of this step) before trusting this in CI.
+          $fence = [string][char]96 * 3
+          $tail = Get-Content pytest-output.log -Tail 300 -ErrorAction SilentlyContinue | Out-String
+          if ([string]::IsNullOrWhiteSpace($tail)) {
+            $tail = "(pytest-output.log was empty or missing -- the run likely crashed before pytest produced any output at all.)"
+          }
+          $body = "### CI test job failed (commit ${{ github.sha }})`n`nLast 300 lines of pytest-output.log:`n`n$fence`n$tail`n$fence"
+          gh pr comment ${{ github.event.pull_request.number }} --body $body
 
   uia_integration:
     # Milestone 28 follow-up (Tier 1 of the NVDA-pass accommodation, see
