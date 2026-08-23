@@ -151,10 +151,30 @@ jobs:
         # script's own module docstring for the full evidence and why
         # os._exit() (skipping that finalization entirely once pytest's real
         # result is already known) is the correct fix, not a workaround.
+        #
+        # Split into two invocations, test_worker_runner.py first: that
+        # file's real-QThreadPool tests (wait_for_signal against a real
+        # cross-thread signal) proved flaky even at a 15000ms timeout on
+        # one of two identical-commit CI runs (the other, same commit,
+        # passed clean) -- pytest has no test-ordering randomization here
+        # (confirmed: no addopts/-p randomly in pyproject.toml), so by
+        # default collection order "ui" sorts late alphabetically among
+        # tests/*, meaning this file was already running ~78% deep into a
+        # 1470+-test single-process session, after everything else already
+        # posted its own queued signals/timers into the same shared
+        # main-thread event loop across the whole run. Running it FIRST,
+        # before that backlog exists, is the actual fix for real
+        # event-loop backpressure -- widening the timeout further was
+        # explicitly documented as the wrong next move in
+        # wait_for_signal's own docstring once 15000ms itself proved
+        # insufficient.
         shell: pwsh
         run: |
-          python scripts/run_tests_and_exit_cleanly.py tests/ -q -m "not uia_integration" --tb=long 2>&1 | Tee-Object -FilePath pytest-output.log
-          exit $LASTEXITCODE
+          python scripts/run_tests_and_exit_cleanly.py tests/ui/test_worker_runner.py -q --tb=long 2>&1 | Tee-Object -FilePath pytest-output.log
+          $exit1 = $LASTEXITCODE
+          python scripts/run_tests_and_exit_cleanly.py tests/ -q -m "not uia_integration" --tb=long --ignore=tests/ui/test_worker_runner.py 2>&1 | Tee-Object -FilePath pytest-output.log -Append
+          $exit2 = $LASTEXITCODE
+          exit ([Math]::Max($exit1, $exit2))
 
       - name: Upload pytest log
         # if: always() -- runs whether the step above passed or failed, so a
