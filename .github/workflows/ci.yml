@@ -39,6 +39,23 @@ jobs:
       # Set once, for the whole job, matching tests/ui/conftest.py's own
       # requirement that this be set before any PySide6 import happens.
       QT_QPA_PLATFORM: offscreen
+      # Added investigating a real, confirmed CI-only failure that is neither
+      # a collection error nor a per-test failure: pytest's own summary
+      # reports a fully clean run (e.g. "1371 passed, 103 skipped ... in
+      # 374.35s") with zero FAILED lines, yet the step's own exit code is 1
+      # -- meaning whatever fails happens after pytest has already finished
+      # and printed its results, during CPython/Qt interpreter shutdown.
+      # tests/ui/conftest.py's own qapp fixture docstring already documents
+      # exactly this class of risk ("calling quit() between tests crashes on
+      # Windows... Qt destroys the platform integration while widgets from
+      # the previous test are still pending deletion") for the mid-session
+      # case; this may be the same failure mode occurring once, unavoidably,
+      # at final process teardown instead. PYTHONFAULTHANDLER causes a
+      # native (non-Python) fatal signal to print a C-level traceback to
+      # stderr before the process dies, which -- piped into this job's
+      # existing pytest-output.log capture -- is the only way to get real
+      # evidence for a crash this silent, rather than guessing further.
+      PYTHONFAULTHANDLER: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -170,7 +187,11 @@ jobs:
           # character, not the intended literal backtick-t, in an earlier
           # draft of this step) before trusting this in CI.
           $fence = [string][char]96 * 3
-          $tail = Get-Content pytest-output.log -Tail 300 -ErrorAction SilentlyContinue | Out-String
+          # 500, not 300: PYTHONFAULTHANDLER's per-thread native stack dumps
+          # (added alongside this) can run longer than a single test
+          # traceback, and GitHub's ~65536-char comment limit still comfortably
+          # fits 500 lines of pytest/faulthandler output.
+          $tail = Get-Content pytest-output.log -Tail 500 -ErrorAction SilentlyContinue | Out-String
           if ([string]::IsNullOrWhiteSpace($tail)) {
             $tail = "(pytest-output.log was empty or missing -- the run likely crashed before pytest produced any output at all.)"
           }
