@@ -17,6 +17,7 @@ from src.services.analysis_orchestrator_service import (
     PipelineStage,
 )
 from src.services.report_service import ReportService
+from src.services.settings_service import SettingsService
 from src.services.workspace_service import WorkspaceService
 from src.ui.dialogs.generate_report_dialog import GenerateReportDialog
 from src.ui.dock_manager import DockManager
@@ -40,6 +41,9 @@ class ReportController:
         status_bar: For busy/progress/message feedback.
         worker_runner: Runs report generation (rasterizes every chart via
             kaleido and writes a real file) off the UI thread.
+        settings_service: Read for ``reports.default_export_format`` (milestone 29) to
+            pre-select the matching entry in :class:`~src.ui.dialogs.generate_report_dialog.
+            GenerateReportDialog`'s format combo.
     """
 
     def __init__(
@@ -51,6 +55,7 @@ class ReportController:
         dock_manager: DockManager,
         status_bar: ApplicationStatusBar,
         worker_runner: WorkerRunner,
+        settings_service: SettingsService,
     ) -> None:
         self._parent = parent
         self._workspace_service = workspace_service
@@ -59,6 +64,7 @@ class ReportController:
         self._dock_manager = dock_manager
         self._status_bar = status_bar
         self._worker_runner = worker_runner
+        self._settings_service = settings_service
 
     def generate_report(self) -> None:
         active_dataset = self._workspace_service.get_active_dataset()
@@ -77,8 +83,14 @@ class ReportController:
             stage for stage in PipelineStage if stage in completed_stages
         ]
 
+        default_format = self._settings_service.get(
+            "reports", "default_export_format", default="pdf"
+        )
         dialog = GenerateReportDialog(
-            active_dataset.name, available_stages, self._parent
+            active_dataset.name,
+            available_stages,
+            self._parent,
+            default_format=default_format,
         )
         if dialog.exec() != GenerateReportDialog.DialogCode.Accepted:
             return

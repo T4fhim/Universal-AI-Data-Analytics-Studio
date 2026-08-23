@@ -65,20 +65,39 @@ class ProviderRotationService:
     """Holds an ordered list of provider profiles and rotates through them on failure.
 
     Args:
-        profiles: Ordered fail-over list. Index 0 is tried first.
-            Must be non-empty.
+        profiles: Ordered fail-over list. Index 0 is tried first, unless ``start_index``
+            says otherwise.
+        start_index: Mirrors ``ai.active_provider_index`` (milestone 29's wiring of a config
+            key that existed since milestone 7 but was never read anywhere -- confirmed by
+            :meth:`from_config_profiles` previously always constructing at index 0
+            regardless of what this config value said). Out-of-range values (a profile was
+            removed since this was last saved, or the value was hand-edited) are clamped to
+            ``0`` with a warning rather than raising -- a saved "which provider was active"
+            preference going stale is a normal, recoverable config-drift situation, not a
+            fatal one; the assistant should still start rather than refuse to construct.
 
     Raises:
         ServiceError: If ``profiles`` is empty.
     """
 
-    def __init__(self, profiles: list[ResolvedProviderProfile]) -> None:
+    def __init__(
+        self, profiles: list[ResolvedProviderProfile], start_index: int = 0
+    ) -> None:
         if not profiles:
             raise ServiceError(
                 "ProviderRotationService requires at least one provider profile."
             )
         self._profiles = profiles
-        self._index = 0
+        if 0 <= start_index < len(profiles):
+            self._index = start_index
+        else:
+            _logger.warning(
+                "ai.active_provider_index (%d) is out of range for %d configured "
+                "profile(s) -- starting at index 0 instead.",
+                start_index,
+                len(profiles),
+            )
+            self._index = 0
         # Provider instances are constructed lazily and cached per
         # profile index, not eagerly for every profile up front — most
         # conversations never rotate at all, so building N SDK clients
@@ -125,7 +144,7 @@ class ProviderRotationService:
 
     @classmethod
     def from_config_profiles(
-        cls, config_profiles: list[dict[str, Any]]
+        cls, config_profiles: list[dict[str, Any]], active_index: int = 0
     ) -> ProviderRotationService:
         """Build from the ``ai.providers`` config shape (see :mod:`src.core.config`).
 
@@ -137,6 +156,11 @@ class ProviderRotationService:
         (it ignores its ``api_key`` argument entirely) and which any
         other provider will simply fail authentication on, surfacing a
         clear error rather than silently doing nothing.
+
+        Args:
+            config_profiles: The ``ai.providers`` list.
+            active_index: Mirrors ``ai.active_provider_index`` -- see :meth:`__init__`'s own
+                ``start_index`` docstring for the out-of-range handling.
         """
         resolved = [
             ResolvedProviderProfile(
@@ -151,4 +175,4 @@ class ProviderRotationService:
             )
             for profile in config_profiles
         ]
-        return cls(resolved)
+        return cls(resolved, start_index=active_index)

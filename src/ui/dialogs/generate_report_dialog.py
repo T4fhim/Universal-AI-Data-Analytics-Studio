@@ -86,6 +86,12 @@ class GenerateReportDialog(QDialog):
             :meth:`~src.services.analysis_orchestrator_service.
             AnalysisLog.completed_stages`).
         parent: Parent widget, typically the main window.
+        default_format: Mirrors ``reports.default_export_format`` (milestone 29 -- described
+            in config since milestone 1a, never actually read anywhere before this). Pre-selects
+            the matching entry in the format combo if it names a real, currently available
+            format; left at the combo's own first entry otherwise (an unrecognized value here
+            is treated the same as not passing one at all, not an error -- a hand-edited typo
+            in config.yaml should not block generating a report).
     """
 
     def __init__(
@@ -93,6 +99,7 @@ class GenerateReportDialog(QDialog):
         dataset_name: str,
         available_stages: list[PipelineStage],
         parent: QWidget | None = None,
+        default_format: str | None = None,
     ) -> None:
         super().__init__(parent)
         self._dataset_name = dataset_name
@@ -115,6 +122,10 @@ class GenerateReportDialog(QDialog):
                 format_key, (format_key.upper(), format_key)
             )
             self._format_combo.addItem(label.split(" (")[0], format_key)
+        if default_format is not None:
+            index = self._format_combo.findData(default_format)
+            if index >= 0:
+                self._format_combo.setCurrentIndex(index)
         self._format_combo.currentIndexChanged.connect(self._on_format_changed)
         form.addRow("Format:", self._format_combo)
 

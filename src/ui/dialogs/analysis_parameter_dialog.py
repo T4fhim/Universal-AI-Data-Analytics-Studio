@@ -67,6 +67,12 @@ class AnalysisParameterDialog(QDialog):
             12 analysis tools.
         column_names: The active dataset's column names, used to populate every
             column-shaped field's picker.
+        field_defaults: Overrides ``schema.get("default")`` per field name, for a caller that
+            knows a better default than the tool's own static schema does -- e.g.
+            :class:`~src.ui.workbench.pages.predict_page.PredictPage` prefilling ``"periods"``
+            from ``forecasting.default_horizon_periods`` (a live, per-session config value none
+            of the five forecast tools' own static schemas could bake in). ``None`` (the
+            default) leaves every field's own schema default untouched.
         parent: Parent widget.
     """
 
@@ -75,10 +81,12 @@ class AnalysisParameterDialog(QDialog):
         tool: ToolDefinition,
         column_names: list[str],
         parent: QWidget | None = None,
+        field_defaults: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(parent)
         self._tool = tool
         self._column_names = [str(c) for c in column_names]
+        self._field_defaults = field_defaults or {}
         self._required = set(tool.input_schema.get("required", []))
         self._parameters: dict[str, Any] = {}
 
@@ -138,14 +146,16 @@ class AnalysisParameterDialog(QDialog):
             return combo
         if schema.get("type") == "boolean":
             checkbox = QCheckBox(self)
-            checkbox.setChecked(bool(schema.get("default", False)))
+            checkbox.setChecked(
+                bool(self._field_defaults.get(field_name, schema.get("default", False)))
+            )
             return checkbox
         # Numbers, arrays, and plain strings all fall back to one line edit -- arrays are
         # entered comma-separated (e.g. "col_a, col_b") and split back into a list in
         # _on_accept, matching how src.ai.tool_registry's own JSON-schema arrays are just
         # `list[str]` under the hood.
         line_edit = QLineEdit(self)
-        default = schema.get("default")
+        default = self._field_defaults.get(field_name, schema.get("default"))
         if default is not None:
             line_edit.setText(str(default))
         return line_edit

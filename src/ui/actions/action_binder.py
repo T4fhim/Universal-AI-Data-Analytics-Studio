@@ -23,6 +23,7 @@ from PySide6.QtWidgets import QMenu, QWidget
 
 from src.core.exceptions import ServiceError
 from src.core.logger import get_logger
+from src.ui.a11y.accessible import HELP_ANCHOR_PROPERTY
 from src.ui.actions.action_registry import get_action, list_actions
 from src.ui.theme.icon_provider import IconProvider
 
@@ -78,6 +79,13 @@ class ActionBinder(QObject):
         action.setCheckable(spec.checkable)
         if self._icon_provider is not None and spec.icon_name:
             action.setIcon(self._icon_provider.icon(spec.icon_name))
+        if spec.help_anchor:
+            # Milestone 29: QAction is a QObject, so it carries dynamic properties the same
+            # way a QWidget does -- stamped directly here rather than via describe() (which
+            # takes a QWidget) since a QAction is not one. This is what lets
+            # src.ui.help.help_router.resolve_help_anchor answer F1 for a focused toolbar
+            # button or an open menu item, not only for a StagePage's own described widgets.
+            action.setProperty(HELP_ANCHOR_PROPERTY, spec.help_anchor)
 
         self._actions[action_id] = action
         return action

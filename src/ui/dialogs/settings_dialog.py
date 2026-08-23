@@ -177,6 +177,15 @@ class SettingsDialog(QDialog):
         )
         layout.addRow("Base font size:", self._base_font_size_spinbox)
 
+        # Milestone 29: a one-shot reset action, not a persistent toggle -- ui.first_run_completed
+        # is always True immediately after the tour has been dismissed once, so a checkbox
+        # reflecting its current value would always show "off" the moment this dialog is
+        # reopened, which is not useful. Clicking this sets it back to False (still only taking
+        # effect once Save is clicked, matching every other field in this dialog).
+        show_tour_button = QPushButton("Show tour again next time", tab)
+        show_tour_button.clicked.connect(self._on_show_tour_again_clicked)
+        layout.addRow("First-run tour:", show_tour_button)
+
         return tab
 
     def _build_ai_tab(self) -> QWidget:
@@ -409,6 +418,15 @@ class SettingsDialog(QDialog):
 
     def _on_base_font_size_changed(self, size: int) -> None:
         self._settings_service.set("accessibility", "base_font_size", value=size)
+
+    def _on_show_tour_again_clicked(self) -> None:
+        self._settings_service.set("ui", "first_run_completed", value=False)
+        QMessageBox.information(
+            self,
+            "First-Run Tour",
+            "The tour will be shown again the next time the application starts, once "
+            "these settings are saved.",
+        )
 
     def _on_save(self) -> None:
         self._settings_service.save()

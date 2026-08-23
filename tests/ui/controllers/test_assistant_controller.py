@@ -53,6 +53,10 @@ def _make_settings_service(tmp_path, *, with_provider: bool) -> SettingsService:
     service = SettingsService(config, config_path)
     if with_provider:
         service.set("ai", "providers", value=[_FAKE_PROVIDER_PROFILE])
+        # Milestone 29: ai.enabled is now actually enforced (AssistantController refuses to
+        # build a service when it's False) -- a fixture configuring a real provider profile
+        # is exactly the "fully configured" case that flag is meant to describe.
+        service.set("ai", "enabled", value=True)
     return service
 
 

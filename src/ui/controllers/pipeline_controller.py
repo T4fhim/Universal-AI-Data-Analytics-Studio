@@ -42,6 +42,10 @@ from src.ui.command_stack import CommandStack, DatasetPointerCommand
 from src.ui.dock_manager import DockManager
 from src.ui.status_bar import ApplicationStatusBar
 from src.ui.ui_state_bus import UiStateBus
+from src.ui.workbench.pages.clean_page import CleanPage
+from src.ui.workbench.pages.reproduce_page import ReproducePage
+from src.ui.workbench.pages.understand_page import UnderstandPage
+from src.ui.workbench.workbench import Workbench
 from src.ui.worker_runner import WorkerRunner
 
 if TYPE_CHECKING:
@@ -130,6 +134,29 @@ class PipelineController:
         log = self._orchestrator_service.get_log(dataset.dataset_id)
         proposal = self._orchestrator_service.propose_next_stage(dataset.dataset_id)
         return PipelineSnapshot(log=log, proposal=proposal)
+
+    def connect_stage_pages(self, workbench: Workbench) -> None:
+        """Wire the stage-page signals that target only this controller's own methods.
+
+        Moved out of ``MainWindow._connect_actions`` in milestone 29, which pushed that
+        file to its ``tests.ui.test_module_size`` budget -- this is the smallest safe
+        extraction available: understand_page/reproduce_page/clean_page's signals all target
+        methods on this controller alone, unlike report_page's (targets
+        ``ReportController``) or visualize_page's (targets ``VisualizationController``), which
+        stay in ``main_window.py`` since this project's controllers deliberately never import
+        each other directly (see this module's own docstring's "ProjectController does not
+        import this module" note) -- wiring a *cross*-controller connection has to happen
+        somewhere that already holds both controllers, which is only ``main_window.py`` itself.
+        """
+        understand_page = workbench.page_for(PipelineStage.UNDERSTAND)
+        if isinstance(understand_page, UnderstandPage):
+            understand_page.run_requested.connect(self.run_understand_stage)
+        reproduce_page = workbench.page_for(PipelineStage.REPRODUCE)
+        if isinstance(reproduce_page, ReproducePage):
+            reproduce_page.reproduce_requested.connect(self.reproduce_active_dataset)
+        clean_page = workbench.page_for(PipelineStage.CLEAN)
+        if isinstance(clean_page, CleanPage):
+            clean_page.operation_applied.connect(self.register_clean_operation)
 
     # -- Running stages --------------------------------------------------------
 

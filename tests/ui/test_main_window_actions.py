@@ -351,3 +351,16 @@ def test_changing_expertise_level_updates_theme_density(
     process_events()
 
     assert theme_manager._density is Density.COMPACT
+
+
+def test_f1_opens_the_manual_dialog_on_a_real_main_window(
+    main_window: MainWindow,
+) -> None:
+    """Milestone 29: F1 wired all the way through a real, fully-constructed MainWindow --
+    not just HelpController in isolation (see tests/ui/controllers/test_help_controller.py).
+    """
+    main_window._help_controller._shortcut.activated.emit()
+
+    assert main_window._help_controller._dialog is not None
+    assert main_window._help_controller._dialog._current_anchor is not None
+    assert main_window._help_controller._dialog.isVisible()

@@ -159,6 +159,7 @@ class AssistantService:
         rotation_enabled: bool,
         workspace_service: WorkspaceService,
         expertise_level: str = ExpertiseLevel.BEGINNER,
+        active_provider_index: int = 0,
     ) -> AssistantService:
         """Construct from the ``ai.providers`` config list (milestone 7's real wiring path).
 
@@ -177,6 +178,10 @@ class AssistantService:
                 8) — a plain string (the config's own storage type; see
                 :class:`~src.core.expertise_level.ExpertiseLevel`'s
                 docstring for why it round-trips without conversion).
+            active_provider_index: Mirrors ``ai.active_provider_index`` (milestone 29 —
+                previously stored but never read; see
+                :class:`~src.ai.provider_rotation.ProviderRotationService`'s own
+                ``start_index`` docstring for the out-of-range handling).
 
         Raises:
             ServiceError: If ``config_profiles`` is empty — mirrors
@@ -191,7 +196,7 @@ class AssistantService:
             )
         instance = cls.__new__(cls)
         instance._rotation = ProviderRotationService.from_config_profiles(
-            config_profiles
+            config_profiles, active_index=active_provider_index
         )
         instance._rotation_enabled = rotation_enabled
         instance._workspace_service = workspace_service

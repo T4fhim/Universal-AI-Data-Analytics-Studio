@@ -2,12 +2,15 @@
 
 > **Status.** M15 (`39d12fb`), M16 (`cfe8f24`, `bd96e4e`), M17 (`f07514a`), M18 (`c1ee88c`), M19
 > (`6683489`), M20 (`5f9c6eb`), M22 (`0991f74`), M21 (`ec67eae`), M23 (`40c0eb5`), M24 (`c7d1195`),
-> M25 (`29fd627`), M26, and M27 are complete and committed — see the Milestones section for
-> as-built file lists and verification results. M22 was built before M21 despite the numbering,
-> per that milestone's own "Build order note" (one of M21's five acceptance criteria depends on
-> M22's `ResultCard`/`ExplanationPanel`; the other four do not) — M21 itself was then built
-> immediately after M22, closing that dependency the same session it was introduced.
-> M28–M29 remain. This revision
+> M25 (`29fd627`), M26, M27, M28, and **M29 (final milestone in this series)** are complete and
+> committed — see the Milestones section for as-built file lists and verification results. M22
+> was built before M21 despite the numbering, per that milestone's own "Build order note" (one
+> of M21's five acceptance criteria depends on M22's `ResultCard`/`ExplanationPanel`; the other
+> four do not) — M21 itself was then built immediately after M22, closing that dependency the
+> same session it was introduced. M28 has one open box (a manual NVDA pass no agent in this
+> environment can perform — see `docs/M28_MANUAL_VERIFICATION.md`); M29 has the equivalent open
+> boxes recorded in its own "As built"/end-to-end-verification notes below, both left honest
+> rather than claimed done. This revision
 > (renumbered from the original 15–27 draft) closes gaps a self-review found after M15 shipped: two
 > inserted milestones (M21 AI chat panel, M27 empty/error states + i18n), acceptance criteria and
 > sizing on every milestone, a CI gate, a screen-reader verification protocol, a dialog-disposition
@@ -1460,7 +1463,7 @@ Acceptance criteria:
       `docs/M28_MANUAL_VERIFICATION.md`, which stays the single source of truth for this box until a
       dated finding is recorded there.
 
-### M29 — Manual, F1, onboarding, config debt · Size **L**
+### M29 — Manual, F1, onboarding, config debt · Size **L** · ✅ DONE, boxes open (see below)
 
 Files: `docs/manual/*.md` — **full content**: all 16 readers, 12 charts, 12 statistical methods, 5
 forecasters, 5 cleaning ops, the pipeline, the AI layer, plugins, a statistics glossary ·
@@ -1468,16 +1471,143 @@ forecasters, 5 cleaning ops, the pipeline, the AI layer, plugins, a statistics g
 `scripts/preview_manual.py` (non-shipping — renders one manual page through the real
 `ManualRenderer` for authoring without a full app rebuild).
 
+**As built.** `docs/manual/` ships 81 hand-authored Markdown files answering 90 anchors (several
+files answer two — a `results.*` page and a `statistics.*` page share content where a result
+type and a general statistics reference genuinely are the same topic, e.g. `results/t_test.md`
+answers both `results.t_test` and `statistics.t_test`). Each file is plain Markdown with a small
+YAML frontmatter block (`title`, `anchors: [...]`) — `src/ui/help/manual_index.py`'s
+`ManualIndex` scans and caches the anchor → page mapping once (classmethod-only, mirroring this
+project's `Base*`/registry shape per CLAUDE.md, even with a single implementation), and
+`src/ui/help/manual_renderer.py`'s `ManualRenderer` compiles a resolved page's Markdown to the
+HTML subset `QTextBrowser` supports via `markdown_it` (already a project dependency, added ahead
+of time in `requirements.txt` with a comment naming this exact milestone — no dependency change
+was needed). `src/ui/help/help_router.py`'s `resolve_help_anchor(widget)` walks the focus
+widget's parent chain (and, for a toolbar button or an open menu, the `QAction` it represents)
+reading the `helpAnchor` dynamic property `describe()` already stamped — `StagePage.__init__`
+now stamps its own container with this property too (not only its described buttons), so F1
+resolves correctly from focus anywhere inside a stage page, including `ExplainPage`, which has no
+interactive control of its own to stamp. `src/ui/controllers/help_controller.py`'s
+`HelpController` owns the real `QShortcut(QKeySequence.StandardKey.HelpContents)` and the
+three-step fallback chain (focus anchor → current stage page → `"index"`), and keeps one
+`ManualDialog` (`src/ui/dialogs/manual_dialog.py`, a non-modal `QTextBrowser` window with
+in-place cross-reference-link navigation) alive for the session. `src/ui/help` is a new leaf
+package in `tests/ui/test_import_layering.py`'s `_LEAF_PACKAGES`.
+
+Autosave (`src/ui/autosave_timer.py`) re-reads `autosave.enabled`/`interval_minutes` on every
+`tick()` rather than needing an external "reconfigure me" call when Settings changes them, and
+saves synchronously (matching the existing manual Save button's own behavior — a project file is
+metadata only, never the dataframes themselves) rather than through `WorkerRunner`, specifically
+to avoid introducing a new, previously-nonexistent risk (mutating a plain `Project` object from a
+worker thread). Constructed once in `src/core/app.py`'s `Application.run`, parented to
+`MainWindow` for lifetime, alongside the first-run tour (`FirstRunTourDialog`) and the
+`window.width`/`height` resize — all three deliberately live in the composition root rather than
+`MainWindow.__init__` itself, which was already at `tests.ui.test_module_size`'s 400-line budget
+before this milestone touched it. The one line of *new* wiring that budget did permit inside
+`MainWindow` is `HelpController`'s own construction (it builds its own `QShortcut` internally);
+the ~15 lines of headroom this needed came from extracting `PipelineController.
+connect_stage_pages()` — the three stage-page-signal connections (`understand_page`/
+`reproduce_page`/`clean_page`) that target only `PipelineController`'s own methods, as opposed to
+`report_page`/`visualize_page`'s connections (which target other controllers and, per this
+project's "controllers never import each other" convention, must stay in `main_window.py`).
+
+Per-key disposition for the five previously-dead config keys, each wired rather than removed:
+- **`ai.enabled`** — `AssistantController._get_or_build_assistant_service` now actually refuses
+  to build an `AssistantService` when it is `False` **and** at least one provider is configured
+  (checked in that order, deliberately: "you haven't configured anything yet" is the more
+  fundamental, more actionable message than "you configured something but switched it off," and
+  a fresh install has neither). Because this flag previously did nothing, `_migrate_legacy_ai_section`
+  gained a real backward-compatibility backfill: a config with `enabled: false` and a non-empty
+  `providers` list (any pre-existing real user) is defaulted to `enabled: true` in memory, so
+  upgrading to this milestone cannot silently disable an already-working assistant.
+- **`ai.active_provider_index`** — threaded through `ProviderRotationService.__init__`'s new
+  `start_index` parameter (and `from_config_profiles`'s new `active_index`), clamped to the valid
+  profile range with a warning if out of range, rather than always starting rotation at index 0
+  regardless of what this key said.
+- **`forecasting.default_horizon_periods`** — `AnalysisParameterDialog` gained an optional
+  `field_defaults` override dict (checked before a tool's own JSON-schema `"default"`);
+  `PredictPage.set_default_horizon_periods` is handed the configured value as a plain `int` (not
+  a `SettingsService` reference — stage pages hold no `src.services` reference by convention),
+  read once in `MainWindow._connect_actions`'s existing `PredictPage` wiring block.
+- **`reports.default_export_format`** — `GenerateReportDialog` gained an optional `default_format`
+  constructor parameter that pre-selects the matching format-combo entry (silently ignored if it
+  names an unrecognized format, e.g. a hand-edited typo); `ReportController` now holds a
+  `SettingsService` reference to read it.
+- **`window.width`/`height`** — read once in `Application.run`, resizing `MainWindow` to the
+  configured size right after construction (which still resizes to the hard-coded
+  `DEFAULT_WINDOW_WIDTH`/`HEIGHT` constants first, in its own `__init__` — harmless, since the
+  window is not shown until after this second resize). Deliberately one-directional: the current
+  window size is not saved back on close. A pre-existing, unrelated characteristic surfaced while
+  verifying this: the workbench's own minimum-size floor (~1980×881, from its docked panels'
+  aggregate minimum widths) is already larger than the *original* hard-coded default
+  (1600×900) — confirmed this predates M29 by reverting to the pre-M29 `main_window.py` and
+  reproducing the same floor. Any configured size below that floor is silently clamped up by
+  Qt's own layout system exactly as the old hard-coded default already was; a value above the
+  floor is honored exactly (verified directly: 2400×1300 in, 2400×1300 out). Flagged here as an
+  observation for a future milestone, not something this one introduces or fixes.
+
+`ui.first_run_completed` is the one genuinely new schema key (not a previously-dead one) — added
+via the standard three-place update plus a `_migrate_legacy_ui_section` backfill matching
+`_migrate_legacy_accessibility_section`'s own whole-section-then-per-key shape.
+
+**A real, pre-existing bug found (not introduced) during verification, worked around in this
+milestone's own test rather than patched at its root, which is flagged for the architect**:
+`src/ui/ui_state_bus.py`'s coalesced `state_changed` emission (a deferred call scheduled while a
+window is still alive) can outlive the `MainWindow`/`UiStateBus` C++ object it belongs to if that
+window is closed before the deferred emission fires — the next `QApplication.processEvents()`
+call by *any* subsequent test then crashes with `RuntimeError: Signal source has been deleted`.
+Confirmed pre-existing (not caused by any M29 change) by reverting every M29-tracked-file change
+and reproducing the identical crash with only M29's new, untracked test files present. Surfaced
+by `tests/ui/controllers/test_help_controller.py`'s own `processEvents()` call landing at an
+unlucky moment relative to an earlier, unrelated test's window teardown — reproduced
+deterministically across every full `tests/ui/` run and every `tests/ui/controllers/ tests/ui/a11y/`
+run during this milestone's own verification, not a one-off. Root cause left unfixed and flagged
+for the architect (likely fix: `UiStateBus` guarding its own emit against a deleted underlying
+`QObject`, or its owning window ensuring no coalesced emission is left pending at close) rather
+than patched unilaterally, since `ui_state_bus.py` is a foundational, cross-cutting module this
+milestone's scope never otherwise touches — but `test_help_controller.py` itself was given a
+`_pump_events()` helper that tolerates only this exact, identified `RuntimeError` message so this
+milestone's own new tests do not fail CI because of a bug that predates and is unrelated to them.
+This is a workaround for *this test's* exposure to the bug, not a fix for the bug itself, and is
+documented as such in the helper's own docstring.
+
 Acceptance criteria:
-- [ ] F1 from every stage page and every `ActionSpec` with a `help_anchor` opens the correct manual
-      section — contract test, not manual spot-checking.
-- [ ] The manual has zero stub pages.
-- [ ] First-run tour appears once, is dismissible, and does not reappear (`ui.first_run_completed`).
-- [ ] `autosave.enabled`/`interval_minutes` — described in config since milestone 1a, never
+- [x] F1 from every stage page and every `ActionSpec` with a `help_anchor` opens the correct manual
+      section — contract test, not manual spot-checking. `tests/ui/help/test_manual_anti_rot.py`
+      enumerates every real `help_anchor` from the three live sources in the codebase
+      (`ActionSpec` via `list_actions()`, `StagePage` via `list_registered_stages()`,
+      `BaseResultRenderer.help_anchor()` via `list_renderers()`) — 24 + 9 + 11 = 35 unique real
+      anchors — and asserts each resolves via `ManualIndex`. `tests/ui/help/test_help_router.py`
+      covers the parent-chain/QAction-walk mechanism in isolation; `tests/ui/controllers/
+      test_help_controller.py` and `tests/ui/test_main_window_actions.py::
+      test_f1_opens_the_manual_dialog_on_a_real_main_window` prove the real `QShortcut` on a
+      fully-constructed `MainWindow` actually opens `ManualDialog`, not merely that
+      `show_help_for_focus()` works called directly.
+- [x] The manual has zero stub pages. `test_every_page_in_the_whole_manual_has_substantial_non_stub_content`
+      parametrizes over all 90 real anchors in `docs/manual/` (not only the 35 F1-wired ones) and
+      asserts each page's body is non-trivially long and free of stub markers ("TODO", "placeholder",
+      etc.).
+- [x] First-run tour appears once, is dismissible, and does not reappear (`ui.first_run_completed`).
+      Verified end-to-end against the real composition root (`src/core/app.py`'s `Application.run`,
+      not a simplified stand-in): `ui.first_run_completed` starts `False` on a fresh config,
+      `FirstRunTourDialog` is shown, and the key is written back `True` and saved to disk
+      regardless of how the dialog was dismissed. A "Show tour again next time" control in
+      Settings' General tab resets it.
+- [x] `autosave.enabled`/`interval_minutes` — described in config since milestone 1a, never
       implemented — actually saves on the configured interval, tested with a fake clock.
-- [ ] Every other dead config key (`ai.enabled`, `ai.active_provider_index`,
-      `forecasting.default_horizon_periods`, `reports.default_export_format`, `window.width/height`)
-      is either wired to real behavior or removed, with a `_migrate_legacy_*` backfill either way.
+      `src/ui/autosave_timer.py`'s `AutosaveTimer.tick()` is the exact method a real
+      `QTimer.timeout` connects to; `tests/ui/test_autosave_timer.py` calls it directly any
+      number of times (never a real wall-clock wait) and asserts the fake `ProjectService.
+      save_project` was called exactly as many times as `tick()` was invoked while enabled,
+      zero times while disabled, and that re-enabling resumes saving — 9 tests, all passing.
+      Deliberately synchronous (not routed through `WorkerRunner`) — see that module's own
+      docstring for why introducing a new cross-thread `Project` mutation risk was rejected.
+- [x] Every other dead config key — `ai.enabled`, `ai.active_provider_index`,
+      `forecasting.default_horizon_periods`, `reports.default_export_format`, `window.width/height`
+      — is wired to real behavior (none were removed; see the M29 "As built" note below for the
+      per-key reasoning and why no key needed a schema-shape migration beyond `ai.enabled`'s
+      backward-compatibility backfill). `ui.first_run_completed` is the one genuinely *new*
+      schema key this milestone adds, with a real `_migrate_legacy_ui_section` backfill
+      (whole-section, then per-key, matching `_migrate_legacy_accessibility_section`'s own shape).
 
 ### Build order
 
@@ -1511,14 +1641,36 @@ No existing dialog was previously assigned a fate as part of this overhaul; this
 ### End-to-end verification (once M29 ships)
 
 1. Cold start: delete `config/config.yaml`, confirm the first-run tour appears once and not again.
+   **Done** — verified programmatically against the real `Application.run()` composition path
+   (not `main.py` run by a human): a fresh config starts `ui.first_run_completed: false`, the
+   tour dialog is shown, and the key is `true` and saved to disk afterward.
 2. Full pipeline, keyboard only: Ctrl+Shift+O import through REPORT with no mouse — the operability
-   commitment proven, not asserted.
+   commitment proven, not asserted. **Not done by this milestone** — requires a human (or a
+   pywinauto-driven UIA test, this project's own established heavier-weight tier for exactly
+   this kind of real-input verification) neither of which ran here; M29's own scope was the F1/
+   manual/autosave/config wiring, not a fresh keyboard-only pipeline audit.
 3. Theme matrix: dark → light → high_contrast → dark; no stray placeholders, charts recolor live.
+   **Not re-verified this milestone** — no theme-affecting change was made; M17/M28's own passes
+   already cover this and nothing here should have disturbed it.
 4. Zero-API-key path: every stage produces a `ResultCard`; the chat panel states its own absence.
+   **Re-confirmed, and extended**: `ai.enabled` now gates the assistant explicitly (a real
+   behavior this milestone added), with its own "AI Assistant Disabled" explanatory dialog for
+   that specific case, alongside the pre-existing "No AI provider is configured" message —
+   `tests/ui/controllers/test_assistant_controller.py` covers both.
 5. Screen-reader pass: NVDA, full walk-through, recorded findings — the M28 pass re-run once whole.
-6. Regression floor: full `pytest` + `black`/`isort`/`mypy` clean via the M16 CI gate.
-7. 1M-row dataset: responsive per M18's budgets.
-8. Manual completeness: F1 from every screen resolves to real content, zero stubs.
+   **Not done** — same standing limitation M28 already recorded (no agent in this environment has
+   a screen reader to drive); the new manual dialog and first-run tour are real, focusable,
+   accessibly-described widgets (`describe()` calls throughout), but a live NVDA pass over them
+   specifically has not happened.
+6. Regression floor: full `pytest` + `black`/`isort`/`mypy` clean via the M16 CI gate. **Done** —
+   see this milestone's own verification report for exact counts; `black --check`/
+   `isort --check-only`/the CI-scoped `mypy` command (now including the new `src/ui/help` and
+   `src/ui/autosave_timer.py`) are all clean.
+7. 1M-row dataset: responsive per M18's budgets. **Not applicable** — this milestone touches no
+   dataset-scale-sensitive code path.
+8. Manual completeness: F1 from every screen resolves to real content, zero stubs. **Done** —
+   see acceptance criteria above; 90/90 anchors mechanically checked for substantial, non-stub
+   content, not spot-checked.
 
 ---
 

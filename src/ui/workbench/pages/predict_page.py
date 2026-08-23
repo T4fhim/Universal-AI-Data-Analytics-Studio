@@ -150,6 +150,12 @@ class PredictPage(StagePage):
         self._expertise_level = ExpertiseLevel.BEGINNER
         self._worker_runner: WorkerRunner | None = None
         self._status_bar: ApplicationStatusBar | None = None
+        # Milestone 29: matches config.yaml's own "forecasting.default_horizon_periods"
+        # default (see src.core.config._default_config_dict) -- overwritten with the
+        # configured value by set_default_horizon_periods before this page is ever shown a
+        # real dataset, so this literal is only ever the value seen if that call is somehow
+        # skipped (a defensive fallback, not the value real users see).
+        self._default_horizon_periods = 30
         super().__init__(parent)
 
     def _build_form(self, layout: QVBoxLayout) -> None:
@@ -219,6 +225,18 @@ class PredictPage(StagePage):
         self._worker_runner = worker_runner
         self._status_bar = status_bar
 
+    def set_default_horizon_periods(self, periods: int) -> None:
+        """Set the value the "periods" field opens pre-filled with.
+
+        A plain ``int``, not a service reference -- this page still holds no
+        ``SettingsService`` of its own (see this module's own docstring on why every stage
+        page holds no ``src.services`` reference); ``main_window.py`` reads
+        ``forecasting.default_horizon_periods`` once and hands the resolved value straight
+        through, the same "resolve outside, hand in a plain value" shape
+        :meth:`set_worker_collaborators` already uses for ``WorkerRunner``/``ApplicationStatusBar``.
+        """
+        self._default_horizon_periods = periods
+
     # -- Running --------------------------------------------------------
 
     def _on_run_clicked(self) -> None:
@@ -233,7 +251,12 @@ class PredictPage(StagePage):
         tool_name = self._tool_combo.currentData()
         tool = get_tool_by_name(tool_name)
         column_names = [str(c) for c in self._dataset.dataframe.columns]
-        dialog = AnalysisParameterDialog(tool, column_names, self)
+        dialog = AnalysisParameterDialog(
+            tool,
+            column_names,
+            self,
+            field_defaults={"periods": self._default_horizon_periods},
+        )
         if dialog.exec() != dialog.DialogCode.Accepted:
             return
 

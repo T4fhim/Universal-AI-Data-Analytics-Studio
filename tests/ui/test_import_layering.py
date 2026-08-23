@@ -44,7 +44,14 @@ _SRC_ROOT = PROJECT_ROOT / "src"
 # nothing from src.ui at all. What this rule actually forbids is a leaf
 # depending on a *non-leaf* UI module (workbench/, controllers/, ...),
 # which would make it not a foundation at all.
-_LEAF_PACKAGES = ("theme", "a11y", "actions")
+#
+# Milestone 29 adds help/ for the same reason actions/ joined in milestone 17: help_router.py
+# depends on a11y.accessible (another leaf-to-leaf edge, reading HELP_ANCHOR_PROPERTY), and
+# manual_index.py/manual_renderer.py import nothing from src.ui at all. The actual F1 shortcut
+# and the dialog that displays a rendered page live outside this leaf
+# (src/ui/controllers/help_controller.py, src/ui/dialogs/manual_dialog.py) since they need a
+# live QApplication/parent window this foundation layer has no business depending on.
+_LEAF_PACKAGES = ("theme", "a11y", "actions", "help")
 
 # src/core/app.py is the application's composition root -- the one place
 # documented in docs/ARCHITECTURE.md that constructs QApplication, MainWindow,

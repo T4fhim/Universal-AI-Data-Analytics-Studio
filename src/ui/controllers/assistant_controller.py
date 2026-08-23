@@ -84,19 +84,39 @@ class AssistantController:
     def _get_or_build_assistant_service(self) -> AssistantService | None:
         """Return the running :class:`AssistantService`, constructing it from config on first use.
 
-        Returns ``None`` (after showing an explanatory dialog) if no
-        provider is configured or construction otherwise fails --
-        callers must check for this rather than assuming a non-``None``
-        return, since "not configured yet" is a normal, expected state
-        for a freshly installed application, not an error to raise past
+        Returns ``None`` (after showing an explanatory dialog) if ``ai.enabled`` is off, no
+        provider is configured, or construction otherwise fails -- callers must check for this
+        rather than assuming a non-``None`` return, since "not configured yet" is a normal,
+        expected state for a freshly installed application, not an error to raise past
         the UI layer.
         """
         if self._assistant_service is not None:
             return self._assistant_service
 
         providers = self._settings_service.get("ai", "providers", default=[])
+
+        # Milestone 29: ai.enabled, wired for the first time -- previously stored (and shown
+        # as a Settings checkbox) but never actually consulted anywhere; every conversation
+        # attempt reached the provider-profile check below regardless of this flag. Checked
+        # only once at least one provider is actually configured, and deliberately *after*
+        # the (unaffected) "no provider configured" case below gets first refusal -- "you
+        # haven't set anything up yet" is the more fundamental, more actionable problem than
+        # "you set something up but switched it off," and a fresh install has neither, so it
+        # should see the former message, not this one.
+        if providers and not self._settings_service.get("ai", "enabled", default=False):
+            QMessageBox.information(
+                self._parent,
+                "AI Assistant Disabled",
+                "The AI assistant is turned off. Enable it in Settings > AI to use the "
+                "chat panel.",
+            )
+            return None
+
         rotation_enabled = self._settings_service.get(
             "ai", "rotation_enabled", default=False
+        )
+        active_provider_index = self._settings_service.get(
+            "ai", "active_provider_index", default=0
         )
         # A pending live override (set before this service existed) wins over
         # SettingsService -- see _expertise_level_override's own docstring.
@@ -106,7 +126,11 @@ class AssistantController:
 
         try:
             service = AssistantService.from_provider_profiles(
-                providers, rotation_enabled, self._workspace_service, expertise_level
+                providers,
+                rotation_enabled,
+                self._workspace_service,
+                expertise_level,
+                active_provider_index,
             )
         except ServiceError as exc:
             QMessageBox.information(

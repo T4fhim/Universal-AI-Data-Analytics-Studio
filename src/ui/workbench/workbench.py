@@ -75,6 +75,20 @@ class Workbench(QWidget):
         """Return the constructed page for ``stage``, or ``None`` if it has no page yet."""
         return self._pages.get(stage)
 
+    def current_page(self) -> StagePage | None:
+        """Return the currently visible stage page, or ``None`` if the welcome page is showing.
+
+        Milestone 29: the second-level fallback :class:`~src.ui.controllers.help_controller.
+        HelpController.show_help_for_focus` uses when :func:`~src.ui.help.help_router.
+        resolve_help_anchor` finds nothing on the focus chain itself -- e.g. focus sitting in a
+        dock (Dataset Explorer, the AI chat panel) rather than inside the visible stage page's
+        own widget subtree. Reading ``self.stack.currentWidget()`` rather than tracking a
+        separate "current stage" field keeps this a pure reflection of what
+        :class:`QStackedWidget` is already showing, with nothing to fall out of sync.
+        """
+        current = self.stack.currentWidget()
+        return current if isinstance(current, StagePage) else None
+
     def all_pages(self) -> tuple[StagePage, ...]:
         """Return every constructed stage page, in :class:`PipelineStage` declaration order.
 

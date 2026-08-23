@@ -66,6 +66,7 @@ from src.ui.controllers.assistant_controller import AssistantController
 from src.ui.controllers.database_controller import DatabaseController
 from src.ui.controllers.dataset_controller import DatasetController
 from src.ui.controllers.guidance_controller import GuidanceController
+from src.ui.controllers.help_controller import HelpController
 from src.ui.controllers.pipeline_controller import PipelineController
 from src.ui.controllers.project_controller import ProjectController
 from src.ui.controllers.report_controller import ReportController
@@ -84,7 +85,6 @@ from src.ui.workbench.pages.clean_page import CleanPage
 from src.ui.workbench.pages.explore_page import ExplorePage
 from src.ui.workbench.pages.predict_page import PredictPage
 from src.ui.workbench.pages.report_page import ReportPage
-from src.ui.workbench.pages.reproduce_page import ReproducePage
 from src.ui.workbench.pages.understand_page import UnderstandPage
 from src.ui.workbench.pages.visualize_page import VisualizePage
 from src.ui.workbench.workbench import Workbench
@@ -244,6 +244,7 @@ class MainWindow(QMainWindow):
             self._dock_manager,
             self._status_bar,
             self._worker_runner,
+            self._settings_service,
         )
         self._assistant_controller = AssistantController(
             self,
@@ -266,6 +267,7 @@ class MainWindow(QMainWindow):
         self._theme_controller = ThemeController(
             self, self._settings_service, self._plugin_manager
         )
+        self._help_controller = HelpController(self, self._workbench)
 
     def _populate_view_menu(self) -> None:
         for toggle_action in self._dock_manager.view_menu_toggle_actions():
@@ -314,35 +316,18 @@ class MainWindow(QMainWindow):
             self._dataset_controller.on_dataset_double_clicked
         )
 
-        # Milestone 20: workbench stage pages emit signals rather than
-        # calling services themselves (see src/ui/workbench/__init__.py's
-        # own docstring) -- this is where those signals meet the
-        # controller methods that actually do the work. isinstance narrows
-        # StagePage down to each concrete subclass so its own signals (not
-        # declared on the StagePage base) are visible to mypy, rather than
-        # an `is not None` check alone.
-        understand_page = self._workbench.page_for(PipelineStage.UNDERSTAND)
-        if isinstance(understand_page, UnderstandPage):
-            understand_page.run_requested.connect(
-                self._pipeline_controller.run_understand_stage
-            )
+        # Milestone 20: workbench stage pages emit signals rather than calling services
+        # themselves (see src/ui/workbench/__init__.py's own docstring). Milestone 29 moved
+        # understand_page/reproduce_page/clean_page's wiring (each targets only
+        # PipelineController's own methods) into PipelineController.connect_stage_pages
+        # itself -- see that method's own docstring for why report_page/visualize_page below
+        # stay here instead (their signals target a *different* controller, and this
+        # project's controllers never import each other directly).
+        self._pipeline_controller.connect_stage_pages(self._workbench)
         report_page = self._workbench.page_for(PipelineStage.REPORT)
         if isinstance(report_page, ReportPage):
             report_page.generate_report_requested.connect(
                 self._report_controller.generate_report
-            )
-        reproduce_page = self._workbench.page_for(PipelineStage.REPRODUCE)
-        if isinstance(reproduce_page, ReproducePage):
-            reproduce_page.reproduce_requested.connect(
-                self._pipeline_controller.reproduce_active_dataset
-            )
-        # Milestone 23: CleanPage computes the derived dataset itself (see its own
-        # docstring for why) and hands it off via a signal, the same "structure here,
-        # behavior wired by the caller" split every other stage page above uses.
-        clean_page = self._workbench.page_for(PipelineStage.CLEAN)
-        if isinstance(clean_page, CleanPage):
-            clean_page.operation_applied.connect(
-                self._pipeline_controller.register_clean_operation
             )
 
         # Milestone 24: VisualizePage builds its own figure and renders it inline (see its
@@ -362,6 +347,10 @@ class MainWindow(QMainWindow):
         predict_page = self._workbench.page_for(PipelineStage.PREDICT)
         if isinstance(predict_page, PredictPage):
             predict_page.set_worker_collaborators(self._worker_runner, self._status_bar)
+            horizon = self._settings_service.get(
+                "forecasting", "default_horizon_periods", default=30
+            )
+            predict_page.set_default_horizon_periods(horizon)
 
         # Milestone 23: "genuinely reachable" close actions -- see
         # DockManager.connect_dataset_close_requested/connect_chart_closed's own

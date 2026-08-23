@@ -24,7 +24,7 @@ from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 from src.services.analysis_orchestrator_service import PipelineStage
 from src.services.guidance_service import Suggestion
-from src.ui.a11y.accessible import describe
+from src.ui.a11y.accessible import HELP_ANCHOR_PROPERTY, describe
 from src.ui.widgets.error_state import ErrorState
 from src.ui.widgets.guidance_panel import GuidancePanel
 
@@ -46,6 +46,15 @@ class StagePage(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName(f"stagePage_{self.stage.value}")
+        # Milestone 29: stamped on the page container itself, not only on individual
+        # described widgets (every concrete subclass's own run/generate/reproduce button
+        # already carries this -- see e.g. UnderstandPage._build_form). ExplainPage has no
+        # interactive control at all to stamp, and any subclass's non-button widgets (combo
+        # boxes, labels) are never described with help_anchor -- without this, F1 pressed
+        # while focus sits on one of those would climb the parent chain past this page
+        # entirely and find nothing. Stamping the container guarantees resolve_help_anchor
+        # succeeds for focus anywhere inside a stage page, not only on its one described button.
+        self.setProperty(HELP_ANCHOR_PROPERTY, self.help_anchor)
 
         layout = QVBoxLayout(self)
 

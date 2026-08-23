@@ -16,12 +16,18 @@ said it would, rather than restructuring this class or changing how
 from __future__ import annotations
 
 import sys
+from typing import cast
 
 from PySide6.QtWidgets import QApplication
 
 from src.core.bootstrap import BootstrapContext, bootstrap
 from src.core.constants import APP_NAME, APP_VERSION
 from src.core.logger import get_logger
+from src.services.project_service import ProjectService
+from src.services.settings_service import SettingsService
+from src.services.workspace_service import WorkspaceService
+from src.ui.autosave_timer import AutosaveTimer
+from src.ui.dialogs.first_run_tour_dialog import FirstRunTourDialog
 from src.ui.main_window import MainWindow
 from src.ui.theme_manager import ThemeManager
 
@@ -127,7 +133,50 @@ class Application:
 
         main_window = MainWindow(self._context)
         main_window.attach_theme_manager(theme_manager)
+
+        # Milestone 29: window.width/height, described in config since milestone 1a and never
+        # read anywhere before this -- MainWindow.__init__ already resized itself to the
+        # hard-coded DEFAULT_WINDOW_WIDTH/HEIGHT constants by this point; this simply resizes
+        # again to whatever config.yaml actually says, which is a real, if inelegant, way to
+        # wire it without adding to MainWindow's own tests.ui.test_module_size budget (it was
+        # already at that budget's ceiling before this milestone touched it at all). The
+        # window is not visible yet (show() is still below), so the intermediate default size
+        # is never actually seen on screen.
+        main_window.resize(
+            self._context.config.window_width, self._context.config.window_height
+        )
         main_window.show()
+
+        # Milestone 29: autosave.enabled/interval_minutes, described in config since
+        # milestone 1a and never implemented before this -- see src/ui/autosave_timer.py's own
+        # docstring for the full reasoning. Parented to main_window so it is torn down with the
+        # window rather than needing an explicit stop() call in closeEvent.
+        #
+        # cast(), not a bare resolve() call: DependencyContainer.resolve() returns `object`
+        # (the same "resolve() -> object gap" src/ui/main_window.py's own construction lives
+        # with -- see .github/workflows/ci.yml's mypy-scope comment) -- every resolve() call
+        # here is registered with exactly this type in src/core/bootstrap.py, so a cast is a
+        # documented, narrow correction, not a blind type: ignore.
+        settings_service = cast(
+            SettingsService, self._context.container.resolve(SettingsService)
+        )
+        AutosaveTimer(
+            cast(ProjectService, self._context.container.resolve(ProjectService)),
+            cast(WorkspaceService, self._context.container.resolve(WorkspaceService)),
+            settings_service,
+            parent=main_window,
+        )
+
+        # Milestone 29: the first-run tour -- appears once, backed by the real
+        # ui.first_run_completed config key (see src/ui/dialogs/first_run_tour_dialog.py's own
+        # docstring for why the dialog itself holds no notion of "have I been shown before").
+        # Marked completed and saved to disk regardless of how the dialog was dismissed
+        # (exec() returns for any close path, not only its own "Get Started" button), so it
+        # genuinely never reappears once shown.
+        if not self._context.config.ui_first_run_completed:
+            FirstRunTourDialog(main_window).exec()
+            settings_service.set("ui", "first_run_completed", value=True)
+            settings_service.save()
 
         _logger.info("Main window shown; entering Qt event loop.")
         return qt_application.exec()

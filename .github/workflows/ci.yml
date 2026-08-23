@@ -74,6 +74,12 @@ jobs:
         # tests/ui/test_module_size.py's _LEGACY_EXEMPTIONS shrinks, rather
         # than one big repo-wide fix landing all at once.
         #
+        # Milestone 29 adds src/ui/help (the new manual/anchor-resolution leaf package) and
+        # src/ui/autosave_timer.py (the new standalone module) -- both genuinely clean, per
+        # this same convention. src/core/app.py (already covered via `src/core`) needed two
+        # `cast()` calls at its new DependencyContainer.resolve() call sites to stay clean --
+        # see that module's own comment for why cast(), not a blind `type: ignore`.
+        #
         # --follow-imports=silent: several of these modules (e.g.
         # controllers/*, actions/action_context.py) import the services
         # layer (ProjectService/WorkspaceService/SettingsService/
@@ -86,10 +92,12 @@ jobs:
         run: python -m mypy src/core src/services src/analysis src/database
           src/workers src/ui/theme src/ui/a11y src/ui/web src/ui/actions
           src/ui/controllers src/ui/workbench src/ui/widgets src/ui/results
-          src/ui/dialogs src/ui/command_stack.py src/ui/command_palette.py
+          src/ui/dialogs src/ui/help src/ui/command_stack.py
+          src/ui/command_palette.py
           src/ui/dataset_close_menu.py src/ui/dock_manager.py
           src/ui/menu_bar.py src/ui/status_bar.py src/ui/theme_manager.py
           src/ui/toolbar.py src/ui/ui_state_bus.py src/ui/worker_runner.py
+          src/ui/autosave_timer.py
           src/ui/__init__.py --ignore-missing-imports --follow-imports=silent
 
       - name: pytest

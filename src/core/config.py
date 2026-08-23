@@ -140,6 +140,15 @@ def _default_config_dict() -> dict[str, Any]:
             "reduced_motion": False,
             "base_font_size": 13,
         },
+        "ui": {
+            # Milestone 29: read by src.core.app.Application.run to decide whether to show
+            # the first-run tour, and set True (then saved) once that tour has been shown and
+            # dismissed — see src/ui/dialogs/first_run_tour_dialog.py's own docstring. False
+            # on a fresh install (or a config.yaml recreated because the old one was deleted,
+            # per this module's own "delete config.yaml" self-healing behavior) so the tour
+            # genuinely appears once, and only once, per real first run.
+            "first_run_completed": False,
+        },
     }
 
 
@@ -158,6 +167,7 @@ _TOP_LEVEL_SCHEMA: dict[str, type] = {
     "reports": dict,
     "database": dict,
     "accessibility": dict,
+    "ui": dict,
 }
 
 _NESTED_SCHEMA: dict[str, dict[str, type]] = {
@@ -180,6 +190,7 @@ _NESTED_SCHEMA: dict[str, dict[str, type]] = {
     "reports": {"default_export_format": str},
     "database": {"profiles": list},
     "accessibility": {"reduced_motion": bool, "base_font_size": int},
+    "ui": {"first_run_completed": bool},
 }
 
 
@@ -244,6 +255,28 @@ def _migrate_legacy_ai_section(data: dict[str, Any]) -> None:
             "config.yaml's 'ai' section predates milestone 8's "
             "'expertise_level' key — defaulted it to 'beginner' in memory. "
             "Save settings once to persist this change."
+        )
+
+    # Milestone 29: 'ai.enabled' is wired to real behavior for the first time this
+    # milestone (src.ui.controllers.assistant_controller.AssistantController now actually
+    # refuses to build an AssistantService when it is False, where before it was stored but
+    # never read anywhere). Without this backfill, every config.yaml saved before this
+    # milestone — which defaults 'enabled' to False and had no reason for a user to ever
+    # flip a checkbox that visibly did nothing — would suddenly appear "disabled" despite
+    # having real, working provider profiles already configured. A non-empty 'providers'
+    # list is treated as proof the user already intended the assistant to be reachable;
+    # an empty list is left alone; a config saved *during* this milestone's own testing
+    # (where 'enabled' may have been deliberately left False with providers configured) is
+    # the one case this over-corrects, judged an acceptable trade-off against silently
+    # breaking every pre-existing real user's already-working setup.
+    if ai_section.get("providers") and not ai_section.get("enabled", False):
+        ai_section["enabled"] = True
+        _bootstrap_logger.warning(
+            "config.yaml's 'ai' section had 'enabled: false' with provider profiles "
+            "already configured — since this flag was never actually enforced before "
+            "milestone 29, it has been defaulted to 'true' in memory to avoid silently "
+            "disabling an already-working assistant. Save settings once to persist this "
+            "change, or turn it off deliberately in Settings if you want it off."
         )
 
 
@@ -318,6 +351,31 @@ def _migrate_legacy_accessibility_section(data: dict[str, Any]) -> None:
         section["reduced_motion"] = False
     if "base_font_size" not in section:
         section["base_font_size"] = 13
+
+
+def _migrate_legacy_ui_section(data: dict[str, Any]) -> None:
+    """Back-fill milestone 29's ``ui`` section into a config saved before it existed, in place.
+
+    Same whole-section-then-per-key shape as :func:`_migrate_legacy_accessibility_section`: a
+    ``config.yaml`` saved before this milestone has no ``ui`` key at all, while one saved
+    *during* this milestone's own development could in principle have the section but be
+    missing ``first_run_completed`` specifically. Defaulting a genuinely pre-existing
+    installation's ``first_run_completed`` to ``False`` (the fresh-install default) is a
+    deliberate, accepted trade-off: an existing user who upgrades into this milestone sees the
+    first-run tour once, the same as a brand new install, rather than this migration guessing
+    at "have they effectively already been onboarded" from other config state that was never
+    meant to answer that question.
+    """
+    if "ui" not in data or not isinstance(data.get("ui"), dict):
+        data["ui"] = {"first_run_completed": False}
+        _bootstrap_logger.warning(
+            "config.yaml predates milestone 29's 'ui' section — added one with "
+            "default values in memory. Save settings once to persist this change."
+        )
+        return
+
+    if "first_run_completed" not in data["ui"]:
+        data["ui"]["first_run_completed"] = False
 
 
 def validate_config_structure(data: dict[str, Any]) -> None:
@@ -440,6 +498,7 @@ def load_config(path: Path = CONFIG_FILE_PATH) -> dict[str, Any]:
     _migrate_legacy_plugins_section(loaded)
     _migrate_legacy_database_section(loaded)
     _migrate_legacy_accessibility_section(loaded)
+    _migrate_legacy_ui_section(loaded)
     validate_config_structure(loaded)
     return loaded
 
@@ -483,6 +542,7 @@ class AppConfig:
     database_profiles: list[dict[str, Any]]
     accessibility_reduced_motion: bool
     accessibility_base_font_size: int
+    ui_first_run_completed: bool
 
     _raw: dict[str, Any] = field(repr=False, compare=False)
 
@@ -520,6 +580,7 @@ class AppConfig:
             database_profiles=list(data["database"]["profiles"]),
             accessibility_reduced_motion=data["accessibility"]["reduced_motion"],
             accessibility_base_font_size=data["accessibility"]["base_font_size"],
+            ui_first_run_completed=data["ui"]["first_run_completed"],
             _raw=data,
         )
 
