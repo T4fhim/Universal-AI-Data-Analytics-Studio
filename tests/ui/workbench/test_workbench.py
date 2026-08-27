@@ -126,7 +126,8 @@ def test_show_stage_syncs_the_rails_current_item(qapp: QApplication) -> None:
     """Unit 6: show_stage() is the programmatic navigation path a rail click never goes
     through -- before this fix the rail's own current-item cursor (what keyboard arrow
     navigation starts from) stayed wherever a previous click left it, out of sync with
-    whatever page was actually visible. See StageRail.set_current_stage's own docstring."""
+    whatever page was actually visible. See StageRail.set_current_stage's own docstring.
+    """
     workbench = Workbench()
     proposal = StageProposal(stage=PipelineStage.UNDERSTAND, rationale="Profile first.")
     workbench.update_pipeline_state(

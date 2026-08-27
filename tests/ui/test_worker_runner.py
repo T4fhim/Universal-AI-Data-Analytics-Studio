@@ -103,7 +103,8 @@ def test_on_progress_and_report_progress_are_forwarded_to_baseworker(
 def test_busy_widget_is_disabled_then_reenabled_on_finish(qapp: QApplication) -> None:
     """Unit 7 (UI-friendliness pass, button loading-state polish): the generalized version
     of the manual setEnabled(False)/setEnabled(True) pair PredictPage's own run_button used
-    to hand-roll around every call -- see WorkerRunner.run()'s own busy_widget docstring."""
+    to hand-roll around every call -- see WorkerRunner.run()'s own busy_widget docstring.
+    """
     from tests.ui.qt_helpers import wait_for_signal
 
     button = QPushButton()
@@ -121,7 +122,8 @@ def test_busy_widget_is_disabled_then_reenabled_on_finish(qapp: QApplication) ->
 
 def test_busy_widget_is_reenabled_even_when_fn_raises(qapp: QApplication) -> None:
     """finished always fires from BaseWorker.run()'s own finally block regardless of
-    success or failure -- a busy_widget must never be left stuck disabled after an error."""
+    success or failure -- a busy_widget must never be left stuck disabled after an error.
+    """
     from tests.ui.qt_helpers import wait_for_signal
 
     button = QPushButton()

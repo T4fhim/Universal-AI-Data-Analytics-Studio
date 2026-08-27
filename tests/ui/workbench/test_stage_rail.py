@@ -50,7 +50,8 @@ def test_status_prefix_is_visible_in_the_item_text_not_color_only(
 
 def test_set_current_stage_sets_the_matching_item_current(qapp: QApplication) -> None:
     """Unit 6: the fix for the rail's current-item cursor going stale on any
-    programmatic (non-click) navigation -- see StageRail.set_current_stage's own docstring."""
+    programmatic (non-click) navigation -- see StageRail.set_current_stage's own docstring.
+    """
     rail = StageRail()
     rail.set_current_stage(PipelineStage.CLEAN)
 

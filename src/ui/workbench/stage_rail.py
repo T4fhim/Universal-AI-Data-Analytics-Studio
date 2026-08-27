@@ -151,7 +151,9 @@ class StageRail(QListWidget):
                 "reachable but not yet interactive" note on :meth:`Workbench._on_stage_selected`).
         """
         if stage is None:
-            self.setCurrentItem(None)
+            # QListWidget.setCurrentItem(None) is valid, documented Qt behavior (clears the
+            # current item) -- the PySide6 stubs just don't declare the None-accepting overload.
+            self.setCurrentItem(None)  # type: ignore[call-overload]
             return
         for index in range(self.count()):
             item = self.item(index)

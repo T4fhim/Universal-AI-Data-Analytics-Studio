@@ -425,7 +425,9 @@ class VisualizePage(StagePage):
             self.show_error("Failed to Build Chart", str(exc))
             _logger.warning("Chart build failed: %s", exc)
             return
-        except Exception as exc:  # noqa: BLE001 -- shown to the user, not swallowed silently
+        except (
+            Exception
+        ) as exc:  # noqa: BLE001 -- shown to the user, not swallowed silently
             self.show_error("Failed to Build Chart", f"Unexpected error: {exc}")
             _logger.error("Chart build failed unexpectedly: %s", exc)
             return
