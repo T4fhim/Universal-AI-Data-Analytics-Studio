@@ -9,36 +9,62 @@ introspection this project's chart classes were not built to support
 (their ``build`` signatures use plain keyword arguments, not a
 declarative parameter-schema format). A fixed registry is less
 extensible to a chart type added later without also updating this
-dialog, but is far simpler and less error-prone for the six chart
-types milestone 5a actually built.
+dialog, but is far simpler and less error-prone for the twelve chart
+types this registry now lists.
+
+**Milestone 24: rebuilt on the shared multi-select picker, unlocking Treemap/Radar.**
+Before this milestone, every field got one :class:`QComboBox`, which cannot represent a
+``list[str]`` parameter (Treemap's ``path_columns``, Radar's ``value_columns``) — so
+:attr:`~src.visualization.chart_registry.ChartRegistration.dialog_compatible` excluded both
+chart types from this dialog entirely, even though their column requirements are otherwise
+exactly as expressible as any other chart's. Now a field named in
+:attr:`~src.visualization.chart_registry.ChartRegistration.list_fields` gets a
+:class:`~src.ui.widgets.column_multi_select.ColumnMultiSelect` instead, and
+``chart_registry._register_builtins`` flips both chart types' ``dialog_compatible`` back to
+``True`` (its default) now that this dialog can actually represent their fields.
 """
 
 from __future__ import annotations
 
 import pandas as pd
-from pptx import exc
-from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
-                               QFormLayout, QLineEdit, QMessageBox, QWidget)
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QLineEdit,
+    QMessageBox,
+    QWidget,
+)
 
 from src.core.exceptions import ApplicationError
 from src.core.logger import get_logger
-from src.visualization.categorical_charts import BarChart, PieChart
-from src.visualization.continuous_charts import LineChart, ScatterChart
-from src.visualization.distribution_charts import BoxPlotChart, HistogramChart
+from src.ui.widgets.column_multi_select import ColumnMultiSelect
+from src.visualization.base_chart import BaseChart
+from src.visualization.chart_registry import display_name_for, list_dialog_charts
 
 _logger = get_logger(__name__)
 
-# Each entry: (builder class, required column-picker fields, optional
-# column-picker fields). Field names here match each builder's own
+# Milestone 12: sourced from src.visualization.chart_registry rather
+# than a dict this dialog maintained independently — see that
+# module's own docstring for why. Each entry: (builder class,
+# required column-picker fields, optional column-picker fields,
+# list-typed field names). Field names match each builder's own
 # keyword argument names exactly, since they are passed straight
-# through — see _on_accept below.
-_CHART_REGISTRY: dict[str, tuple[type, list[str], list[str]]] = {
-    "Bar": (BarChart, ["category_column"], ["value_column"]),
-    "Pie": (PieChart, ["category_column"], ["value_column"]),
-    "Line": (LineChart, ["y_column"], ["x_column"]),
-    "Scatter": (ScatterChart, ["x_column", "y_column"], ["color_column"]),
-    "Histogram": (HistogramChart, ["column"], []),
-    "Box Plot": (BoxPlotChart, ["value_column"], ["group_column"]),
+# through — see _on_accept below. Only chart_registry.
+# list_dialog_charts()'s entries appear here — as of milestone 24
+# that is every registered chart type (see this module's own
+# docstring for why Treemap/Radar are no longer excluded).
+_CHART_REGISTRY: dict[
+    str, tuple[type[BaseChart], list[str], list[str], frozenset[str]]
+] = {
+    display_name_for(name): (
+        registration.chart_class,
+        list(registration.required_fields),
+        list(registration.optional_fields),
+        frozenset(registration.list_fields),
+    )
+    for name, registration in list_dialog_charts().items()
 }
 
 
@@ -59,7 +85,7 @@ class CreateVisualizationDialog(QDialog):
         self._built_chart_type: str | None = None
         self._built_parameters: dict = {}
 
-        self.setWindowTitle("Create Visualization")
+        self.setWindowTitle(self.tr("Create Visualization"))
         self.setModal(True)
         self.setMinimumWidth(360)
 
@@ -75,7 +101,10 @@ class CreateVisualizationDialog(QDialog):
 
         self._column_field_layout = QFormLayout()
         layout.addRow(self._column_field_layout)
-        self._column_combos: dict[str, QComboBox] = {}
+        # Milestone 24: a field's widget is either a single-column QComboBox
+        # or a multi-column ColumnMultiSelect -- see _rebuild_column_fields
+        # for which fields get which, driven by ChartRegistration.list_fields.
+        self._column_fields: dict[str, QComboBox | ColumnMultiSelect] = {}
 
         self._rebuild_column_fields(self._chart_type_combo.currentText())
 
@@ -103,32 +132,71 @@ class CreateVisualizationDialog(QDialog):
         """
         while self._column_field_layout.rowCount() > 0:
             self._column_field_layout.removeRow(0)
-        self._column_combos.clear()
+        self._column_fields.clear()
 
-        _builder_class, required_fields, optional_fields = _CHART_REGISTRY[chart_type_name]
+        _builder_class, required_fields, optional_fields, list_fields = _CHART_REGISTRY[
+            chart_type_name
+        ]
 
         for field_name in required_fields:
-            combo = QComboBox(self)
-            combo.addItems(self._column_names)
-            self._column_field_layout.addRow(f"{_humanize(field_name)}:", combo)
-            self._column_combos[field_name] = combo
+            if field_name in list_fields:
+                multi_select = ColumnMultiSelect(self)
+                multi_select.set_columns(self._column_names)
+                self._column_field_layout.addRow(
+                    f"{_humanize(field_name)}:", multi_select
+                )
+                self._column_fields[field_name] = multi_select
+            else:
+                combo = QComboBox(self)
+                combo.addItems(self._column_names)
+                self._column_field_layout.addRow(f"{_humanize(field_name)}:", combo)
+                self._column_fields[field_name] = combo
 
         for field_name in optional_fields:
-            combo = QComboBox(self)
-            combo.addItem("(none)")
-            combo.addItems(self._column_names)
-            self._column_field_layout.addRow(f"{_humanize(field_name)} (optional):", combo)
-            self._column_combos[field_name] = combo
+            if field_name in list_fields:
+                multi_select = ColumnMultiSelect(self)
+                multi_select.set_columns(self._column_names)
+                self._column_field_layout.addRow(
+                    f"{_humanize(field_name)} (optional):", multi_select
+                )
+                self._column_fields[field_name] = multi_select
+            else:
+                combo = QComboBox(self)
+                combo.addItem("(none)")
+                combo.addItems(self._column_names)
+                self._column_field_layout.addRow(
+                    f"{_humanize(field_name)} (optional):", combo
+                )
+                self._column_fields[field_name] = combo
 
     def _on_accept(self) -> None:
         chart_type_name = self._chart_type_combo.currentText()
-        builder_class, _required, _optional = _CHART_REGISTRY[chart_type_name]
+        builder_class, required_fields, _optional, _list_fields = _CHART_REGISTRY[
+            chart_type_name
+        ]
 
         parameters: dict = {}
-        for field_name, combo in self._column_combos.items():
-            value = combo.currentText()
-            if value != "(none)":
-                parameters[field_name] = value
+        missing: list[str] = []
+        for field_name, widget in self._column_fields.items():
+            if isinstance(widget, ColumnMultiSelect):
+                selected = widget.selected_columns()
+                if selected:
+                    parameters[field_name] = selected
+                elif field_name in required_fields:
+                    missing.append(field_name)
+            else:
+                value = widget.currentText()
+                if value != "(none)":
+                    parameters[field_name] = value
+
+        if missing:
+            QMessageBox.warning(
+                self,
+                "Missing Required Fields",
+                "Please select at least one column for: "
+                + ", ".join(_humanize(f) for f in missing),
+            )
+            return
 
         title = self._title_field.text().strip()
         if title:
@@ -141,10 +209,12 @@ class CreateVisualizationDialog(QDialog):
             _logger.warning("Chart build failed: %s", exc)
             return
         except Exception as exc:
-            QMessageBox.critical(self, "Failed to Build Chart", f"Unexpected error: {exc}")
+            QMessageBox.critical(
+                self, "Failed to Build Chart", f"Unexpected error: {exc}"
+            )
             _logger.error("Chart build failed unexpectedly: %s", exc)
             return
-        
+
         self._built_figure = figure
         self._built_chart_type = builder_class.__name__
         self._built_parameters = parameters

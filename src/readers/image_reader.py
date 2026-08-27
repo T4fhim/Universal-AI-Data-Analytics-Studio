@@ -123,7 +123,9 @@ class ImageReader(BaseReader):
             raise ReaderError(f"Failed to open {path} as an image: {exc}") from exc
 
         try:
-            ocr_data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
+            ocr_data = pytesseract.image_to_data(
+                image, output_type=pytesseract.Output.DICT
+            )
         except Exception as exc:
             raise ReaderError(f"OCR failed on {path}: {exc}") from exc
 
@@ -140,7 +142,9 @@ class ImageReader(BaseReader):
         dataframe = cls._rows_to_dataframe(rows)
 
         warnings: list[str] = []
-        low_confidence_count = sum(1 for w in words if w["conf"] < _LOW_CONFIDENCE_THRESHOLD)
+        low_confidence_count = sum(
+            1 for w in words if w["conf"] < _LOW_CONFIDENCE_THRESHOLD
+        )
         if low_confidence_count > 0:
             warnings.append(
                 f"{low_confidence_count} of {len(words)} recognized "
@@ -226,7 +230,10 @@ class ImageReader(BaseReader):
         current_row_top: int | None = None
 
         for word in sorted_words:
-            if current_row_top is None or abs(word["top"] - current_row_top) <= _ROW_CLUSTER_TOLERANCE_PX:
+            if (
+                current_row_top is None
+                or abs(word["top"] - current_row_top) <= _ROW_CLUSTER_TOLERANCE_PX
+            ):
                 current_row.append(word)
                 if current_row_top is None:
                     current_row_top = word["top"]

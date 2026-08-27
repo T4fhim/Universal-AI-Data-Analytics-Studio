@@ -3,6 +3,15 @@ pandas
 polars
 numpy
 plotly
+# Real, unconditional runtime dependency of src/visualization/continuous_charts.py
+# (LineChart/ScatterChart's automatic large-dataset downsampling, milestone 5a) --
+# missing from this file entirely until now. Found via a real, reproduced CI-only
+# failure: this dev venv has had plotly-resampler installed directly (not via any
+# line in this file) for long enough that nothing here noticed it was never
+# actually declared, so every fresh `pip install -r requirements.txt` -- which is
+# all CI, or any other machine, ever does -- silently lacked it, cascading into 41
+# test-collection errors for every module importing continuous_charts.py.
+plotly-resampler
 kaleido
 scipy
 statsmodels
@@ -13,6 +22,15 @@ openpyxl
 pyxlsb
 odfpy
 pymupdf
+# Real, unconditional runtime dependency of src/readers/pdf_reader.py --
+# missing from this file entirely until now, same class of gap as
+# plotly-resampler above and found the same way (a real, reproduced
+# CI-only failure). pdf_reader.py's own module docstring already admits
+# this: "camelot was already present in this project's environment,
+# unprompted" -- i.e. this was known, at the time that reader was
+# written, to be relying on something never declared here. PyPI package
+# name is camelot-py; it imports as `camelot`.
+camelot-py
 pdfplumber
 python-docx
 python-pptx
@@ -22,6 +40,11 @@ pytesseract
 beautifulsoup4
 lxml
 sqlalchemy
+pymysql
+psycopg2-binary
+pyodbc
+oracledb
+duckdb_engine
 pyarrow
 fastparquet
 python-magic
@@ -38,18 +61,42 @@ lightgbm
 catboost
 networkx
 duckdb
-anthropic
-openai
-google-genai
+# Bounded, not left fully unpinned like most of this file: these three SDKs
+# release breaking major versions with no warning (confirmed directly --
+# investigating a real, reproduced CI-only pytest failure found this dev
+# venv frozen at anthropic==0.122.0/openai==2.49.0, while a fresh install of
+# this same unpinned line resolves anthropic==1.0.0/openai==3.3.1, both
+# major-version jumps). src/ai/llm_provider.py's usage (Anthropic()/
+# OpenAI() constructors, .messages.create/.chat.completions.create,
+# APIError/OpenAIError) was verified compatible with the new majors before
+# raising these lower bounds, so this pins the floor to what's proven to
+# work and caps the ceiling so the *next* unannounced major can't silently
+# reach a fresh install (CI or otherwise) unreviewed.
+anthropic>=1.0.0,<2
+openai>=3.0.0,<4
+google-genai>=2.19.0,<3
 python-dotenv
 rich
+# Explicit rather than relying on it arriving transitively via rich: the
+# milestone-27 in-app manual (src/ui/help/) compiles docs/manual/*.md through
+# markdown_it. It has been importable in this venv only as rich's own
+# dependency, which is fragile -- a future rich upgrade could drop it.
+markdown-it-py
 joblib
 numba
 dask
 pytest
-black
-isort
-mypy
+black==26.5.1
+isort==8.0.1
+mypy==2.1.0
 ruff==0.16.3
 
 bandit==1.9.4
+# Milestone 28 follow-up (Tier 1 UIA verification, tests/ui/a11y/
+# test_uia_integration.py): the real Windows UI Automation driver. Windows-
+# only by nature of what it wraps (win32com/comtypes underneath) -- this
+# project's own verified dev/CI environment is windows-latest (see
+# .github/workflows/ci.yml's own comment), so an unconditional entry here
+# matches how every other dependency in this file is listed, rather than a
+# platform marker no other line uses.
+pywinauto

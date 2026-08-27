@@ -76,7 +76,9 @@ class BarChart(BaseChart):
                     f"value_column '{value_column}' must be numeric; "
                     f"has dtype {dataframe[value_column].dtype}."
                 )
-            grouped = dataframe.groupby(category_column, dropna=False)[value_column].sum()
+            grouped = dataframe.groupby(category_column, dropna=False)[
+                value_column
+            ].sum()
             grouped = grouped.sort_values(ascending=False)
             if len(grouped) > _MAX_CATEGORIES:
                 top = grouped.iloc[: _MAX_CATEGORIES - 1]
@@ -118,7 +120,9 @@ class PieChart(BaseChart):
                     f"value_column '{value_column}' must be numeric; "
                     f"has dtype {dataframe[value_column].dtype}."
                 )
-            grouped = dataframe.groupby(category_column, dropna=False)[value_column].sum()
+            grouped = dataframe.groupby(category_column, dropna=False)[
+                value_column
+            ].sum()
             grouped = grouped.sort_values(ascending=False)
             if len(grouped) > _MAX_CATEGORIES:
                 top = grouped.iloc[: _MAX_CATEGORIES - 1]

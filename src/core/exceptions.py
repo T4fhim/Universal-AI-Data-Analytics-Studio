@@ -111,4 +111,3 @@ class ReaderError(ApplicationError):
     :mod:`src.readers.base_reader` for the reader interface that
     raises this.
     """
-

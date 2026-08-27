@@ -64,9 +64,7 @@ class DropMissingValues(BaseOperation):
         cleaned_dataframe = dataset.dataframe.dropna(subset=subset_arg)
 
         rows_dropped = len(dataset.dataframe) - len(cleaned_dataframe)
-        column_description = (
-            f"in {', '.join(columns)}" if columns else "in any column"
-        )
+        column_description = f"in {', '.join(columns)}" if columns else "in any column"
 
         _logger.info(
             "DropMissingValues on '%s': dropped %d row(s) %s.",
@@ -133,9 +131,7 @@ class FillMissingValues(BaseOperation):
 
         missing_after = int(filled_dataframe.isna().sum().sum())
         values_filled = missing_before - missing_after
-        column_description = (
-            f"in {', '.join(columns)}" if columns else "in all columns"
-        )
+        column_description = f"in {', '.join(columns)}" if columns else "in all columns"
 
         _logger.info(
             "FillMissingValues on '%s': filled %d value(s) %s with %r.",

@@ -119,7 +119,9 @@ class ScatterChart(BaseChart):
             ServiceError: If a named column does not exist, or either
                 ``x_column`` or ``y_column`` is not numeric.
         """
-        columns_to_check = [x_column, y_column] + ([color_column] if color_column else [])
+        columns_to_check = [x_column, y_column] + (
+            [color_column] if color_column else []
+        )
         validate_columns(dataframe, *columns_to_check)
         _require_numeric(dataframe, x_column)
         _require_numeric(dataframe, y_column)
@@ -143,7 +145,6 @@ class ScatterChart(BaseChart):
             xaxis_title=x_column,
             yaxis_title=y_column,
         )
-        #return _maybe_resample(fig, len(dataframe))
+        # return _maybe_resample(fig, len(dataframe))
 
         return fig
-    

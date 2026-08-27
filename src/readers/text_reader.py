@@ -124,9 +124,7 @@ class TextReader(BaseReader):
         try:
             raw_text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError as exc:
-            raise ReaderError(
-                f"Text file {path} is not valid UTF-8: {exc}"
-            ) from exc
+            raise ReaderError(f"Text file {path} is not valid UTF-8: {exc}") from exc
 
         lines = raw_text.splitlines()
         dataframe = pd.DataFrame({"line": lines})

@@ -167,8 +167,7 @@ class SqliteReader(BaseReader):
             )
 
         _logger.info(
-            "Read SQLite table '%s' from %s: %d rows, %d columns, "
-            "%d warning(s).",
+            "Read SQLite table '%s' from %s: %d rows, %d columns, " "%d warning(s).",
             table_name,
             path,
             len(dataframe),
@@ -177,7 +176,11 @@ class SqliteReader(BaseReader):
         )
 
         return Dataset(
-            name=f"{path.stem} — {table_name}" if len(available_tables) > 1 else path.stem,
+            name=(
+                f"{path.stem} — {table_name}"
+                if len(available_tables) > 1
+                else path.stem
+            ),
             dataframe=dataframe,
             source_format="sqlite",
             source_path=path,

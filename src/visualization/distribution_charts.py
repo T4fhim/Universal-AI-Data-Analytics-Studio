@@ -99,8 +99,11 @@ class BoxPlotChart(BaseChart):
             fig.add_trace(go.Box(y=dataframe[value_column], name=value_column))
 
         fig.update_layout(
-            title=title or (
-                f"{value_column} by {group_column}" if group_column else f"Distribution of {value_column}"
+            title=title
+            or (
+                f"{value_column} by {group_column}"
+                if group_column
+                else f"Distribution of {value_column}"
             ),
             yaxis_title=value_column,
         )

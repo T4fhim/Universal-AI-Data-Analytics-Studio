@@ -39,7 +39,12 @@ from src.core.constants import CONFIG_FILE_PATH, LOG_DIR
 from src.core.dependency_container import DependencyContainer
 from src.core.exceptions import BootstrapError
 from src.core.logger import configure_logging, get_logger
+from src.plugins.plugin_manager import PluginManager
+from src.services.analysis_orchestrator_service import AnalysisOrchestratorService
+from src.services.database_connection_service import DatabaseConnectionService
+from src.services.guidance_service import GuidanceService
 from src.services.project_service import ProjectService
+from src.services.report_service import ReportService
 from src.services.settings_service import SettingsService
 from src.services.workspace_service import WorkspaceService
 
@@ -71,7 +76,9 @@ class BootstrapContext:
     state: ApplicationState
 
 
-def bootstrap(config_path: Path = CONFIG_FILE_PATH, log_dir: Path = LOG_DIR) -> BootstrapContext:
+def bootstrap(
+    config_path: Path = CONFIG_FILE_PATH, log_dir: Path = LOG_DIR
+) -> BootstrapContext:
     """Run application startup and return a ready-to-use context.
 
     Args:
@@ -149,6 +156,70 @@ def bootstrap(config_path: Path = CONFIG_FILE_PATH, log_dir: Path = LOG_DIR) -> 
     workspace_service = WorkspaceService()
     container.register(WorkspaceService, lambda: workspace_service, singleton=True)
     logger.debug("Registered WorkspaceService into the dependency container.")
+
+    # Milestone 9: depends on the WorkspaceService instance just
+    # registered above (resolves/mutates datasets and visualizations
+    # through it, exactly as AssistantService does) — registered after
+    # it for the same "construct in dependency order" reasoning this
+    # function already documents for every service above.
+    analysis_orchestrator_service = AnalysisOrchestratorService(workspace_service)
+    container.register(
+        AnalysisOrchestratorService,
+        lambda: analysis_orchestrator_service,
+        singleton=True,
+    )
+    logger.debug(
+        "Registered AnalysisOrchestratorService into the dependency container."
+    )
+
+    # Milestone 26: depends on the AnalysisOrchestratorService instance just
+    # registered above (reads its propose_next_stage() as one of
+    # GuidanceService's own four deterministic suggestion sources), for the
+    # same "construct in dependency order" reasoning already documented
+    # above -- registered here, immediately after it, per the plan's own
+    # "Registered in bootstrap() after AnalysisOrchestratorService" note.
+    guidance_service = GuidanceService(analysis_orchestrator_service)
+    container.register(GuidanceService, lambda: guidance_service, singleton=True)
+    logger.debug("Registered GuidanceService into the dependency container.")
+
+    # Milestone 13: depends on both WorkspaceService and
+    # AnalysisOrchestratorService instances just registered above, for
+    # the same "construct in dependency order" reasoning documented
+    # above — ReportService replays AnalysisOrchestratorService's log
+    # and resolves visualizations through WorkspaceService, and needs
+    # both to already exist.
+    report_service = ReportService(workspace_service, analysis_orchestrator_service)
+    container.register(ReportService, lambda: report_service, singleton=True)
+    logger.debug("Registered ReportService into the dependency container.")
+
+    # Milestone 14: depends on SettingsService for saved (credential-
+    # free) connection profiles — see DatabaseConnectionService's own
+    # docstring for why live connections/passwords are kept purely
+    # in-memory and never routed through SettingsService at all.
+    database_connection_service = DatabaseConnectionService(settings_service)
+    container.register(
+        DatabaseConnectionService, lambda: database_connection_service, singleton=True
+    )
+    logger.debug("Registered DatabaseConnectionService into the dependency container.")
+
+    # Milestone 12: constructed and loaded here — plugins should be
+    # discovered and registered before anything in the UI layer (the
+    # chart-builder dialog, the AI tool registry) first reads from the
+    # shared chart/operation/reader registries those plugins register
+    # into, so a plugin's classes are available from the very first
+    # frame rather than appearing only after a later manual reload.
+    # load_plugins() never raises for an individual plugin's own
+    # problems (see plugin_loader.py's own docstring for why) — a bad
+    # plugin is recorded on the PluginManager's loaded-plugin list for
+    # a settings panel to surface, not a BootstrapError.
+    plugin_manager = PluginManager(
+        search_paths=config.plugin_search_paths,
+        enabled=config.plugins_enabled,
+        disabled_plugin_names=set(config.plugin_disabled_names),
+    )
+    plugin_manager.load_plugins()
+    container.register(PluginManager, lambda: plugin_manager, singleton=True)
+    logger.debug("Registered PluginManager into the dependency container.")
 
     context = BootstrapContext(config=config, container=container, state=state)
 

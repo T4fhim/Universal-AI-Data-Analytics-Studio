@@ -257,7 +257,9 @@ class WorkspaceService:
             )
 
         self._datasets[dataset.dataset_id] = dataset
-        _logger.info("Added dataset to workspace: %s (%s)", dataset.name, dataset.dataset_id)
+        _logger.info(
+            "Added dataset to workspace: %s (%s)", dataset.name, dataset.dataset_id
+        )
 
     def close_dataset(self, dataset_id: str) -> None:
         """Remove a dataset from the workspace.
@@ -340,9 +342,7 @@ class WorkspaceService:
         stale (for example, checking what would be orphaned before
         closing a dataset).
         """
-        return [
-            d for d in self._datasets.values() if d.parent_dataset_id == dataset_id
-        ]
+        return [d for d in self._datasets.values() if d.parent_dataset_id == dataset_id]
 
     def list_datasets(self) -> list[Dataset]:
         """Return all currently loaded datasets."""
@@ -430,7 +430,10 @@ class WorkspaceService:
             ServiceError: If ``visualization_id`` is not ``None`` and
                 no visualization with that ID is currently tracked.
         """
-        if visualization_id is not None and visualization_id not in self._visualizations:
+        if (
+            visualization_id is not None
+            and visualization_id not in self._visualizations
+        ):
             raise ServiceError(
                 f"Cannot set active visualization to "
                 f"{visualization_id}: no visualization with that id "
@@ -501,7 +504,9 @@ class WorkspaceService:
         removed = self._dashboards.pop(dashboard_id)
         _logger.info("Closed dashboard: %s (%s)", removed.name, dashboard_id)
 
-    def get_dashboard_tiles(self, dashboard_id: str) -> list[tuple[DashboardTile, Visualization | None]]:
+    def get_dashboard_tiles(
+        self, dashboard_id: str
+    ) -> list[tuple[DashboardTile, Visualization | None]]:
         """Return each tile paired with its resolved Visualization, or None if closed.
 
         Args:

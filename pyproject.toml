@@ -15,6 +15,10 @@ known_first_party = ["src"]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-ra"
+markers = [
+    "webengine: constructs a real QWebEngineView and waits for a page load. Offscreen QWebEngineView can hang or fail to initialize (plan risk R6) -- kept as the one guarded smoke test per chart-related module rather than the default for every assertion.",
+    "uia_integration: launches a real, visible top-level window in its own process and drives it with pywinauto's UIA backend (Windows-only; see tests/ui/a11y/test_uia_integration.py's own docstring). QT_QPA_PLATFORM=offscreen -- the default for the rest of tests/ui/ -- never creates real OS-level UI Automation elements, so this cannot run inside the main offscreen pytest session; kept as its own opt-in marker/CI job rather than folded into the default `pytest tests/` run.",
+]
 
 [tool.mypy]
 python_version = "3.13"

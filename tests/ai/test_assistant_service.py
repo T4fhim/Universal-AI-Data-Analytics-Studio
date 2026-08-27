@@ -58,7 +58,6 @@ from src.ai.llm_provider import LLMTurn, PendingToolCall
 from src.ai.tool_registry import get_anthropic_tool_schemas
 from src.core.exceptions import ServiceError
 from src.services.workspace_service import Dataset, WorkspaceService
-
 from tests.ai.conftest import make_provider
 
 _FAKE_API_KEY = "sk-test-not-a-real-key"

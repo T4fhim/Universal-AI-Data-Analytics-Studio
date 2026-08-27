@@ -120,8 +120,7 @@ class XmlReader(BaseReader):
         unique_warnings = list(dict.fromkeys(warnings))
 
         _logger.info(
-            "Read XML file %s (row tag: <%s>): %d rows, %d columns, "
-            "%d warning(s).",
+            "Read XML file %s (row tag: <%s>): %d rows, %d columns, " "%d warning(s).",
             path,
             row_tag,
             len(dataframe),
@@ -212,7 +211,12 @@ class XmlReader(BaseReader):
             else:
                 record[_local_tag(child)] = child.text
 
-        if element.text and element.text.strip() and len(element) == 0 and not element.attrib:
+        if (
+            element.text
+            and element.text.strip()
+            and len(element) == 0
+            and not element.attrib
+        ):
             # An element with direct text content and no attributes or
             # children at all (e.g. <product>Widget</product> with no
             # sub-structure) — its own text becomes the record itself

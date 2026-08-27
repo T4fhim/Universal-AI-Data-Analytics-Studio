@@ -1,0 +1,268 @@
+name: CI
+
+# Milestone 16. black/isort/mypy/pytest were declared dependencies with no
+# committed config and no gate before this -- every guard test the UI
+# overhaul milestones add (test_module_size, test_import_layering, the
+# contrast suite, and future ones: assert_all_bound in M17, the a11y audit
+# in M28) is inert unless something runs it on every change. This is that
+# something.
+#
+# Runs on windows-latest, not a Linux runner: this repository's verified
+# development and test environment is Windows (see CLAUDE.md/README), and
+# QWebEngineView-related tests (tests/ui/widgets/test_chart_view.py's
+# @pytest.mark.webengine class, and the confirmed Windows-specific shutdown
+# crash the pyside6-development skill documents) are exactly the surface
+# this milestone touches -- running CI on the same OS family as the one the
+# original defects were found on is more representative than a Linux
+# runner would be, and avoids an unverified system-package list for
+# QtWebEngine's Linux dependencies (Mesa/EGL/NSS/etc.) that nothing in this
+# environment could confirm is correct before this file's first real run.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    permissions:
+      # Explicit, not left to the repo's default GITHUB_TOKEN scope (which
+      # varies by repo/org setting and can be read-only) -- the "Post
+      # failure log to the PR" step below needs write access to comment;
+      # `contents: read` is the minimum this job also needs for checkout to
+      # behave normally under a restricted default.
+      contents: read
+      pull-requests: write
+    env:
+      # Set once, for the whole job, matching tests/ui/conftest.py's own
+      # requirement that this be set before any PySide6 import happens.
+      QT_QPA_PLATFORM: offscreen
+      # Added investigating a real, confirmed CI-only failure that is neither
+      # a collection error nor a per-test failure: pytest's own summary
+      # reports a fully clean run (e.g. "1371 passed, 103 skipped ... in
+      # 374.35s") with zero FAILED lines, yet the step's own exit code is 1
+      # -- meaning whatever fails happens after pytest has already finished
+      # and printed its results, during CPython/Qt interpreter shutdown.
+      # tests/ui/conftest.py's own qapp fixture docstring already documents
+      # exactly this class of risk ("calling quit() between tests crashes on
+      # Windows... Qt destroys the platform integration while widgets from
+      # the previous test are still pending deletion") for the mid-session
+      # case; this may be the same failure mode occurring once, unavoidably,
+      # at final process teardown instead. PYTHONFAULTHANDLER causes a
+      # native (non-Python) fatal signal to print a C-level traceback to
+      # stderr before the process dies, which -- piped into this job's
+      # existing pytest-output.log capture -- is the only way to get real
+      # evidence for a crash this silent, rather than guessing further.
+      PYTHONFAULTHANDLER: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: black --check
+        run: python -m black --check src/ tests/
+
+      - name: isort --check-only
+        run: python -m isort --check-only src/ tests/
+
+      - name: mypy (clean packages)
+        # Scoped, not repo-wide: this scope was frozen at four foundation
+        # packages from milestone 16 through the remediation pass that added
+        # this comment, even though later milestones (19-27) built whole new
+        # packages -- controllers, workbench, widgets, results -- that were
+        # never folded in, so mypy stopped meaning anything for roughly a
+        # third of src/ui/. The remediation pass re-ran a from-scratch
+        # `mypy --follow-imports=silent` against the full src/ tree, found 79
+        # errors (fixed 7 genuine, narrowly-scoped bugs along the way -- see
+        # git history for this comment's commit -- leaving 72), and widened
+        # this list to every package/module that is now genuinely clean:
+        # src/core, src/services, src/analysis, src/database, src/workers,
+        # and (within src/ui/) theme, a11y, web, actions, controllers,
+        # workbench, widgets, results, dialogs, and every standalone
+        # top-level src/ui/*.py module except main_window.py. What's
+        # deliberately still excluded -- src/ui/main_window.py itself (the
+        # DependencyContainer.resolve() -> object gap), src/ai, src/reports,
+        # src/visualization, src/forecasting, src/cleaning, src/readers,
+        # src/plugins -- is real, categorized, pre-existing debt, not
+        # forgotten scope: see docs/MYPY_DEBT.md for exactly what's excluded
+        # and why, so the next milestone that makes one of those clean knows
+        # to add it here rather than this list silently going stale again.
+        # This list is still expected to grow the same way
+        # tests/ui/test_module_size.py's _LEGACY_EXEMPTIONS shrinks, rather
+        # than one big repo-wide fix landing all at once.
+        #
+        # Milestone 29 adds src/ui/help (the new manual/anchor-resolution leaf package) and
+        # src/ui/autosave_timer.py (the new standalone module) -- both genuinely clean, per
+        # this same convention. src/core/app.py (already covered via `src/core`) needed two
+        # `cast()` calls at its new DependencyContainer.resolve() call sites to stay clean --
+        # see that module's own comment for why cast(), not a blind `type: ignore`.
+        #
+        # --follow-imports=silent: several of these modules (e.g.
+        # controllers/*, actions/action_context.py) import the services
+        # layer (ProjectService/WorkspaceService/SettingsService/
+        # PipelineStage) and src/ui/main_window.py to build snapshots/wire
+        # collaborators, and without this flag mypy also emits diagnostics
+        # for *those* modules' own pre-existing errors -- this flag keeps
+        # mypy using their type signatures for checking the modules listed
+        # here while not holding them responsible for fixing debt in modules
+        # they merely call into.
+        run: python -m mypy src/core src/services src/analysis src/database
+          src/workers src/ui/theme src/ui/a11y src/ui/web src/ui/actions
+          src/ui/controllers src/ui/workbench src/ui/widgets src/ui/results
+          src/ui/dialogs src/ui/help src/ui/command_stack.py
+          src/ui/command_palette.py
+          src/ui/dataset_close_menu.py src/ui/dock_manager.py
+          src/ui/menu_bar.py src/ui/status_bar.py src/ui/theme_manager.py
+          src/ui/toolbar.py src/ui/ui_state_bus.py src/ui/worker_runner.py
+          src/ui/autosave_timer.py
+          src/ui/__init__.py --ignore-missing-imports --follow-imports=silent
+
+      - name: pytest
+        # -m "not uia_integration" excludes tests/ui/a11y/test_uia_integration.py's
+        # three real-window UIA tests from this blocking gate -- see the
+        # separate uia_integration job below for why they run there instead,
+        # not here.
+        #
+        # Piped through Tee-Object rather than a plain `run:` (this project's
+        # own regression, found investigating a real CI-only `test` job
+        # failure with no local repro and no available log-fetching tool --
+        # gh CLI isn't installed and the GitHub MCP server here has no log
+        # endpoint -- so the failing run's actual traceback was simply
+        # unrecoverable after the fact). $LASTEXITCODE is read explicitly
+        # and re-raised via `exit` since Tee-Object is a cmdlet, not an
+        # external process, so it does not itself clobber the pipeline's
+        # exit code, but the step's own overall exit code still needs to be
+        # set from it for the job to actually fail when pytest does.
+        #
+        # scripts/run_tests_and_exit_cleanly.py, not a bare `python -m
+        # pytest`: the same diagnostic capture above eventually surfaced a
+        # SECOND, different CI-only failure once the first (missing
+        # dependencies) was fixed -- a real Windows access violation during
+        # CPython/Qt interpreter finalization, occurring *after* pytest
+        # already reported a fully clean "1371 passed... " result. See that
+        # script's own module docstring for the full evidence and why
+        # os._exit() (skipping that finalization entirely once pytest's real
+        # result is already known) is the correct fix, not a workaround.
+        #
+        # Split into two invocations, test_worker_runner.py first: that
+        # file's real-QThreadPool tests (wait_for_signal against a real
+        # cross-thread signal) proved flaky even at a 15000ms timeout on
+        # one of two identical-commit CI runs (the other, same commit,
+        # passed clean) -- pytest has no test-ordering randomization here
+        # (confirmed: no addopts/-p randomly in pyproject.toml), so by
+        # default collection order "ui" sorts late alphabetically among
+        # tests/*, meaning this file was already running ~78% deep into a
+        # 1470+-test single-process session, after everything else already
+        # posted its own queued signals/timers into the same shared
+        # main-thread event loop across the whole run. Running it FIRST,
+        # before that backlog exists, is the actual fix for real
+        # event-loop backpressure -- widening the timeout further was
+        # explicitly documented as the wrong next move in
+        # wait_for_signal's own docstring once 15000ms itself proved
+        # insufficient.
+        shell: pwsh
+        run: |
+          python scripts/run_tests_and_exit_cleanly.py tests/ui/test_worker_runner.py -q --tb=long 2>&1 | Tee-Object -FilePath pytest-output.log
+          $exit1 = $LASTEXITCODE
+          python scripts/run_tests_and_exit_cleanly.py tests/ -q -m "not uia_integration" --tb=long --ignore=tests/ui/test_worker_runner.py 2>&1 | Tee-Object -FilePath pytest-output.log -Append
+          $exit2 = $LASTEXITCODE
+          exit ([Math]::Max($exit1, $exit2))
+
+      - name: Upload pytest log
+        # if: always() -- runs whether the step above passed or failed, so a
+        # failure's full output is always downloadable from the run's own
+        # Summary page (Artifacts section) without needing `gh run view
+        # --log` or any authenticated API access this project's own tooling
+        # may not have. A passing run's log is harmless, low-cost evidence
+        # of what the environment actually looked like at run time --
+        # useful the next time "passes locally, fails in CI" recurs.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-output-log
+          path: pytest-output.log
+          retention-days: 14
+
+      - name: Post failure log to the PR
+        # The artifact above still needs an authenticated download (`gh run
+        # download` or the REST API with a token) -- exactly the access this
+        # project's own tooling was confirmed *not* to have when this step
+        # was added (no `gh` CLI installed there, no GitHub MCP log/artifact
+        # endpoint, direct API log fetch returns 403). `gh` IS preinstalled
+        # on every GitHub-hosted runner, and `secrets.GITHUB_TOKEN` is
+        # supplied automatically -- so instead of relying on log/artifact
+        # access from *outside* the run, the run posts its own failure
+        # straight to the PR as a comment, readable by anything that can
+        # read PR comments (which every environment here already can).
+        # Guarded to pull_request runs only: the matching `push`-triggered
+        # run for the same commit has no `github.event.pull_request.number`
+        # to comment on.
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          # Built via [char]96 rather than a literal backtick: PowerShell's
+          # own escape character *is* the backtick, so a literal one inside
+          # a double-quoted string (or here-string interpolation) is
+          # error-prone -- verified directly (`` `t `` silently became a tab
+          # character, not the intended literal backtick-t, in an earlier
+          # draft of this step) before trusting this in CI.
+          $fence = [string][char]96 * 3
+          # 500, not 300: PYTHONFAULTHANDLER's per-thread native stack dumps
+          # (added alongside this) can run longer than a single test
+          # traceback, and GitHub's ~65536-char comment limit still comfortably
+          # fits 500 lines of pytest/faulthandler output.
+          $tail = Get-Content pytest-output.log -Tail 500 -ErrorAction SilentlyContinue | Out-String
+          if ([string]::IsNullOrWhiteSpace($tail)) {
+            $tail = "(pytest-output.log was empty or missing -- the run likely crashed before pytest produced any output at all.)"
+          }
+          $body = "### CI test job failed (commit ${{ github.sha }})`n`nLast 300 lines of pytest-output.log:`n`n$fence`n$tail`n$fence"
+          gh pr comment ${{ github.event.pull_request.number }} --body $body
+
+  uia_integration:
+    # Milestone 28 follow-up (Tier 1 of the NVDA-pass accommodation, see
+    # docs/M28_MANUAL_VERIFICATION.md). A deliberately separate, non-blocking
+    # job, not a step folded into `test` above -- judgment call, recorded
+    # here rather than silently decided:
+    #
+    # tests/ui/a11y/test_uia_integration.py launches a real, visible
+    # top-level window (its own process, forcing QT_QPA_PLATFORM=windows
+    # regardless of this job's own env -- see that test module's docstring)
+    # and drives it with pywinauto's real UIA backend, exactly the kind of
+    # "actually pops a window and does real OS-level input/COM automation"
+    # test this repository's other guarded tiers (see the `webengine`
+    # marker's own comment on test_chart_view.py) have already found more
+    # failure-prone than a plain unit/offscreen-widget test. Manual
+    # verification while building this test (see that module's own
+    # docstring) found individual UI Automation queries occasionally slow,
+    # and on repeated connects to the same long-lived process,
+    # non-deterministically stalling -- mitigated there with per-test bounded
+    # timeouts and a fresh process per test, but not eliminated as a risk
+    # this early. `continue-on-error: true` means a stall or a real-window
+    # limitation specific to a given runner cannot fail the required `test`
+    # job's status check; this job's own pass/fail is still visible on every
+    # run, so a regression here is noticed, just not gate-blocking yet.
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: pytest (UIA integration)
+        run: python -m pytest tests/ui/a11y/test_uia_integration.py -q -m uia_integration

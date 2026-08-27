@@ -82,6 +82,50 @@ def test_validate_config_structure_rejects_non_dict_input() -> None:
         validate_config_structure(["not", "a", "dict"])  # type: ignore[arg-type]
 
 
+def test_missing_config_file_has_accessibility_defaults(config_path: Path) -> None:
+    data = load_config(config_path)
+
+    assert data["accessibility"]["reduced_motion"] is False
+    assert data["accessibility"]["base_font_size"] == 13
+
+
+def test_config_predating_milestone_28_is_backfilled_with_accessibility_defaults(
+    config_path: Path,
+) -> None:
+    """A config.yaml saved before milestone 28 has no 'accessibility' key at
+    all -- without _migrate_legacy_accessibility_section, this would raise
+    ConfigError on the very next startup, breaking self-healing."""
+    load_config(config_path)  # write a valid default first
+    loaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    del loaded["accessibility"]
+    config_path.write_text(yaml.safe_dump(loaded), encoding="utf-8")
+
+    data = load_config(config_path)
+
+    assert data["accessibility"] == {"reduced_motion": False, "base_font_size": 13}
+
+
+def test_config_with_accessibility_section_missing_one_key_is_backfilled(
+    config_path: Path,
+) -> None:
+    load_config(config_path)
+    loaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    del loaded["accessibility"]["base_font_size"]
+    config_path.write_text(yaml.safe_dump(loaded), encoding="utf-8")
+
+    data = load_config(config_path)
+
+    assert data["accessibility"]["base_font_size"] == 13
+    assert data["accessibility"]["reduced_motion"] is False
+
+
+def test_app_config_exposes_accessibility_fields(config_path: Path) -> None:
+    config = AppConfig.load(config_path)
+
+    assert config.accessibility_reduced_motion is False
+    assert config.accessibility_base_font_size == 13
+
+
 def test_app_config_to_dict_is_a_deep_copy(config_path: Path) -> None:
     config = AppConfig.load(config_path)
 

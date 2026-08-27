@@ -49,9 +49,7 @@ def render_dashboard(
         ServiceError: If ``dashboard`` has no tiles at all.
     """
     if not dashboard.tiles:
-        raise ServiceError(
-            f"Dashboard '{dashboard.name}' has no tiles to render."
-        )
+        raise ServiceError(f"Dashboard '{dashboard.name}' has no tiles to render.")
 
     max_row = max(t.row for t, _viz in resolved_tiles)
     max_col = max(t.column for t, _viz in resolved_tiles)

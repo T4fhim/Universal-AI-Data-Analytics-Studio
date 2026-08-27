@@ -82,7 +82,9 @@ class ConvertType(BaseOperation):
         converted_dataframe = dataset.dataframe.copy()
         original_series = converted_dataframe[column]
 
-        converted_series, failed_values = cls._convert_series(original_series, target_type)
+        converted_series, failed_values = cls._convert_series(
+            original_series, target_type
+        )
         converted_dataframe[column] = converted_series
 
         description = cls._build_description(column, target_type, failed_values)
@@ -133,7 +135,9 @@ class ConvertType(BaseOperation):
             # returning an unconverted series if a target type is
             # ever added to _VALID_TARGET_TYPES without a
             # corresponding branch here being added too.
-            raise ServiceError(f"No conversion implemented for target_type: {target_type!r}")
+            raise ServiceError(
+                f"No conversion implemented for target_type: {target_type!r}"
+            )
 
         failed_mask = converted.isna() & series.notna()
         failed_values = series[failed_mask].tolist()
