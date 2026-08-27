@@ -99,6 +99,22 @@ class BaseWorker(QRunnable):
         **kwargs: Any,
     ) -> None:
         super().__init__()
+        # Milestone-28 remediation, part 2 -- root cause of the defect the [diag] logs
+        # below were added to chase: QRunnable.autoDelete() defaults to True, so
+        # QThreadPool deleted this runnable within microseconds of run() returning.
+        # self.signals (constructed with no QObject parent, just below) had no other
+        # owner, so it went down with it -- racing the UI thread's delivery of the
+        # result/finished queued-connection events run() had *just* posted, and
+        # sometimes losing: real application.log evidence (2026-08-24) showed the
+        # "finished" handler's queued delivery failing 5/5 real dataset-load attempts
+        # and "result" failing 1/5 -- finished is emitted the instant before run()
+        # returns (near-zero headroom before deletion), result slightly earlier (more
+        # headroom, but not immune). WorkerRunner.run() now keeps a strong reference to
+        # this worker for exactly as long as needed instead of relying on
+        # QThreadPool's auto-delete timing -- see that method's own comment; this call
+        # is the other half of that fix; without it QThreadPool would still delete the
+        # runnable regardless of what WorkerRunner holds onto in Python.
+        self.setAutoDelete(False)
         self._fn = fn
         self._args = args
         self._kwargs = kwargs

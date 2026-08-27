@@ -41,6 +41,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLineEdit,
     QListWidget,
@@ -117,15 +118,24 @@ class VisualizePage(StagePage):
     def _build_form(self, layout: QVBoxLayout) -> None:
         describe(self, name="Visualize stage form", description="", focusable=False)
 
-        self.column_select = ColumnMultiSelect(self)
+        # Unit 4 (UI-friendliness pass): this page has more stacked form controls than any
+        # other stage page (column picker, recommendations, chart-type/field picker, all
+        # ahead of the chart+table split below) -- grouping them into two QGroupBoxes gives
+        # the eye two named sections ("Pick Columns", "Configure Chart") to scan instead of
+        # one undifferentiated column of seven widgets, with no change to any widget's
+        # behavior, attribute name, or signal.
+        pick_columns_group = QGroupBox("Pick Columns", self)
+        pick_columns_layout = QVBoxLayout(pick_columns_group)
+
+        self.column_select = ColumnMultiSelect(pick_columns_group)
         describe(
             self.column_select,
             name="Columns to consider",
             description="Check two or more columns for a chart recommendation.",
         )
-        layout.addWidget(self.column_select)
+        pick_columns_layout.addWidget(self.column_select)
 
-        self.recommend_button = QPushButton("Get Recommendations", self)
+        self.recommend_button = QPushButton("Get Recommendations", pick_columns_group)
         self.recommend_button.setObjectName("visualizeRecommendButton")
         describe(
             self.recommend_button,
@@ -133,9 +143,9 @@ class VisualizePage(StagePage):
             description="Suggests chart types for the checked columns.",
         )
         self.recommend_button.clicked.connect(self._on_recommend_clicked)
-        layout.addWidget(self.recommend_button)
+        pick_columns_layout.addWidget(self.recommend_button)
 
-        self.recommendation_list = QListWidget(self)
+        self.recommendation_list = QListWidget(pick_columns_group)
         self.recommendation_list.setObjectName("visualizeRecommendationList")
         describe(
             self.recommendation_list,
@@ -145,17 +155,22 @@ class VisualizePage(StagePage):
         self.recommendation_list.itemActivated.connect(
             self._on_recommendation_activated
         )
-        layout.addWidget(self.recommendation_list)
+        pick_columns_layout.addWidget(self.recommendation_list)
 
-        self.title_field = QLineEdit(self)
+        layout.addWidget(pick_columns_group)
+
+        configure_chart_group = QGroupBox("Configure Chart", self)
+        configure_chart_layout = QVBoxLayout(configure_chart_group)
+
+        self.title_field = QLineEdit(configure_chart_group)
         describe(
             self.title_field,
             name="Chart title",
             description="Optional title for the built chart.",
         )
-        layout.addWidget(self.title_field)
+        configure_chart_layout.addWidget(self.title_field)
 
-        self.chart_type_combo = QComboBox(self)
+        self.chart_type_combo = QComboBox(configure_chart_group)
         self.chart_type_combo.setObjectName("visualizeChartTypeCombo")
         for name in list_dialog_charts():
             self.chart_type_combo.addItem(display_name_for(name), name)
@@ -165,15 +180,15 @@ class VisualizePage(StagePage):
             description="Which chart type to build.",
         )
         self.chart_type_combo.currentIndexChanged.connect(self._rebuild_field_widgets)
-        layout.addWidget(self.chart_type_combo)
+        configure_chart_layout.addWidget(self.chart_type_combo)
 
-        self._field_form_container = QWidget(self)
+        self._field_form_container = QWidget(configure_chart_group)
         self._field_form_layout = QFormLayout(self._field_form_container)
         self._field_form_layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self._field_form_container)
+        configure_chart_layout.addWidget(self._field_form_container)
         self._column_fields: dict[str, QComboBox | ColumnMultiSelect] = {}
 
-        self.build_button = QPushButton("Build Chart", self)
+        self.build_button = QPushButton("Build Chart", configure_chart_group)
         self.build_button.setObjectName("visualizeBuildButton")
         describe(
             self.build_button,
@@ -182,7 +197,9 @@ class VisualizePage(StagePage):
             help_anchor=self.help_anchor,
         )
         self.build_button.clicked.connect(self._on_build_clicked)
-        layout.addWidget(self.build_button)
+        configure_chart_layout.addWidget(self.build_button)
+
+        layout.addWidget(configure_chart_group)
 
         split_container = QWidget(self)
         split_layout = QHBoxLayout(split_container)
@@ -408,9 +425,7 @@ class VisualizePage(StagePage):
             self.show_error("Failed to Build Chart", str(exc))
             _logger.warning("Chart build failed: %s", exc)
             return
-        except (
-            Exception
-        ) as exc:  # noqa: BLE001 -- shown to the user, not swallowed silently
+        except Exception as exc:  # noqa: BLE001 -- shown to the user, not swallowed silently
             self.show_error("Failed to Build Chart", f"Unexpected error: {exc}")
             _logger.error("Chart build failed unexpectedly: %s", exc)
             return

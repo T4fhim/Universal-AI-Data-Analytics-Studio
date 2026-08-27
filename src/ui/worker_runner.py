@@ -28,7 +28,7 @@ from collections.abc import Callable
 from typing import Any
 
 from PySide6.QtCore import QObject, Qt, QThreadPool
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QWidget
 
 from src.core.logger import get_logger
 from src.workers import BaseWorker
@@ -121,6 +121,20 @@ class WorkerRunner(QObject):
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
+        # Milestone-28 remediation, part 2 -- see BaseWorker.__init__'s own comment for
+        # the root cause this pairs with (autoDelete() racing queued signal delivery).
+        # A worker is added here just before QThreadPool.start() and only discarded once
+        # its own `finished` signal has actually been delivered (see the connection made
+        # at the bottom of run() below) -- for exactly as long as that takes, this keeps
+        # both `worker` and `worker.signals` (the actual queued-event emitter) alive
+        # regardless of what QThreadPool does to the runnable itself, closing the race.
+        # A plain set, not a lock-guarded one: add() happens synchronously on the UI
+        # thread inside run() below; discard() happens via the same _CROSS_THREAD_SAFE
+        # QueuedConnection every other callback here uses, which -- like those -- is
+        # delivered on this QObject's own (UI) thread, not the worker thread emitting
+        # it. Both operations land on the UI thread, so there is no cross-thread
+        # mutation of this set to guard against.
+        self._active_workers: set[BaseWorker] = set()
 
     def run(
         self,
@@ -131,6 +145,7 @@ class WorkerRunner(QObject):
         on_finished: Callable[[], None] | None = None,
         on_progress: Callable[[int, str], None] | None = None,
         report_progress: bool = False,
+        busy_widget: QWidget | None = None,
         **kwargs: Any,
     ) -> BaseWorker:
         """Run ``fn(*args, **kwargs)`` off the UI thread and route its signals.
@@ -145,6 +160,17 @@ class WorkerRunner(QObject):
             on_progress: Connected to ``signals.progress`` if given.
             report_progress: Forwarded to ``BaseWorker`` unchanged -- see
                 its own docstring for what this adds to ``fn``'s call.
+            busy_widget: UI-friendliness pass, unit 7 -- disabled the instant this call
+                starts, re-enabled the instant ``finished`` fires (success or failure alike,
+                same as ``on_finished``). Typically the button that triggered this call
+                (:class:`~src.ui.workbench.pages.predict_page.PredictPage`'s own
+                ``run_button`` did this by hand, before this parameter existed -- see that
+                page's own ``_run_comparison`` for the pattern this generalizes), so a user
+                cannot double-click into a second overlapping run of the same operation, and
+                gets immediate at-the-click-point feedback rather than only the status bar's
+                busy indicator, which is easy to miss since it sits away from what was
+                actually clicked. Optional and additive -- every existing call site that
+                does not pass this keeps working exactly as it did before.
 
         Returns:
             The started :class:`~src.workers.base_worker.BaseWorker`, in
@@ -154,6 +180,8 @@ class WorkerRunner(QObject):
             so nothing further needs to be done with it to run it.
         """
         worker = BaseWorker(fn, *args, report_progress=report_progress, **kwargs)
+        if busy_widget is not None:
+            busy_widget.setEnabled(False)
         if on_result is not None:
             worker.signals.result.connect(
                 _guarded("result handler", on_result), _CROSS_THREAD_SAFE
@@ -170,5 +198,30 @@ class WorkerRunner(QObject):
             worker.signals.progress.connect(
                 _guarded("progress handler", on_progress), _CROSS_THREAD_SAFE
             )
+
+        if busy_widget is not None:
+            # Connected after the caller's own on_finished (if any) -- Qt delivers
+            # multiple slots on one signal in connection order, so on_finished's own
+            # logic (e.g. hiding the status-bar busy indicator) runs first, this only
+            # re-enables the widget. Unconditional re-enable regardless of success or
+            # failure, same as on_finished itself: a raising fn already went through
+            # BaseWorker.run()'s except branch and still reaches finally -- see that
+            # method's own docstring -- so the button is never left stuck disabled.
+            worker.signals.finished.connect(
+                lambda _w=busy_widget: _w.setEnabled(True), _CROSS_THREAD_SAFE
+            )
+
+        # Connected last (Qt delivers multiple slots on one signal in connection
+        # order), and unconditionally regardless of whether the caller passed
+        # on_finished -- finished is always emitted by BaseWorker.run()'s own finally
+        # block, so this always runs and this is the one place that actually releases
+        # the reference added just below. See __init__'s own comment for why this
+        # exists and why a plain lambda (not _guarded()) is fine here -- discard() on
+        # a set cannot meaningfully fail the way a caller's own callback can.
+        self._active_workers.add(worker)
+        worker.signals.finished.connect(
+            lambda _w=worker: self._active_workers.discard(_w), _CROSS_THREAD_SAFE
+        )
+
         QThreadPool.globalInstance().start(worker)
         return worker

@@ -117,12 +117,21 @@ class Workbench(QWidget):
     def show_welcome(self) -> None:
         """Switch to the welcome page -- called when no dataset is active."""
         self.stack.setCurrentWidget(self.welcome_page)
+        # Unit 6: keep the rail's own current-item cursor honest -- see
+        # StageRail.set_current_stage's own docstring for why a programmatic switch (this
+        # method is never reached from a rail click itself, which already syncs for free)
+        # would otherwise leave a keyboard user's next arrow-key press starting from
+        # whatever the rail last had selected, not from "nothing is showing".
+        self.stage_rail.set_current_stage(None)
 
     def show_stage(self, stage: PipelineStage) -> None:
         """Switch to ``stage``'s page, if one is registered. No-op otherwise."""
         page = self._pages.get(stage)
         if page is not None:
             self.stack.setCurrentWidget(page)
+            # Unit 6: see show_welcome's own comment just above -- same reasoning, the
+            # other direction (a stage now showing, not the welcome page).
+            self.stage_rail.set_current_stage(stage)
 
     def update_pipeline_state(
         self,

@@ -143,6 +143,13 @@ class ThemeTokens:
     font_size_sm: int = 12
     font_size_md: int = 13
     font_size_lg: int = 16
+    # Unit 5 (UI-friendliness pass, welcome/onboarding polish): added because
+    # QLabel#welcomeTitle in base.qss.template was the one hardcoded "24px" literal in an
+    # otherwise fully token-driven stylesheet -- every other font-size already used a
+    # ${font_size_*} placeholder. Default matches that literal exactly (no visual change at
+    # the default base font size), but now scales with with_base_font_size() like every
+    # other size below, instead of silently ignoring the milestone-28 accessibility setting.
+    font_size_xl: int = 24
 
     def with_density(self, density: Density) -> ThemeTokens:
         """Return a copy at a different :class:`Density`.
@@ -155,13 +162,13 @@ class ThemeTokens:
         return replace(self, density=density)
 
     def with_base_font_size(self, base_font_size: int) -> ThemeTokens:
-        """Return a copy whose ``font_size_sm/md/lg`` are re-derived from a new base.
+        """Return a copy whose ``font_size_sm/md/lg/xl`` are re-derived from a new base.
 
         Milestone 28's adjustable-base-font-size accessibility setting
         (WCAG 1.4.4, text resize). ``font_size_md`` becomes
-        ``base_font_size`` exactly; ``font_size_sm``/``font_size_lg`` are
-        shifted by *this instance's own* current sm/lg-to-md deltas (``-1``
-        and ``+3`` for every token set defined in this module, none of
+        ``base_font_size`` exactly; ``font_size_sm``/``font_size_lg``/``font_size_xl`` are
+        shifted by *this instance's own* current sm/lg/xl-to-md deltas (``-1``, ``+3``, and
+        ``+11`` for every token set defined in this module, none of
         which overrides the dataclass defaults) rather than by hardcoded
         constants, so a theme that ever did override those defaults would
         still scale proportionally instead of silently losing its own
@@ -172,11 +179,13 @@ class ThemeTokens:
         """
         offset_sm = self.font_size_sm - self.font_size_md
         offset_lg = self.font_size_lg - self.font_size_md
+        offset_xl = self.font_size_xl - self.font_size_md
         return replace(
             self,
             font_size_md=base_font_size,
             font_size_sm=max(8, base_font_size + offset_sm),
             font_size_lg=base_font_size + offset_lg,
+            font_size_xl=base_font_size + offset_xl,
         )
 
     def space(self, step: int) -> int:
@@ -205,6 +214,7 @@ class ThemeTokens:
             "font_size_sm": f"{self.font_size_sm}px",
             "font_size_md": f"{self.font_size_md}px",
             "font_size_lg": f"{self.font_size_lg}px",
+            "font_size_xl": f"{self.font_size_xl}px",
             "focus_ring_width": f"{self.focus_ring_width}px",
             "radius_sm": f"{self.radius_sm}px",
             "radius_md": f"{self.radius_md}px",

@@ -182,8 +182,14 @@ QLabel:disabled {
     color: ${text_disabled};
 }
 
+/* Unit 5 (UI-friendliness pass): 24px was this file's one hardcoded font-size literal --
+   every other size below already uses a font-size token placeholder (see tokens.py's
+   font_size_xl for why this needed a new token rather than reusing font_size_lg). Reminder
+   for future comments anywhere in this file: string.Template scans the raw text of the
+   whole file, comments included, so a lone dollar sign in prose is read the same as one in
+   real CSS and breaks compilation -- confirmed the hard way while writing this note itself. */
 QLabel#welcomeTitle {
-    font-size: 24px;
+    font-size: ${font_size_xl};
     font-weight: 600;
     color: ${text_primary};
 }
@@ -206,6 +212,50 @@ QLabel#hintLabel {
 
 QWidget#welcomeWidget {
     background-color: ${surface_0};
+}
+
+/* -- Stage page zones (UI-friendliness pass, unit 1) -----------------------
+   stageGuidanceCard / stageResultArea are set via setObjectName() in
+   src/ui/workbench/stage_page.py; before this rule both fell through to the
+   plain QLabel rule above and read as ordinary body text, giving the page's
+   three zones (guidance / form / result) no visual separation. */
+QLabel#stageGuidanceCard {
+    background-color: ${surface_1};
+    border-radius: ${radius_md};
+    padding: ${space_3};
+}
+
+QLabel#stageResultArea {
+    background-color: ${surface_1};
+    border-left: 3px solid ${success};
+    border-radius: ${radius_sm};
+    padding: ${space_2} ${space_3};
+}
+
+/* Zone frames (unit 4): visually separate a stage page's guidance / form / result zones
+   from each other, so a page with many form controls (e.g. Visualize) reads as three
+   distinct sections rather than one undifferentiated stack. Margin, not just padding --
+   these are siblings in the same QVBoxLayout, so spacing between them has to come from
+   the frame's own box, QVBoxLayout has no per-widget gap control. */
+/* The scroll area StagePage.__init__ now wraps every stage page's content in (see that
+   module's own comment) is a QFrame subclass, and its viewport/content widget are plain
+   QWidgets that this app's QSS gives no default background -- both need to stay transparent
+   explicitly, the same reason the zone frames just below do, or Qt's styled-background
+   painting path (switched on for every widget once any application stylesheet is set) would
+   fill them with a default panel color that reads as a visible seam around the page. */
+QScrollArea#stagePageScrollArea, QScrollArea#stagePageScrollArea > QWidget > QWidget {
+    background: transparent;
+    border: none;
+}
+
+QFrame#stagePageZone_guidance, QFrame#stagePageZone_result {
+    background: transparent;
+    border: none;
+    margin-bottom: ${space_3};
+}
+
+QWidget#stagePageZone_form {
+    margin-bottom: ${space_2};
 }
 
 /* -- Empty/error state (milestone 27) -------------------------------------- */
@@ -352,12 +402,16 @@ QCheckBox:focus, QRadioButton:focus {
     border: ${focus_ring_width} solid ${focus_ring};
 }
 
+/* Extra top padding (space_4 vs the surrounding space_3 margin) keeps the
+   title clear of the first grouped control -- previously both used space_3,
+   which left the title's own padding and the group's padding visually
+   flush against each other. */
 QGroupBox {
     color: ${text_primary};
     border: 1px solid ${border};
     border-radius: ${radius_md};
     margin-top: ${space_3};
-    padding-top: ${space_3};
+    padding-top: ${space_4};
 }
 
 QGroupBox::title {
@@ -403,6 +457,17 @@ QTreeView::item:selected, QTableView::item:selected {
 QListWidget:focus, QListView:focus, QTreeWidget:focus, QTreeView:focus,
 QTableView:focus {
     border: ${focus_ring_width} solid ${focus_ring};
+}
+
+/* GuidancePanel's suggestion items carry two lines of text (title + rationale --
+   see GuidancePanel.set_suggestions), but the shared QListWidget::item rule above
+   is a 24px min-height sized for the milestone-18 table/tree's single-line rows --
+   that was clipping the rationale line. Object-name-scoped so this widens only
+   guidanceSuggestionList, not every list/tree/table view in the app (UI-friendliness
+   pass, unit 2). */
+QListWidget#guidanceSuggestionList::item {
+    min-height: 40px;
+    padding: ${space_2};
 }
 
 QHeaderView {

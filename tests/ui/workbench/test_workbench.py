@@ -122,6 +122,38 @@ def test_the_real_stage_proposal_rationale_reaches_the_guidance_card(
     )
 
 
+def test_show_stage_syncs_the_rails_current_item(qapp: QApplication) -> None:
+    """Unit 6: show_stage() is the programmatic navigation path a rail click never goes
+    through -- before this fix the rail's own current-item cursor (what keyboard arrow
+    navigation starts from) stayed wherever a previous click left it, out of sync with
+    whatever page was actually visible. See StageRail.set_current_stage's own docstring."""
+    workbench = Workbench()
+    proposal = StageProposal(stage=PipelineStage.UNDERSTAND, rationale="Profile first.")
+    workbench.update_pipeline_state(
+        dataset_active=True, log=AnalysisLog(dataset_id="d1"), proposal=proposal
+    )
+
+    workbench.show_stage(PipelineStage.REPORT)
+
+    report_index = list(PipelineStage).index(PipelineStage.REPORT)
+    assert workbench.stage_rail.currentRow() == report_index
+
+
+def test_show_welcome_clears_the_rails_current_item(qapp: QApplication) -> None:
+    workbench = Workbench()
+    proposal = StageProposal(stage=PipelineStage.UNDERSTAND, rationale="Profile first.")
+    workbench.update_pipeline_state(
+        dataset_active=True, log=AnalysisLog(dataset_id="d1"), proposal=proposal
+    )
+    assert (
+        workbench.stage_rail.currentItem() is not None
+    )  # sanity: something was current
+
+    workbench.update_pipeline_state(dataset_active=False, log=None, proposal=None)
+
+    assert workbench.stage_rail.currentItem() is None
+
+
 def test_manual_navigation_is_not_yanked_back_by_a_later_refresh(
     qapp: QApplication,
 ) -> None:

@@ -20,7 +20,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from src.services.analysis_orchestrator_service import PipelineStage
 from src.services.guidance_service import Suggestion
@@ -56,13 +56,50 @@ class StagePage(QWidget):
         # succeeds for focus anywhere inside a stage page, not only on its one described button.
         self.setProperty(HELP_ANCHOR_PROPERTY, self.help_anchor)
 
-        layout = QVBoxLayout(self)
+        # Unit-4-regression fix: a stage page's total content height has no ceiling --
+        # VisualizePage alone stacks two QGroupBoxes, a dynamic per-chart-type field form,
+        # and a chart+table split, and different chart types/dataset shapes can make any
+        # page's content taller than whatever window/dock space it is actually given. Before
+        # this, the three zones below were laid directly into this page's own QVBoxLayout
+        # with nothing to fall back on when total height exceeded the available viewport --
+        # Qt's layout system does not clip or add scrollbars on its own; it silently renders
+        # child widgets (observed: VisualizePage's per-field QFormLayout rows) squeezed below
+        # their natural height, which reads as overlapping text, not a clean cutoff. A
+        # QScrollArea around the real content, with setWidgetResizable(True) so the inner
+        # widget's *width* always tracks the scroll area's (only height ever scrolls), is the
+        # standard Qt fix: content that already fits renders exactly as before -- no visible
+        # scrollbar -- content that doesn't scrolls instead of corrupting.
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Zone 1: guidance card. Static at construction (each subclass may seed
-        # its own default text), overwritten by Workbench.update_pipeline_state
-        # with the live StageProposal.rationale whenever this page's stage is
-        # the one currently proposed.
-        self._guidance_label = QLabel(self)
+        scroll_area = QScrollArea(self)
+        scroll_area.setObjectName("stagePageScrollArea")
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        outer_layout.addWidget(scroll_area)
+
+        # The three zones below are built into this content widget, not `self` directly --
+        # `self` now holds only the scroll area (see outer_layout above).
+        content = QWidget(scroll_area)
+        content.setObjectName("stagePageScrollContent")
+        scroll_area.setWidget(content)
+        layout = QVBoxLayout(content)
+
+        # Zone 1: guidance card + suggestion panel, grouped in one QFrame (UI-friendliness
+        # pass, unit 4) so the two read as a single "why this stage / what to try" zone
+        # instead of two independent labels floating at the top of the page -- previously
+        # both were direct children of this page's own layout with nothing visually tying
+        # them together or separating them from Zone 2's form. stagePageZone_guidance is
+        # purely a styling hook (see base.qss.template); it owns no behavior of its own.
+        guidance_zone = QFrame(content)
+        guidance_zone.setObjectName("stagePageZone_guidance")
+        guidance_zone_layout = QVBoxLayout(guidance_zone)
+        guidance_zone_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Static at construction (each subclass may seed its own default text),
+        # overwritten by Workbench.update_pipeline_state with the live
+        # StageProposal.rationale whenever this page's stage is the one currently proposed.
+        self._guidance_label = QLabel(guidance_zone)
         self._guidance_label.setObjectName("stageGuidanceCard")
         self._guidance_label.setWordWrap(True)
         describe(
@@ -71,7 +108,7 @@ class StagePage(QWidget):
             description="Explains why this stage is recommended next.",
             focusable=False,  # a label with text, not a control to tab to
         )
-        layout.addWidget(self._guidance_label)
+        guidance_zone_layout.addWidget(self._guidance_label)
 
         # Milestone 26: one GuidancePanel per stage page, in the guidance-card zone
         # alongside the static rationale label above -- see GuidancePanel's own docstring
@@ -79,8 +116,10 @@ class StagePage(QWidget):
         # update_suggestions below; starts empty (its own "No suggestions right now."
         # placeholder) until the first real MainWindow._refresh_workbench call pushes a
         # ranked list in.
-        self.guidance_panel = GuidancePanel(self)
-        layout.addWidget(self.guidance_panel)
+        self.guidance_panel = GuidancePanel(guidance_zone)
+        guidance_zone_layout.addWidget(self.guidance_panel)
+
+        layout.addWidget(guidance_zone)
 
         # Zone 3's widget is constructed here, ahead of Zone 2's form, but
         # not yet added to the layout -- a subclass's _build_form (called
@@ -89,7 +128,7 @@ class StagePage(QWidget):
         # writes to must already exist before that call runs. Layout order
         # (guidance, form, result) is still established explicitly by the
         # addWidget calls below, independent of construction order.
-        self._result_label = QLabel(self)
+        self._result_label = QLabel(content)
         self._result_label.setObjectName("stageResultArea")
         self._result_label.setWordWrap(True)
         self._result_label.setTextInteractionFlags(
@@ -110,19 +149,31 @@ class StagePage(QWidget):
         self._error_state = ErrorState(
             heading=f"{self.stage.value.title()} stage error",
             message="",
-            parent=self,
+            parent=content,
         )
         self._error_state.setVisible(False)
 
-        # Zone 2: the parameter form, supplied entirely by the subclass.
-        self._form_container = QWidget(self)
+        # Zone 2: the parameter form, supplied entirely by the subclass. objectName is a
+        # pure styling hook (unit 4) -- QWidget rather than QFrame since it was already a
+        # bare container pre-unit-4 and every subclass's _build_form already populates
+        # self._form_layout directly; no structural change needed here, unlike zones 1/3.
+        self._form_container = QWidget(content)
+        self._form_container.setObjectName("stagePageZone_form")
         self._form_layout = QVBoxLayout(self._form_container)
         self._form_layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._form_container)
         self._build_form(self._form_layout)
 
-        layout.addWidget(self._result_label)
-        layout.addWidget(self._error_state)
+        # Zone 3: result label + error state, grouped in one frame for the same reason
+        # Zone 1's guidance_zone groups its two widgets -- see that comment above.
+        result_zone = QFrame(content)
+        result_zone.setObjectName("stagePageZone_result")
+        result_zone_layout = QVBoxLayout(result_zone)
+        result_zone_layout.setContentsMargins(0, 0, 0, 0)
+        result_zone_layout.addWidget(self._result_label)
+        result_zone_layout.addWidget(self._error_state)
+        layout.addWidget(result_zone)
+
         layout.addStretch(1)
 
     def _build_form(self, layout: QVBoxLayout) -> None:

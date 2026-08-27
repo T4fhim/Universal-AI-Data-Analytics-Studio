@@ -123,6 +123,12 @@ class PipelineController:
         self._worker_runner = worker_runner
         self._command_stack = command_stack
         self._on_changed = on_changed
+        # Unit 7 (UI-friendliness pass, button loading-state polish): set by
+        # connect_stage_pages once it has UnderstandPage in hand -- None until then (and in
+        # any test/context that never calls connect_stage_pages), in which case
+        # run_understand_stage simply passes busy_widget=None, a documented no-op for
+        # WorkerRunner.run().
+        self._understand_run_button: QWidget | None = None
 
     # -- Reading pipeline state --------------------------------------------------------
 
@@ -151,6 +157,11 @@ class PipelineController:
         understand_page = workbench.page_for(PipelineStage.UNDERSTAND)
         if isinstance(understand_page, UnderstandPage):
             understand_page.run_requested.connect(self.run_understand_stage)
+            # Unit 7: stored here (not just connected) so run_understand_stage can pass it
+            # as WorkerRunner.run()'s busy_widget -- disabling the same button that started
+            # the run for exactly as long as it takes, matching PredictPage's own
+            # already-established run_button pattern.
+            self._understand_run_button = understand_page.run_button
         reproduce_page = workbench.page_for(PipelineStage.REPRODUCE)
         if isinstance(reproduce_page, ReproducePage):
             reproduce_page.reproduce_requested.connect(self.reproduce_active_dataset)
@@ -186,6 +197,7 @@ class PipelineController:
             on_result=lambda entry: self._on_stage_run_completed(dataset_id, entry),
             on_error=self._on_stage_run_error,
             on_finished=self._status_bar.hide_busy,
+            busy_widget=self._understand_run_button,
         )
 
     def _on_stage_run_completed(self, dataset_id: str, entry: AnalysisLogEntry) -> None:

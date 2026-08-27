@@ -102,6 +102,16 @@ def test_with_base_font_size_preserves_the_sm_lg_deltas() -> None:
     assert scaled.font_size_lg - scaled.font_size_md == base_delta_lg
 
 
+def test_with_base_font_size_preserves_the_xl_delta() -> None:
+    """Unit 5 (UI-friendliness pass): font_size_xl (added for QLabel#welcomeTitle, the
+    stylesheet's one hardcoded font-size literal) must scale the same way sm/lg already do,
+    or the welcome screen's title would silently stop respecting the milestone-28
+    accessibility base-font-size setting the moment someone changed it."""
+    base_delta_xl = DARK_TOKENS.font_size_xl - DARK_TOKENS.font_size_md
+    scaled = DARK_TOKENS.with_base_font_size(20)
+    assert scaled.font_size_xl - scaled.font_size_md == base_delta_xl
+
+
 def test_with_base_font_size_floors_the_small_size_at_8px() -> None:
     scaled = DARK_TOKENS.with_base_font_size(8)  # sm would be 7 without the floor
     assert scaled.font_size_sm == 8

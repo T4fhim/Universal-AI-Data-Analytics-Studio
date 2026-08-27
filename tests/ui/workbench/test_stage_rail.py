@@ -48,6 +48,36 @@ def test_status_prefix_is_visible_in_the_item_text_not_color_only(
     assert item.text().startswith("✓")
 
 
+def test_set_current_stage_sets_the_matching_item_current(qapp: QApplication) -> None:
+    """Unit 6: the fix for the rail's current-item cursor going stale on any
+    programmatic (non-click) navigation -- see StageRail.set_current_stage's own docstring."""
+    rail = StageRail()
+    rail.set_current_stage(PipelineStage.CLEAN)
+
+    clean_index = list(PipelineStage).index(PipelineStage.CLEAN)
+    assert rail.currentRow() == clean_index
+    assert rail.currentItem() is rail.item(clean_index)
+
+
+def test_set_current_stage_none_clears_the_current_item(qapp: QApplication) -> None:
+    rail = StageRail()
+    rail.set_current_stage(PipelineStage.CLEAN)
+
+    rail.set_current_stage(None)
+
+    assert rail.currentItem() is None
+
+
+def test_set_current_stage_moves_off_a_previous_stage(qapp: QApplication) -> None:
+    rail = StageRail()
+    rail.set_current_stage(PipelineStage.UNDERSTAND)
+
+    rail.set_current_stage(PipelineStage.EXPLAIN)
+
+    explain_index = list(PipelineStage).index(PipelineStage.EXPLAIN)
+    assert rail.currentRow() == explain_index
+
+
 def test_clicking_an_item_emits_a_real_pipeline_stage_not_a_plain_string(
     qapp: QApplication,
 ) -> None:

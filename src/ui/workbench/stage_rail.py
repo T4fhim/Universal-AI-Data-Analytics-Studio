@@ -116,6 +116,48 @@ class StageRail(QListWidget):
                 status = "pending"
             item.setText(_label_for(stage, status))
             item.setData(_STATUS_ROLE, status)
+            # UI-friendliness pass (unit 2): bold the proposed stage so it reads as
+            # "go here next" at a glance, not only via the one-glyph "→ " prefix in
+            # _STATUS_PREFIX above -- easy to miss when scanning quickly. Reapplied
+            # (and un-set for every other item) on every call rather than only when an
+            # item first becomes proposed, since "proposed" moves between calls as the
+            # pipeline advances and a stale bold item would otherwise linger. Font
+            # weight, not color, for the same reason _STATUS_PREFIX itself is text
+            # (WCAG 1.4.1) and to avoid making this stateless widget theme-aware just
+            # for one emphasis cue -- mirrors ResultCard._title_label's own
+            # font.setBold(...) pattern for emphasis elsewhere in this codebase.
+            font = item.font()
+            font.setBold(status == "proposed")
+            item.setFont(font)
+
+    def set_current_stage(self, stage: PipelineStage | None) -> None:
+        """Sync this rail's own current-item cursor to whichever stage is actually shown.
+
+        Unit 6 (UI-friendliness pass, stage-rail keyboard navigation): a direct click on a
+        rail item already makes Qt set that item current (and selected) for free -- what was
+        missing is every *programmatic* navigation path (:meth:`~src.ui.workbench.workbench.
+        Workbench.show_stage`, :meth:`~src.ui.workbench.workbench.Workbench.show_welcome`,
+        and the auto-navigate-on-dataset-open branch in :meth:`~src.ui.workbench.workbench.
+        Workbench.update_pipeline_state`) left the rail's current-item cursor exactly where a
+        user's last rail click (or nothing at all, on first launch) put it. Since arrow-key
+        navigation starts from whatever item is currently "current" -- not from whichever
+        page is actually visible -- a keyboard user tabbing into the rail after any
+        non-rail-driven navigation would have their first Up/Down press jump from a stale,
+        invisible starting point instead of the stage they are actually looking at.
+
+        Args:
+            stage: The stage to mark current, or ``None`` to clear the current item entirely
+                (the welcome page has no corresponding rail item -- see ``UPLOAD``'s own
+                "reachable but not yet interactive" note on :meth:`Workbench._on_stage_selected`).
+        """
+        if stage is None:
+            self.setCurrentItem(None)
+            return
+        for index in range(self.count()):
+            item = self.item(index)
+            if _stage_from_item_data(item.data(_STAGE_ROLE)) == stage:
+                self.setCurrentItem(item)
+                return
 
     def status_for(self, stage: PipelineStage) -> str | None:
         """Return the currently displayed status for ``stage`` -- ``"complete"``, ``"proposed"``,

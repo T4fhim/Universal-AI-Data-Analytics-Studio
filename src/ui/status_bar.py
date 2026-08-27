@@ -18,6 +18,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import QLabel, QMainWindow, QProgressBar, QStatusBar
 
 from src.core.logger import get_logger
+from src.ui.a11y.accessible import announce, describe
 
 _logger = get_logger(__name__)
 
@@ -33,8 +34,30 @@ class ApplicationStatusBar(QStatusBar):
 
     def __init__(self, parent_window: QMainWindow) -> None:
         super().__init__(parent_window)
+        # Unit 3: this widget itself is the target announce() (called from show_message
+        # below) posts its DescriptionChanged event against -- giving it a real accessible
+        # name means a screen reader identifies *what* just spoke, not an unnamed status
+        # bar role.
+        describe(
+            self,
+            name="Application status bar",
+            description="Shows background-task progress and status messages.",
+            focusable=False,
+        )
 
         self._project_label = QLabel(self.tr("No project open"))
+        # Unit 3 (UI-friendliness pass, feedback/responsiveness): this label and the busy
+        # indicator below had no accessible name at all before this -- unlike almost every
+        # other informational/interactive widget in this codebase, which wraps construction
+        # in describe() (see src/ui/a11y/accessible.py's own docstring on why that call was
+        # added specifically to stop this exact omission from happening by accident).
+        # focusable=False on both: neither is a control to tab to, they are status text.
+        describe(
+            self._project_label,
+            name="Active project",
+            description="The name of the currently open project.",
+            focusable=False,
+        )
         self.addPermanentWidget(self._project_label)
 
         # Busy indicator (milestone 6): indeterminate (0/0 range) rather
@@ -51,6 +74,15 @@ class ApplicationStatusBar(QStatusBar):
         self._busy_indicator.setMaximumWidth(120)
         self._busy_indicator.setTextVisible(False)
         self._busy_indicator.setVisible(False)
+        describe(
+            self._busy_indicator,
+            name="Background task progress",
+            description=(
+                "Shows progress while a background task -- a dataset load, chart "
+                "render, or report generation -- is running."
+            ),
+            focusable=False,
+        )
         self.addPermanentWidget(self._busy_indicator)
 
         # Milestone 28: an indeterminate QProgressBar is Qt's own built-in
@@ -135,6 +167,11 @@ class ApplicationStatusBar(QStatusBar):
         """
         self._busy = True
         self._set_busy_range()
+        # Unit 3: a busy operation has no real percentage to report -- indeterminate mode
+        # (or reduced motion's static full bar, see _set_busy_range) would otherwise show a
+        # meaningless "0%"/"100%" that show_progress() below never displays. Text only
+        # turns on for a genuine determinate report.
+        self._busy_indicator.setTextVisible(False)
         self._busy_indicator.setVisible(True)
         self.show_message(message, timeout_ms=0)
 
@@ -171,6 +208,11 @@ class ApplicationStatusBar(QStatusBar):
         self._busy = False
         self._busy_indicator.setRange(0, 100)
         self._busy_indicator.setValue(max(0, min(100, percent)))
+        # Unit 3: a real, determinate percentage is exactly the case show_busy's own
+        # comment above says text should be hidden for -- this is the one place it should
+        # show, so the numeric progress the caller worked out is not silently thrown away
+        # (before this, the bar filled with no readable percentage anywhere in the UI).
+        self._busy_indicator.setTextVisible(True)
         if message:
             self.show_message(message, timeout_ms=0)
 
@@ -199,6 +241,14 @@ class ApplicationStatusBar(QStatusBar):
                 convention for a zero timeout.
         """
         self.showMessage(message, timeout_ms)
+        # Unit 3: status-bar messages are exactly the asynchronous "something happened"
+        # feedback announce()'s own docstring names as its motivating example
+        # ("analysis complete", "3 datasets skipped") -- yet nothing in the app called it
+        # before this. Without it, a screen-reader user not currently focused on the
+        # status bar (the common case -- they are focused on whatever page or dialog they
+        # were just using) never learns a background task finished, failed, or what a
+        # busy operation is doing, even though a sighted user sees it appear immediately.
+        announce(self, message)
 
     def set_active_project_label(self, project_name: str | None) -> None:
         """Update the permanent project-name label.

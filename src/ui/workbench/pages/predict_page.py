@@ -317,9 +317,7 @@ class PredictPage(StagePage):
             self.show_error("Forecast Failed", str(exc))
             _logger.warning("Forecast '%s' failed: %s", tool_name, exc)
             return None
-        except (
-            Exception
-        ) as exc:  # noqa: BLE001 -- shown to the user, not swallowed silently
+        except Exception as exc:  # noqa: BLE001 -- shown to the user, not swallowed silently
             self.show_error("Forecast Failed", f"Unexpected error: {exc}")
             _logger.error("Forecast '%s' failed unexpectedly: %s", tool_name, exc)
             return None
@@ -352,7 +350,6 @@ class PredictPage(StagePage):
             self._display_result(result, level, "Ran Automatic Model Competition.")
             return None
 
-        self.run_button.setEnabled(False)
         self._status_bar.show_busy("Comparing forecast models…")
         return self._worker_runner.run(
             compare_forecast_models,
@@ -362,6 +359,11 @@ class PredictPage(StagePage):
             on_result=lambda result: self._on_comparison_result(result, level),
             on_error=self._on_comparison_error,
             on_finished=self._on_comparison_finished,
+            # Unit 7: this used to be a manual self.run_button.setEnabled(False) here plus
+            # setEnabled(True) in _on_comparison_finished below -- WorkerRunner.run() now
+            # generalizes exactly that pattern, so this page reuses it instead of hand-rolling
+            # its own copy.
+            busy_widget=self.run_button,
             **parameters,
         )
 
@@ -377,7 +379,10 @@ class PredictPage(StagePage):
     def _on_comparison_finished(self) -> None:
         if self._status_bar is not None:
             self._status_bar.hide_busy()
-        self.run_button.setEnabled(True)
+        # Unit 7: run_button's own re-enable is now handled by WorkerRunner.run()'s
+        # busy_widget parameter (see _run_comparison's call site) -- it used to be a manual
+        # setEnabled(True) here, connected after this callback in signal-connection order, so
+        # removing it changes nothing about when the button re-enables.
 
     def _display_result(
         self,

@@ -106,6 +106,47 @@ def test_run_understand_stage_runs_profile_dataset_and_records_a_real_log_entry(
     assert not block_modals  # no error dialog was shown
 
 
+def test_run_understand_stage_disables_and_reenables_the_run_button(
+    qapp: QApplication, block_modals
+) -> None:
+    """Unit 7 (UI-friendliness pass, button loading-state polish): connect_stage_pages wires
+    UnderstandPage.run_button as WorkerRunner.run()'s busy_widget -- proves the button is
+    disabled the instant the run starts and re-enabled once it genuinely finishes, the same
+    guarantee test_predict_page.py's own progress test already covers for PredictPage's
+    run_button (see that test's own comment for why isEnabled() False right after starting
+    proves the async path, not a same-call synchronous shortcut)."""
+    from src.ui.workbench.pages.understand_page import UnderstandPage
+    from src.ui.workbench.workbench import Workbench
+
+    controller, workspace_service, _orchestrator_service, _ = _make_controller(qapp)
+    workbench = Workbench()
+    controller.connect_stage_pages(workbench)
+    understand_page = workbench.page_for(PipelineStage.UNDERSTAND)
+    assert isinstance(understand_page, UnderstandPage)
+
+    dataset = _make_dataset()
+    workspace_service.add_dataset(dataset)
+    workspace_service.set_active_dataset(dataset.dataset_id)
+
+    assert understand_page.run_button.isEnabled() is True
+
+    completed_signal_holder: list = []
+    original_run = controller._worker_runner.run
+
+    def _capturing_run(*args, **kwargs):
+        worker = original_run(*args, **kwargs)
+        completed_signal_holder.append(worker)
+        return worker
+
+    controller._worker_runner.run = _capturing_run  # type: ignore[method-assign]
+
+    controller.run_understand_stage()
+    assert understand_page.run_button.isEnabled() is False
+
+    wait_for_signal(completed_signal_holder[0].signals.finished)
+    assert understand_page.run_button.isEnabled() is True
+
+
 def test_run_understand_stage_with_no_active_dataset_shows_a_message_not_a_crash(
     qapp: QApplication, block_modals
 ) -> None:
