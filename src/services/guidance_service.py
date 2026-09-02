@@ -41,7 +41,7 @@ provider is configured.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from src.analysis.dataset_profile import profile_dataset
 from src.core.expertise_level import ExpertiseLevel
@@ -76,10 +76,10 @@ _VISUALIZE_ACTION_ID = "analysis.visualize"
 _CLEAN_ACTION_ID = "workbench.go_to_clean"
 
 
-class SuggestionCategory(str, Enum):
+class SuggestionCategory(StrEnum):
     """Which of :mod:`GuidanceService`'s deterministic sources produced a :class:`Suggestion`.
 
-    Subclasses ``str`` for the same round-trip-friendly reason
+    A :class:`~enum.StrEnum` for the same round-trip-friendly reason
     :class:`~src.core.expertise_level.ExpertiseLevel` does -- comparable/serializable with no
     manual ``.value`` conversion, useful for a caller (or a test) filtering suggestions by
     source without importing this enum's identity, only its value.

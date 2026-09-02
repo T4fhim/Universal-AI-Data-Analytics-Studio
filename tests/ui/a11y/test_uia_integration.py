@@ -70,11 +70,9 @@ import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any
 
 import pytest
-
-T = TypeVar("T")
 
 _WINDOWS_ONLY = pytest.mark.skipif(
     sys.platform != "win32",
@@ -117,7 +115,7 @@ _EXPECTED_CONTROL_TYPE: dict[str, str] = {
 }
 
 
-def _run_bounded(fn: Callable[[], T], *, timeout: float, description: str) -> T:
+def _run_bounded[T](fn: Callable[[], T], *, timeout: float, description: str) -> T:
     """Run ``fn`` in a daemon thread and fail loudly if it exceeds ``timeout``.
 
     See this module's own docstring for why every UIA call site needs this:

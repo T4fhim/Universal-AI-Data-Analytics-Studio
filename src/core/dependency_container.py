@@ -17,7 +17,8 @@ application actually uses.
 
 from __future__ import annotations
 
-from typing import Callable, TypeVar
+from collections.abc import Callable
+from typing import TypeVar
 
 from src.core.exceptions import DependencyResolutionError
 from src.core.logger import get_logger
@@ -133,8 +134,7 @@ class DependencyContainer:
             raise
         except Exception as exc:
             raise DependencyResolutionError(
-                f"Factory for {_describe_key(key)} raised during "
-                f"construction: {exc}"
+                f"Factory for {_describe_key(key)} raised during construction: {exc}"
             ) from exc
 
         if is_singleton:

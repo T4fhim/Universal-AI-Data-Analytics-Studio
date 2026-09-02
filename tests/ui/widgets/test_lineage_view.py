@@ -45,7 +45,7 @@ def test_show_lineage_with_none_target_resets_to_the_placeholder(
     qapp: QApplication,
 ) -> None:
     view = LineageView()
-    workspace, root, child, _grandchild = _make_chain()
+    workspace, _root, child, _grandchild = _make_chain()
     view.show_lineage(workspace.get_lineage(child.dataset_id), child, [])
 
     view.show_lineage([], None, [])

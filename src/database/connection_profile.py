@@ -16,14 +16,14 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class DatabaseType(str, Enum):
+class DatabaseType(StrEnum):
     """Which database engine a :class:`ConnectionProfile` connects to.
 
-    Subclasses ``str`` for the same reason
+    A :class:`~enum.StrEnum` for the same reason
     :class:`~src.core.expertise_level.ExpertiseLevel` does: a member
     compares equal to and serializes as its plain string value, so
     ``database.profiles[i].db_type`` round-trips through YAML with no

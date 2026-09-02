@@ -147,8 +147,19 @@ All fixed paths (`config/`, `logs/`, `projects/`) are anchored to the project ro
 - **Multi-file touchpoints that do not auto-sync**: adding a reader requires updating both
   `reader_registry.py`'s `_REGISTERED_READERS` tuple *and* the hardcoded `_DATASET_FILE_FILTER`
   string in `src/ui/main_window.py` — the second does not derive from the first automatically.
-- **No test suite currently exists.** `tests/` is empty despite `pytest` being a declared
-  dependency; `black`/`isort`/`mypy` have no committed configuration or CI gate. "Tests pass" is
-  not currently a meaningful verification signal for this project.
-- Several `src/` subpackages (`database/`, `models/`, `plugins/`, `workers/`, `reports/`,
-  `resources/`) are still empty directories awaiting their milestone.
+- **A real test suite and enforced tooling exist and are CI-gated.** `tests/` mirrors `src/`'s
+  package layout; `black`, `isort`, `mypy` (scoped to a curated clean-module list — see
+  [docs/MYPY_DEBT.md](MYPY_DEBT.md)), `ruff`, and `bandit` all have committed configuration in
+  `pyproject.toml` with pinned versions in `requirements.txt`, and `.github/workflows/ci.yml` gates
+  on all of them. "Tests pass" (and "lint/type/security checks pass") is a meaningful verification
+  signal — see [CLAUDE.md](../CLAUDE.md#commands) for the exact commands, including why the full
+  suite must be run via `scripts/run_tests_and_exit_cleanly.py` in two invocations rather than a
+  bare `pytest tests/`. Keep this note current going forward: it went stale once already (written
+  when milestone 16 first observed the opposite state) and nothing caught the drift until a later
+  audit — treat a milestone that changes test/tooling state as also owning an update here.
+- Two `src/` subpackages remain genuinely unbuilt: `models/` (empty — no milestone in the plan this
+  project has followed names what it is for) and `resources/` (used only for `resources/styles/*.qss`
+  theme files, referenced directly by `ThemeManager` rather than through a `src/resources/` module).
+  `database/`, `plugins/`, `workers/`, and `reports/` were empty at an earlier point but are now
+  built out (milestones 14, 12, 6, and 13 respectively) — see
+  [docs/ROADMAP.md](ROADMAP.md#what-is-explicitly-not-built-yet) for the authoritative, current list.

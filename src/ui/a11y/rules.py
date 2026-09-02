@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QShortcut
@@ -58,10 +58,10 @@ from src.ui.theme.contrast import contrast_ratio
 from src.ui.theme.tokens import ThemeTokens
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     """How seriously a finding should be treated.
 
-    Subclasses ``str`` for the same reason
+    A :class:`~enum.StrEnum` for the same reason
     :class:`~src.core.expertise_level.ExpertiseLevel` and
     :class:`~src.ui.theme.tokens.Density` do -- it prints and compares
     cleanly in test failure output and log lines with no extra conversion.

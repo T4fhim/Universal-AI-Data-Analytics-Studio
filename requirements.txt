@@ -86,10 +86,22 @@ joblib
 numba
 dask
 pytest
+# The standard pytest plugin for PySide6/PyQt testing (qtbot fixture: simulated
+# key/mouse events, waitSignal/waitSignals, auto-fail on exceptions in Qt virtual
+# methods/slots), runs fully offscreen. Added 2026-09-01 -- this project already
+# hand-rolls offscreen QT_QPA_PLATFORM=offscreen widget tests without it; adopt
+# qtbot incrementally in new/rewritten tests rather than migrating the existing
+# suite wholesale in one pass.
+pytest-qt
 black==26.5.1
 isort==8.0.1
 mypy==2.1.0
 ruff==0.16.3
+# The standalone git pre-commit hook framework (see .pre-commit-config.yaml). Added
+# 2026-09-01 alongside pytest-qt -- distinct from .claude/hooks/*.ps1, which only
+# fire inside a Claude Code session; this is the tool-agnostic enforcement layer for
+# commits made from a plain terminal, another editor, or another machine.
+pre-commit==4.6.2
 
 bandit==1.9.4
 # Milestone 28 follow-up (Tier 1 UIA verification, tests/ui/a11y/

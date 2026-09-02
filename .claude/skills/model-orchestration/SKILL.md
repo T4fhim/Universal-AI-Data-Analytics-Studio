@@ -32,16 +32,21 @@ tool call) rather than to edit the agent's frontmatter.
 - **Implement approved work**: `implementer` agent, or inline if it's a single-file,
   pattern-following change the architect/planner step already fully specified.
 - **Bug/crash/failing test**: `debugger` agent — reproduce and root-cause before proposing a fix.
-- **Any new `Base*` implementation, service, or milestone stage**: check `project-architecture`
-  skill for the integration points (registry, config 3-place rule, bootstrap registration)
-  *before* declaring the change complete, then `test-engineer` for coverage.
+- **Any new `Base*` implementation, service, or milestone stage**: `add-extension` skill to
+  scaffold the file in the right shape, then check `project-architecture` skill for the
+  integration points (registry, config 3-place rule, bootstrap registration) *before* declaring
+  the change complete, then `test-engineer` for coverage.
 - **Chart/visualization work**: `dataviz-development` skill.
 - **Qt/PySide6 widget, threading, or lifecycle work**: `pyside6-development` skill.
 - **Before claiming any milestone/feature/fix complete**: `milestone-verification` skill —
-  non-negotiable per that skill's own scope; this skill does not restate its checklist.
-- **Review after non-trivial change**: `code-reviewer` (quality) and/or `security-reviewer`
-  (only for `src/ai/`, `src/readers/`, `src/database/`, credential/network/filesystem code) —
-  select the one relevant to what changed, not both by default.
+  non-negotiable per that skill's own scope; this skill does not restate its checklist. If the
+  milestone changed test/tooling/build state (not just application features), also run
+  `milestone-doc-sync` immediately after — see that skill for why this is a separate step.
+- **Review after non-trivial change**: `code-reviewer` (quality), `security-reviewer` (only for
+  `src/ai/`, `src/readers/`, `src/database/`, credential/network/filesystem code), `a11y-reviewer`
+  (widget/dock/dialog/chart/QSS changes in `src/ui/`), and/or `performance-analyzer`
+  (DataFrame-processing, forecasting, or chart-rendering code with a data-volume dimension) —
+  select the one(s) relevant to what changed, not all four by default.
 
 ## Confidence gate before writing code
 

@@ -122,7 +122,7 @@ class _QtLogHandler(QObject, logging.Handler):
         try:
             message = self.format(record)
             self._append_requested.emit(message)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- see comment below
             # A logging handler must never raise — doing so risks
             # taking down whatever code just tried to log a message,
             # which is almost always worse than a dropped log line in

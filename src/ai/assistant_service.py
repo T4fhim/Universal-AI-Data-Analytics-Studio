@@ -409,7 +409,10 @@ class AssistantService:
         except ApplicationError as exc:
             _logger.warning("Tool '%s' failed: %s", tool_name, exc)
             return f"Error: {exc}", None, None, None
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- tool implementations are arbitrary,
+            # third-party-shaped callables (see this method's own docstring: any
+            # failure must become a correctable conversational turn, not a crash),
+            # so there is no narrower exception type this dispatch loop could name.
             _logger.error("Tool '%s' raised an unexpected error: %s", tool_name, exc)
             return f"Unexpected error: {exc}", None, None, None
 
@@ -422,9 +425,11 @@ class AssistantService:
                 result.dataset_id,
             )
             return (
-                f"Success. Created new dataset '{result.name}' "
-                f"({result.row_count} rows, {result.column_count} cols). "
-                f"{result.derivation_description}",
+                (
+                    f"Success. Created new dataset '{result.name}' "
+                    f"({result.row_count} rows, {result.column_count} cols). "
+                    f"{result.derivation_description}"
+                ),
                 result,
                 None,
                 None,

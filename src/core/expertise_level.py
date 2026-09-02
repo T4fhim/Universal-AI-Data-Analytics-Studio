@@ -8,7 +8,7 @@ for "how should this be explained" that both the AI system prompt
 rather than a service, avoids the AI and UI layers drifting toward two
 different notions of what "beginner" versus "engineer" means.
 
-A plain :class:`~enum.Enum`, not a service: this module has no
+A plain :class:`~enum.StrEnum`, not a service: this module has no
 behavior, no state, and nothing to register in
 :mod:`src.core.bootstrap`'s dependency container — it belongs next to
 :mod:`src.core.exceptions` as a small shared vocabulary type, matching
@@ -17,14 +17,14 @@ how that module is also core-but-not-a-service.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class ExpertiseLevel(str, Enum):
+class ExpertiseLevel(StrEnum):
     """How much statistical/technical background the user has told the app they have.
 
-    Subclasses ``str`` so a member compares equal to and serializes as
-    its plain string value (``ExpertiseLevel.BEGINNER == "beginner"``)
+    A :class:`~enum.StrEnum` so a member compares equal to and serializes
+    as its plain string value (``ExpertiseLevel.BEGINNER == "beginner"``)
     — this is what lets ``ai.expertise_level`` in ``config.yaml`` store
     a plain string while code elsewhere works with the enum, with no
     manual ``.value``/round-trip conversion needed at the config

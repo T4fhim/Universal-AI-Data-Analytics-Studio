@@ -167,7 +167,7 @@ class SqliteReader(BaseReader):
             )
 
         _logger.info(
-            "Read SQLite table '%s' from %s: %d rows, %d columns, " "%d warning(s).",
+            "Read SQLite table '%s' from %s: %d rows, %d columns, %d warning(s).",
             table_name,
             path,
             len(dataframe),

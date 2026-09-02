@@ -1,0 +1,61 @@
+# Standalone git pre-commit enforcement, independent of any AI coding harness.
+#
+# This project already has .claude/hooks/quality-check.ps1 (auto ruff format+fix
+# on Edit/Write) and .claude/hooks/pre-commit-check.ps1 (pytest + bandit gate on
+# `git commit`) -- but both fire ONLY inside a Claude Code session. A commit made
+# from a plain terminal, another editor, another AI tool, or a teammate's machine
+# gets none of that. This file is the tool-agnostic enforcement layer everyone
+# gets regardless of how the commit was made. Install once per clone:
+#   pre-commit install
+#
+# Kept fast on purpose (2026 best practice: pre-commit hooks should be fast,
+# auto-fixing ones; push slow/comprehensive checks -- the full test suite, mypy,
+# bandit -- to CI instead, where .github/workflows/ci.yml already runs them).
+# Vendored/generated assets: never touch these with formatting/whitespace hooks.
+# Verified necessary 2026-09-01 -- a `pre-commit run --all-files` sanity check
+# (checking this file actually works after `pre-commit install`) rewrote 23 lines
+# of trailing whitespace inside resources/web/plotly.min.js (a vendored third-party
+# bundle) before this exclude existed. Cosmetic (whitespace inside embedded shader
+# source comments, reverted, no functional change), but a vendored file should
+# never be reformatted by local tooling regardless.
+#
+# Formatter of record is `black`, not `ruff format`, deliberately. Verified
+# 2026-09-02: a `ruff-format` hook here fought with `black --check` (the actual
+# CI gate) over long `assert`-statement wrapping style in
+# tests/ui/a11y/test_uia_integration.py -- ruff-format and black are not always
+# byte-identical despite ruff aiming for compatibility, and letting both run
+# means every commit can silently flip a file back and forth between the two
+# styles depending on which tool last touched it. Use `black` here too so this
+# hook can never disagree with what CI actually checks.
+exclude: ^resources/web/
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.3  # pinned to match requirements.txt's ruff==0.16.3
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+        # No ruff-format hook here -- see the comment above exclude:.
+
+  - repo: https://github.com/psf/black
+    rev: 26.5.1  # pinned to match requirements.txt's black==26.5.1 -- the actual CI-gating formatter
+    hooks:
+      - id: black
+
+  - repo: https://github.com/PyCQA/isort
+    rev: 8.0.1  # pinned to match requirements.txt's isort==8.0.1
+    hooks:
+      - id: isort
+        # isort remains the tool of record for import order (see pyproject.toml's
+        # [tool.isort] section and its own comment on why ruff's "I" rule group
+        # is deliberately not enabled) -- this hook is the same tool the
+        # Claude-Code-specific on-save hook already runs, not a second opinion.

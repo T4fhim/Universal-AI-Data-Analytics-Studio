@@ -34,8 +34,10 @@ from src.ui.results.result_view import significance_caption
 # list stays common to both variants rather than trying to guess which formulation ran.
 _T_TEST_ASSUMPTIONS = (
     "The two groups' values are independent of each other.",
-    "Each group's values are approximately normally distributed (or the sample is large "
-    "enough for the Central Limit Theorem to apply).",
+    (
+        "Each group's values are approximately normally distributed (or the sample is large "
+        "enough for the Central Limit Theorem to apply)."
+    ),
     "Observations within each group do not influence one another.",
 )
 
@@ -47,15 +49,19 @@ _ANOVA_ASSUMPTIONS = (
 
 _CHI_SQUARE_ASSUMPTIONS = (
     "Observations are independent of each other.",
-    "Expected frequency in each contingency-table cell is at least 5 for the test statistic "
-    "to be reliably chi-square distributed.",
+    (
+        "Expected frequency in each contingency-table cell is at least 5 for the test statistic "
+        "to be reliably chi-square distributed."
+    ),
 )
 
 _NORMALITY_ASSUMPTIONS = (
     "The sample was drawn independently and identically from the population being tested.",
-    "The test's own null hypothesis is 'the data is normally distributed' -- a low p-value is "
-    "evidence against normality, not proof of it, and a high p-value is failure to reject "
-    "normality, not proof of it either.",
+    (
+        "The test's own null hypothesis is 'the data is normally distributed' -- a low p-value is "
+        "evidence against normality, not proof of it, and a high p-value is failure to reject "
+        "normality, not proof of it either."
+    ),
 )
 
 

@@ -100,7 +100,7 @@ class Dataset:
     """
 
     name: str
-    dataframe: "pd.DataFrame"
+    dataframe: pd.DataFrame
     source_format: str
     source_path: Path | None = None
     row_count: int = field(init=False)
@@ -159,7 +159,7 @@ class Visualization:
 
     name: str
     dataset_id: str
-    figure: "go.Figure"
+    figure: go.Figure
     chart_type: str
     chart_parameters: dict = field(default_factory=dict)
     visualization_id: str = field(default_factory=lambda: str(uuid.uuid4()))

@@ -48,7 +48,7 @@ def parse_hex(color: str) -> tuple[int, int, int]:
 
 
 def relative_luminance(color: str) -> float:
-    """Return the WCAG relative luminance of ``color``, in ``0.0``–``1.0``.
+    """Return the WCAG relative luminance of ``color``, in ``0.0``-``1.0``.
 
     Each sRGB channel is normalized to 0-1, linearized (undoing the sRGB
     transfer function), then combined with the standard luminance weights.

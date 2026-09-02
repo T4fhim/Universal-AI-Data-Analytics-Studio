@@ -36,12 +36,12 @@ import os
 # Must precede every PySide6 import in the process. See point 1 above.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from collections.abc import Iterator  # noqa: E402
-from typing import Any, NamedTuple  # noqa: E402
+from collections.abc import Iterator
+from typing import Any, NamedTuple
 
-import pytest  # noqa: E402
-from PySide6.QtCore import Qt  # noqa: E402
-from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox  # noqa: E402
+import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 
 class ModalCall(NamedTuple):

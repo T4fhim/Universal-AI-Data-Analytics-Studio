@@ -317,9 +317,9 @@ class PredictPage(StagePage):
             self.show_error("Forecast Failed", str(exc))
             _logger.warning("Forecast '%s' failed: %s", tool_name, exc)
             return None
-        except (
-            Exception
-        ) as exc:  # noqa: BLE001 -- shown to the user, not swallowed silently
+        except Exception as exc:  # noqa: BLE001 -- shown to user, not swallowed
+            # handler() dispatches to a forecasting tool that can raise anything; this
+            # in-page ErrorState must surface it rather than crash the whole app.
             self.show_error("Forecast Failed", f"Unexpected error: {exc}")
             _logger.error("Forecast '%s' failed unexpectedly: %s", tool_name, exc)
             return None
