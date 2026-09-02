@@ -44,12 +44,18 @@ def _stage_from_item_data(raw: object) -> PipelineStage:
     ``PySide6``'s ``QVariant`` round-trip does not reliably preserve a ``str``-subclass
     ``Enum`` object's Python type -- a value stored via ``item.setData(role, PipelineStage.
     UPLOAD)`` can come back out as a plain ``str`` (``"upload"``) rather than the original
-    enum member, which breaks any code that then calls ``.value`` on it. ``PipelineStage(raw)``
-    handles both cases uniformly: called with a plain string it looks up the matching member;
-    called with an already-correct :class:`PipelineStage` member it returns that same member
-    unchanged (``Enum.__call__`` on an existing member is a no-op lookup, not an error).
+    enum member, which breaks any code that then calls ``.value`` on it. Handled explicitly
+    rather than via a single ``PipelineStage(raw)`` call: an already-correct member is
+    returned unchanged, and anything else is coerced through ``str()`` first. ``PipelineStage``
+    became a :class:`~enum.StrEnum` rather than a hand-rolled ``str, Enum`` subclass (ruff's
+    UP042), and ``StrEnum.__new__``'s stub is typed to take ``str``, not the ``object`` this
+    function receives from Qt -- the explicit ``isinstance``/``str()`` split here satisfies
+    that narrower signature instead of relying on ``Enum.__call__``'s runtime-only tolerance
+    for an already-correct member, which mypy cannot see through.
     """
-    return PipelineStage(raw)
+    if isinstance(raw, PipelineStage):
+        return raw
+    return PipelineStage(str(raw))
 
 
 class StageRail(QListWidget):
