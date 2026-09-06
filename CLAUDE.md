@@ -211,14 +211,22 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#path-resolution) for how the anc
 ### PySide6/Qt layer specifics
 
 - **Exactly one `QApplication` per process**, constructed only in `Application.run()`.
-- **Chart rendering** (`src/ui/widgets/chart_view.py`): a Plotly figure is rendered to HTML and loaded
-  into a `QWebEngineView` via a temporary file + `setUrl()`, not `setHtml()` — a fully inlined Plotly
-  bundle can be large enough that `setHtml()` silently fails to load.
+- **Chart rendering** (`src/ui/widgets/chart_view.py`): each `ChartView` loads a single static shell
+  page (`chart_host.html`, staged to disk by `src/ui/web/web_assets.py::staged_chart_host_url`) **once**
+  via `setUrl()` — never `setHtml()` (a fully inlined Plotly bundle is large enough that `setHtml()`
+  silently fails to load). Every subsequent figure/theme update is pushed into that already-loaded page
+  through `QWebEnginePage.runJavaScript()` calling `Plotly.newPlot`/`Plotly.react`/`relayout`, not a new
+  page load per chart. (An earlier implementation wrote a fresh `NamedTemporaryFile` per chart and
+  `setUrl()`-ed each one — that is the *old* behavior, described in the module docstring as what was
+  replaced.)
 - **Theming** (`src/ui/theme_manager.py`): `.qss` files in `resources/styles/` are applied at the
   `QApplication` level via `setStyleSheet()`, cascading to every widget; switching themes at runtime just
   re-applies a different file.
-- **Dock widgets** (`src/ui/dock_manager.py`): Project Explorer and Dataset Explorer are tabbed together;
-  Console and Log are tabbed together; the Chart dock is left un-tabbed. The Logging dock attaches a live
+- **Dock widgets** (`src/ui/dock_manager.py`): Dataset Explorer sits alone in the left area — the
+  separate Project Explorer dock was **deleted** in milestone 20, its one job (naming the open project)
+  absorbed as a top-level "Project" node inside Dataset Explorer. Console and Log are tabbed together
+  (bottom area); Chart and Data Table are tabbed together (right area, milestone 18); the AI chat panel
+  is split vertically below the Chart dock, not tabbed. The Logging dock attaches a live
   `logging.Handler` to the root logger and must be detached before window close.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#pyside6qt-layer-specifics) for more.

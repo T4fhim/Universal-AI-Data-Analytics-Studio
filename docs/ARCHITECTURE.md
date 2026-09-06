@@ -19,13 +19,19 @@ src/
 ├── visualization/ # BaseChart + categorical/continuous/distribution charts, dashboard renderer — depends on core, services
 ├── ai/            # LLM provider abstraction, tool registry, assistant service — depends on core, services, cleaning, analysis, forecasting
 ├── ui/            # PySide6 main window, dialogs, widgets, dock/menu/toolbar/theme managers — depends on everything above
-├── database/      # empty — not yet built
-├── models/        # empty — not yet built
-├── plugins/       # empty — not yet built
-├── workers/       # empty — not yet built
-├── reports/       # empty — not yet built
-└── resources/     # empty — not yet built
+├── database/      # BaseDatabaseConnection + PostgreSQL/MySQL/SQL Server/Oracle/DuckDB connectors, DatabaseReader (milestone 14)
+├── plugins/       # plugin manager + loader + built-in plugin categories (milestone 12)
+├── workers/       # BaseWorker (QRunnable) + WorkerRunner — async work off the UI thread (milestone 6)
+└── reports/       # report exporters (HTML/PDF/…) + the report-generation wizard backend (milestone 13)
 ```
+
+> `src/models/`, `src/resources/`, and `src/utils/` were empty scaffold directories that no
+> milestone ever populated; they were removed in Phase 0.4 of the desktop→web transition
+> (`plans/web-transition-glass-box-studio.md`). QSS theme files live in `resources/styles/` at the
+> repo root — referenced directly by `ThemeManager`, never through a `src/` package. Dataclasses in
+> this codebase are co-located with their consumers (`Dataset` in `workspace_service.py`,
+> `AnalysisLog` in `analysis_orchestrator_service.py`), not gathered into a central `models/`
+> package.
 
 Dependency direction is one-way down this list: `core` depends on nothing else in `src/`;
 `ui` is the only package that depends on nearly everything else. Nothing in `core`, `services`,
@@ -150,16 +156,21 @@ All fixed paths (`config/`, `logs/`, `projects/`) are anchored to the project ro
 - **A real test suite and enforced tooling exist and are CI-gated.** `tests/` mirrors `src/`'s
   package layout; `black`, `isort`, `mypy` (scoped to a curated clean-module list — see
   [docs/MYPY_DEBT.md](MYPY_DEBT.md)), `ruff`, and `bandit` all have committed configuration in
-  `pyproject.toml` with pinned versions in `requirements.txt`, and `.github/workflows/ci.yml` gates
-  on all of them. "Tests pass" (and "lint/type/security checks pass") is a meaningful verification
-  signal — see [CLAUDE.md](../CLAUDE.md#commands) for the exact commands, including why the full
-  suite must be run via `scripts/run_tests_and_exit_cleanly.py` in two invocations rather than a
-  bare `pytest tests/`. Keep this note current going forward: it went stale once already (written
-  when milestone 16 first observed the opposite state) and nothing caught the drift until a later
-  audit — treat a milestone that changes test/tooling state as also owning an update here.
-- Two `src/` subpackages remain genuinely unbuilt: `models/` (empty — no milestone in the plan this
-  project has followed names what it is for) and `resources/` (used only for `resources/styles/*.qss`
-  theme files, referenced directly by `ThemeManager` rather than through a `src/resources/` module).
-  `database/`, `plugins/`, `workers/`, and `reports/` were empty at an earlier point but are now
-  built out (milestones 14, 12, 6, and 13 respectively) — see
-  [docs/ROADMAP.md](ROADMAP.md#what-is-explicitly-not-built-yet) for the authoritative, current list.
+  `pyproject.toml` with pinned versions in `requirements.txt`. `.github/workflows/ci.yml` gates on
+  `black`, `isort`, scoped `mypy`, and `pytest` on `windows-latest`, and — added in Phase 0.6 of the
+  web-transition plan — `ruff check` + `bandit` on a `ubuntu-latest` lint job. `ruff` and `bandit`
+  are *also* enforced pre-CI by `.claude/hooks/` (on every Edit/Write and `git commit`) and by
+  `.pre-commit-config.yaml`. "Tests pass" (and "lint/type/security checks pass") is a meaningful
+  verification signal — see [CLAUDE.md](../CLAUDE.md#commands) for the exact commands, including why
+  the full suite must be run via `scripts/run_tests_and_exit_cleanly.py` in two invocations rather
+  than a bare `pytest tests/`. Keep this note current going forward: it went stale once already
+  (written when milestone 16 first observed the opposite state, then claimed ruff/bandit were
+  CI-gated when they were not) and nothing caught the drift until a later audit — treat a milestone
+  that changes test/tooling state as also owning an update here.
+- **No `src/` subpackage is an empty placeholder any more.** `database/`, `plugins/`, `workers/`,
+  and `reports/` are built out (milestones 14, 12, 6, 13). The three that never had a purpose —
+  `models/`, `resources/`, `utils/` — were deleted in Phase 0.4 of the web-transition plan. QSS
+  theme files live in `resources/styles/` at the repo root, referenced directly by `ThemeManager`,
+  not through a `src/` package. See
+  [docs/ROADMAP.md](ROADMAP.md#what-is-explicitly-not-built-yet) for what genuinely does not exist
+  yet (all of it now web-transition scope, not desktop).

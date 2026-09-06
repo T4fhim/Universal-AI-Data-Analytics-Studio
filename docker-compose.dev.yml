@@ -9,8 +9,9 @@
 #   Logs:       docker compose -f docker-compose.dev.yml logs -f
 #   Tear down:  docker compose -f docker-compose.dev.yml down        (-v also wipes data)
 #
-# Requires Docker Desktop running with the WSL2 backend. If `docker` is not yet
-# on PATH, see the setup notes handed over with this file.
+# Requires Docker Desktop running (either the WSL2 or the Hyper-V backend works —
+# these are plain Linux service images, nothing here depends on WSL specifically).
+# If `docker` is not yet on PATH, see the setup notes handed over with this file.
 
 name: uadas-dev
 

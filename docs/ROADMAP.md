@@ -94,26 +94,29 @@ every milestone is separately git-tagged; this is reconstructed from in-code cit
   `DatabaseReader`, which does not subclass `BaseReader` since a live connection has no path to
   dispatch on); the "Connect to Database" dialog.
 
+## Roadmap status (updated 2026-09-06, Phase 0.2 of the web transition)
+
+The milestone list above (1a–14) was the last state this document tracked. **Milestones 15–29
+also completed** — the design-token/QSS system, `ChartView` hardening, `ActionRegistry`/command
+palette, the dataframe viewer, `MainWindow` decomposition, the Workbench/StageRail shell, the AI
+chat overhaul, the result-rendering framework, real undo/redo (`src/ui/command_stack.py`,
+milestone 23), the Visualize/Predict stages, `GuidanceService`, empty/error states + i18n,
+accessibility enforcement (`src/ui/a11y/`), and the in-app manual / F1 help / onboarding pass.
+Their plan is `plans/ui-overhaul-pioneering-adaptive-workbench.md`; their detail lives in git
+history and module docstrings rather than being re-narrated here.
+
+**The desktop roadmap is now closed.** No further desktop milestones are planned. Active
+direction is the desktop→web transition — see
+[plans/web-transition-glass-box-studio.md](../plans/web-transition-glass-box-studio.md).
+
 ## What is explicitly not built yet
 
-`src/models/` remains an empty directory awaiting its milestone — no milestone in the plan this
-project has followed so far (`plans/defining-features-what-stateless-zebra.md`) names what it is
-for.
+The empty scaffold packages `src/models/`, `src/resources/`, and `src/utils/` were **deleted** in
+Phase 0.4 of the web transition (no milestone ever named a purpose for them). QSS theme files
+live in `resources/styles/` at the repo root, referenced directly by `ThemeManager`.
 
-- `resources/` remains partially used only for `resources/styles/*.qss` theme files, referenced
-  directly by `ThemeManager` rather than through a `src/resources/` module.
+Still genuinely absent (carried into web-transition scope, not desktop):
 
-Also not yet built, evidenced directly by repository state rather than a docstring claim:
-
-- **Enforced formatting/linting.** `black`, `isort`, and `mypy` are declared dependencies with
-  no committed configuration file and no CI gate.
-- **Undo/redo for cleaning operations.** The lineage fields added in milestone 3a
-  (`parent_dataset_id`, `derivation_description`) are descriptive metadata for UI display only —
-  per `workspace_service.py`'s own docstring, this is "not a machine-replayable operation
-  record," and building that replay capability is explicitly deferred to a milestone that
-  doesn't exist yet.
-- **Visualization rebuild.** `Visualization.chart_type`/`chart_parameters` are recorded (as of
-  milestone 5b) but nothing yet consumes them to actually rebuild a chart against updated data.
 - **Association rules.** Explicitly deferred in milestone 11 (no `mlxtend` dependency).
 - **Report-format plugin extensibility and a `forecast_models`/`ai_providers` plugin category.**
   Both deliberately excluded from milestone 12's plugin system — see

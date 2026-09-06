@@ -35,8 +35,16 @@ repos:
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
+        # bandit's JSON output has no trailing newline; let the fixer add one
+        # to the committed baseline without that counting as a failure on the
+        # first run.
       - id: check-yaml
       - id: check-added-large-files
+        # Default is 500 KB. uv.lock (Phase 0.7) is ~800 KB — a fully
+        # resolved + hashed graph of ~200 packages, legitimately large and
+        # intentionally committed. 1500 KB still catches an accidental
+        # dataset/media blob without flagging the lockfile.
+        args: ["--maxkb=1500"]
       - id: check-merge-conflict
 
   - repo: https://github.com/astral-sh/ruff-pre-commit

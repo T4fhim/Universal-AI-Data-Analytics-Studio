@@ -266,3 +266,94 @@ jobs:
 
       - name: pytest (UIA integration)
         run: python -m pytest tests/ui/a11y/test_uia_integration.py -q -m uia_integration
+
+  lint:
+    # Phase 0.6 of the desktop->web transition
+    # (plans/web-transition-glass-box-studio.md). Two gaps this closes:
+    #
+    #  1. `ruff check` and `bandit` were enforced only by .claude/hooks/
+    #     (on every Edit/Write and `git commit`) and by
+    #     .pre-commit-config.yaml -- never in CI itself. A commit made
+    #     outside a Claude Code session with `pre-commit` not installed
+    #     bypassed both; the 55-violation ruff backlog resolved in commit
+    #     d7433f0 is exactly the class of debt that accumulated invisibly
+    #     that way. docs/ARCHITECTURE.md claimed for a long time that CI
+    #     "gates on all of them" while it did not.
+    #  2. The whole suite has only ever run on Windows. The web backend
+    #     target is Linux, so a Linux runner catches Windows-only
+    #     assumptions in the non-UI code destined to become `uadas_core`.
+    #
+    # Deliberately NOT the full `pytest tests/` on Linux: that needs the
+    # entire Qt + QtWebEngine + camelot/OpenCV/Tesseract stack, whose
+    # Linux system-library set nothing here has verified (see the `test`
+    # job's own header comment). The Qt-free core test run on Linux is a
+    # Phase 1 verification step, once the import-linter contract exists.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install lint tools
+        # Exact versions taken from requirements.txt so this can never
+        # disagree with what .pre-commit-config.yaml and the local hooks
+        # run (all pinned to the same values).
+        run: pip install $(grep -E '^(ruff|bandit|black|isort)==' requirements.txt)
+
+      - name: ruff check
+        run: ruff check src/ tests/
+
+      - name: bandit
+        # Same scope as the local hook and pyproject.toml [tool.bandit]
+        # (excludes .venv and tests).
+        run: bandit -r src -q
+
+      - name: black --check
+        run: black --check src/ tests/
+
+      - name: isort --check-only
+        run: isort --check-only src/ tests/
+
+  dco:
+    # Phase 0.8: Developer Certificate of Origin. Every commit introduced
+    # by a pull request must carry a `Signed-off-by:` trailer matching its
+    # author -- see CONTRIBUTING.md for the `git commit -s` flow.
+    #
+    # continue-on-error while the branch that predates this policy is still
+    # open: the Phase 0 cleanup commits already pushed to PR #2 were made
+    # before DCO existed and are not being history-rewritten just to
+    # backfill trailers. This job is visible on every run now; it flips to
+    # a required check at the first Phase 1 (uadas_core extraction) commit,
+    # from which point every commit is signed off.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Signed-off-by on every commit in the PR
+        shell: bash
+        run: |
+          base='${{ github.event.pull_request.base.sha }}'
+          head='${{ github.event.pull_request.head.sha }}'
+          missing=0
+          while read -r sha; do
+            [ -z "$sha" ] && continue
+            author="$(git show -s --format='%an <%ae>' "$sha")"
+            trailers="$(git show -s --format='%(trailers:key=Signed-off-by,valueonly)' "$sha")"
+            if ! printf '%s\n' "$trailers" | grep -qiF "$author"; then
+              subject="$(git show -s --format='%s' "$sha")"
+              echo "::warning::$sha \"$subject\" has no Signed-off-by matching its author <$author>"
+              missing=$((missing + 1))
+            fi
+          done < <(git rev-list "$base..$head")
+          if [ "$missing" -gt 0 ]; then
+            echo "$missing commit(s) missing a matching Signed-off-by. Run: git rebase --exec 'git commit --amend --no-edit -s' $base"
+            exit 1
+          fi
+          echo "All PR commits are signed off."
