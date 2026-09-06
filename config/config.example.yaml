@@ -1,0 +1,68 @@
+# File: config/config.example.yaml
+#
+# Committed REFERENCE copy of the application configuration schema.
+#
+# The live file — config/config.yaml — is machine-local and gitignored
+# (Phase 0.3 of the desktop->web transition plan). It is generated
+# automatically on first run by src/core/config.py::_write_default_config
+# when missing, so you normally never create it by hand. Copy this file
+# to config/config.yaml only if you want to pre-seed settings before the
+# first launch.
+#
+# This mirrors src/core/config.py::_default_config_dict(), which is the
+# single source of truth. If you add a key here, you must also update
+# _default_config_dict, _TOP_LEVEL_SCHEMA / _NESTED_SCHEMA, and
+# AppConfig.from_dict together (see CLAUDE.md "Configuration").
+#
+# Secrets are never stored here or in config.yaml: an AI provider profile
+# names the *environment variable* that holds its key (api_key_env_var),
+# never the key itself; database profiles are metadata-only (no password
+# field exists anywhere in the schema).
+
+theme: dark                     # one of src/core/constants.py::AVAILABLE_THEMES
+window:
+  width: 1600
+  height: 900
+recent_projects: []
+autosave:
+  enabled: true
+  interval_minutes: 5
+logging:
+  level: INFO                   # DEBUG | INFO | WARNING | ERROR | CRITICAL
+  max_bytes: 5242880            # 5 MiB per rotated log file
+  backup_count: 5
+ai:
+  enabled: false
+  # Milestone 7+: an ordered list of provider profiles. AssistantService
+  # can fail over between them when rotation_enabled is true. Example:
+  #
+  # providers:
+  #   - name: "Groq key 1"
+  #     provider_type: groq      # anthropic | gemini | groq | ollama
+  #     api_key_env_var: GROQ_API_KEY
+  #     model: null              # null = that provider class's own default
+  #   - name: "Local Ollama"
+  #     provider_type: ollama
+  #     api_key_env_var: null    # ollama needs no key
+  #     model: llama3.1
+  providers: []
+  active_provider_index: 0
+  rotation_enabled: false
+  expertise_level: beginner     # see src/core/expertise_level.py::ExpertiseLevel
+plugins:
+  enabled: true
+  search_paths: []
+  disabled_plugin_names: []
+forecasting:
+  default_horizon_periods: 30
+reports:
+  default_export_format: pdf
+database:
+  # Milestone 14: saved "Connect to Database" profiles. Metadata only —
+  # name / db_type / host / port / database / username. No password field.
+  profiles: []
+accessibility:
+  reduced_motion: false
+  base_font_size: 13
+ui:
+  first_run_completed: false

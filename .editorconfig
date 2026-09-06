@@ -1,0 +1,46 @@
+# EditorConfig — one formatting contract for every editor and contributor.
+# https://editorconfig.org  (honored by the editorconfig.editorconfig VS Code
+# extension, and natively by black / isort / ruff / prettier).
+#
+# Values are chosen to AGREE with what CI already gates on, so this file can
+# never disagree with the tools of record:
+#   * *.py      -> black line-length 88 (pyproject.toml [tool.black]),
+#                  isort profile "black"
+#   * lf + trimmed trailing whitespace + final newline
+#                  -> the pre-commit hooks trailing-whitespace /
+#                     end-of-file-fixer (.pre-commit-config.yaml)
+#   * resources/web/  is left untouched, exactly as .pre-commit-config.yaml's
+#                     `exclude: ^resources/web/` does (vendored plotly bundle).
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.py]
+indent_size = 4
+max_line_length = 88
+
+[*.{js,jsx,ts,tsx,mjs,cjs,json,jsonc,css,scss,html,vue}]
+indent_size = 2
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.md]
+# Markdown uses two trailing spaces for a hard line break — do not strip them.
+trim_trailing_whitespace = false
+
+[*.{bat,cmd}]
+end_of_line = crlf
+
+[resources/web/**]
+# Vendored third-party bundle — never reformatted by local tooling.
+trim_trailing_whitespace = false
+insert_final_newline = false
+
+[Makefile]
+indent_style = tab

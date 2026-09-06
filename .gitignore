@@ -17,3 +17,35 @@ Thumbs.db
 # after removing one such file (test_chart.html) that had been
 # committed to the repo root.
 test_chart*.html
+
+# Machine-local runtime configuration. Phase 0.3 of the web-transition
+# plan: config/config.yaml carried per-machine state (window geometry,
+# recent projects, a named AI provider profile pointing at a local
+# environment variable) in a *tracked* file, and the committed copy had
+# drifted to a pre-milestone-7 schema. The committed reference is now
+# config/config.example.yaml; the live file is generated on first run by
+# src/core/config.py and is never committed.
+config/config.yaml
+
+# Stray agent git worktrees. Phase 0.4: .claude/worktrees/ accumulated
+# registered and unregistered scratch worktrees from delegated agent
+# runs; none is project content.
+.claude/worktrees/
+
+# Claude Code per-machine settings overrides (not shared).
+.claude/settings.local.json
+
+# --- Web app (apps/web/, Vite + React + TypeScript) ---
+node_modules/
+apps/web/dist/
+apps/web/dist-ssr/
+apps/web/coverage/
+apps/web/.vite/
+apps/web/playwright-report/
+apps/web/test-results/
+*.local
+.eslintcache
+.turbo/
+*.egg-info/
+build/
+dist/
