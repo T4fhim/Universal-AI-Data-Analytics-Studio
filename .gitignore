@@ -49,3 +49,6 @@ apps/web/test-results/
 *.egg-info/
 build/
 dist/
+
+# Playwright MCP session scratch (screenshots, snapshots, console logs)
+.playwright-mcp/
