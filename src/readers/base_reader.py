@@ -139,7 +139,7 @@ class BaseReader(ABC):
 
     @classmethod
     @abstractmethod
-    def read(cls, path: Path, table_name: str | None = None) -> "Dataset":
+    def read(cls, path: Path, table_name: str | None = None) -> Dataset:
         """Read ``path`` and return a populated :class:`~src.services.workspace_service.Dataset`.
 
         Callers are expected to have already established that this

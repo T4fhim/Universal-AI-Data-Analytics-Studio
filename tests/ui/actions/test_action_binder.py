@@ -7,6 +7,7 @@ qapp fixture from tests/ui/conftest.py.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 import pytest
@@ -146,7 +147,7 @@ def test_assert_all_bound_counts_actions_referenced_only_via_build_menu(
     binder = ActionBinder(window)
     menu = QMenu(window)
     binder.build_menu(menu, ("test.always_on",))  # constructed, not bound
-    with pytest.raises(ServiceError, match="test.always_on"):
+    with pytest.raises(ServiceError, match=re.escape("test.always_on")):
         binder.assert_all_bound()
 
 

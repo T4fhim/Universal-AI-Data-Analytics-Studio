@@ -104,9 +104,7 @@ def _synchronous_run(
     """
     try:
         result = fn(*args, **kwargs)
-    except (
-        Exception
-    ) as exc:  # noqa: BLE001 -- mirrors BaseWorker's own catch-all boundary
+    except Exception as exc:  # noqa: BLE001 -- mirrors BaseWorker's own catch-all
         if on_error is not None:
             on_error(exc, "")
     else:

@@ -217,9 +217,9 @@ class CleanPage(StagePage):
             self.show_error("Cleaning Operation Failed", str(exc))
             _logger.warning("Cleaning operation '%s' failed: %s", tool_name, exc)
             return None
-        except (
-            Exception
-        ) as exc:  # noqa: BLE001 -- shown to the user, not swallowed silently
+        except Exception as exc:  # noqa: BLE001 -- shown to user, not swallowed
+            # operation_class.apply() is a BaseOperation implementation and can raise
+            # anything; this in-page ErrorState must surface it rather than crash.
             self.show_error("Cleaning Operation Failed", f"Unexpected error: {exc}")
             _logger.error(
                 "Cleaning operation '%s' failed unexpectedly: %s", tool_name, exc

@@ -107,9 +107,12 @@ def _string_literal_violations(path: Path) -> list[tuple[int, str, str]]:
 
             if _is_translation_wrapped(candidate):
                 continue
-            if isinstance(candidate, ast.Constant) and isinstance(candidate.value, str):
-                if candidate.value.strip():
-                    violations.append((node.lineno, name, candidate.value))
+            if (
+                isinstance(candidate, ast.Constant)
+                and isinstance(candidate.value, str)
+                and candidate.value.strip()
+            ):
+                violations.append((node.lineno, name, candidate.value))
 
     return violations
 
@@ -166,9 +169,12 @@ def _violations_in_source(source: str) -> list[tuple[int, str, str]]:
                 candidate = candidate.func.value
             if _is_translation_wrapped(candidate):
                 continue
-            if isinstance(candidate, ast.Constant) and isinstance(candidate.value, str):
-                if candidate.value.strip():
-                    violations.append((node.lineno, name, candidate.value))
+            if (
+                isinstance(candidate, ast.Constant)
+                and isinstance(candidate.value, str)
+                and candidate.value.strip()
+            ):
+                violations.append((node.lineno, name, candidate.value))
     return violations
 
 

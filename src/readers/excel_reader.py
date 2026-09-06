@@ -150,7 +150,7 @@ class ExcelReader(BaseReader):
             )
 
         _logger.info(
-            "Read Excel sheet '%s' from %s: %d rows, %d columns, " "%d warning(s).",
+            "Read Excel sheet '%s' from %s: %d rows, %d columns, %d warning(s).",
             table_name,
             path,
             len(dataframe),
@@ -192,7 +192,7 @@ class ExcelReader(BaseReader):
             workbook = openpyxl.load_workbook(path, read_only=False, data_only=True)
             worksheet = workbook[sheet_name]
             return [str(merged_range) for merged_range in worksheet.merged_cells.ranges]
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- deliberately broad, see comment
             # Merged-cell detection is a "nice to know" warning, not a
             # correctness-critical read step — if it fails for any
             # reason (an unusual workbook structure openpyxl can't

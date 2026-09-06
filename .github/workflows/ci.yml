@@ -266,3 +266,111 @@ jobs:
 
       - name: pytest (UIA integration)
         run: python -m pytest tests/ui/a11y/test_uia_integration.py -q -m uia_integration
+
+  lint:
+    # Phase 0.6 of the desktop->web transition
+    # (plans/web-transition-glass-box-studio.md). Two gaps this closes:
+    #
+    #  1. `ruff check` and `bandit` were enforced only by .claude/hooks/
+    #     (on every Edit/Write and `git commit`) and by
+    #     .pre-commit-config.yaml -- never in CI itself. A commit made
+    #     outside a Claude Code session with `pre-commit` not installed
+    #     bypassed both; the 55-violation ruff backlog resolved in commit
+    #     d7433f0 is exactly the class of debt that accumulated invisibly
+    #     that way. docs/ARCHITECTURE.md claimed for a long time that CI
+    #     "gates on all of them" while it did not.
+    #  2. The whole suite has only ever run on Windows. The web backend
+    #     target is Linux, so a Linux runner catches Windows-only
+    #     assumptions in the non-UI code destined to become `uadas_core`.
+    #
+    # Deliberately NOT the full `pytest tests/` on Linux: that needs the
+    # entire Qt + QtWebEngine + camelot/OpenCV/Tesseract stack, whose
+    # Linux system-library set nothing here has verified (see the `test`
+    # job's own header comment). The Qt-free core test run on Linux is a
+    # Phase 1 verification step, once the import-linter contract exists.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install lint tools
+        # Versions kept in sync with requirements.txt (and therefore with
+        # .pre-commit-config.yaml and the local hooks — all pinned to the
+        # same values). If a pin changes there, change it here too.
+        run: python -m pip install ruff==0.16.3 bandit==1.9.4 black==26.5.1 isort==8.0.1
+
+      - name: ruff check
+        run: python -m ruff check src/ tests/
+
+      - name: bandit
+        # `bandit -r src -q` has a pre-existing set of accepted low/medium
+        # findings. Skipped by code (cross-platform — a path-keyed baseline
+        # file breaks between Windows and Linux):
+        #   B101 assert_used            — asserts are used deliberately in
+        #                                 this codebase's style (~10 sites).
+        #   B107 hardcoded_password_default — fires on `password: str = ""`
+        #                                 defaults in ConnectionProfile /
+        #                                 DatabaseConnectionService, which
+        #                                 deliberately hold NO real password
+        #                                 (see their docstrings + ROADMAP).
+        #   B608 hardcoded_sql_expressions — 2 intentional query-construction
+        #                                 sites (base_connection.py,
+        #                                 sqlite_reader.py), confidence Low.
+        #                                 REMOVED from this skip list in
+        #                                 Phase 1.8, which gates execute_query
+        #                                 behind an explicit capability.
+        run: python -m bandit -r src -q --skip B101,B107,B608
+
+      - name: black --check
+        run: python -m black --check src/ tests/
+
+      - name: isort --check-only
+        run: python -m isort --check-only src/ tests/
+
+  dco:
+    # Phase 0.8: Developer Certificate of Origin. Every commit introduced
+    # by a pull request must carry a `Signed-off-by:` trailer matching its
+    # author -- see CONTRIBUTING.md for the `git commit -s` flow.
+    #
+    # ADVISORY for now: the commits already on PR #2 predate this policy and
+    # are not being history-rewritten just to backfill trailers, so this job
+    # reports missing sign-offs as ::warning:: annotations and still exits 0.
+    # To make it enforcing (from the first Phase 1 commit): set
+    # DCO_ENFORCING below to "1". Nothing else changes.
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    env:
+      DCO_ENFORCING: "0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Signed-off-by on every commit in the PR
+        shell: bash
+        run: |
+          base='${{ github.event.pull_request.base.sha }}'
+          head='${{ github.event.pull_request.head.sha }}'
+          missing=0
+          while read -r sha; do
+            [ -z "$sha" ] && continue
+            author="$(git show -s --format='%an <%ae>' "$sha")"
+            trailers="$(git show -s --format='%(trailers:key=Signed-off-by,valueonly)' "$sha")"
+            if ! printf '%s\n' "$trailers" | grep -qiF "$author"; then
+              subject="$(git show -s --format='%s' "$sha")"
+              echo "::warning::commit $sha \"$subject\" has no Signed-off-by matching its author <$author>"
+              missing=$((missing + 1))
+            fi
+          done < <(git rev-list "$base..$head")
+          if [ "$missing" -eq 0 ]; then
+            echo "All PR commits are signed off."
+            exit 0
+          fi
+          echo "$missing commit(s) missing a matching Signed-off-by."
+          echo "Fix: git rebase --exec 'git commit --amend --no-edit -s' $base && git push --force-with-lease"
+          if [ "$DCO_ENFORCING" = "1" ]; then exit 1; fi
+          echo "DCO is advisory (DCO_ENFORCING=0) — not failing the build."

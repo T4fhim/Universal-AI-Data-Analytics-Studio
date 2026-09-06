@@ -153,7 +153,7 @@ class WordReader(BaseReader):
         dataframe, warnings = cls._table_to_dataframe(selected_table, path)
 
         _logger.info(
-            "Read Word table '%s' from %s: %d rows, %d columns, " "%d warning(s).",
+            "Read Word table '%s' from %s: %d rows, %d columns, %d warning(s).",
             available_names[selected_index],
             path,
             len(dataframe),

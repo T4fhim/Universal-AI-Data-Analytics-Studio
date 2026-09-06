@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import plotly.graph_objects as go
@@ -41,7 +41,7 @@ from src.services.workspace_service import Dataset, Visualization, WorkspaceServ
 _logger = get_logger(__name__)
 
 
-class PipelineStage(str, Enum):
+class PipelineStage(StrEnum):
     """The ten stages of the Universal Data Scientist pipeline, in their fixed order."""
 
     UPLOAD = "upload"

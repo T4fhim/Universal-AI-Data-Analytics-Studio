@@ -11,17 +11,25 @@ This skill adds project-specific verification on top of generic verification wor
 
 ## Test Verification
 
-The `tests/` directory may contain no tests.
+`tests/` mirrors `src/`'s package layout and has real, CI-gated coverage — this is no longer "may
+contain no tests." Still verify that the tests relevant to this milestone were actually collected
+and executed, not merely that some command's exit code was 0: a narrowed `--ignore`/`-k`/marker
+selection, or a collection error masked by `-q`, can silently produce a misleadingly-green run.
 
-Never report "tests pass" merely because:
+Run the suite the way CI does, not a bare `pytest tests/` — see this project's root `CLAUDE.md`
+("Tests" under "Commands") for the exact two-invocation command via
+`scripts/run_tests_and_exit_cleanly.py` and why it exists (a real test-ordering flakiness issue in
+`tests/ui/test_worker_runner.py`, and a Windows CPython/Qt interpreter-shutdown crash that a bare
+`pytest` invocation can mask after pytest itself already reported a clean result).
 
-    pytest tests/
-
-returns exit code 0.
-
-First verify that tests were actually collected and executed. Zero collected tests means there is currently no automated test evidence.
-
-`pytest`, `black`, `isort`, and `mypy` are project dependencies, but they are not currently sufficient by themselves to establish milestone correctness because project-wide enforcement/configuration is incomplete.
+`black`, `isort`, `mypy` (scoped to a curated clean-module list, not repo-wide — see
+`docs/MYPY_DEBT.md`), `ruff`, and `bandit` all have committed configuration in `pyproject.toml`,
+pinned versions in `requirements.txt`, and are gated in `.github/workflows/ci.yml`. "Tests pass"
+and "lint/type/security checks pass" are meaningful verification signals for this project — do not
+discount them as insufficient by default. (This section previously said the opposite, written when
+that was still true; it stayed unfixed for many milestones after tooling was actually configured —
+treat a milestone that changes test/tooling state as also owning an update to this file and to
+`docs/ARCHITECTURE.md`'s "Important architectural constraints to preserve" section.)
 
 ## Structural Verification
 

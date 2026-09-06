@@ -68,11 +68,13 @@ class HtmlReportExporter(BaseReportExporter):
     def _render_body(cls, report_content: ReportContent) -> str:
         parts = [
             f"<h1>{html.escape(report_content.title)}</h1>",
-            "<p class='meta'>"
-            f"Dataset: {html.escape(report_content.dataset_name)} &middot; "
-            f"Generated: {html.escape(report_content.generated_at)} &middot; "
-            f"Expertise level: {html.escape(report_content.expertise_level.value)}"
-            "</p>",
+            (
+                "<p class='meta'>"
+                f"Dataset: {html.escape(report_content.dataset_name)} &middot; "
+                f"Generated: {html.escape(report_content.generated_at)} &middot; "
+                f"Expertise level: {html.escape(report_content.expertise_level.value)}"
+                "</p>"
+            ),
             "<h2>Dataset Summary</h2><ul>",
         ]
         for key, value in report_content.dataset_summary.items():

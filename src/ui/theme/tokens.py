@@ -29,21 +29,21 @@ are baked into the shape of this dataclass:
   it scored 5.81 and 2.83 respectively, so the dark theme's focus ring was
   failing 1.4.11. Splitting the role is the fix.
 - ``chart_categorical`` is **per-theme**, not a module constant. The standard
-  Okabe–Ito colourblind-safe palette is designed for white grounds; on the
+  Okabe-Ito colourblind-safe palette is designed for white grounds; on the
   dark surface its blue scores 2.87. Each theme carries a ramp that keeps
-  Okabe–Ito's hue *separation* (the property that makes it colourblind-safe)
+  Okabe-Ito's hue *separation* (the property that makes it colourblind-safe)
   while meeting 3:1 against its own background.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from enum import Enum
+from enum import StrEnum
 
 from src.core.expertise_level import ExpertiseLevel
 
 
-class Density(str, Enum):
+class Density(StrEnum):
     """How tightly the UI packs content.
 
     Subclasses ``str`` for the same reason

@@ -120,7 +120,7 @@ class XmlReader(BaseReader):
         unique_warnings = list(dict.fromkeys(warnings))
 
         _logger.info(
-            "Read XML file %s (row tag: <%s>): %d rows, %d columns, " "%d warning(s).",
+            "Read XML file %s (row tag: <%s>): %d rows, %d columns, %d warning(s).",
             path,
             row_tag,
             len(dataframe),

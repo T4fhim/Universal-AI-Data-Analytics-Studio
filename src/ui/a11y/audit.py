@@ -181,7 +181,7 @@ def _discover_dialog_classes() -> tuple[type[QDialog], ...]:
     for module_info in pkgutil.walk_packages([str(_SRC_UI_DIR)], prefix="src.ui."):
         try:
             module = importlib.import_module(module_info.name)
-        except Exception as exc:  # pragma: no cover - defensive, see docstring
+        except Exception as exc:  # noqa: BLE001 -- pragma: no cover, see docstring
             _logger.warning(
                 "Skipped '%s' while discovering QDialog subclasses: %s",
                 module_info.name,

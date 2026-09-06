@@ -35,7 +35,7 @@ class BaseOperation(ABC):
 
     @classmethod
     @abstractmethod
-    def apply(cls, dataset: "Dataset", **kwargs) -> "Dataset":
+    def apply(cls, dataset: Dataset, **kwargs) -> Dataset:
         """Apply this operation to ``dataset`` and return a new, derived Dataset.
 
         Args:

@@ -19,7 +19,9 @@ before it — not a stub — but later milestones' functionality genuinely does 
 ## Commands
 
 There is no build step (pure Python). Environment: Python 3.13, dependencies in
-[requirements.txt](requirements.txt), a `.venv` already present at the repo root.
+[requirements.txt](requirements.txt) (runtime and pinned dev-tool versions in one file — there is no
+separate `requirements-dev.txt`), a `.venv` already present at the repo root. Tool configuration
+(`black`, `isort`, `mypy`, `ruff`, `bandit`, `pytest`) lives in `pyproject.toml`.
 
 ```powershell
 # activate the existing venv (PowerShell)
@@ -30,17 +32,103 @@ pip install -r requirements.txt
 
 # run the application
 python main.py
+```
 
-# run tests (pytest is a declared dependency; tests/ exists but is currently empty —
-# there is no pytest.ini/pyproject.toml yet, so run directly against the package)
-pytest tests/
-pytest tests/test_some_module.py::test_case_name   # single test
+### Tests
 
-# formatting / linting / types (all declared dependencies; no config files committed yet,
-# so these run with their tool defaults)
-black src/ tests/
-isort src/ tests/
-mypy src/
+`tests/` mirrors `src/`'s package layout and is not empty. Two markers are declared in
+`pyproject.toml` and are opt-in, not part of a default run:
+
+- `webengine` — constructs a real `QWebEngineView`; can hang/fail to initialize offscreen, so it's
+  kept as a guarded smoke test rather than the default for chart-related assertions.
+- `uia_integration` — launches a real, visible top-level window in its own process and drives it
+  with pywinauto's UIA backend (Windows-only). This forces `QT_QPA_PLATFORM=windows` regardless of
+  the surrounding job's env, so it cannot run inside the main offscreen session; CI runs it as its
+  own non-blocking job.
+
+`tests/ui/conftest.py` requires `QT_QPA_PLATFORM=offscreen` to be set **before any PySide6 import**
+— export/set it before running anything under `tests/ui/`. `pytest-qt` is installed (`qt_api =
+"pyside6"` pinned in `pyproject.toml`) — its `qtbot` fixture (simulated key/mouse events,
+`waitSignal`/`waitSignals`, auto-fail on exceptions in Qt virtual methods/slots) is the standard way
+to write new offscreen widget tests; the existing suite predates it and hasn't been migrated
+wholesale, so don't assume every existing test already uses it.
+
+```powershell
+$env:QT_QPA_PLATFORM = "offscreen"
+
+# single test — plain pytest is fine for iterating
+pytest tests/some_package/test_some_module.py::test_case_name
+
+# full suite — mirror CI exactly, not a bare `pytest tests/`, for two reasons documented in
+# .github/workflows/ci.yml: (1) tests/ui/test_worker_runner.py's real-QThreadPool tests proved
+# flaky once event-loop backpressure builds up later in a long single-process run, so it must run
+# FIRST; (2) a real Windows access violation during CPython/Qt interpreter shutdown can fail the
+# process *after* pytest itself already reported a fully clean result, which is why
+# scripts/run_tests_and_exit_cleanly.py (calls os._exit() once pytest's real result is known) is
+# used instead of a bare `python -m pytest` — see that script's own docstring for the evidence.
+python scripts/run_tests_and_exit_cleanly.py tests/ui/test_worker_runner.py -q
+python scripts/run_tests_and_exit_cleanly.py tests/ -q -m "not uia_integration" --ignore=tests/ui/test_worker_runner.py
+
+# the UIA integration tests, separately (Windows only)
+pytest tests/ui/a11y/test_uia_integration.py -q -m uia_integration
+```
+
+### Formatting, linting, types, security
+
+Versions are pinned in `requirements.txt` (`black==26.5.1`, `isort==8.0.1`, `mypy==2.1.0`,
+`ruff==0.16.3`, `bandit==1.9.4`) and enforced in CI (`.github/workflows/ci.yml`), not left to
+whatever the tool defaults to:
+
+```powershell
+black --check src/ tests/
+isort --check-only src/ tests/
+bandit -r src -q                # excludes .venv and tests per pyproject.toml [tool.bandit]
+```
+
+`mypy` is **not** run repo-wide — it's scoped to an explicit, curated list of packages/modules that
+are currently clean (see the `mypy` step in `.github/workflows/ci.yml` for the authoritative list,
+and [docs/MYPY_DEBT.md](docs/MYPY_DEBT.md) for what's excluded and why). Running `mypy src/`
+directly will surface pre-existing debt, not a meaningful pass/fail signal; when a milestone makes
+an excluded module clean, add it to that CI list rather than treating a bare repo-wide run as the
+target.
+
+`ruff` is also configured (`[tool.ruff]`), with an explicitly curated `select` list (not "ruff's
+current defaults") and `ignore = ["RUF001", "RUF005"]`. Ruff's own isort rule-group (`"I"`) is
+deliberately **not** enabled — `isort` (profile `black`) stays the tool of record for import order.
+This matters because a `PostToolUse` hook (`.claude/hooks/quality-check.ps1`) already runs
+`ruff format` + `ruff check --fix` automatically on every Edit/Write to a `.py` file — re-running
+`ruff` by hand after an edit is redundant, but `black`/`isort`/`mypy`/`bandit` are not part of that
+hook and still need to be run explicitly to match what CI gates on.
+
+### Standalone git pre-commit hooks (tool-agnostic)
+
+`.pre-commit-config.yaml` (ruff check+format, isort, plus lightweight
+trailing-whitespace/YAML/large-file checks) is the enforcement layer for commits made *outside*
+Claude Code — a plain terminal, another editor, another AI tool. Run `pre-commit install` once per
+clone to activate it. It does not replace `.claude/hooks/pre-commit-check.ps1`'s pytest+bandit gate
+below; that stays Claude-Code-specific and comprehensive, while this stays fast and tool-agnostic
+per 2026 pre-commit-framework convention (fast/auto-fixing checks locally, slow/comprehensive ones
+in CI).
+
+### Other repo-enforced hooks
+
+- `git commit` (any Bash command matching it) is intercepted by
+  `.claude/hooks/pre-commit-check.ps1`, which runs the full `pytest` suite and
+  `bandit -r src -q` first and blocks the commit if either fails — a commit that appears to hang or
+  get rejected usually means one of those failed; check their output rather than retrying blindly.
+- `.claude/hooks/protect-files.ps1` blocks Edit/Write to `.env*`, `secrets.json`,
+  `credentials.json`, and `*.pem`/`*.key` files.
+
+### Visual verification
+
+`scripts/screenshot_app_state.py` boots the real `Application`/`bootstrap()`/`MainWindow`
+composition path offscreen and saves a PNG — run it after any milestone that changes what the app
+looks like, the same way the test suite and formatters/linters run after every milestone:
+
+```powershell
+python scripts/screenshot_app_state.py --output out.png
+python scripts/screenshot_app_state.py --output out.png --new-project
+python scripts/screenshot_app_state.py --output out.png --open-dataset path/to/file.csv
 ```
 
 ## Architecture
@@ -119,6 +207,36 @@ them where they fit before adding a new one. See
 Fixed paths (`config/`, `logs/`, `projects/`) are anchored to the project root, not `Path.cwd()` — don't
 introduce a new path constant that depends on the working directory the app happens to be launched from.
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#path-resolution) for how the anchoring works.
+
+### PySide6/Qt layer specifics
+
+- **Exactly one `QApplication` per process**, constructed only in `Application.run()`.
+- **Chart rendering** (`src/ui/widgets/chart_view.py`): each `ChartView` loads a single static shell
+  page (`chart_host.html`, staged to disk by `src/ui/web/web_assets.py::staged_chart_host_url`) **once**
+  via `setUrl()` — never `setHtml()` (a fully inlined Plotly bundle is large enough that `setHtml()`
+  silently fails to load). Every subsequent figure/theme update is pushed into that already-loaded page
+  through `QWebEnginePage.runJavaScript()` calling `Plotly.newPlot`/`Plotly.react`/`relayout`, not a new
+  page load per chart. (An earlier implementation wrote a fresh `NamedTemporaryFile` per chart and
+  `setUrl()`-ed each one — that is the *old* behavior, described in the module docstring as what was
+  replaced.)
+- **Theming** (`src/ui/theme_manager.py`): `.qss` files in `resources/styles/` are applied at the
+  `QApplication` level via `setStyleSheet()`, cascading to every widget; switching themes at runtime just
+  re-applies a different file.
+- **Dock widgets** (`src/ui/dock_manager.py`): Dataset Explorer sits alone in the left area — the
+  separate Project Explorer dock was **deleted** in milestone 20, its one job (naming the open project)
+  absorbed as a top-level "Project" node inside Dataset Explorer. Console and Log are tabbed together
+  (bottom area); Chart and Data Table are tabbed together (right area, milestone 18); the AI chat panel
+  is split vertically below the Chart dock, not tabbed. The Logging dock attaches a live
+  `logging.Handler` to the root logger and must be detached before window close.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#pyside6qt-layer-specifics) for more.
+
+### Multi-file touchpoints that do not auto-sync
+
+Adding a reader requires updating both `reader_registry.py`'s `_REGISTERED_READERS` tuple *and* the
+hardcoded `_DATASET_FILE_FILTER` string in `src/ui/main_window.py` — the second does not derive from the
+first automatically. Watch for the same class of gap (a registry plus a separately-hardcoded consumer)
+when extending charts, cleaning operations, or plugin categories.
 
 ## Conventions to follow
 

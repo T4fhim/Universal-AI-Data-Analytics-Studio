@@ -2,6 +2,36 @@
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
+# Phase 0.5 of the desktop->web transition plan: until now this file held
+# tool config only, so the codebase was not pip-installable — a fresh
+# clone could not `pip install -e .`, and nothing downstream (the
+# Qt-free `uadas_core` extraction in Phase 1, an `apps/api` that depends
+# on it, an import-linter contract) can be packaged without this section
+# existing first. The importable package is still literally named `src`
+# here; Phase 1.1 renames it to `uadas_core`.
+[project]
+name = "universal-ai-data-analytics-studio"
+version = "0.0.0"
+description = "Universal AI Data Analytics & Visualization Studio — desktop app, mid-transition to web."
+requires-python = ">=3.13"
+readme = "README.md"
+license = { text = "AGPL-3.0-or-later" }
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+# Single source of truth stays requirements.txt (runtime + pinned dev
+# tools in one file, per CLAUDE.md). Comment lines and blanks are
+# ignored by setuptools; there are no inline `#` comments or `-r`
+# includes in that file.
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools.packages.find]
+# `src` is a real package (src/__init__.py exists) at the repo root, not
+# a src-layout container, so point find() at the repo root and take
+# everything under `src`.
+where = ["."]
+include = ["src*"]
+
 [tool.black]
 line-length = 88
 target-version = ["py313"]
@@ -15,6 +45,11 @@ known_first_party = ["src"]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-ra"
+# Explicit, not left to pytest-qt's auto-detection: this project only ever installs
+# PySide6 (never PyQt5/6 or PySide2), so auto-detection would resolve to the same
+# thing today, but pinning it removes any ambiguity if a second Qt binding is ever
+# present in the environment for any reason (e.g. a transitive dependency).
+qt_api = "pyside6"
 markers = [
     "webengine: constructs a real QWebEngineView and waits for a page load. Offscreen QWebEngineView can hang or fail to initialize (plan risk R6) -- kept as the one guarded smoke test per chart-related module rather than the default for every assertion.",
     "uia_integration: launches a real, visible top-level window in its own process and drives it with pywinauto's UIA backend (Windows-only; see tests/ui/a11y/test_uia_integration.py's own docstring). QT_QPA_PLATFORM=offscreen -- the default for the rest of tests/ui/ -- never creates real OS-level UI Automation elements, so this cannot run inside the main offscreen pytest session; kept as its own opt-in marker/CI job rather than folded into the default `pytest tests/` run.",

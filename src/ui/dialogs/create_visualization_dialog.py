@@ -208,7 +208,10 @@ class CreateVisualizationDialog(QDialog):
             QMessageBox.critical(self, "Failed to Build Chart", str(exc))
             _logger.warning("Chart build failed: %s", exc)
             return
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- builder_class.build() is a
+            # BaseChart implementation (see src/visualization/base_chart.py), a plugin
+            # extension point that can raise anything; this dialog must surface any
+            # failure as a QMessageBox rather than crash the whole application.
             QMessageBox.critical(
                 self, "Failed to Build Chart", f"Unexpected error: {exc}"
             )

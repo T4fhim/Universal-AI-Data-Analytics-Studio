@@ -2,6 +2,23 @@
 
 ## Status
 
+**Superseded — 2026-09-06.** This ADR's own "Decision" section said that if the project later
+adopts a general dependency-pinning policy (a lockfile, `pip-compile`, or a blanket rule), these
+three SDKs should be pinned as part of that broader change. That has now happened, in two steps:
+
+1. `requirements.txt` was given bounded constraints on all three
+   (`anthropic>=1.0.0,<2`, `openai>=3.0.0,<4`, `google-genai>=2.19.0,<3`) after a real CI-only
+   failure traced to unannounced major-version jumps — see that file's own comment.
+2. **Phase 0.7 of the desktop→web transition** (`plans/web-transition-glass-box-studio.md`) adds
+   a `uv.lock` lockfile covering the entire dependency graph, so CI installs a fully resolved,
+   hash-pinned set.
+
+The original decision below is kept for the record.
+
+---
+
+## Status (original)
+
 Accepted.
 
 ## Context

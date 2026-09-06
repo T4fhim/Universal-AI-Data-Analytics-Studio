@@ -170,9 +170,9 @@ class AnalyzePage(StagePage):
             self.show_error("Analysis Failed", str(exc))
             _logger.warning("Analysis '%s' failed: %s", tool_name, exc)
             return
-        except (
-            Exception
-        ) as exc:  # noqa: BLE001 -- shown to the user, not swallowed silently
+        except Exception as exc:  # noqa: BLE001 -- shown to user, not swallowed
+            # handler() dispatches to an analysis tool that can raise anything; this
+            # in-page ErrorState must surface it rather than crash the whole app.
             self.show_error("Analysis Failed", f"Unexpected error: {exc}")
             _logger.error("Analysis '%s' failed unexpectedly: %s", tool_name, exc)
             return

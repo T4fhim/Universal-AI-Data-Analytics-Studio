@@ -27,7 +27,7 @@ import yaml
 
 from src.core.config import AppConfig, load_config, validate_config_structure
 from src.core.constants import CONFIG_FILE_PATH
-from src.core.exceptions import ConfigError, ServiceError
+from src.core.exceptions import ServiceError
 from src.core.logger import get_logger
 
 _logger = get_logger(__name__)

@@ -1,0 +1,34 @@
+# Normalize line endings. The repo standard is LF (see .editorconfig); without
+# this, Git on Windows warns "LF will be replaced by CRLF" on every add and can
+# commit CRLF, which then fights black / the pre-commit end-of-file-fixer.
+* text=auto eol=lf
+
+# Windows batch files are the one exception — they need CRLF (matches
+# .editorconfig's [*.{bat,cmd}] block).
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets: never touched by line-ending or diff normalization.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.xlsx binary
+*.xlsb binary
+*.ods binary
+*.odt binary
+*.parquet binary
+*.feather binary
+
+# Vendored third-party bundle — exclude from language stats and from any
+# normalization (matches .pre-commit-config.yaml's `exclude: ^resources/web/`
+# and .editorconfig's [resources/web/**] block).
+resources/web/** -text linguist-vendored
+
+# Lockfiles: keep as-is, collapse in review diffs.
+uv.lock linguist-generated
+apps/web/pnpm-lock.yaml linguist-generated

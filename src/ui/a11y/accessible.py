@@ -23,6 +23,8 @@ Free functions rather than a mixin -- see this package's ``__init__`` for why.
 
 from __future__ import annotations
 
+import itertools
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAccessible, QAccessibleEvent
 from PySide6.QtWidgets import QLabel, QWidget
@@ -128,7 +130,7 @@ def set_tab_order(*widgets: QWidget) -> None:
     Fewer than two widgets is a silent no-op rather than an error, so callers
     can pass a list built conditionally without guarding.
     """
-    for previous, following in zip(widgets, widgets[1:]):
+    for previous, following in itertools.pairwise(widgets):
         QWidget.setTabOrder(previous, following)
 
 

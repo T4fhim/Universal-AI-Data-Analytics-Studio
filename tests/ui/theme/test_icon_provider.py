@@ -59,7 +59,7 @@ def test_set_tokens_to_new_theme_clears_the_cache_and_emits(
     provider.set_tokens(LIGHT_TOKENS)
 
     assert received, "icons_changed did not fire on a real theme switch"
-    assert provider._cache == {}  # noqa: SLF001 -- verifying the cache actually cleared
+    assert provider._cache == {}  # verifying the cache actually cleared
 
 
 def test_icon_accepts_an_explicit_color_override(provider: IconProvider) -> None:
