@@ -14,11 +14,11 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QApplication, QWidget
 
-from src.core.bootstrap import bootstrap
-from src.plugins.plugin_manager import PluginManager
-from src.services.settings_service import SettingsService
 from src.ui.controllers.theme_controller import ThemeController
 from src.ui.theme_manager import ThemeManager
+from uadas_core.core.bootstrap import bootstrap
+from uadas_core.plugins.plugin_manager import PluginManager
+from uadas_core.services.settings_service import SettingsService
 
 
 def test_apply_theme_from_settings_is_a_safe_no_op_before_a_theme_manager_is_attached(

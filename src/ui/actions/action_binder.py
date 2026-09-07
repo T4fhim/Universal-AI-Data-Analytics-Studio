@@ -21,11 +21,11 @@ from PySide6.QtCore import QObject
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QMenu, QWidget
 
-from src.core.exceptions import ServiceError
-from src.core.logger import get_logger
 from src.ui.a11y.accessible import HELP_ANCHOR_PROPERTY
 from src.ui.actions.action_registry import get_action, list_actions
 from src.ui.theme.icon_provider import IconProvider
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.core.logger import get_logger
 
 if TYPE_CHECKING:
     from src.ui.actions.action_context import ActionContext
@@ -159,7 +159,7 @@ class ActionBinder(QObject):
         This is the check that turns the pre-milestone-17 class of bug --
         ``Edit > Undo``/``Redo`` and "Open Recent" existing as real,
         clickable, connected-to-nothing menu items -- into a startup-time
-        :class:`~src.core.exceptions.ServiceError` instead of something a
+        :class:`~uadas_core.core.exceptions.ServiceError` instead of something a
         code review has to remember to catch. Checked against
         :func:`~src.ui.actions.action_registry.list_actions` (every
         *registered* action), not just ``self._actions`` (every

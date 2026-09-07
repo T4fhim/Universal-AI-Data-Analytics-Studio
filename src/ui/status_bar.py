@@ -17,8 +17,8 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QLabel, QMainWindow, QProgressBar, QStatusBar
 
-from src.core.logger import get_logger
 from src.ui.a11y.accessible import announce, describe
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 

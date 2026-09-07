@@ -2,10 +2,10 @@
 """Builds and resolves the anchor -> manual-page index from ``docs/manual/*.md`` frontmatter.
 
 ``ManualIndex`` mirrors this project's ``Base*``/registry extension-point shape (see CLAUDE.md's
-"``Base*`` extension-point pattern" and, more directly, :mod:`~src.visualization.chart_registry`'s
+"``Base*`` extension-point pattern" and, more directly, :mod:`~uadas_core.visualization.chart_registry`'s
 module-level registry) even though there is exactly one implementation of "a manual page" today
 -- a plugin-provided manual page is out of scope for this milestone (see
-:mod:`~src.plugins.plugin_manifest`'s own ``SUPPORTED_CATEGORIES`` for the project's existing,
+:mod:`~uadas_core.plugins.plugin_manifest`'s own ``SUPPORTED_CATEGORIES`` for the project's existing,
 deliberate line on what is and isn't plugin-extensible yet). Keeping the same "stateless,
 classmethod-only, look things up through the class" shape means a future plugin-provided page
 would not need this module's call sites to change shape, only to feed a second source directory
@@ -42,9 +42,9 @@ from pathlib import Path
 
 import yaml
 
-from src.core.constants import PROJECT_ROOT
-from src.core.exceptions import ServiceError
-from src.core.logger import get_logger
+from uadas_core.core.constants import PROJECT_ROOT
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 

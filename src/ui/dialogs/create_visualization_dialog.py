@@ -2,7 +2,7 @@
 """Dialog for building a chart from the active dataset's columns.
 
 Maps a small, fixed registry of chart-type names to their
-:mod:`src.visualization` builder classes and the columns each one
+:mod:`uadas_core.visualization` builder classes and the columns each one
 needs — rather than a fully dynamic parameter form driven by
 inspecting each builder's signature, which would need real parameter
 introspection this project's chart classes were not built to support
@@ -15,10 +15,10 @@ types this registry now lists.
 **Milestone 24: rebuilt on the shared multi-select picker, unlocking Treemap/Radar.**
 Before this milestone, every field got one :class:`QComboBox`, which cannot represent a
 ``list[str]`` parameter (Treemap's ``path_columns``, Radar's ``value_columns``) — so
-:attr:`~src.visualization.chart_registry.ChartRegistration.dialog_compatible` excluded both
+:attr:`~uadas_core.visualization.chart_registry.ChartRegistration.dialog_compatible` excluded both
 chart types from this dialog entirely, even though their column requirements are otherwise
 exactly as expressible as any other chart's. Now a field named in
-:attr:`~src.visualization.chart_registry.ChartRegistration.list_fields` gets a
+:attr:`~uadas_core.visualization.chart_registry.ChartRegistration.list_fields` gets a
 :class:`~src.ui.widgets.column_multi_select.ColumnMultiSelect` instead, and
 ``chart_registry._register_builtins`` flips both chart types' ``dialog_compatible`` back to
 ``True`` (its default) now that this dialog can actually represent their fields.
@@ -37,15 +37,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.core.exceptions import ApplicationError
-from src.core.logger import get_logger
 from src.ui.widgets.column_multi_select import ColumnMultiSelect
-from src.visualization.base_chart import BaseChart
-from src.visualization.chart_registry import display_name_for, list_dialog_charts
+from uadas_core.core.exceptions import ApplicationError
+from uadas_core.core.logger import get_logger
+from uadas_core.visualization.base_chart import BaseChart
+from uadas_core.visualization.chart_registry import display_name_for, list_dialog_charts
 
 _logger = get_logger(__name__)
 
-# Milestone 12: sourced from src.visualization.chart_registry rather
+# Milestone 12: sourced from uadas_core.visualization.chart_registry rather
 # than a dict this dialog maintained independently — see that
 # module's own docstring for why. Each entry: (builder class,
 # required column-picker fields, optional column-picker fields,
@@ -209,7 +209,7 @@ class CreateVisualizationDialog(QDialog):
             _logger.warning("Chart build failed: %s", exc)
             return
         except Exception as exc:  # noqa: BLE001 -- builder_class.build() is a
-            # BaseChart implementation (see src/visualization/base_chart.py), a plugin
+            # BaseChart implementation (see uadas_core/visualization/base_chart.py), a plugin
             # extension point that can raise anything; this dialog must surface any
             # failure as a QMessageBox rather than crash the whole application.
             QMessageBox.critical(

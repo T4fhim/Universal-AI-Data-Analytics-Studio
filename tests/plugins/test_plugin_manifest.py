@@ -1,5 +1,5 @@
 # File: tests/plugins/test_plugin_manifest.py
-"""Tests for src.plugins.plugin_manifest.PluginManifest."""
+"""Tests for uadas_core.plugins.plugin_manifest.PluginManifest."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from src.core.exceptions import ServiceError
-from src.plugins.plugin_manifest import PluginManifest
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.plugins.plugin_manifest import PluginManifest
 
 
 def _write_manifest(tmp_path: Path, data: dict) -> Path:

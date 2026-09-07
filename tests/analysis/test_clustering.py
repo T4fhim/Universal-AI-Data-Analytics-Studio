@@ -1,5 +1,5 @@
 # File: tests/analysis/test_clustering.py
-"""Tests for src.analysis.clustering."""
+"""Tests for uadas_core.analysis.clustering."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.analysis.clustering import k_means_clustering
-from src.core.exceptions import ServiceError
+from uadas_core.analysis.clustering import k_means_clustering
+from uadas_core.core.exceptions import ServiceError
 
 
 def _well_separated_clusters() -> pd.DataFrame:

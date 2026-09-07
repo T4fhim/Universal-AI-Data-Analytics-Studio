@@ -29,7 +29,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QAccessible, QAccessibleEvent
 from PySide6.QtWidgets import QLabel, QWidget
 
-from src.core.logger import get_logger
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 

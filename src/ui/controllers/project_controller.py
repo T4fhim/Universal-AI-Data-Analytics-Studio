@@ -15,15 +15,15 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
-from src.core.exceptions import ApplicationError
-from src.core.logger import get_logger
-from src.readers.reader_registry import get_reader_for_path
-from src.services.project_service import Project, ProjectService
-from src.services.workspace_service import WorkspaceService
 from src.ui.dock_manager import DockManager
 from src.ui.status_bar import ApplicationStatusBar
 from src.ui.ui_state_bus import UiStateBus
 from src.ui.worker_runner import WorkerRunner
+from uadas_core.core.exceptions import ApplicationError
+from uadas_core.core.logger import get_logger
+from uadas_core.readers.reader_registry import get_reader_for_path
+from uadas_core.services.project_service import Project, ProjectService
+from uadas_core.services.workspace_service import WorkspaceService
 
 if TYPE_CHECKING:
     from src.ui.menu_bar import ApplicationMenuBar
@@ -46,10 +46,10 @@ def _read_recorded_datasets(recorded: list[tuple[str, Path]]) -> tuple[list, lis
 
     Returns:
         A ``(datasets, failures)`` tuple: successfully read
-        :class:`~src.services.workspace_service.Dataset` objects, and
+        :class:`~uadas_core.services.workspace_service.Dataset` objects, and
         human-readable failure strings for recorded datasets that could not
         be reloaded (multi-table source, or a caught
-        :class:`~src.core.exceptions.ApplicationError`) -- same
+        :class:`~uadas_core.core.exceptions.ApplicationError`) -- same
         skip-with-a-warning behavior as before this milestone, just moved.
     """
     datasets = []
@@ -79,7 +79,7 @@ class ProjectController:
         parent: The window dialogs (``QFileDialog``, ``QMessageBox``)
             should be parented to.
         project_service: Resolved from the shared
-            :class:`~src.core.bootstrap.DependencyContainer`.
+            :class:`~uadas_core.core.bootstrap.DependencyContainer`.
         workspace_service: Same -- datasets reloaded from a project are
             added here.
         dock_manager: For refreshing the Dataset Explorer and appending
@@ -91,8 +91,8 @@ class ProjectController:
         worker_runner: Runs the dataset-reload read off the UI thread.
         menu_bar: The "Open Recent" submenu is rebuilt here after any
             open/save-as that could have changed the recent-projects list.
-        on_before_save: Milestone 20 -- called with the :class:`~src.services.project_service.
-            Project` about to be saved, just before :meth:`~src.services.project_service.
+        on_before_save: Milestone 20 -- called with the :class:`~uadas_core.services.project_service.
+            Project` about to be saved, just before :meth:`~uadas_core.services.project_service.
             ProjectService.save_project` is called, so every loaded dataset's current analysis
             log gets recorded into the project's contents first. Typically
             :meth:`~src.ui.controllers.pipeline_controller.PipelineController.persist_all_logs`.
@@ -101,7 +101,7 @@ class ProjectController:
             why this is a callback, matching how :class:`~src.ui.controllers.database_controller.
             DatabaseController` already receives ``on_dataset_loaded`` rather than importing
             :class:`~src.ui.controllers.dataset_controller.DatasetController`.
-        on_project_opened: Milestone 20 -- called with the :class:`~src.services.project_service.
+        on_project_opened: Milestone 20 -- called with the :class:`~uadas_core.services.project_service.
             Project` just opened, after every other post-open bookkeeping in
             :meth:`open_project_at_path` below, so recorded analysis logs are restored into the
             orchestrator. Typically :meth:`~src.ui.controllers.pipeline_controller.

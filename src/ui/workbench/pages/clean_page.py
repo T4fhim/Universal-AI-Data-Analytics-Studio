@@ -3,29 +3,29 @@
 
 Milestone 23's primary acceptance criterion: "All 5 ``operation_registry`` cleaning operations are
 reachable from the Clean page -- first non-AI path to any cleaning operation." Before this
-milestone, every one of :mod:`~src.cleaning.operation_registry`'s five operations
+milestone, every one of :mod:`~uadas_core.cleaning.operation_registry`'s five operations
 (``drop_missing_values``, ``fill_missing_values``, ``drop_duplicates``, ``normalize_text``,
 ``convert_type``) was reachable only through the AI assistant's tool-calling loop
-(:mod:`src.ai.tool_registry`) -- a user with no AI provider configured had no way to clean data
-through the UI at all, despite :mod:`src.cleaning` having existed since milestone 3b.
+(:mod:`uadas_core.ai.tool_registry`) -- a user with no AI provider configured had no way to clean data
+through the UI at all, despite :mod:`uadas_core.cleaning` having existed since milestone 3b.
 
 **Dispatches through ``operation_registry``, not ``tool_registry``, unlike its sibling pages.**
 :class:`~src.ui.workbench.pages.analyze_page.AnalyzePage`/:class:`~src.ui.workbench.pages.
-explore_page.ExplorePage` call :mod:`src.analysis` functions directly rather than through
-:mod:`src.ai.tool_registry`'s handlers because those handlers convert a typed result dataclass
+explore_page.ExplorePage` call :mod:`uadas_core.analysis` functions directly rather than through
+:mod:`uadas_core.ai.tool_registry`'s handlers because those handlers convert a typed result dataclass
 into a JSON dict, which would defeat :mod:`~src.ui.results.result_renderer_registry`'s
 type-dispatch (see ``AnalyzePage``'s own docstring). Cleaning operations have no such problem --
-:mod:`src.ai.tool_registry`'s own cleaning handlers (``_drop_missing_values`` and its four
+:mod:`uadas_core.ai.tool_registry`'s own cleaning handlers (``_drop_missing_values`` and its four
 siblings) are thin pass-throughs that already return the real, typed
-:class:`~src.services.workspace_service.Dataset` :meth:`~src.cleaning.base_operation.
+:class:`~uadas_core.services.workspace_service.Dataset` :meth:`~uadas_core.cleaning.base_operation.
 BaseOperation.apply` produced, nothing is lost by going through them. This page still bypasses
-``tool_registry`` and calls :func:`~src.cleaning.operation_registry.get_operation` directly,
+``tool_registry`` and calls :func:`~uadas_core.cleaning.operation_registry.get_operation` directly,
 though, for a different reason: ``tool_registry`` is the *AI* layer's own module (see its
 docstring: "Maps tool names to schemas and implementations... for the assistant"), and reaching a
 cleaning operation from this page should not require importing AI-layer plumbing at all --
 matching this milestone's own "first non-AI path" framing literally, not just in outcome.
-:func:`~src.ai.tool_registry.get_tool_by_name` is still used for one thing:
-:class:`~src.ai.tool_registry.ToolDefinition.input_schema`, which
+:func:`~uadas_core.ai.tool_registry.get_tool_by_name` is still used for one thing:
+:class:`~uadas_core.ai.tool_registry.ToolDefinition.input_schema`, which
 :class:`~src.ui.dialogs.analysis_parameter_dialog.AnalysisParameterDialog` needs to build a
 parameter form -- pure JSON-schema *data*, not a live AI call, the same narrow reuse
 ``AnalyzePage`` already established for its own parameter dialogs.
@@ -41,9 +41,9 @@ called with (mirroring ``AnalyzePage.set_dataset``'s "display-only, no service r
 
 **Emits, does not register, the derived dataset.** Like :class:`~src.ui.workbench.pages.
 understand_page.UnderstandPage`'s ``run_requested``, this page holds no
-:class:`~src.services.workspace_service.WorkspaceService` reference and cannot add the derived
+:class:`~uadas_core.services.workspace_service.WorkspaceService` reference and cannot add the derived
 dataset to the workspace, set it active, or push an undo command itself -- :attr:`operation_applied`
-carries the new :class:`~src.services.workspace_service.Dataset` out to whichever controller
+carries the new :class:`~uadas_core.services.workspace_service.Dataset` out to whichever controller
 method ``main_window.py`` connects it to
 (:meth:`~src.ui.controllers.pipeline_controller.PipelineController.register_clean_operation`),
 which does exactly that. This keeps the "never mutate a Dataset in place" contract's *consumer*
@@ -65,17 +65,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.ai.tool_registry import get_tool_by_name
-from src.cleaning.operation_registry import get_operation, list_operations
-from src.core.exceptions import ApplicationError
-from src.core.logger import get_logger
-from src.services.analysis_orchestrator_service import PipelineStage
-from src.services.workspace_service import Dataset
 from src.ui.a11y.accessible import describe
 from src.ui.dialogs.analysis_parameter_dialog import AnalysisParameterDialog
 from src.ui.widgets.data_table.data_table_view import DataTableView
 from src.ui.widgets.lineage_view import LineageView
 from src.ui.workbench.stage_page import StagePage
+from uadas_core.ai.tool_registry import get_tool_by_name
+from uadas_core.cleaning.operation_registry import get_operation, list_operations
+from uadas_core.core.exceptions import ApplicationError
+from uadas_core.core.logger import get_logger
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
+from uadas_core.services.workspace_service import Dataset
 
 _logger = get_logger(__name__)
 
@@ -198,7 +198,7 @@ class CleanPage(StagePage):
         sequence.
 
         Returns:
-            The new, derived :class:`~src.services.workspace_service.Dataset` on success, or
+            The new, derived :class:`~uadas_core.services.workspace_service.Dataset` on success, or
             ``None`` if the operation name was unrecognized or it raised.
         """
         try:

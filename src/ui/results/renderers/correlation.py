@@ -1,10 +1,8 @@
 # File: src/ui/results/renderers/correlation.py
-"""Renders :class:`~src.analysis.correlation.CorrelationResult` -- ``compute_correlation``'s result."""
+"""Renders :class:`~uadas_core.analysis.correlation.CorrelationResult` -- ``compute_correlation``'s result."""
 
 from __future__ import annotations
 
-from src.analysis.correlation import CorrelationResult
-from src.core.expertise_level import ExpertiseLevel
 from src.ui.results.base_result_renderer import (
     BaseResultRenderer,
     KeyValueSection,
@@ -12,10 +10,12 @@ from src.ui.results.base_result_renderer import (
     ResultSection,
     TableSection,
 )
+from uadas_core.analysis.correlation import CorrelationResult
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 
 class CorrelationResultRenderer(BaseResultRenderer):
-    """Renderer for :class:`~src.analysis.correlation.CorrelationResult`."""
+    """Renderer for :class:`~uadas_core.analysis.correlation.CorrelationResult`."""
 
     @classmethod
     def title(cls, result: CorrelationResult) -> str:

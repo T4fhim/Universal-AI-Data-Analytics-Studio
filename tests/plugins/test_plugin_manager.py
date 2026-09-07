@@ -1,5 +1,5 @@
 # File: tests/plugins/test_plugin_manager.py
-"""Tests for src.plugins.plugin_manager.PluginManager."""
+"""Tests for uadas_core.plugins.plugin_manager.PluginManager."""
 
 from __future__ import annotations
 
@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from src.cleaning import operation_registry
-from src.cleaning.operation_registry import get_operation
-from src.core.exceptions import ServiceError
-from src.plugins.plugin_manager import PluginManager
+from uadas_core.cleaning import operation_registry
+from uadas_core.cleaning.operation_registry import get_operation
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.plugins.plugin_manager import PluginManager
 
 
 @pytest.fixture(autouse=True)
@@ -20,7 +20,7 @@ def _restore_operation_registry() -> Iterator[None]:
     """Snapshot and restore ``operation_registry._REGISTRY`` around every test in this file.
 
     Every test here loads a plugin through a real :class:`PluginManager`, which registers a
-    real ``ManagerTestOperation`` class into :mod:`src.cleaning.operation_registry`'s
+    real ``ManagerTestOperation`` class into :mod:`uadas_core.cleaning.operation_registry`'s
     process-global dict -- the same module-level mutable state every other cleaning-operation
     consumer reads (notably ``tests/ui/workbench/test_clean_page.py``'s exact-count assertion
     against ``list_operations()``). Without this, a plugin registered here would otherwise
@@ -36,7 +36,7 @@ def _restore_operation_registry() -> Iterator[None]:
 
 _VALID_OPERATION_MODULE = """
 from __future__ import annotations
-from src.cleaning.base_operation import BaseOperation
+from uadas_core.cleaning.base_operation import BaseOperation
 
 class ManagerTestOperation(BaseOperation):
     @classmethod

@@ -5,9 +5,9 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QApplication, QGroupBox, QTableWidget
 
-from src.analysis.t_test import TTestResult
-from src.core.expertise_level import ExpertiseLevel
 from src.ui.results.result_card import ResultCard
+from uadas_core.analysis.t_test import TTestResult
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 
 def _make_t_test_result() -> TTestResult:
@@ -50,7 +50,7 @@ def test_display_gives_the_card_a_real_accessible_name(qapp: QApplication) -> No
 
 
 def test_table_section_becomes_a_real_qtablewidget(qapp: QApplication) -> None:
-    from src.analysis.anova import AnovaResult
+    from uadas_core.analysis.anova import AnovaResult
 
     result = AnovaResult(
         f_statistic=4.2,

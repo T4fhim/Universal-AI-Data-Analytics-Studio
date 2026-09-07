@@ -36,7 +36,7 @@ class ColumnMultiSelect(QListWidget):
     Signals:
         selection_changed: Emitted with the currently checked column names, in the
             order :meth:`set_columns` originally listed them (i.e. dataset column order,
-            not check order) -- matching :class:`~src.visualization.chart_recommender.
+            not check order) -- matching :class:`~uadas_core.visualization.chart_recommender.
             ChartSuggestion.columns`'s own "in the order the corresponding chart builder
             expects them" contract, so a caller that seeds a chart's ``path_columns``/
             ``value_columns`` from this widget's selection does not need to re-sort it.
@@ -80,7 +80,7 @@ class ColumnMultiSelect(QListWidget):
 
         Emits :attr:`selection_changed` once at the end rather than once per row --
         callers pre-filling a selection (e.g. from a
-        :class:`~src.visualization.chart_recommender.ChartSuggestion`) want one
+        :class:`~uadas_core.visualization.chart_recommender.ChartSuggestion`) want one
         notification of the final state, not one per intermediate checkbox toggle.
         """
         wanted = set(column_names)

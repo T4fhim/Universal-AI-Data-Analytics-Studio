@@ -1,5 +1,5 @@
 # File: tests/reports/test_rasterize.py
-"""Tests for src.reports.rasterize.figure_to_png_bytes.
+"""Tests for uadas_core.reports.rasterize.figure_to_png_bytes.
 
 One real kaleido call to confirm the happy path genuinely rasterizes a
 figure (kaleido's headless-Chrome startup makes each call take a few
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import plotly.graph_objects as go
 
-from src.reports.rasterize import figure_to_png_bytes
+from uadas_core.reports.rasterize import figure_to_png_bytes
 
 
 def test_figure_to_png_bytes_returns_real_png_bytes() -> None:

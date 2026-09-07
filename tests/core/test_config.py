@@ -1,5 +1,5 @@
 # File: tests/core/test_config.py
-"""Tests for src.core.config: load_config, validate_config_structure, AppConfig.
+"""Tests for uadas_core.core.config: load_config, validate_config_structure, AppConfig.
 
 Covers config.py's self-healing behavior (missing/empty file recreation),
 schema validation failures, and AppConfig.to_dict()'s deep-copy isolation
@@ -14,8 +14,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from src.core.config import AppConfig, load_config, validate_config_structure
-from src.core.exceptions import ConfigError
+from uadas_core.core.config import AppConfig, load_config, validate_config_structure
+from uadas_core.core.exceptions import ConfigError
 
 
 def test_missing_config_file_is_created_with_defaults(config_path: Path) -> None:

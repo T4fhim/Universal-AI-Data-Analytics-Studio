@@ -4,7 +4,7 @@ anywhere in this file, per milestone 22's acceptance criterion "Renderer tests r
 QApplication -- sections() returns comparable dataclasses."
 
 Each test builds a real result dataclass with plausible numbers (no mocking of
-:mod:`src.analysis` itself -- these are the exact dataclasses those functions return) and asserts
+:mod:`uadas_core.analysis` itself -- these are the exact dataclasses those functions return) and asserts
 against ``sections()``'s output using plain ``==``/``isinstance``, proving
 :class:`~src.ui.results.base_result_renderer.ResultSection` values really are comparable
 dataclasses, not opaque objects that happen to be constructible.
@@ -14,17 +14,6 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.analysis.anova import AnovaResult
-from src.analysis.chi_square import ChiSquareResult
-from src.analysis.clustering import ClusteringResult
-from src.analysis.column_profile import ColumnProfile
-from src.analysis.correlation import CorrelationResult
-from src.analysis.dataset_profile import DatasetProfile
-from src.analysis.normality import NormalityResult
-from src.analysis.pca import PcaResult
-from src.analysis.regression import RegressionResult
-from src.analysis.t_test import TTestResult
-from src.core.expertise_level import ExpertiseLevel
 from src.ui.results.base_result_renderer import (
     AssumptionsSection,
     KeyValueSection,
@@ -46,6 +35,17 @@ from src.ui.results.renderers.statistical_tests import (
     NormalityResultRenderer,
     TTestResultRenderer,
 )
+from uadas_core.analysis.anova import AnovaResult
+from uadas_core.analysis.chi_square import ChiSquareResult
+from uadas_core.analysis.clustering import ClusteringResult
+from uadas_core.analysis.column_profile import ColumnProfile
+from uadas_core.analysis.correlation import CorrelationResult
+from uadas_core.analysis.dataset_profile import DatasetProfile
+from uadas_core.analysis.normality import NormalityResult
+from uadas_core.analysis.pca import PcaResult
+from uadas_core.analysis.regression import RegressionResult
+from uadas_core.analysis.t_test import TTestResult
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 
 def test_t_test_renderer_sections_include_statistic_p_value_and_assumptions() -> None:

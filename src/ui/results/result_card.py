@@ -29,7 +29,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.core.expertise_level import ExpertiseLevel
 from src.ui.a11y.accessible import describe
 from src.ui.results.base_result_renderer import (
     AssumptionsSection,
@@ -42,6 +41,7 @@ from src.ui.results.base_result_renderer import (
 )
 from src.ui.results.result_renderer_registry import get_renderer
 from src.ui.widgets.chart_view import ChartView
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 # Object-name / accessible-name prefix stamped on every section widget this card builds, plus a
 # `resultSectionKind` dynamic property naming which ResultSection subclass produced it -- a test
@@ -98,7 +98,7 @@ class ResultCard(QWidget):
                 :func:`~src.ui.results.result_renderer_registry.get_renderer`, which never
                 raises (see that function's own docstring), so this method cannot fail on an
                 unrecognized result type either.
-            level: Which :class:`~src.core.expertise_level.ExpertiseLevel` to render for.
+            level: Which :class:`~uadas_core.core.expertise_level.ExpertiseLevel` to render for.
         """
         renderer = get_renderer(type(result))
         title = renderer.title(result)

@@ -1,5 +1,5 @@
 # File: tests/core/test_dependency_container.py
-"""Tests for src.core.dependency_container.DependencyContainer.
+"""Tests for uadas_core.core.dependency_container.DependencyContainer.
 
 Covers the registration/resolution contract documented in
 dependency_container.py's own module and class docstrings: singleton
@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.dependency_container import DependencyContainer
-from src.core.exceptions import DependencyResolutionError
+from uadas_core.core.dependency_container import DependencyContainer
+from uadas_core.core.exceptions import DependencyResolutionError
 
 
 class _Widget:

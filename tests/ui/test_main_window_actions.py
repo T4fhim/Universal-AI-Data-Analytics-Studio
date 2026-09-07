@@ -15,9 +15,9 @@ from pathlib import Path
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from src.core.bootstrap import bootstrap
 from src.ui.actions.action_context import ActionContext
 from src.ui.main_window import MainWindow
+from uadas_core.core.bootstrap import bootstrap
 
 
 @pytest.fixture()
@@ -116,8 +116,8 @@ def test_opening_a_dataset_transitions_the_workbench_off_the_welcome_page(
     """Acceptance criterion 1, end to end through a real dataset load."""
     import pandas as pd
 
-    from src.services.workspace_service import Dataset
     from tests.ui.qt_helpers import process_events
+    from uadas_core.services.workspace_service import Dataset
 
     dataset = Dataset(
         name="test", dataframe=pd.DataFrame({"a": [1, 2, 3]}), source_format="csv"
@@ -138,9 +138,9 @@ def test_opening_a_dataset_shows_upload_complete_and_understand_proposed_on_the_
     """Acceptance criterion 2, end to end through real services."""
     import pandas as pd
 
-    from src.services.analysis_orchestrator_service import PipelineStage
-    from src.services.workspace_service import Dataset
     from tests.ui.qt_helpers import process_events
+    from uadas_core.services.analysis_orchestrator_service import PipelineStage
+    from uadas_core.services.workspace_service import Dataset
 
     dataset = Dataset(
         name="test", dataframe=pd.DataFrame({"a": [1, 2, 3]}), source_format="csv"
@@ -163,9 +163,9 @@ def test_clicking_run_on_understand_produces_a_real_log_entry_end_to_end(
     """Acceptance criterion 3, driven through the actual page's Run button."""
     import pandas as pd
 
-    from src.services.analysis_orchestrator_service import PipelineStage
-    from src.services.workspace_service import Dataset
     from tests.ui.qt_helpers import process_events, wait_for_signal
+    from uadas_core.services.analysis_orchestrator_service import PipelineStage
+    from uadas_core.services.workspace_service import Dataset
 
     dataset = Dataset(
         name="test", dataframe=pd.DataFrame({"a": [1, 2, 3]}), source_format="csv"
@@ -283,8 +283,8 @@ def test_opening_a_dataset_populates_every_stage_pages_guidance_panel(
     """
     import pandas as pd
 
-    from src.services.workspace_service import Dataset
     from tests.ui.qt_helpers import process_events
+    from uadas_core.services.workspace_service import Dataset
 
     dataset = Dataset(
         name="test",
@@ -310,9 +310,9 @@ def test_activating_a_guidance_suggestion_navigates_the_workbench(
     """
     import pandas as pd
 
-    from src.services.analysis_orchestrator_service import PipelineStage
-    from src.services.workspace_service import Dataset
     from tests.ui.qt_helpers import process_events
+    from uadas_core.services.analysis_orchestrator_service import PipelineStage
+    from uadas_core.services.workspace_service import Dataset
 
     dataset = Dataset(
         name="test", dataframe=pd.DataFrame({"a": [1, 2, 3]}), source_format="csv"

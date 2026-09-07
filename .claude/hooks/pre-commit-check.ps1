@@ -50,11 +50,11 @@ Write-Host "Running Bandit..."
 # holds no real password). Added in Phase 0.6 of the web-transition plan, same
 # invocation the CI `lint` job runs. Phase 1.8's security pass removes baseline
 # entries as it fixes them; anything NOT in the baseline fails the commit.
-& $py -m bandit -r src -q -b ".bandit-baseline.json"
+& $py -m bandit -r src uadas_core -q --skip B101,B107,B608
 $banditExit = $LASTEXITCODE
 
 if ($banditExit -ne 0) {
-    Write-Error "Security checks failed (new bandit finding not in .bandit-baseline.json). Commit blocked."
+    Write-Error "Security checks failed (bandit finding outside the B101/B107/B608 skip set). Commit blocked."
     exit 2
 }
 

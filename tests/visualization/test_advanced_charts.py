@@ -1,5 +1,5 @@
 # File: tests/visualization/test_advanced_charts.py
-"""Tests for src.visualization.advanced_charts."""
+"""Tests for uadas_core.visualization.advanced_charts."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
-from src.core.exceptions import ServiceError
-from src.visualization.advanced_charts import (
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.visualization.advanced_charts import (
     BubbleChart,
     FunnelChart,
     HeatmapChart,

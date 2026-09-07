@@ -51,7 +51,7 @@ two representative dialogs -- :class:`~src.ui.dialogs.about_dialog.
 AboutDialog` and :class:`~src.ui.command_palette.CommandPalette` -- chosen
 because both are constructible from a :class:`~src.ui.main_window.
 MainWindow` with no additional service wiring beyond what
-:func:`~src.core.bootstrap.bootstrap` already provides. It does not open
+:func:`~uadas_core.core.bootstrap.bootstrap` already provides. It does not open
 every one of the dialog classes ``src.ui.a11y.audit.ALL_DIALOG_CLASSES``
 discovers (currently more than these two): several require constructing
 services (a real ``SettingsService`` plus every plugin-facing dependency,

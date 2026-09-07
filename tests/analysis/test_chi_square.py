@@ -1,13 +1,13 @@
 # File: tests/analysis/test_chi_square.py
-"""Tests for src.analysis.chi_square."""
+"""Tests for uadas_core.analysis.chi_square."""
 
 from __future__ import annotations
 
 import pandas as pd
 import pytest
 
-from src.analysis.chi_square import chi_square_test
-from src.core.exceptions import ServiceError
+from uadas_core.analysis.chi_square import chi_square_test
+from uadas_core.core.exceptions import ServiceError
 
 
 def _dependent_dataframe() -> pd.DataFrame:

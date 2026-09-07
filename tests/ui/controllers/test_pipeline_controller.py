@@ -15,9 +15,9 @@ Backs milestone 20's acceptance criteria:
    for the pure-service-layer version; this file additionally covers the controller-level
    persist/restore wiring with real services).
 
-Uses real :class:`~src.services.workspace_service.WorkspaceService`,
-:class:`~src.services.analysis_orchestrator_service.AnalysisOrchestratorService`, and
-:class:`~src.services.project_service.ProjectService` instances (not mocks) -- the same
+Uses real :class:`~uadas_core.services.workspace_service.WorkspaceService`,
+:class:`~uadas_core.services.analysis_orchestrator_service.AnalysisOrchestratorService`, and
+:class:`~uadas_core.services.project_service.ProjectService` instances (not mocks) -- the same
 "duck-typed fakes only for Qt-adjacent collaborators, real services for the actual business
 logic under test" split ``tests/ui/controllers/test_project_controller.py`` established.
 """
@@ -27,12 +27,6 @@ from __future__ import annotations
 import pandas as pd
 from PySide6.QtWidgets import QApplication, QMainWindow
 
-from src.services.analysis_orchestrator_service import (
-    AnalysisOrchestratorService,
-    PipelineStage,
-)
-from src.services.project_service import ProjectService
-from src.services.workspace_service import Dataset, WorkspaceService
 from src.ui.command_stack import CommandStack
 from src.ui.controllers.pipeline_controller import PipelineController
 from src.ui.dock_manager import DockManager
@@ -40,6 +34,12 @@ from src.ui.status_bar import ApplicationStatusBar
 from src.ui.ui_state_bus import UiStateBus
 from src.ui.worker_runner import WorkerRunner
 from tests.ui.qt_helpers import wait_for_signal
+from uadas_core.services.analysis_orchestrator_service import (
+    AnalysisOrchestratorService,
+    PipelineStage,
+)
+from uadas_core.services.project_service import ProjectService
+from uadas_core.services.workspace_service import Dataset, WorkspaceService
 
 
 def _make_dataset() -> Dataset:

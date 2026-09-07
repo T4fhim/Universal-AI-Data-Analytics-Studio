@@ -6,7 +6,7 @@ test that triggering the UI action actually calls through to the WorkspaceServic
 the right id." :meth:`~src.ui.dataset_close_menu.DatasetCloseMenu` (tested directly in
 ``tests/ui/test_dataset_close_menu.py``) is what a real right-click drives; this file covers
 the controller method that context menu is wired to in ``main_window.py``, against a real
-:class:`~src.services.workspace_service.WorkspaceService`.
+:class:`~uadas_core.services.workspace_service.WorkspaceService`.
 """
 
 from __future__ import annotations
@@ -14,12 +14,12 @@ from __future__ import annotations
 import pandas as pd
 from PySide6.QtWidgets import QApplication, QMainWindow
 
-from src.services.workspace_service import Dataset, WorkspaceService
 from src.ui.controllers.dataset_controller import DatasetController
 from src.ui.dock_manager import DockManager
 from src.ui.status_bar import ApplicationStatusBar
 from src.ui.ui_state_bus import UiStateBus
 from src.ui.worker_runner import WorkerRunner
+from uadas_core.services.workspace_service import Dataset, WorkspaceService
 
 
 def _make_controller(qapp: QApplication) -> tuple[DatasetController, WorkspaceService]:

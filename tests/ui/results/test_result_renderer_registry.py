@@ -11,28 +11,28 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from src.ai.tool_registry import TOOLS
-from src.analysis.aggregation import aggregate
-from src.analysis.anova import AnovaResult, one_way_anova
-from src.analysis.chi_square import ChiSquareResult, chi_square_test
-from src.analysis.clustering import ClusteringResult, k_means_clustering
-from src.analysis.correlation import CorrelationResult, compute_correlation
-from src.analysis.crosstab import cross_tabulate
-from src.analysis.dataset_profile import DatasetProfile, profile_dataset
-from src.analysis.normality import NormalityResult, check_normality
-from src.analysis.pca import PcaResult, compute_pca
-from src.analysis.regression import RegressionResult, linear_regression
-from src.analysis.t_test import TTestResult, independent_t_test, paired_t_test
-from src.core.exceptions import ServiceError
-from src.services.workspace_service import Dataset
 from src.ui.results import result_renderer_registry
 from src.ui.results.renderers.generic import GenericResultRenderer
 from src.ui.results.renderers.profiling import DatasetProfileRenderer
+from uadas_core.ai.tool_registry import TOOLS
+from uadas_core.analysis.aggregation import aggregate
+from uadas_core.analysis.anova import AnovaResult, one_way_anova
+from uadas_core.analysis.chi_square import ChiSquareResult, chi_square_test
+from uadas_core.analysis.clustering import ClusteringResult, k_means_clustering
+from uadas_core.analysis.correlation import CorrelationResult, compute_correlation
+from uadas_core.analysis.crosstab import cross_tabulate
+from uadas_core.analysis.dataset_profile import DatasetProfile, profile_dataset
+from uadas_core.analysis.normality import NormalityResult, check_normality
+from uadas_core.analysis.pca import PcaResult, compute_pca
+from uadas_core.analysis.regression import RegressionResult, linear_regression
+from uadas_core.analysis.t_test import TTestResult, independent_t_test, paired_t_test
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.services.workspace_service import Dataset
 
 
-# The 12 orphaned src.analysis functions this milestone's acceptance criterion 2 names,
+# The 12 orphaned uadas_core.analysis functions this milestone's acceptance criterion 2 names,
 # mapped to a callable(dataset) -> real result object -- i.e. exactly what a caller of that
-# tool_registry entry actually gets back from src.analysis itself, before src.ai.tool_registry's
+# tool_registry entry actually gets back from uadas_core.analysis itself, before uadas_core.ai.tool_registry's
 # own handler flattens it into a JSON dict (see src/ui/workbench/pages/analyze_page.py's own
 # docstring for why that flattening matters and why this test does not go through the handler).
 def _make_dataset() -> Dataset:
@@ -86,7 +86,7 @@ def test_every_orphaned_analysis_function_resolves_via_get_renderer(
 
     tool_registry.ToolDefinition carries no explicit "return type" field (its handlers all
     return a JSON-friendly dict or Dataset -- see that module's own docstring); this test calls
-    the underlying src.analysis function directly, the same real object
+    the underlying uadas_core.analysis function directly, the same real object
     src/ui/workbench/pages/analyze_page.py's dispatch table hands to ResultCard, and resolves
     *that* object's type -- the type get_renderer is actually asked to resolve in the running
     application.

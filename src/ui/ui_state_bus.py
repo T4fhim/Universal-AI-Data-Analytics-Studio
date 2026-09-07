@@ -32,7 +32,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
-from src.core.logger import get_logger
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 

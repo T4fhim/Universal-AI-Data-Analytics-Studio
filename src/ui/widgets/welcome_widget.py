@@ -15,9 +15,9 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
-from src.core.constants import APP_NAME
-from src.core.logger import get_logger
 from src.ui.a11y.accessible import describe
+from uadas_core.core.constants import APP_NAME
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 

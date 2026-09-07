@@ -58,6 +58,22 @@ pre-carve-out tree.)*
 
 ---
 
+## Post-1.1 adjustment (recorded 2026-09-07)
+
+Step 1.1's carve-out moves ~112 `.py` files from `src/` to `uadas_core/` and adds one new
+`uadas_core/__init__.py`. `tests/ui/test_import_layering.py::test_nothing_outside_ui_imports_ui`
+is parametrized over *every* source module (so the "nothing outside `src/ui` imports `src.ui`"
+rule is enforced file-by-file); it was widened in 1.1 to also scan `uadas_core/`, so it keeps
+enforcing that rule over the moved code. Net effect on the counts: **exactly +1** parametrized
+case (the new package `__init__.py`), which passes.
+
+**Post-1.1 expected numbers** — collected **1488 / 1485 non-uia** (was 1487 / 1484); suite
+**1382 passed, 103 skipped, 0 failed** (was 1381 passed). Any *other* delta = a real
+regression from the move (Risk A abort criterion still applies to everything except this
+one documented +1).
+
+---
+
 ## Environment
 
 - Python **3.13.14**, `.venv` at repo root

@@ -2,7 +2,7 @@
 """Registers every action built before milestone 17.
 
 Populated once at import time (bottom of this module), the same convention
-:func:`~src.visualization.chart_registry._register_builtins` already
+:func:`~uadas_core.visualization.chart_registry._register_builtins` already
 established -- both ``main_window.py`` (via ``menu_bar.py``/``toolbar.py``)
 and ``tests/ui/actions/`` import this module, so import-time population
 guarantees the registry is full before either first reads from it, with no
@@ -32,13 +32,13 @@ predicate rather than forcing a boolean ``Requirement`` to fit.
 
 from __future__ import annotations
 
-from src.services.analysis_orchestrator_service import PipelineStage
 from src.ui.actions.action_registry import (
     ActionCategory,
     ActionSpec,
     Requirement,
     register_action,
 )
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
 
 # Milestone 26: one "jump to this stage" action per PipelineStage that has a
 # real registered workbench page (src.ui.workbench.stage_registry) -- UPLOAD

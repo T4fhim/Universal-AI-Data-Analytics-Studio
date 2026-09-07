@@ -1,5 +1,5 @@
 # File: tests/forecasting/test_random_forest_forecast.py
-"""Tests for src.forecasting.random_forest_forecast."""
+"""Tests for uadas_core.forecasting.random_forest_forecast."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.core.exceptions import ServiceError
-from src.forecasting.random_forest_forecast import forecast_random_forest
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.forecasting.random_forest_forecast import forecast_random_forest
 
 
 def _trending_series(n: int = 30) -> pd.DataFrame:

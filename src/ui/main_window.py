@@ -26,7 +26,7 @@ Milestone 20 note: :class:`~src.ui.workbench.workbench.Workbench` replaces
 ``WelcomeWidget`` as the central widget (see :meth:`__init__`'s own
 comment on that call site), and :meth:`_refresh_workbench` -- reached via
 ``state_changed`` alongside the existing enablement recompute -- is the one
-place this file reads live :class:`~src.services.analysis_orchestrator_service.
+place this file reads live :class:`~uadas_core.services.analysis_orchestrator_service.
 AnalysisOrchestratorService` state and pushes it into that otherwise
 service-free widget tree.
 """
@@ -36,7 +36,7 @@ from __future__ import annotations
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QMainWindow
 
-# Import-time registration side effect, matching how src.visualization.
+# Import-time registration side effect, matching how uadas_core.visualization.
 # chart_registry's own built-ins are seeded -- this module must be imported
 # somewhere before ActionBinder.assert_all_bound() runs below, or the
 # registry it populates would simply be empty. main_window.py is the
@@ -44,20 +44,6 @@ from PySide6.QtWidgets import QMainWindow
 # natural place for this import to live rather than a scattered import in
 # menu_bar.py/toolbar.py, which only *consume* the registry, not populate it.
 import src.ui.actions.builtin_actions  # noqa: F401
-from src.core.bootstrap import BootstrapContext
-from src.core.constants import APP_NAME, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH
-from src.core.logger import get_logger
-from src.plugins.plugin_manager import PluginManager
-from src.services.analysis_orchestrator_service import (
-    AnalysisOrchestratorService,
-    PipelineStage,
-)
-from src.services.database_connection_service import DatabaseConnectionService
-from src.services.guidance_service import GuidanceService
-from src.services.project_service import ProjectService
-from src.services.report_service import ReportService
-from src.services.settings_service import SettingsService
-from src.services.workspace_service import WorkspaceService
 from src.ui.actions.action_binder import ActionBinder
 from src.ui.actions.action_context import ActionContext
 from src.ui.command_palette import CommandPalette
@@ -89,6 +75,24 @@ from src.ui.workbench.pages.understand_page import UnderstandPage
 from src.ui.workbench.pages.visualize_page import VisualizePage
 from src.ui.workbench.workbench import Workbench
 from src.ui.worker_runner import WorkerRunner
+from uadas_core.core.bootstrap import BootstrapContext
+from uadas_core.core.constants import (
+    APP_NAME,
+    DEFAULT_WINDOW_HEIGHT,
+    DEFAULT_WINDOW_WIDTH,
+)
+from uadas_core.core.logger import get_logger
+from uadas_core.plugins.plugin_manager import PluginManager
+from uadas_core.services.analysis_orchestrator_service import (
+    AnalysisOrchestratorService,
+    PipelineStage,
+)
+from uadas_core.services.database_connection_service import DatabaseConnectionService
+from uadas_core.services.guidance_service import GuidanceService
+from uadas_core.services.project_service import ProjectService
+from uadas_core.services.report_service import ReportService
+from uadas_core.services.settings_service import SettingsService
+from uadas_core.services.workspace_service import WorkspaceService
 
 _logger = get_logger(__name__)
 
@@ -98,12 +102,12 @@ class MainWindow(QMainWindow):
 
     Args:
         context: The result of a successful
-            :func:`~src.core.bootstrap.bootstrap` call. Services this
+            :func:`~uadas_core.core.bootstrap.bootstrap` call. Services this
             window needs are resolved from ``context.container`` during
             construction and handed to whichever controller owns them;
             ``ThemeManager`` is constructed fresh here (it wraps the live
             ``QApplication`` instance, which does not exist until
-            :mod:`src.core.app` constructs it -- see that module's
+            :mod:`src.app` constructs it -- see that module's
             extended ``run()`` for where this window is built).
     """
 
@@ -126,7 +130,7 @@ class MainWindow(QMainWindow):
         # Milestone 17: IconProvider needs a ThemeTokens instance at
         # construction, but ThemeManager (which knows the real, configured
         # theme) is not constructed until after this window is, by
-        # src/core/app.py -- see attach_theme_manager below for where this
+        # src/app.py -- see attach_theme_manager below for where this
         # gets corrected to the real theme. DARK_TOKENS here is a safe,
         # visible-either-way placeholder for the brief window before that
         # call, not a real theme decision.
@@ -400,7 +404,7 @@ class MainWindow(QMainWindow):
     def _refresh_workbench(self) -> None:
         """Push a fresh :class:`~src.ui.controllers.pipeline_controller.PipelineSnapshot`
         into the workbench -- the sole place that reads
-        :class:`~src.services.analysis_orchestrator_service.AnalysisOrchestratorService`
+        :class:`~uadas_core.services.analysis_orchestrator_service.AnalysisOrchestratorService`
         state and translates it into what :class:`~src.ui.workbench.workbench.Workbench`
         (a display-only widget with no service reference of its own) renders.
         """
@@ -465,13 +469,13 @@ class MainWindow(QMainWindow):
 
     # -- Settings / theme / about -----------------------------------------------
     # Milestone 26: the handlers themselves moved to ThemeController (see that module's own
-    # docstring for why) -- attach_theme_manager stays here since src/core/app.py calls it
+    # docstring for why) -- attach_theme_manager stays here since src/app.py calls it
     # externally and it mutates __init__-only state (self._icon_provider/self._dock_manager).
 
     def attach_theme_manager(self, theme_manager: ThemeManager) -> None:
         """Attach the running application's :class:`~src.ui.theme_manager.ThemeManager`.
 
-        Called once by :mod:`src.core.app` after both the
+        Called once by :mod:`src.app` after both the
         ``QApplication`` and this window exist, since ``ThemeManager``
         wraps the live application instance and cannot be constructed
         before it. Stored via ``QWidget.setProperty`` rather than a plain
@@ -497,7 +501,7 @@ class MainWindow(QMainWindow):
         # as a placeholder in __init__ (ThemeManager did not exist yet) --
         # correct it to the real, configured theme now, and keep it
         # current on every future toggle. current_tokens() is not None
-        # here: src/core/app.py always calls apply_theme() before this
+        # here: src/app.py always calls apply_theme() before this
         # method, so a theme has already been applied by this point.
         current_tokens = theme_manager.current_tokens()
         if current_tokens is not None:
@@ -530,7 +534,7 @@ class MainWindow(QMainWindow):
 
         Milestone 19: also closes every live database connection this
         session opened. Before this milestone nothing called
-        :meth:`~src.services.database_connection_service.
+        :meth:`~uadas_core.services.database_connection_service.
         DatabaseConnectionService.close_all_connections` from the UI at
         all -- a connection opened via Connect to Database stayed open
         until the process exited rather than being released when the

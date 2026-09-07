@@ -21,11 +21,11 @@ import pandas as pd
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidgetAction
 
 import src.ui.actions.builtin_actions  # noqa: F401 -- populates the real registry
-from src.services.workspace_service import Dataset
 from src.ui.actions.action_binder import ActionBinder
 from src.ui.dock_manager import DockManager
 from src.ui.menu_bar import ApplicationMenuBar
 from src.ui.widgets.empty_state import EmptyState
+from uadas_core.services.workspace_service import Dataset
 
 
 def _make_dataset(name: str = "test") -> Dataset:

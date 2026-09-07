@@ -4,12 +4,12 @@
 Milestone 24's primary acceptance criteria: Treemap and Radar creatable from a real column
 selection (previously AI-tool-only -- see :mod:`~src.ui.dialogs.create_visualization_dialog`'s
 own docstring for how :class:`~src.ui.widgets.column_multi_select.ColumnMultiSelect` unlocked
-both), every :func:`~src.visualization.chart_recommender.recommend_charts` suggestion resolving
-in :mod:`~src.visualization.chart_registry`, and clicking a data point in the built chart
+both), every :func:`~uadas_core.visualization.chart_recommender.recommend_charts` suggestion resolving
+in :mod:`~uadas_core.visualization.chart_registry`, and clicking a data point in the built chart
 filtering the paired :class:`~src.ui.widgets.data_table.data_table_view.DataTableView`.
 
 **Shares its column-picker/field-rebuild machinery with ``CreateVisualizationDialog``, not the
-class itself.** Both read the same :func:`~src.visualization.chart_registry.list_dialog_charts`
+class itself.** Both read the same :func:`~uadas_core.visualization.chart_registry.list_dialog_charts`
 registry and build the same per-field ``QComboBox``/``ColumnMultiSelect`` shape, but this page
 additionally offers a recommendation flow the modal dialog has no room for (a picked-column list,
 a ranked suggestion list, and a chart+table split all visible together) -- inlining the dialog's
@@ -23,12 +23,12 @@ one-shot vs. persistent stage page).
 **Recommendation columns don't map onto a chart's required-fields order.** :class:`~src.
 visualization.chart_recommender.ChartSuggestion.columns`'s own docstring says its order matches
 "the order the corresponding chart builder expects them" -- true for most of
-:func:`~src.visualization.chart_recommender.recommend_charts`'s seven suggestion kinds, but not
+:func:`~uadas_core.visualization.chart_recommender.recommend_charts`'s seven suggestion kinds, but not
 for its Line suggestion: it returns ``[date_column, numeric_column]`` (x before y), while
-:class:`~src.visualization.continuous_charts.LineChart.build`'s signature -- and
+:class:`~uadas_core.visualization.continuous_charts.LineChart.build`'s signature -- and
 ``chart_registry``'s own ``required_fields=("y_column",)`` -- puts ``y_column`` first.
 :data:`_RECOMMENDATION_FIELD_ORDER` below is an explicit, per-chart-type map from suggestion-
-column-position to field name, built directly from :mod:`~src.visualization.chart_recommender`'s
+column-position to field name, built directly from :mod:`~uadas_core.visualization.chart_recommender`'s
 own seven branches, rather than trusting a positional match against ``required_fields`` that
 would silently swap Line's x/y on every recommendation-driven build.
 """
@@ -52,17 +52,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.core.exceptions import ApplicationError
-from src.core.logger import get_logger
-from src.services.analysis_orchestrator_service import PipelineStage
-from src.services.workspace_service import Dataset
 from src.ui.a11y.accessible import describe
 from src.ui.widgets.chart_view import ChartView
 from src.ui.widgets.column_multi_select import ColumnMultiSelect
 from src.ui.widgets.data_table.data_table_view import DataTableView
 from src.ui.workbench.stage_page import StagePage
-from src.visualization.chart_recommender import ChartSuggestion, recommend_charts
-from src.visualization.chart_registry import display_name_for, list_dialog_charts
+from uadas_core.core.exceptions import ApplicationError
+from uadas_core.core.logger import get_logger
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
+from uadas_core.services.workspace_service import Dataset
+from uadas_core.visualization.chart_recommender import ChartSuggestion, recommend_charts
+from uadas_core.visualization.chart_registry import display_name_for, list_dialog_charts
 
 _logger = get_logger(__name__)
 

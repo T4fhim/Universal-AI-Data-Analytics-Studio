@@ -1,8 +1,8 @@
 # File: tests/services/test_database_connection_service.py
-"""Tests for src.services.database_connection_service.DatabaseConnectionService.
+"""Tests for uadas_core.services.database_connection_service.DatabaseConnectionService.
 
 Uses a real SettingsService backed by a tmp_path config.yaml (same
-construction pattern src.core.bootstrap.bootstrap itself uses), so
+construction pattern uadas_core.core.bootstrap.bootstrap itself uses), so
 save_profile()/list_profiles()/delete_profile() are tested against
 real persistence, not a mock — and against a real DuckDB connection
 for the live-connection half of this service, for the same "no mocked
@@ -16,11 +16,11 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from src.core.config import AppConfig, load_config
-from src.core.exceptions import ServiceError
-from src.database.connection_profile import ConnectionProfile, DatabaseType
-from src.services.database_connection_service import DatabaseConnectionService
-from src.services.settings_service import SettingsService
+from uadas_core.core.config import AppConfig, load_config
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.database.connection_profile import ConnectionProfile, DatabaseType
+from uadas_core.services.database_connection_service import DatabaseConnectionService
+from uadas_core.services.settings_service import SettingsService
 
 
 @pytest.fixture()

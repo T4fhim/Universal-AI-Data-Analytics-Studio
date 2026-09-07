@@ -1,12 +1,12 @@
 # File: tests/visualization/test_chart_registry.py
-"""Tests for src.visualization.chart_registry."""
+"""Tests for uadas_core.visualization.chart_registry."""
 
 from __future__ import annotations
 
 import pytest
 
-from src.core.exceptions import ServiceError
-from src.visualization.chart_registry import (
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.visualization.chart_registry import (
     ChartRegistration,
     display_name_for,
     get_chart,
@@ -14,7 +14,7 @@ from src.visualization.chart_registry import (
     list_dialog_charts,
     register_chart,
 )
-from src.visualization.distribution_charts import HistogramChart
+from uadas_core.visualization.distribution_charts import HistogramChart
 
 
 def test_builtin_charts_are_registered() -> None:

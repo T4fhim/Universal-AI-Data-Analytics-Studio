@@ -15,9 +15,9 @@ import pytest
 from PySide6.QtCore import QThreadPool
 from PySide6.QtWidgets import QApplication
 
-from src.services.workspace_service import Dataset
 from src.ui.widgets.data_table import data_table_view as data_table_view_module
 from src.ui.widgets.data_table.data_table_view import DataTableView
+from uadas_core.services.workspace_service import Dataset
 
 
 class _RecordingThreadPool:

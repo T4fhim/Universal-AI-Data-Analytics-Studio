@@ -2,14 +2,14 @@
 """The EXPLORE stage's page: relationships between columns -- crosstabs, aggregates, correlation.
 
 Sibling of :class:`~src.ui.workbench.pages.analyze_page.AnalyzePage`, sharing its exact
-dispatch-and-render shape (see that module's own docstring for why it calls :mod:`src.analysis`
-functions directly rather than through :mod:`src.ai.tool_registry`/the orchestrator). Split into
+dispatch-and-render shape (see that module's own docstring for why it calls :mod:`uadas_core.analysis`
+functions directly rather than through :mod:`uadas_core.ai.tool_registry`/the orchestrator). Split into
 its own page rather than folded into ``AnalyzePage`` because the plan's own per-stage rationale
-text (:data:`~src.services.analysis_orchestrator_service._STAGE_RATIONALE`) describes EXPLORE
+text (:data:`~uadas_core.services.analysis_orchestrator_service._STAGE_RATIONALE`) describes EXPLORE
 and ANALYZE as two different moments in the guided pipeline -- "look at relationships ... before
 committing to a specific statistical test" versus "run a targeted statistical analysis" -- and
-this page's three tools (:func:`~src.analysis.aggregation.aggregate`,
-:func:`~src.analysis.crosstab.cross_tabulate`, :func:`~src.analysis.correlation.
+this page's three tools (:func:`~uadas_core.analysis.aggregation.aggregate`,
+:func:`~uadas_core.analysis.crosstab.cross_tabulate`, :func:`~uadas_core.analysis.correlation.
 compute_correlation`) are exactly the exploratory ones that rationale names.
 """
 
@@ -20,19 +20,19 @@ from typing import ClassVar
 
 from PySide6.QtWidgets import QComboBox, QMessageBox, QPushButton, QVBoxLayout
 
-from src.ai.tool_registry import get_tool_by_name
-from src.analysis.aggregation import aggregate
-from src.analysis.correlation import compute_correlation
-from src.analysis.crosstab import cross_tabulate
-from src.core.exceptions import ApplicationError
-from src.core.expertise_level import ExpertiseLevel
-from src.core.logger import get_logger
-from src.services.analysis_orchestrator_service import PipelineStage
-from src.services.workspace_service import Dataset
 from src.ui.a11y.accessible import describe
 from src.ui.dialogs.analysis_parameter_dialog import AnalysisParameterDialog
 from src.ui.results.result_card import ResultCard
 from src.ui.workbench.stage_page import StagePage
+from uadas_core.ai.tool_registry import get_tool_by_name
+from uadas_core.analysis.aggregation import aggregate
+from uadas_core.analysis.correlation import compute_correlation
+from uadas_core.analysis.crosstab import cross_tabulate
+from uadas_core.core.exceptions import ApplicationError
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.core.logger import get_logger
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
+from uadas_core.services.workspace_service import Dataset
 
 _logger = get_logger(__name__)
 
@@ -43,7 +43,7 @@ _DEFAULT_GUIDANCE = (
 
 # Tool name -> callable(dataframe, **params) -> result (a DataFrame for the first two, a
 # CorrelationResult for the third -- see this module's own docstring for why this dispatches to
-# src.analysis directly rather than through src.ai.tool_registry's dict-returning handlers).
+# uadas_core.analysis directly rather than through uadas_core.ai.tool_registry's dict-returning handlers).
 _EXPLORE_DISPATCH: dict[str, Callable[..., object]] = {
     "aggregate": aggregate,
     "cross_tabulate": cross_tabulate,

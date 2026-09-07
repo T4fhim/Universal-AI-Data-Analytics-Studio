@@ -1,5 +1,5 @@
 # File: src/ui/results/__init__.py
-"""Result rendering: turns ~2,000 orphaned :mod:`src.analysis` lines into product (milestone 22).
+"""Result rendering: turns ~2,000 orphaned :mod:`uadas_core.analysis` lines into product (milestone 22).
 
 Two layers, per the plan's A5 ("Result rendering"):
 

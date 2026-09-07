@@ -1,5 +1,5 @@
 # File: tests/forecasting/test_model_comparison.py
-"""Tests for src.forecasting.model_comparison.compare_forecast_models.
+"""Tests for uadas_core.forecasting.model_comparison.compare_forecast_models.
 
 Uses a real (small, synthetic) time series rather than mocking either
 forecasting method — the whole point of this module is genuine
@@ -13,8 +13,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.core.exceptions import ServiceError
-from src.forecasting.model_comparison import compare_forecast_models
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.forecasting.model_comparison import compare_forecast_models
 
 
 def _trending_series(n: int = 40) -> pd.DataFrame:
@@ -95,7 +95,7 @@ def test_compare_forecast_models_default_holdout_is_reasonable_fraction() -> Non
 
 
 def test_compare_forecast_models_reports_progress_once_per_candidate() -> None:
-    """Milestone 25's own new parameter — the first genuinely slow src.forecasting operation
+    """Milestone 25's own new parameter — the first genuinely slow uadas_core.forecasting operation
     reports incremental progress, matching WorkerSignals.progress's (int, str) contract exactly
     (see that class's own docstring) so a caller can hand this straight to WorkerRunner.
     """

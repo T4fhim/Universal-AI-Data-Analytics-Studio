@@ -1,5 +1,5 @@
 # File: tests/visualization/test_forecast_charts.py
-"""Tests for src.visualization.forecast_charts.ForecastChart -- milestone 25's own chart type.
+"""Tests for uadas_core.visualization.forecast_charts.ForecastChart -- milestone 25's own chart type.
 
 Uses real ForecastResult objects produced by real forecasters (not hand-built fixtures) so this
 test exercises the exact shape src.ui.results.renderers.forecasting hands to ForecastChart.build
@@ -12,10 +12,10 @@ import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
-from src.core.exceptions import ServiceError
-from src.forecasting.exponential_smoothing import forecast_exponential_smoothing
-from src.forecasting.linear_regression_forecast import forecast_linear_regression
-from src.visualization.forecast_charts import ForecastChart
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.forecasting.exponential_smoothing import forecast_exponential_smoothing
+from uadas_core.forecasting.linear_regression_forecast import forecast_linear_regression
+from uadas_core.visualization.forecast_charts import ForecastChart
 
 
 def _series(n: int = 12) -> pd.DataFrame:

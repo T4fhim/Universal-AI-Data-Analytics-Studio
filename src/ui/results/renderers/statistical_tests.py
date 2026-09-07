@@ -3,21 +3,16 @@
 
 Grouped together (rather than one file each) because they share a real shape: a test statistic,
 a p-value, a significance flag, and a fixed set of named assumptions the test relies on but does
-not itself verify -- see :class:`~src.analysis.explanation.Explanation.assumptions`'s own
+not itself verify -- see :class:`~uadas_core.analysis.explanation.Explanation.assumptions`'s own
 docstring for why "named, not verified" is the right framing. Milestone 22's acceptance
 criterion ("Running a t-test from the Analyze page renders a ``ResultCard`` with statistic,
 p-value, and an ``AssumptionsSection`` -- with no API key configured") is what
 :class:`TTestResultRenderer` exists to satisfy: every field it needs comes straight off
-:class:`~src.analysis.t_test.TTestResult`, no AI call involved.
+:class:`~uadas_core.analysis.t_test.TTestResult`, no AI call involved.
 """
 
 from __future__ import annotations
 
-from src.analysis.anova import AnovaResult
-from src.analysis.chi_square import ChiSquareResult
-from src.analysis.normality import NormalityResult
-from src.analysis.t_test import TTestResult
-from src.core.expertise_level import ExpertiseLevel
 from src.ui.results.base_result_renderer import (
     AssumptionsSection,
     BaseResultRenderer,
@@ -27,6 +22,11 @@ from src.ui.results.base_result_renderer import (
     TableSection,
 )
 from src.ui.results.result_view import significance_caption
+from uadas_core.analysis.anova import AnovaResult
+from uadas_core.analysis.chi_square import ChiSquareResult
+from uadas_core.analysis.normality import NormalityResult
+from uadas_core.analysis.t_test import TTestResult
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 # Named per test_type -- an independent t-test additionally assumes equal variance only when
 # the caller opted into Student's (rather than Welch's) formulation, which TTestResult does not
@@ -66,7 +66,7 @@ _NORMALITY_ASSUMPTIONS = (
 
 
 class TTestResultRenderer(BaseResultRenderer):
-    """Renderer for :class:`~src.analysis.t_test.TTestResult` (independent and paired)."""
+    """Renderer for :class:`~uadas_core.analysis.t_test.TTestResult` (independent and paired)."""
 
     @classmethod
     def title(cls, result: TTestResult) -> str:
@@ -114,7 +114,7 @@ class TTestResultRenderer(BaseResultRenderer):
 
 
 class AnovaResultRenderer(BaseResultRenderer):
-    """Renderer for :class:`~src.analysis.anova.AnovaResult`."""
+    """Renderer for :class:`~uadas_core.analysis.anova.AnovaResult`."""
 
     @classmethod
     def title(cls, result: AnovaResult) -> str:
@@ -162,7 +162,7 @@ class AnovaResultRenderer(BaseResultRenderer):
 
 
 class ChiSquareResultRenderer(BaseResultRenderer):
-    """Renderer for :class:`~src.analysis.chi_square.ChiSquareResult`."""
+    """Renderer for :class:`~uadas_core.analysis.chi_square.ChiSquareResult`."""
 
     @classmethod
     def title(cls, result: ChiSquareResult) -> str:
@@ -215,7 +215,7 @@ class ChiSquareResultRenderer(BaseResultRenderer):
 
 
 class NormalityResultRenderer(BaseResultRenderer):
-    """Renderer for :class:`~src.analysis.normality.NormalityResult`."""
+    """Renderer for :class:`~uadas_core.analysis.normality.NormalityResult`."""
 
     @classmethod
     def title(cls, result: NormalityResult) -> str:

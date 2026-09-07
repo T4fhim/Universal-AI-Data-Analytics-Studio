@@ -1,5 +1,5 @@
 # File: tests/reports/test_excel_exporter.py
-"""Tests for src.reports.excel_exporter.ExcelReportExporter.
+"""Tests for uadas_core.reports.excel_exporter.ExcelReportExporter.
 
 Same figure_to_png_bytes-monkeypatching approach as
 tests/reports/test_pdf_exporter.py, for the same reason.
@@ -13,8 +13,8 @@ from pathlib import Path
 import plotly.graph_objects as go
 import pytest
 
-from src.core.expertise_level import ExpertiseLevel
-from src.reports.report_content import ReportContent, ReportSection
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.reports.report_content import ReportContent, ReportSection
 
 _TINY_PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY"
@@ -47,12 +47,12 @@ def test_export_writes_an_xlsx_file(
     tmp_path: Path, report_content: ReportContent, monkeypatch
 ) -> None:
     monkeypatch.setattr(
-        "src.reports.excel_exporter.figure_to_png_bytes",
+        "uadas_core.reports.excel_exporter.figure_to_png_bytes",
         lambda *a, **k: _TINY_PNG_BYTES,
     )
     output_path = tmp_path / "report.xlsx"
 
-    from src.reports.excel_exporter import ExcelReportExporter
+    from uadas_core.reports.excel_exporter import ExcelReportExporter
 
     result = ExcelReportExporter.export(report_content, output_path)
 
@@ -65,14 +65,14 @@ def test_export_sanitizes_sheet_titles_with_invalid_characters(
     tmp_path: Path, report_content: ReportContent, monkeypatch
 ) -> None:
     monkeypatch.setattr(
-        "src.reports.excel_exporter.figure_to_png_bytes",
+        "uadas_core.reports.excel_exporter.figure_to_png_bytes",
         lambda *a, **k: _TINY_PNG_BYTES,
     )
     output_path = tmp_path / "report.xlsx"
 
     from openpyxl import load_workbook
 
-    from src.reports.excel_exporter import ExcelReportExporter
+    from uadas_core.reports.excel_exporter import ExcelReportExporter
 
     ExcelReportExporter.export(report_content, output_path)
     workbook = load_workbook(str(output_path))

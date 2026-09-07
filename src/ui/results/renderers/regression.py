@@ -1,10 +1,8 @@
 # File: src/ui/results/renderers/regression.py
-"""Renders :class:`~src.analysis.regression.RegressionResult` -- ``linear_regression``'s result."""
+"""Renders :class:`~uadas_core.analysis.regression.RegressionResult` -- ``linear_regression``'s result."""
 
 from __future__ import annotations
 
-from src.analysis.regression import RegressionResult
-from src.core.expertise_level import ExpertiseLevel
 from src.ui.results.base_result_renderer import (
     AssumptionsSection,
     BaseResultRenderer,
@@ -13,6 +11,8 @@ from src.ui.results.base_result_renderer import (
     ResultSection,
     TableSection,
 )
+from uadas_core.analysis.regression import RegressionResult
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 _ASSUMPTIONS = (
     "The relationship between features and target is linear.",
@@ -23,7 +23,7 @@ _ASSUMPTIONS = (
 
 
 class RegressionResultRenderer(BaseResultRenderer):
-    """Renderer for :class:`~src.analysis.regression.RegressionResult`."""
+    """Renderer for :class:`~uadas_core.analysis.regression.RegressionResult`."""
 
     @classmethod
     def title(cls, result: RegressionResult) -> str:

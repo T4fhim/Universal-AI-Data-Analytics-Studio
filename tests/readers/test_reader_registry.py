@@ -1,5 +1,5 @@
 # File: tests/readers/test_reader_registry.py
-"""Tests for src.readers.reader_registry.get_reader_for_path.
+"""Tests for uadas_core.readers.reader_registry.get_reader_for_path.
 
 Covers a passing case for every registered reader's extension, the
 ReaderError raised for an unsupported extension, and the mutual
@@ -15,9 +15,9 @@ from pathlib import Path
 
 import pytest
 
-from src.core.exceptions import ReaderError
-from src.readers.base_reader import BaseReader
-from src.readers.reader_registry import (
+from uadas_core.core.exceptions import ReaderError
+from uadas_core.readers.base_reader import BaseReader
+from uadas_core.readers.reader_registry import (
     _BUILTIN_READERS,
     get_reader_for_path,
     register_reader,
@@ -66,20 +66,20 @@ class _FakePluginReader(BaseReader):
 
 
 def test_register_reader_makes_it_selectable(monkeypatch) -> None:
-    monkeypatch.setattr("src.readers.reader_registry._PLUGIN_READERS", [])
+    monkeypatch.setattr("uadas_core.readers.reader_registry._PLUGIN_READERS", [])
     register_reader(_FakePluginReader)
     assert get_reader_for_path(Path("data.fakefmt")) is _FakePluginReader
 
 
 def test_register_reader_duplicate_raises(monkeypatch) -> None:
-    monkeypatch.setattr("src.readers.reader_registry._PLUGIN_READERS", [])
+    monkeypatch.setattr("uadas_core.readers.reader_registry._PLUGIN_READERS", [])
     register_reader(_FakePluginReader)
     with pytest.raises(ReaderError, match="already registered"):
         register_reader(_FakePluginReader)
 
 
 def test_register_reader_builtin_class_raises(monkeypatch) -> None:
-    monkeypatch.setattr("src.readers.reader_registry._PLUGIN_READERS", [])
+    monkeypatch.setattr("uadas_core.readers.reader_registry._PLUGIN_READERS", [])
     with pytest.raises(ReaderError, match="already registered"):
         register_reader(_BUILTIN_READERS[0])
 
@@ -88,6 +88,6 @@ def test_plugin_readers_checked_after_builtins(monkeypatch) -> None:
     # A plugin reader claiming an extension no built-in claims resolves
     # correctly — confirms _PLUGIN_READERS is actually consulted by
     # get_reader_for_path, not merely appended to without effect.
-    monkeypatch.setattr("src.readers.reader_registry._PLUGIN_READERS", [])
+    monkeypatch.setattr("uadas_core.readers.reader_registry._PLUGIN_READERS", [])
     register_reader(_FakePluginReader)
     assert get_reader_for_path(Path("x.fakefmt")) is _FakePluginReader

@@ -1,8 +1,8 @@
 # File: src/ui/results/base_result_renderer.py
 """The `ResultSection` vocabulary and the `Base*`-shaped renderer contract (milestone 22).
 
-Mirrors :class:`~src.readers.base_reader.BaseReader`, :class:`~src.cleaning.base_operation.
-BaseOperation`, and :class:`~src.visualization.base_chart.BaseChart` exactly, per CLAUDE.md's
+Mirrors :class:`~uadas_core.readers.base_reader.BaseReader`, :class:`~uadas_core.cleaning.base_operation.
+BaseOperation`, and :class:`~uadas_core.visualization.base_chart.BaseChart` exactly, per CLAUDE.md's
 "``Base*`` extension-point pattern": stateless, classmethod-only -- a renderer is never
 instantiated, it is held as a class in :mod:`~src.ui.results.result_renderer_registry`'s
 registry, the same way a chart class is held in ``chart_registry``.
@@ -25,7 +25,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from src.core.expertise_level import ExpertiseLevel
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 
 @dataclass(frozen=True)
@@ -67,7 +67,7 @@ class FigureSection:
     """An embedded Plotly figure -- e.g. a PCA scree plot or a cluster scatter, when a renderer
     builds one. Holds the figure object itself (``Any`` rather than ``plotly.graph_objects.
     Figure`` here, to keep this module importing nothing beyond the standard library and
-    :mod:`src.core` -- the figure's real type is enforced at the renderer call site, where
+    :mod:`uadas_core.core` -- the figure's real type is enforced at the renderer call site, where
     ``plotly`` is already an ordinary dependency)."""
 
     title: str
@@ -93,7 +93,7 @@ class MetricSection:
 
 @dataclass(frozen=True)
 class AssumptionsSection:
-    """The method's assumptions, named but not necessarily verified (see :class:`~src.analysis.
+    """The method's assumptions, named but not necessarily verified (see :class:`~uadas_core.analysis.
     explanation.Explanation.assumptions`'s own docstring for why "named, not verified").
 
     A dedicated dataclass rather than reusing :class:`ProseSection` with bullet-joined text: the
@@ -121,7 +121,7 @@ class BaseResultRenderer(ABC):
     """Abstract base every concrete result renderer inherits from.
 
     Stateless and classmethod-only -- see this module's own docstring for why this mirrors
-    :class:`~src.visualization.base_chart.BaseChart` rather than being instantiated.
+    :class:`~uadas_core.visualization.base_chart.BaseChart` rather than being instantiated.
     """
 
     @classmethod

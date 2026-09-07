@@ -10,7 +10,7 @@ version of the same round trip, which additionally exercises
 
 from __future__ import annotations
 
-from src.services.project_service import ProjectService
+from uadas_core.services.project_service import ProjectService
 
 
 def test_record_then_get_recorded_analysis_logs_round_trips_in_memory() -> None:

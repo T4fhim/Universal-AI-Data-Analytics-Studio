@@ -1,5 +1,5 @@
 # File: tests/reports/test_html_exporter.py
-"""Tests for src.reports.html_exporter.HtmlReportExporter.
+"""Tests for uadas_core.reports.html_exporter.HtmlReportExporter.
 
 Uses a real Plotly figure (no kaleido/rasterization involved — HTML
 export keeps figures interactive via Figure.to_html, so this is fast
@@ -14,9 +14,9 @@ from pathlib import Path
 import plotly.graph_objects as go
 import pytest
 
-from src.core.expertise_level import ExpertiseLevel
-from src.reports.html_exporter import HtmlReportExporter
-from src.reports.report_content import ReportContent, ReportSection
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.reports.html_exporter import HtmlReportExporter
+from uadas_core.reports.report_content import ReportContent, ReportSection
 
 
 @pytest.fixture()

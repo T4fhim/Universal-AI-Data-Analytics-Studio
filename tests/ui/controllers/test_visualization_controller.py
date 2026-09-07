@@ -15,18 +15,18 @@ import pandas as pd
 import plotly.graph_objects as go
 from PySide6.QtWidgets import QApplication, QMainWindow
 
-from src.services.workspace_service import (
+from src.ui.controllers.visualization_controller import VisualizationController
+from src.ui.dock_manager import DockManager
+from src.ui.status_bar import ApplicationStatusBar
+from src.ui.ui_state_bus import UiStateBus
+from src.ui.worker_runner import WorkerRunner
+from uadas_core.services.workspace_service import (
     Dashboard,
     DashboardTile,
     Dataset,
     Visualization,
     WorkspaceService,
 )
-from src.ui.controllers.visualization_controller import VisualizationController
-from src.ui.dock_manager import DockManager
-from src.ui.status_bar import ApplicationStatusBar
-from src.ui.ui_state_bus import UiStateBus
-from src.ui.worker_runner import WorkerRunner
 
 
 def _make_controller(

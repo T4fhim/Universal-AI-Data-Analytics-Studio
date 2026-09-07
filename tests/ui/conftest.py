@@ -63,7 +63,7 @@ class ModalCall(NamedTuple):
 def qapp() -> Iterator[QApplication]:
     """The one ``QApplication`` for the whole test session.
 
-    Sets the same OpenGL attributes :meth:`src.core.app.Application.run` does.
+    Sets the same OpenGL attributes :meth:`src.app.Application.run` does.
     They matter less offscreen, but keeping them identical means the suite
     exercises the configuration that actually ships.
     """

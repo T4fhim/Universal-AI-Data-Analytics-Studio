@@ -12,8 +12,8 @@ from __future__ import annotations
 import pandas as pd
 from PySide6.QtWidgets import QApplication
 
-from src.services.workspace_service import Dataset
 from src.ui.widgets.dataset_explorer_view import DatasetExplorerView
+from uadas_core.services.workspace_service import Dataset
 
 
 def _make_dataset(name: str = "test", parent_dataset_id: str | None = None) -> Dataset:

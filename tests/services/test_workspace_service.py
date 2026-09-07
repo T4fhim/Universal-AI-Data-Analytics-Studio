@@ -1,5 +1,5 @@
 # File: tests/services/test_workspace_service.py
-"""Tests for src.services.workspace_service.WorkspaceService.
+"""Tests for uadas_core.services.workspace_service.WorkspaceService.
 
 Covers the documented non-cascading close behavior (CLAUDE.md: "Closing
 a dataset or visualization does not cascade to things derived from
@@ -27,8 +27,8 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from src.core.exceptions import ServiceError
-from src.services.workspace_service import Dataset, WorkspaceService
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.services.workspace_service import Dataset, WorkspaceService
 
 
 def _make_dataset(name: str = "root", parent_dataset_id: str | None = None) -> Dataset:

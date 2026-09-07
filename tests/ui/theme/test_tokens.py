@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.constants import AVAILABLE_THEMES
-from src.core.expertise_level import ExpertiseLevel
 from src.ui.theme.tokens import (
     DARK_TOKENS,
     DENSITY_BY_EXPERTISE_LEVEL,
@@ -19,12 +17,14 @@ from src.ui.theme.tokens import (
     TOKENS_BY_NAME,
     Density,
 )
+from uadas_core.core.constants import AVAILABLE_THEMES
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 
 def test_available_themes_matches_tokens() -> None:
     """The two theme lists must never drift apart.
 
-    ``AVAILABLE_THEMES`` lives in src/core/constants.py because config
+    ``AVAILABLE_THEMES`` lives in uadas_core/core/constants.py because config
     validation (in core/) needs it and core/ may not import from ui/ --
     see that constant's own comment. This test is the tripwire that catches
     the two lists disagreeing.

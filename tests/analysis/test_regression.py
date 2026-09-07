@@ -1,5 +1,5 @@
 # File: tests/analysis/test_regression.py
-"""Tests for src.analysis.regression."""
+"""Tests for uadas_core.analysis.regression."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.analysis.regression import linear_regression
-from src.core.exceptions import ServiceError
+from uadas_core.analysis.regression import linear_regression
+from uadas_core.core.exceptions import ServiceError
 
 
 def _linear_dataframe() -> pd.DataFrame:

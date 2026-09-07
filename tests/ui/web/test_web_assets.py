@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from src.core.exceptions import ServiceError
 from src.ui.web import web_assets
+from uadas_core.core.exceptions import ServiceError
 
 
 @pytest.fixture(autouse=True)

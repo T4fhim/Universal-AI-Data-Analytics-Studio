@@ -1,9 +1,9 @@
 # File: tests/services/test_analysis_orchestrator_service.py
-"""Tests for src.services.analysis_orchestrator_service.AnalysisOrchestratorService.
+"""Tests for uadas_core.services.analysis_orchestrator_service.AnalysisOrchestratorService.
 
 Covers the stage-by-stage API the milestone plan requires
 (propose_next_stage()/run_stage()), that run_stage dispatches through
-the real src.ai.tool_registry tools (no new statistics invented — see
+the real uadas_core.ai.tool_registry tools (no new statistics invented — see
 that module's own docstring), that Dataset/Figure results get
 registered into WorkspaceService the same way AssistantService does,
 and that reproduce() replays a logged pipeline against fresh tool
@@ -15,14 +15,14 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from src.analysis.explanation import Explanation
-from src.core.exceptions import ServiceError
-from src.services.analysis_orchestrator_service import (
+from uadas_core.analysis.explanation import Explanation
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.services.analysis_orchestrator_service import (
     AnalysisLog,
     AnalysisOrchestratorService,
     PipelineStage,
 )
-from src.services.workspace_service import Dataset, WorkspaceService
+from uadas_core.services.workspace_service import Dataset, WorkspaceService
 
 
 def _make_dataset() -> Dataset:

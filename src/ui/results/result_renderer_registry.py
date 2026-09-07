@@ -1,9 +1,9 @@
 # File: src/ui/results/result_renderer_registry.py
 """The registry that resolves an analysis-result object to its renderer (milestone 22).
 
-Mirrors :mod:`src.visualization.chart_registry` exactly, per this overhaul's cross-cutting rule
+Mirrors :mod:`uadas_core.visualization.chart_registry` exactly, per this overhaul's cross-cutting rule
 3 ("new registries mirror chart_registry.py exactly"): a module-level ``_REGISTRY`` dict,
-``register_renderer`` raising :class:`~src.core.exceptions.ServiceError` on a duplicate key,
+``register_renderer`` raising :class:`~uadas_core.core.exceptions.ServiceError` on a duplicate key,
 plus ``get_renderer``/``list_renderers``/``unregister_renderer``. The one shape difference from
 ``chart_registry`` is the key type: a chart is looked up by a machine name a caller already
 knows (``"box_plot"``); a result renderer is looked up by the *type* of a result a caller did
@@ -20,31 +20,15 @@ then MRO walk, then a generic fallback"):
    registration, the same way Python's own method resolution works.
 3. :class:`~src.ui.results.renderers.generic.GenericResultRenderer` -- never raises. A plain
    ``pandas.DataFrame`` (``aggregate``/``cross_tabulate``'s return type -- neither has a
-   dedicated result dataclass, unlike every other :mod:`src.analysis` function) and any future
+   dedicated result dataclass, unlike every other :mod:`uadas_core.analysis` function) and any future
    analysis function's result both fall through to this, which is *why* :meth:`get_renderer`
-   returns a renderer rather than raising ``ServiceError`` the way :func:`~src.visualization.
+   returns a renderer rather than raising ``ServiceError`` the way :func:`~uadas_core.visualization.
    chart_registry.get_chart` does for an unknown name -- an unrenderable result would otherwise
    crash a stage page instead of degrading to a generic (if less polished) display.
 """
 
 from __future__ import annotations
 
-# Imported only for their types (registration keys), not called directly here -- keeping the
-# import list explicit rather than a wildcard so a reader can see, at a glance, exactly which
-# result dataclasses this milestone shipped a renderer for.
-from src.analysis.anova import AnovaResult
-from src.analysis.chi_square import ChiSquareResult
-from src.analysis.clustering import ClusteringResult
-from src.analysis.correlation import CorrelationResult
-from src.analysis.dataset_profile import DatasetProfile
-from src.analysis.normality import NormalityResult
-from src.analysis.pca import PcaResult
-from src.analysis.regression import RegressionResult
-from src.analysis.t_test import TTestResult
-from src.core.exceptions import ServiceError
-from src.core.logger import get_logger
-from src.forecasting.exponential_smoothing import ForecastResult
-from src.forecasting.model_comparison import ModelComparisonResult
 from src.ui.results.base_result_renderer import BaseResultRenderer
 from src.ui.results.renderers.correlation import CorrelationResultRenderer
 from src.ui.results.renderers.forecasting import (
@@ -65,6 +49,23 @@ from src.ui.results.renderers.statistical_tests import (
     TTestResultRenderer,
 )
 
+# Imported only for their types (registration keys), not called directly here -- keeping the
+# import list explicit rather than a wildcard so a reader can see, at a glance, exactly which
+# result dataclasses this milestone shipped a renderer for.
+from uadas_core.analysis.anova import AnovaResult
+from uadas_core.analysis.chi_square import ChiSquareResult
+from uadas_core.analysis.clustering import ClusteringResult
+from uadas_core.analysis.correlation import CorrelationResult
+from uadas_core.analysis.dataset_profile import DatasetProfile
+from uadas_core.analysis.normality import NormalityResult
+from uadas_core.analysis.pca import PcaResult
+from uadas_core.analysis.regression import RegressionResult
+from uadas_core.analysis.t_test import TTestResult
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.core.logger import get_logger
+from uadas_core.forecasting.exponential_smoothing import ForecastResult
+from uadas_core.forecasting.model_comparison import ModelComparisonResult
+
 _logger = get_logger(__name__)
 
 _REGISTRY: dict[type, type[BaseResultRenderer]] = {}
@@ -82,7 +83,7 @@ def register_renderer(
 
     Raises:
         ServiceError: If ``result_type`` is already registered -- the same "no last-
-            registration-wins" convention :func:`~src.visualization.chart_registry.
+            registration-wins" convention :func:`~uadas_core.visualization.chart_registry.
             register_chart` uses, for the same reason: a silent second registration would mean
             whichever module happened to import last determines what a result type renders as,
             with no error to say so.
@@ -124,7 +125,7 @@ def list_renderers() -> dict[type, type[BaseResultRenderer]]:
 
 def unregister_renderer(result_type: type) -> None:
     """Remove a previously registered renderer. Silently does nothing if ``result_type`` was
-    never registered -- matches :func:`~src.visualization.chart_registry.unregister_chart`'s own
+    never registered -- matches :func:`~uadas_core.visualization.chart_registry.unregister_chart`'s own
     "caller may not know what it actually managed to register" rationale."""
     _REGISTRY.pop(result_type, None)
 
@@ -132,8 +133,8 @@ def unregister_renderer(result_type: type) -> None:
 def _register_builtins() -> None:
     """Populate the registry with every renderer built as of milestone 22.
 
-    Called once at import time, bottom of this module -- matching :func:`~src.visualization.
-    chart_registry._register_builtins`'s own shape. Covers all 12 :mod:`src.analysis` functions'
+    Called once at import time, bottom of this module -- matching :func:`~uadas_core.visualization.
+    chart_registry._register_builtins`'s own shape. Covers all 12 :mod:`uadas_core.analysis` functions'
     result types except ``aggregate``/``cross_tabulate`` (both return a plain ``pandas.
     DataFrame``, which needs no dedicated renderer -- :class:`~src.ui.results.renderers.generic.
     GenericResultRenderer` already renders a ``DataFrame`` as a :class:`~src.ui.results.

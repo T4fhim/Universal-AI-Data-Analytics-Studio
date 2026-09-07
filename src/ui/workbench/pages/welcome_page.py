@@ -2,7 +2,7 @@
 """The workbench's default page: shown until a dataset is active.
 
 Not a :class:`~src.ui.workbench.stage_page.StagePage` -- there is no
-:class:`~src.services.analysis_orchestrator_service.PipelineStage` value for "nothing is open
+:class:`~uadas_core.services.analysis_orchestrator_service.PipelineStage` value for "nothing is open
 yet" (``UPLOAD`` means a dataset already exists; see that enum's own docstring), so forcing this
 page through the three-zone guidance/form/result shape would misrepresent it as stage content.
 

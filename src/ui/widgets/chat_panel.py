@@ -4,7 +4,7 @@
 Pure UI: message list, input box, a status label showing which
 provider profile is currently active (transparency into milestone 7's
 rotation) and whether a turn is in flight. Wiring this to a real
-:class:`~src.ai.assistant_service.AssistantService` — constructing the
+:class:`~uadas_core.ai.assistant_service.AssistantService` — constructing the
 service from configured provider profiles, running ``send_message``
 on a worker thread (milestone 6), refreshing the dataset/chart docks
 when a turn produces new ones — is :mod:`src.ui.main_window`'s job,
@@ -31,7 +31,7 @@ Milestone 21 closes three defects the original audit named in this file:
    ``QLabel``'s foreground is theme-driven and re-coloring it row by
    row fought that instead of using it) loses no information.
 3. Tool-call results (a JSON-friendly ``dict`` — see
-   :mod:`src.ai.tool_registry`'s own docstring) now render through
+   :mod:`uadas_core.ai.tool_registry`'s own docstring) now render through
    :class:`~src.ui.results.result_card.ResultCard`, the exact class
    :mod:`~src.ui.workbench.pages.analyze_page` uses, via
    :meth:`append_tool_result` — not a second, chat-specific renderer.
@@ -54,10 +54,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.core.expertise_level import ExpertiseLevel
-from src.core.logger import get_logger
 from src.ui.a11y.accessible import describe
 from src.ui.results.result_card import ResultCard
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 
@@ -220,7 +220,7 @@ class ChatPanel(QWidget):
         Ties into "Explain Everything" from the defining-features
         list: the user sees *that* a tool ran (and what it produced),
         not just the assistant's final summarized reply — matches
-        :class:`~src.ai.assistant_service.AssistantTurnResult`
+        :class:`~uadas_core.ai.assistant_service.AssistantTurnResult`
         exposing ``new_datasets``/``new_visualizations`` rather than
         only ``reply_text``.
         """
@@ -236,7 +236,7 @@ class ChatPanel(QWidget):
 
         Args:
             result: Any tool-call result object --
-                :class:`~src.ai.assistant_service.AssistantTurnResult.
+                :class:`~uadas_core.ai.assistant_service.AssistantTurnResult.
                 new_tool_results` is where this comes from, one call
                 per entry. Constructs a real
                 :class:`~src.ui.results.result_card.ResultCard` and
@@ -249,11 +249,11 @@ class ChatPanel(QWidget):
                 or format anything itself; doing so would be exactly
                 the second, chat-specific rendering path this
                 milestone's acceptance criteria rule out.
-            level: Which :class:`~src.core.expertise_level.
+            level: Which :class:`~uadas_core.core.expertise_level.
                 ExpertiseLevel` to render for -- the caller
                 (:class:`~src.ui.controllers.assistant_controller.
                 AssistantController`) passes the conversation's live
-                :attr:`~src.ai.assistant_service.AssistantService.
+                :attr:`~uadas_core.ai.assistant_service.AssistantService.
                 expertise_level`.
         """
         card = ResultCard(self)
@@ -264,7 +264,7 @@ class ChatPanel(QWidget):
         """Remove every visible message row -- the "Clear Chat" button's UI half.
 
         Pure UI: clearing the *conversation state*
-        (:meth:`~src.ai.assistant_service.AssistantService.
+        (:meth:`~uadas_core.ai.assistant_service.AssistantService.
         reset_conversation`) is
         :class:`~src.ui.controllers.assistant_controller.
         AssistantController`'s job, matching this file's own "structure

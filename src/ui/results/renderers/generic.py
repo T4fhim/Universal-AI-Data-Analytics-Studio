@@ -4,13 +4,13 @@ returns for a result type nobody registered a dedicated renderer for.
 
 Handles two real shapes rather than just stringifying everything:
 
-* ``pandas.DataFrame`` -- :func:`~src.analysis.aggregation.aggregate` and
-  :func:`~src.analysis.crosstab.cross_tabulate` are the two :mod:`src.analysis` functions with
+* ``pandas.DataFrame`` -- :func:`~uadas_core.analysis.aggregation.aggregate` and
+  :func:`~uadas_core.analysis.crosstab.cross_tabulate` are the two :mod:`uadas_core.analysis` functions with
   no dedicated result dataclass (see :mod:`~src.ui.results.result_renderer_registry`'s own
   docstring); both return a plain ``DataFrame``, which this renderer turns into a real
   :class:`~src.ui.results.base_result_renderer.TableSection` rather than a wall of ``repr()``
   text.
-* ``dict`` -- a defensive path for a JSON-friendly dict (the shape :mod:`src.ai.tool_registry`'s
+* ``dict`` -- a defensive path for a JSON-friendly dict (the shape :mod:`uadas_core.ai.tool_registry`'s
   own handlers return) reaching a renderer directly, rendered as a
   :class:`~src.ui.results.base_result_renderer.KeyValueSection`.
 
@@ -26,7 +26,6 @@ from typing import Any
 
 import pandas as pd
 
-from src.core.expertise_level import ExpertiseLevel
 from src.ui.results.base_result_renderer import (
     BaseResultRenderer,
     KeyValueSection,
@@ -34,6 +33,7 @@ from src.ui.results.base_result_renderer import (
     ResultSection,
     TableSection,
 )
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 # Cap on rows rendered from a DataFrame result -- a generic fallback has no result-specific
 # reason to know a "reasonable" size the way, say, a correlation matrix renderer would; this

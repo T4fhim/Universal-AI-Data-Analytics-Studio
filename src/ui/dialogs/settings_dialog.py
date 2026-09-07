@@ -2,11 +2,11 @@
 """The application's Settings dialog.
 
 :class:`SettingsDialog` is a thin UI layer over
-:class:`~src.services.settings_service.SettingsService` — every value
+:class:`~uadas_core.services.settings_service.SettingsService` — every value
 shown here is read from that service at construction time via
-:meth:`~src.services.settings_service.SettingsService.get`, and every
+:meth:`~uadas_core.services.settings_service.SettingsService.get`, and every
 change the user makes is written back via
-:meth:`~src.services.settings_service.SettingsService.set` immediately
+:meth:`~uadas_core.services.settings_service.SettingsService.set` immediately
 (so the in-memory settings state is always current, matching what the
 widgets show), with persistence to disk deferred until the user clicks
 Save.
@@ -14,10 +14,10 @@ Save.
 This gives a real, working Save/Cancel distinction, not just a
 close button:
 
-* **Save** calls :meth:`~src.services.settings_service.SettingsService.save`,
+* **Save** calls :meth:`~uadas_core.services.settings_service.SettingsService.save`,
   writing the in-memory changes (already applied via ``set()`` as the
   user interacted with the dialog) to ``config.yaml``.
-* **Cancel** calls :meth:`~src.services.settings_service.SettingsService.reload`,
+* **Cancel** calls :meth:`~uadas_core.services.settings_service.SettingsService.reload`,
   discarding whatever the user changed during this dialog session and
   restoring the settings service's in-memory state to whatever is
   currently on disk — which is exactly what "Cancel" should mean.
@@ -56,12 +56,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.core.constants import AVAILABLE_THEMES
-from src.core.expertise_level import ExpertiseLevel
-from src.core.logger import get_logger
-from src.plugins.plugin_manager import PluginManager
-from src.services.settings_service import SettingsService
 from src.ui.widgets.empty_state import EmptyState
+from uadas_core.core.constants import AVAILABLE_THEMES
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.core.logger import get_logger
+from uadas_core.plugins.plugin_manager import PluginManager
+from uadas_core.services.settings_service import SettingsService
 
 _logger = get_logger(__name__)
 
@@ -73,11 +73,11 @@ class SettingsDialog(QDialog):
 
     Args:
         settings_service: The running application's
-            :class:`~src.services.settings_service.SettingsService`
+            :class:`~uadas_core.services.settings_service.SettingsService`
             instance — resolved from the dependency container by
             :mod:`src.ui.main_window`, not constructed here, since
             exactly one instance should exist per process (see
-            :mod:`src.core.bootstrap`'s reasoning for why these
+            :mod:`uadas_core.core.bootstrap`'s reasoning for why these
             services are container-registered).
         parent: Parent widget, typically the main window.
     """
@@ -276,7 +276,7 @@ class SettingsDialog(QDialog):
         """List discovered plugins with load status/errors, and let each be enabled/disabled.
 
         Reads from :attr:`_plugin_manager` (already loaded once during
-        :func:`~src.core.bootstrap.bootstrap`) rather than triggering a
+        :func:`~uadas_core.core.bootstrap.bootstrap`) rather than triggering a
         fresh scan itself — opening the Settings dialog should show
         what's actually running, not silently re-discover plugins as a
         side effect of the user looking at a settings panel.

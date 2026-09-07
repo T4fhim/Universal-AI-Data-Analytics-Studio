@@ -5,9 +5,9 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QApplication
 
-from src.analysis.explanation import Explanation
-from src.core.expertise_level import ExpertiseLevel
 from src.ui.workbench.pages.explain_page import ExplainPage
+from uadas_core.analysis.explanation import Explanation
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 
 def test_explain_page_defaults_to_an_empty_explanation_with_no_ai(

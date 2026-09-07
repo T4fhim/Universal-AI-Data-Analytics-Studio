@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from src.core.constants import PROJECT_ROOT
+from uadas_core.core.constants import PROJECT_ROOT
 
 _MAX_LINES = 400
 

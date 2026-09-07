@@ -1,5 +1,5 @@
 # File: src/ui/results/renderers/profiling.py
-"""Renders :class:`~src.analysis.dataset_profile.DatasetProfile` -- ``profile_dataset``'s result.
+"""Renders :class:`~uadas_core.analysis.dataset_profile.DatasetProfile` -- ``profile_dataset``'s result.
 
 The first result renderer this milestone shipped a real caller for --
 :class:`~src.ui.workbench.pages.understand_page.UnderstandPage.show_profile_summary` formats
@@ -13,8 +13,6 @@ migrating it is not attempted here.
 
 from __future__ import annotations
 
-from src.analysis.dataset_profile import DatasetProfile
-from src.core.expertise_level import ExpertiseLevel
 from src.ui.results.base_result_renderer import (
     BaseResultRenderer,
     KeyValueSection,
@@ -22,10 +20,12 @@ from src.ui.results.base_result_renderer import (
     ResultSection,
     TableSection,
 )
+from uadas_core.analysis.dataset_profile import DatasetProfile
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 
 class DatasetProfileRenderer(BaseResultRenderer):
-    """Renderer for :class:`~src.analysis.dataset_profile.DatasetProfile`."""
+    """Renderer for :class:`~uadas_core.analysis.dataset_profile.DatasetProfile`."""
 
     @classmethod
     def title(cls, result: DatasetProfile) -> str:

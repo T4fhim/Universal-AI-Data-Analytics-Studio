@@ -7,8 +7,8 @@ every :class:`~src.ui.actions.action_registry.ActionSpec`'s ``requires``/
 ``predicate`` against. Captured fresh on every recompute (see
 :mod:`src.ui.ui_state_bus` for when that happens) rather than incrementally
 updated, since the source of truth is always the live services
-(:class:`~src.services.project_service.ProjectService`,
-:class:`~src.services.workspace_service.WorkspaceService`), and re-deriving
+(:class:`~uadas_core.services.project_service.ProjectService`,
+:class:`~uadas_core.services.workspace_service.WorkspaceService`), and re-deriving
 a handful of booleans/counts from them is cheap enough that incremental
 tracking would only add a second place these could drift out of sync.
 
@@ -24,11 +24,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.services.analysis_orchestrator_service import PipelineStage
-from src.services.project_service import ProjectService
-from src.services.settings_service import SettingsService
-from src.services.workspace_service import WorkspaceService
 from src.ui.actions.action_registry import Requirement
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
+from uadas_core.services.project_service import ProjectService
+from uadas_core.services.settings_service import SettingsService
+from uadas_core.services.workspace_service import WorkspaceService
 
 
 @dataclass(frozen=True)
@@ -49,7 +49,7 @@ class ActionContext:
         datetime_column_count: Datetime-dtype column count of the active
             dataset (0 if none is active).
         completed_stages: Pipeline stages the active dataset has completed,
-            per :class:`~src.services.analysis_orchestrator_service.
+            per :class:`~uadas_core.services.analysis_orchestrator_service.
             AnalysisOrchestratorService`. Read by milestone 26's
             ``GuidanceService`` re-ranking, unused by any predicate yet.
         ai_configured: Whether at least one AI provider is configured in
@@ -108,7 +108,7 @@ class ActionContext:
                 visualization count.
             settings_service: Queried for AI provider configuration.
             completed_stages: Passed through -- computing this requires
-                :class:`~src.services.analysis_orchestrator_service.
+                :class:`~uadas_core.services.analysis_orchestrator_service.
                 AnalysisOrchestratorService`, which this method does not
                 take a dependency on (no current action needs it; a caller
                 that does, e.g. milestone 26's ``GuidanceService``

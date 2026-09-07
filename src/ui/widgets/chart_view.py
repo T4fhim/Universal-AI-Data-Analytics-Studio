@@ -35,11 +35,11 @@ from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWidgets import QWidget
 
-from src.core.logger import get_logger
 from src.ui.theme.plotly_theme import plotly_config, plotly_layout
 from src.ui.theme.tokens import DARK_TOKENS, ThemeTokens
 from src.ui.web.chart_bridge import ChartBridge
 from src.ui.web.web_assets import staged_chart_host_url
+from uadas_core.core.logger import get_logger
 
 if TYPE_CHECKING:
     import plotly.graph_objects as go

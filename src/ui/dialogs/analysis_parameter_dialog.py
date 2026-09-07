@@ -1,11 +1,11 @@
 # File: src/ui/dialogs/analysis_parameter_dialog.py
-"""One generic parameter form, driven by a :class:`~src.ai.tool_registry.ToolDefinition`'s own
+"""One generic parameter form, driven by a :class:`~uadas_core.ai.tool_registry.ToolDefinition`'s own
 JSON-schema ``input_schema`` -- replacing N bespoke per-analysis-tool dialogs (milestone 22).
 
 :class:`~src.ui.dialogs.create_visualization_dialog.CreateVisualizationDialog` took the opposite
 approach for charts: a small, fixed registry mapping each chart type to its own column-picker
 fields (see that module's own docstring for why -- chart ``build()`` signatures are plain
-keyword arguments with no declarative schema to introspect). Every :mod:`src.ai.tool_registry`
+keyword arguments with no declarative schema to introspect). Every :mod:`uadas_core.ai.tool_registry`
 tool, by contrast, *already* ships a JSON-schema ``input_schema`` -- written once, for the AI
 API's own ``tools`` parameter -- so building 11 more copies of ``CreateVisualizationDialog``'s
 one-dialog-per-type shape here would duplicate information this module can instead read
@@ -33,9 +33,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.ai.tool_registry import ToolDefinition
-from src.core.logger import get_logger
 from src.ui.a11y.accessible import describe, label_for
+from uadas_core.ai.tool_registry import ToolDefinition
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 
@@ -60,7 +60,7 @@ class AnalysisParameterDialog(QDialog):
     """A parameter form built entirely from ``tool.input_schema``.
 
     Args:
-        tool: The :class:`~src.ai.tool_registry.ToolDefinition` to collect parameters for --
+        tool: The :class:`~uadas_core.ai.tool_registry.ToolDefinition` to collect parameters for --
             any tool works, not only analysis tools, though this milestone's callers
             (:class:`~src.ui.workbench.pages.analyze_page.AnalyzePage` and
             :class:`~src.ui.workbench.pages.explore_page.ExplorePage`) only ever pass one of the
@@ -152,7 +152,7 @@ class AnalysisParameterDialog(QDialog):
             return checkbox
         # Numbers, arrays, and plain strings all fall back to one line edit -- arrays are
         # entered comma-separated (e.g. "col_a, col_b") and split back into a list in
-        # _on_accept, matching how src.ai.tool_registry's own JSON-schema arrays are just
+        # _on_accept, matching how uadas_core.ai.tool_registry's own JSON-schema arrays are just
         # `list[str]` under the hood.
         line_edit = QLineEdit(self)
         default = self._field_defaults.get(field_name, schema.get("default"))

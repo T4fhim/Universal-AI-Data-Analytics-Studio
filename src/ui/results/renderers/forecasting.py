@@ -1,6 +1,6 @@
 # File: src/ui/results/renderers/forecasting.py
-"""Renders :class:`~src.forecasting.exponential_smoothing.ForecastResult` and
-:class:`~src.forecasting.model_comparison.ModelComparisonResult` -- milestone 25's own two
+"""Renders :class:`~uadas_core.forecasting.exponential_smoothing.ForecastResult` and
+:class:`~uadas_core.forecasting.model_comparison.ModelComparisonResult` -- milestone 25's own two
 result types.
 
 The first :mod:`~src.ui.results.renderers` module to return a :class:`~src.ui.results.
@@ -9,7 +9,7 @@ renderers.regression`, :mod:`~src.ui.results.renderers.multivariate`, and siblin
 its result as tables and metrics only. A forecast's own shape genuinely needs a chart: a table of
 projected numbers does not communicate "does this trend look right" the way seeing history and
 projection on the same axes does, so :class:`ForecastResultRenderer` and
-:class:`ModelComparisonResultRenderer` both build a real :class:`~src.visualization.
+:class:`ModelComparisonResultRenderer` both build a real :class:`~uadas_core.visualization.
 forecast_charts.ForecastChart` figure and embed it via ``FigureSection`` rather than reducing the
 result to numbers alone.
 
@@ -26,9 +26,6 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.core.expertise_level import ExpertiseLevel
-from src.forecasting.exponential_smoothing import ForecastResult
-from src.forecasting.model_comparison import ModelComparisonResult
 from src.ui.results.base_result_renderer import (
     BaseResultRenderer,
     FigureSection,
@@ -36,7 +33,10 @@ from src.ui.results.base_result_renderer import (
     ResultSection,
     TableSection,
 )
-from src.visualization.forecast_charts import ForecastChart
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.forecasting.exponential_smoothing import ForecastResult
+from uadas_core.forecasting.model_comparison import ModelComparisonResult
+from uadas_core.visualization.forecast_charts import ForecastChart
 
 # Forecast tables can run long for a large `periods` value -- capped for the same reason
 # src.ui.results.renderers.generic._MAX_TABLE_ROWS caps a DataFrame result: keeping ResultCard's
@@ -45,7 +45,7 @@ _MAX_FORECAST_ROWS = 200
 
 
 def _forecast_point_estimates(result: ForecastResult) -> pd.Series:
-    """See :func:`~src.visualization.forecast_charts._forecast_point_estimates`'s own docstring
+    """See :func:`~uadas_core.visualization.forecast_charts._forecast_point_estimates`'s own docstring
     for why this one-line Prophet-DataFrame normalization is kept as a private copy here rather
     than a shared import."""
     if isinstance(result.forecast_values, pd.DataFrame):
@@ -55,7 +55,7 @@ def _forecast_point_estimates(result: ForecastResult) -> pd.Series:
 
 def _historical_dataframe(result: ForecastResult) -> tuple[pd.DataFrame, str, str]:
     """Reconstruct the (date_column, value_column) historical slice a ``ForecastResult`` was
-    fit from, for :meth:`~src.visualization.forecast_charts.ForecastChart.build`'s own
+    fit from, for :meth:`~uadas_core.visualization.forecast_charts.ForecastChart.build`'s own
     ``dataframe``/``date_column``/``value_column`` arguments -- see that module's own docstring
     for why a forecast chart's real historical data is read off the result's own series rather
     than re-fetching the caller's full active dataset."""
@@ -68,7 +68,7 @@ def _historical_dataframe(result: ForecastResult) -> tuple[pd.DataFrame, str, st
 
 
 class ForecastResultRenderer(BaseResultRenderer):
-    """Renderer for a single :class:`~src.forecasting.exponential_smoothing.ForecastResult`."""
+    """Renderer for a single :class:`~uadas_core.forecasting.exponential_smoothing.ForecastResult`."""
 
     @classmethod
     def title(cls, result: ForecastResult) -> str:
@@ -118,7 +118,7 @@ class ForecastResultRenderer(BaseResultRenderer):
 
 
 class ModelComparisonResultRenderer(BaseResultRenderer):
-    """Renderer for :class:`~src.forecasting.model_comparison.ModelComparisonResult` --
+    """Renderer for :class:`~uadas_core.forecasting.model_comparison.ModelComparisonResult` --
     the "Automatic Model Competition" result, made visible for the first time by this milestone.
     """
 

@@ -5,11 +5,11 @@ Moved out of ``main_window.py`` in milestone 19 -- see
 :mod:`src.ui.controllers`'s own docstring for why this package exists.
 
 Milestone 21 adds two things on top of that: a live path for
-:meth:`~src.ai.assistant_service.AssistantService.set_expertise_level`
+:meth:`~uadas_core.ai.assistant_service.AssistantService.set_expertise_level`
 (previously only reachable by writing ``ai.expertise_level`` to config
 and restarting -- the setter existed and was tested since milestone 8,
 but nothing in the UI ever called it on an already-running service),
-and routing :attr:`~src.ai.assistant_service.AssistantTurnResult.
+and routing :attr:`~uadas_core.ai.assistant_service.AssistantTurnResult.
 new_tool_results` through :meth:`~src.ui.widgets.chat_panel.ChatPanel.
 append_tool_result`.
 """
@@ -18,15 +18,15 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QMessageBox, QWidget
 
-from src.ai.assistant_service import AssistantService, AssistantTurnResult
-from src.core.exceptions import ServiceError
-from src.core.expertise_level import ExpertiseLevel
-from src.core.logger import get_logger
-from src.services.settings_service import SettingsService
-from src.services.workspace_service import WorkspaceService
 from src.ui.dock_manager import DockManager
 from src.ui.status_bar import ApplicationStatusBar
 from src.ui.worker_runner import WorkerRunner
+from uadas_core.ai.assistant_service import AssistantService, AssistantTurnResult
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.core.logger import get_logger
+from uadas_core.services.settings_service import SettingsService
+from uadas_core.services.workspace_service import WorkspaceService
 
 _logger = get_logger(__name__)
 
@@ -151,12 +151,12 @@ class AssistantController:
         """Update the expertise level live -- no restart required.
 
         Args:
-            level: An :class:`~src.core.expertise_level.ExpertiseLevel`
+            level: An :class:`~uadas_core.core.expertise_level.ExpertiseLevel`
                 value, e.g. ``"engineer"``.
 
         Applies immediately to the running
-        :class:`~src.ai.assistant_service.AssistantService` (via its
-        own :meth:`~src.ai.assistant_service.AssistantService.
+        :class:`~uadas_core.ai.assistant_service.AssistantService` (via its
+        own :meth:`~uadas_core.ai.assistant_service.AssistantService.
         set_expertise_level`, in effect from the *next* turn onward --
         see that method's own docstring) if one has been constructed
         already; always records the choice as this session's override
@@ -185,7 +185,7 @@ class AssistantController:
         """ "Clear Chat": reset the running conversation and the visible transcript.
 
         Calls the previously-orphaned
-        :meth:`~src.ai.assistant_service.AssistantService.
+        :meth:`~uadas_core.ai.assistant_service.AssistantService.
         reset_conversation` -- orphaned because nothing in the UI ever
         called it before this milestone. A session with no service
         constructed yet (:attr:`_assistant_service` is ``None``) has no

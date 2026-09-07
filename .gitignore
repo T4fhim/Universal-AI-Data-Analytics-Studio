@@ -52,3 +52,6 @@ dist/
 
 # Playwright MCP session scratch (screenshots, snapshots, console logs)
 .playwright-mcp/
+
+# superpowers SDD ledger + review-package scratch
+.superpowers/

@@ -15,11 +15,11 @@ from pathlib import Path
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from src.core.config import AppConfig, load_config
-from src.plugins.plugin_manager import PluginManager
-from src.services.settings_service import SettingsService
 from src.ui.dialogs.settings_dialog import SettingsDialog
 from src.ui.widgets.empty_state import EmptyState
+from uadas_core.core.config import AppConfig, load_config
+from uadas_core.plugins.plugin_manager import PluginManager
+from uadas_core.services.settings_service import SettingsService
 
 
 @pytest.fixture()

@@ -11,7 +11,7 @@ things actually checked* change for different reasons and at different
 rates, and a new rule should be addable by reading and extending this file
 alone.
 
-**Why not a mutable registry like** :mod:`src.visualization.chart_registry`
+**Why not a mutable registry like** :mod:`uadas_core.visualization.chart_registry`
 **.** This project's own convention (see this repo's cross-cutting rule 3)
 is for new registries to mirror that shape -- a frozen registration
 dataclass, a module dict, ``register_x`` raising on duplicates, ``get_x``/
@@ -62,7 +62,7 @@ class Severity(StrEnum):
     """How seriously a finding should be treated.
 
     A :class:`~enum.StrEnum` for the same reason
-    :class:`~src.core.expertise_level.ExpertiseLevel` and
+    :class:`~uadas_core.core.expertise_level.ExpertiseLevel` and
     :class:`~src.ui.theme.tokens.Density` do -- it prints and compares
     cleanly in test failure output and log lines with no extra conversion.
 

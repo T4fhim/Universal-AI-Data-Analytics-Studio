@@ -1,48 +1,19 @@
 # import-linter contract - the machine-checked half of the desktop->web transition.
 #
-# Purpose: the packages that become the Qt-free, headless, pip-installable
-# `uadas_core` (web-transition Phase 1) must never import a GUI toolkit or a web
-# framework. This file makes that a linter failure instead of a runtime
-# ImportError discovered months later. Run locally with `lint-imports`; it is
-# wired into the CI `lint` job in the same commit as Phase 1.1's `git mv`.
-#
-# PRE-1.1 STATE (now): the carve-out packages still live under `src.`, so the
-# contract is written against `src.*`. `core` is still split - `src/core/app.py`
-# is the QApplication entry and stays in the desktop shell, the other nine
-# `src/core/*` modules move - so the nine are listed individually here rather
-# than the whole `src.core` package.
-#
-# AT 1.1: the codemod rewrites every `src.` below to `uadas_core.`, and once
-# `core/app.py` has left `core`, the nine `uadas_core.core.*` lines collapse to
-# a single `uadas_core.core`.
+# The Qt-free carve-out packages now live under uadas_core (Phase 1.1). No module in
+# uadas_core may import a GUI toolkit or a web framework. Run: lint-imports.
+# Enforced in CI's lint job (see .github/workflows/ci.yml).
 
 [importlinter]
 root_packages =
-    src
+    uadas_core
 include_external_packages = True
 
 [importlinter:contract:uadas-core-qt-and-framework-free]
-name = uadas_core (carve-out packages) must not import PySide6/PyQt/Django
+name = uadas_core must not import PySide6/PyQt/Django
 type = forbidden
 source_modules =
-    src.ai
-    src.analysis
-    src.cleaning
-    src.core.application_state
-    src.core.bootstrap
-    src.core.config
-    src.core.constants
-    src.core.dependency_container
-    src.core.exceptions
-    src.core.expertise_level
-    src.core.logger
-    src.database
-    src.forecasting
-    src.plugins
-    src.readers
-    src.reports
-    src.services
-    src.visualization
+    uadas_core
 forbidden_modules =
     PySide6
     PyQt5

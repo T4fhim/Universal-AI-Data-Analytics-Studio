@@ -2,8 +2,8 @@
 """Shared, Qt-free display-formatting helpers every renderer in :mod:`~src.ui.results.renderers`
 may use.
 
-Per the plan's R5 mitigation ("`results/renderers/` imports only `src.analysis`/
-`src.forecasting`/`result_view` and never Qt"): renderers format numbers into display strings
+Per the plan's R5 mitigation ("`results/renderers/` imports only `uadas_core.analysis`/
+`uadas_core.forecasting`/`result_view` and never Qt"): renderers format numbers into display strings
 themselves (see :mod:`~src.ui.results.base_result_renderer`'s own docstring on why a
 :class:`~src.ui.results.base_result_renderer.MetricSection` already carries a formatted
 ``value``, not a raw ``float``), and this module is where that formatting logic is shared rather

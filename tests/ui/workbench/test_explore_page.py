@@ -6,9 +6,9 @@ from __future__ import annotations
 import pandas as pd
 from PySide6.QtWidgets import QApplication
 
-from src.core.expertise_level import ExpertiseLevel
-from src.services.workspace_service import Dataset
 from src.ui.workbench.pages.explore_page import ExplorePage
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.services.workspace_service import Dataset
 
 
 def _make_dataset() -> Dataset:

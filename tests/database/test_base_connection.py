@@ -1,5 +1,5 @@
 # File: tests/database/test_base_connection.py
-"""Tests for src.database.base_connection.BaseDatabaseConnection's shared logic.
+"""Tests for uadas_core.database.base_connection.BaseDatabaseConnection's shared logic.
 
 Exercised through DuckDbConnection specifically — the one connector in
 this package that needs no live server, so these tests run a genuine,
@@ -21,10 +21,10 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from src.core.exceptions import ServiceError
-from src.database.base_connection import _redact_credentials
-from src.database.connection_profile import ConnectionProfile, DatabaseType
-from src.database.duckdb_connection import DuckDbConnection
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.database.base_connection import _redact_credentials
+from uadas_core.database.connection_profile import ConnectionProfile, DatabaseType
+from uadas_core.database.duckdb_connection import DuckDbConnection
 
 
 @pytest.fixture()

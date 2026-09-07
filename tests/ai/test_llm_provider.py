@@ -1,5 +1,5 @@
 # File: tests/ai/test_llm_provider.py
-"""Tests for src.ai.llm_provider.create_provider().
+"""Tests for uadas_core.ai.llm_provider.create_provider().
 
 create_provider()'s own docstring (read in full before writing this
 file) documents exactly three accepted identifier strings — "anthropic",
@@ -8,7 +8,7 @@ Each provider's __init__ only constructs its underlying SDK client
 object (``anthropic.Anthropic(...)``, ``genai.Client(...)``,
 ``openai.OpenAI(...)``) and stores config; none of the three SDKs used
 here make a network call at client-construction time (confirmed by
-reading each __init__ in src/ai/llm_provider.py: every one just stores
+reading each __init__ in uadas_core/ai/llm_provider.py: every one just stores
 a client handle, a model name string, and — for GroqProvider — the
 base_url string. No ``.models.list()``/handshake/auth-check call
 happens during __init__), so constructing each provider with an
@@ -29,14 +29,14 @@ from __future__ import annotations
 
 import pytest
 
-from src.ai.llm_provider import (
+from uadas_core.ai.llm_provider import (
     AnthropicProvider,
     BaseLLMProvider,
     GeminiProvider,
     GroqProvider,
     create_provider,
 )
-from src.core.exceptions import ServiceError
+from uadas_core.core.exceptions import ServiceError
 
 _FAKE_ANTHROPIC_KEY = "sk-ant-test-not-a-real-key"
 _FAKE_GEMINI_KEY = "test-not-a-real-gemini-key"

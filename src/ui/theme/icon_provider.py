@@ -19,7 +19,7 @@ deliberate: ``QIcon(svg_path)`` would render the file as it is on disk, with
 no opportunity to inject a colour, so the theme would be ignored.
 
 Requires a live ``QApplication`` -- ``QPixmap`` cannot be constructed before
-one exists -- so this must be built after :meth:`src.core.app.Application.run`
+one exists -- so this must be built after :meth:`src.app.Application.run`
 has created it, not at import time.
 """
 
@@ -31,9 +31,9 @@ from PySide6.QtCore import QObject, QSize, Qt, Signal
 from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
-from src.core.constants import PROJECT_ROOT
-from src.core.logger import get_logger
 from src.ui.theme.tokens import ThemeTokens
+from uadas_core.core.constants import PROJECT_ROOT
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 

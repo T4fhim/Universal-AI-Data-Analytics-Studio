@@ -1,5 +1,5 @@
 # File: tests/database/test_database_reader.py
-"""Tests for src.database.database_reader.DatabaseReader, against a real DuckDB connection."""
+"""Tests for uadas_core.database.database_reader.DatabaseReader, against a real DuckDB connection."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from src.core.exceptions import ReaderError
-from src.database.connection_profile import ConnectionProfile, DatabaseType
-from src.database.database_reader import DatabaseReader
-from src.database.duckdb_connection import DuckDbConnection
+from uadas_core.core.exceptions import ReaderError
+from uadas_core.database.connection_profile import ConnectionProfile, DatabaseType
+from uadas_core.database.database_reader import DatabaseReader
+from uadas_core.database.duckdb_connection import DuckDbConnection
 
 
 @pytest.fixture()

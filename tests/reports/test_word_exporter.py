@@ -1,5 +1,5 @@
 # File: tests/reports/test_word_exporter.py
-"""Tests for src.reports.word_exporter.WordReportExporter.
+"""Tests for uadas_core.reports.word_exporter.WordReportExporter.
 
 Same figure_to_png_bytes-monkeypatching approach as
 tests/reports/test_pdf_exporter.py, for the same reason (kaleido is
@@ -14,8 +14,8 @@ from pathlib import Path
 import plotly.graph_objects as go
 import pytest
 
-from src.core.expertise_level import ExpertiseLevel
-from src.reports.report_content import ReportContent, ReportSection
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.reports.report_content import ReportContent, ReportSection
 
 _TINY_PNG_BYTES = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY"
@@ -48,11 +48,12 @@ def test_export_writes_a_docx_file(
     tmp_path: Path, report_content: ReportContent, monkeypatch
 ) -> None:
     monkeypatch.setattr(
-        "src.reports.word_exporter.figure_to_png_bytes", lambda *a, **k: _TINY_PNG_BYTES
+        "uadas_core.reports.word_exporter.figure_to_png_bytes",
+        lambda *a, **k: _TINY_PNG_BYTES,
     )
     output_path = tmp_path / "report.docx"
 
-    from src.reports.word_exporter import WordReportExporter
+    from uadas_core.reports.word_exporter import WordReportExporter
 
     result = WordReportExporter.export(report_content, output_path)
 
@@ -65,13 +66,14 @@ def test_export_contains_section_text(
     tmp_path: Path, report_content: ReportContent, monkeypatch
 ) -> None:
     monkeypatch.setattr(
-        "src.reports.word_exporter.figure_to_png_bytes", lambda *a, **k: _TINY_PNG_BYTES
+        "uadas_core.reports.word_exporter.figure_to_png_bytes",
+        lambda *a, **k: _TINY_PNG_BYTES,
     )
     output_path = tmp_path / "report.docx"
 
     from docx import Document
 
-    from src.reports.word_exporter import WordReportExporter
+    from uadas_core.reports.word_exporter import WordReportExporter
 
     WordReportExporter.export(report_content, output_path)
     document = Document(str(output_path))

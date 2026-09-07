@@ -12,10 +12,10 @@ from __future__ import annotations
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QApplication, QWidget
 
-from src.core.logger import get_logger
 from src.ui.dialogs.manual_dialog import ManualDialog
 from src.ui.help.help_router import resolve_help_anchor
 from src.ui.workbench.workbench import Workbench
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 

@@ -3,14 +3,13 @@
 
 No QApplication anywhere in this file -- ActionSpec/register_action/
 get_action/list_actions are plain data and a dict, exactly like
-src.visualization.chart_registry's own test tier.
+uadas_core.visualization.chart_registry's own test tier.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from src.core.exceptions import ServiceError
 from src.ui.actions.action_registry import (
     ActionCategory,
     ActionSpec,
@@ -20,6 +19,7 @@ from src.ui.actions.action_registry import (
     register_action,
     unregister_action,
 )
+from uadas_core.core.exceptions import ServiceError
 
 
 @pytest.fixture(autouse=True)
@@ -30,7 +30,7 @@ def _isolated_registry(monkeypatch: pytest.MonkeyPatch) -> None:
     builtin_actions.py registrations (if that module happens to already be
     imported elsewhere in the suite) or pollute it for tests that run
     after these -- matching the same isolation concern
-    src.visualization.chart_registry's own tests would have if it defined
+    uadas_core.visualization.chart_registry's own tests would have if it defined
     a fixture like this (it currently does not need one because nothing
     else mutates its registry in tests).
     """

@@ -4,7 +4,7 @@
 Every fixture here exists to satisfy one specific rule: tests must never
 read or write the project's real ``config/config.yaml`` or ``logs/``
 directory. ``Application.create()``'s own docstring (see
-:mod:`src.core.app`) states this separation is exactly why
+:mod:`src.app`) states this separation is exactly why
 ``bootstrap()`` accepts overridable ``config_path``/``log_dir``
 arguments — this module is what exercises that path.
 
@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-import src.core.logger as logger_module
+import uadas_core.core.logger as logger_module
 
 
 @pytest.fixture()
@@ -39,9 +39,9 @@ def log_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture()
 def reset_logging_state():
-    """Reset src.core.logger's one-time configuration guard around a test.
+    """Reset uadas_core.core.logger's one-time configuration guard around a test.
 
-    src.core.logger.configure_logging() is deliberately a no-op on any
+    uadas_core.core.logger.configure_logging() is deliberately a no-op on any
     call after the first (see that module's docstring: "Calling it
     again after the first call is a no-op — it will not attach
     duplicate handlers — but it also will not apply new settings").

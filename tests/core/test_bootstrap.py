@@ -1,5 +1,5 @@
 # File: tests/core/test_bootstrap.py
-"""Tests for src.core.bootstrap.bootstrap().
+"""Tests for uadas_core.core.bootstrap.bootstrap().
 
 Verifies the fixed startup sequence documented in bootstrap.py's own
 module docstring: config load, logging configuration, and registration
@@ -14,15 +14,17 @@ from pathlib import Path
 
 import yaml
 
-from src.core.application_state import ApplicationState
-from src.core.bootstrap import BootstrapContext, bootstrap
-from src.core.config import AppConfig, load_config
-from src.plugins.plugin_manager import PluginManager
-from src.services.analysis_orchestrator_service import AnalysisOrchestratorService
-from src.services.project_service import ProjectService
-from src.services.report_service import ReportService
-from src.services.settings_service import SettingsService
-from src.services.workspace_service import WorkspaceService
+from uadas_core.core.application_state import ApplicationState
+from uadas_core.core.bootstrap import BootstrapContext, bootstrap
+from uadas_core.core.config import AppConfig, load_config
+from uadas_core.plugins.plugin_manager import PluginManager
+from uadas_core.services.analysis_orchestrator_service import (
+    AnalysisOrchestratorService,
+)
+from uadas_core.services.project_service import ProjectService
+from uadas_core.services.report_service import ReportService
+from uadas_core.services.settings_service import SettingsService
+from uadas_core.services.workspace_service import WorkspaceService
 
 
 def test_bootstrap_returns_populated_context(

@@ -1,5 +1,5 @@
 # File: tests/ai/test_assistant_service.py
-"""Tests for src.ai.assistant_service.AssistantService.
+"""Tests for uadas_core.ai.assistant_service.AssistantService.
 
 Grounded directly in AssistantService.send_message()/_execute_tool()
 (read in full before writing any assertion here), not assumptions:
@@ -53,12 +53,12 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from src.ai.assistant_service import AssistantService
-from src.ai.llm_provider import LLMTurn, PendingToolCall
-from src.ai.tool_registry import get_anthropic_tool_schemas
-from src.core.exceptions import ServiceError
-from src.services.workspace_service import Dataset, WorkspaceService
 from tests.ai.conftest import make_provider
+from uadas_core.ai.assistant_service import AssistantService
+from uadas_core.ai.llm_provider import LLMTurn, PendingToolCall
+from uadas_core.ai.tool_registry import get_anthropic_tool_schemas
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.services.workspace_service import Dataset, WorkspaceService
 
 _FAKE_API_KEY = "sk-test-not-a-real-key"
 
@@ -107,7 +107,7 @@ def test_cleaning_tool_result_is_added_as_new_dataset_not_a_mutation(
 
     # The originally-active dataset itself is untouched: same object,
     # same row count, same data (DropMissingValues.apply() never
-    # mutates its input — see src/cleaning/missing_values.py).
+    # mutates its input — see uadas_core/cleaning/missing_values.py).
     assert active_dataset.row_count == original_row_count
     pd.testing.assert_frame_equal(active_dataset.dataframe, original_dataframe_snapshot)
 

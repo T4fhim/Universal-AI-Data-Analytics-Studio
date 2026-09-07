@@ -14,7 +14,7 @@ reference material meant to be consulted *while* working. :class:`~src.ui.contro
 help_controller.HelpController` keeps one instance alive across the whole session and calls
 :meth:`show_anchor` again on every subsequent F1 press, the same "lazily construct once, reuse"
 shape :class:`~src.ui.controllers.assistant_controller.AssistantController` already uses for
-:class:`~src.ai.assistant_service.AssistantService`.
+:class:`~uadas_core.ai.assistant_service.AssistantService`.
 
 **Cross-reference links navigate in place.** Every manual page links to related pages by real,
 relative Markdown file path (``[Clean](../pipeline/clean.md)``) rather than a second, parallel
@@ -32,11 +32,11 @@ from __future__ import annotations
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import QDialog, QPushButton, QTextBrowser, QVBoxLayout, QWidget
 
-from src.core.exceptions import ServiceError
-from src.core.logger import get_logger
 from src.ui.a11y.accessible import describe
 from src.ui.help.manual_index import ManualIndex
 from src.ui.help.manual_renderer import ManualRenderer
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 

@@ -18,26 +18,26 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QFileDialog, QInputDialog, QMessageBox, QWidget
 
-from src.core.exceptions import ApplicationError, ServiceError
-from src.core.logger import get_logger
-from src.readers.reader_registry import get_reader_for_path
-from src.services.workspace_service import Dataset, WorkspaceService
 from src.ui.dock_manager import DockManager
 from src.ui.status_bar import ApplicationStatusBar
 from src.ui.ui_state_bus import UiStateBus
 from src.ui.worker_runner import WorkerRunner
+from uadas_core.core.exceptions import ApplicationError, ServiceError
+from uadas_core.core.logger import get_logger
+from uadas_core.readers.reader_registry import get_reader_for_path
+from uadas_core.services.workspace_service import Dataset, WorkspaceService
 
 _logger = get_logger(__name__)
 
-# Mirrors the extensions each reader in src.readers declares via its own
-# SUPPORTED_EXTENSIONS class attribute (see src.readers.base_reader.
+# Mirrors the extensions each reader in uadas_core.readers declares via its own
+# SUPPORTED_EXTENSIONS class attribute (see uadas_core.readers.base_reader.
 # BaseReader). Not built dynamically from those attributes at import time --
 # Qt's file-dialog filter syntax groups extensions under one
 # human-readable label per format, which doesn't map cleanly onto a flat
 # set union the way reader_registry.get_reader_for_path's own
 # error-message construction does; a hardcoded filter string here is
 # clearer than deriving one generically. This constant needs a manual
-# update whenever a new reader is added to src.readers, since nothing
+# update whenever a new reader is added to uadas_core.readers, since nothing
 # enforces the two staying in sync automatically.
 _DATASET_FILE_FILTER = (
     "All Supported Datasets (*.csv *.tsv *.json *.txt *.xlsx *.xls "
@@ -76,7 +76,7 @@ _TABLE_SELECTION_CANCELLED = object()
 # (a text-only PDF; a Word doc with no tables) that simply has nothing
 # tabular in it. This is not an error (the document isn't malformed) and
 # it is not the same as "exactly one table" (there is nothing to read at
-# all) -- see src.readers.base_reader.BaseReader.list_tables's own
+# all) -- see uadas_core.readers.base_reader.BaseReader.list_tables's own
 # docstring for how readers report this.
 _NO_TABLES_AVAILABLE = object()
 
@@ -234,7 +234,7 @@ class DatasetController:
             # warnings blocks forever exactly this way; the identical dataset with
             # zero warnings returns instantly. Non-fatal, informational content
             # (a skipped malformed row, an encoding fallback, an ambiguous-type
-            # column -- see the individual readers in src.readers for what each can
+            # column -- see the individual readers in uadas_core.readers for what each can
             # report here) does not need a blocking dialog to avoid being discarded
             # silently -- the Console dock (persistent until cleared, unlike the
             # transient status-bar message) already serves exactly this "don't lose
@@ -251,7 +251,7 @@ class DatasetController:
         exit" fix. Connected to :meth:`~src.ui.dock_manager.DockManager.
         connect_dataset_close_requested`'s "Close Dataset" context-menu action.
 
-        Per :meth:`~src.services.workspace_service.WorkspaceService.close_dataset`'s own
+        Per :meth:`~uadas_core.services.workspace_service.WorkspaceService.close_dataset`'s own
         docstring, this does **not** cascade to datasets derived from ``dataset_id`` -- a
         dangling ``parent_dataset_id`` on a child dataset is expected, not an error this
         method guards against (see that method's own reasoning).
@@ -285,7 +285,7 @@ class DatasetController:
     def _resolve_table_name(self, reader_class, dataset_path: Path):
         """Determine which table to read, prompting the user if more than one exists.
 
-        Calls :meth:`~src.readers.base_reader.BaseReader.list_tables`
+        Calls :meth:`~uadas_core.readers.base_reader.BaseReader.list_tables`
         unconditionally rather than only for readers known to be
         multi-table -- every reader supports this method (single-table
         readers inherit a default that returns one name derived from the
@@ -295,7 +295,7 @@ class DatasetController:
 
         Returns:
             ``None`` if the source has exactly one table (no picker was
-            needed; :meth:`~src.readers.base_reader.BaseReader.read`
+            needed; :meth:`~uadas_core.readers.base_reader.BaseReader.read`
             should be called with ``table_name=None``, which every reader
             handles correctly for the single-table case). A table name
             string if the user picked one from a multi-table source.
@@ -304,8 +304,8 @@ class DatasetController:
             :data:`_NO_TABLES_AVAILABLE` if the source has zero tables --
             a genuinely valid state for some formats (a text-only PDF, a
             Word document with no tables; see
-            :mod:`src.readers.pdf_reader` and
-            :mod:`src.readers.word_reader`), not an error condition.
+            :mod:`uadas_core.readers.pdf_reader` and
+            :mod:`uadas_core.readers.word_reader`), not an error condition.
             Callers must check for both sentinels specifically (not just
             falsiness) before proceeding, since ``None`` is itself a
             legitimate, different return value from either.
@@ -313,7 +313,7 @@ class DatasetController:
         If :meth:`list_tables` itself raises (a corrupted file, for
         instance), this method does not catch that -- it propagates to
         :meth:`open_dataset`'s caller, which already wraps the subsequent
-        :meth:`~src.readers.base_reader.BaseReader.read` call in the same
+        :meth:`~uadas_core.readers.base_reader.BaseReader.read` call in the same
         kind of error handling; letting this propagate the same way
         (rather than duplicating a try/except here) keeps error handling
         for "this file is unreadable" in one place regardless of which

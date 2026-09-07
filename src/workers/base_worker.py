@@ -23,7 +23,7 @@ from typing import Any
 
 from PySide6.QtCore import QObject, QRunnable, Signal
 
-from src.core.logger import get_logger
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 

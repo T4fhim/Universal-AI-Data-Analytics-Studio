@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 
-from src.core.app import Application
+from src.app import Application
 
 
 def main() -> int:

@@ -8,10 +8,10 @@ it) once that file crossed ``tests.ui.test_module_size``'s 400-line budget, the 
 handler" growth that module's own docstring already warns about and that motivated
 milestone 19's original controller extraction.
 
-Two responsibilities, both genuinely about :class:`~src.core.expertise_level.ExpertiseLevel`
+Two responsibilities, both genuinely about :class:`~uadas_core.core.expertise_level.ExpertiseLevel`
 and neither large enough to deserve its own controller:
 
-1. Recomputing :class:`~src.services.guidance_service.GuidanceService`'s ranked suggestions on
+1. Recomputing :class:`~uadas_core.services.guidance_service.GuidanceService`'s ranked suggestions on
    every workbench refresh and pushing the same list into every
    :class:`~src.ui.workbench.stage_page.StagePage`'s ``GuidancePanel`` (see
    :meth:`refresh_suggestions`), plus turning an activated suggestion's plain ``action_id``
@@ -30,15 +30,15 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from src.core.expertise_level import ExpertiseLevel
-from src.services.analysis_orchestrator_service import PipelineStage
-from src.services.guidance_service import GuidanceService
-from src.services.settings_service import SettingsService
-from src.services.workspace_service import Dataset
 from src.ui.actions.action_binder import ActionBinder
 from src.ui.dock_manager import DockManager
 from src.ui.theme.tokens import DENSITY_BY_EXPERTISE_LEVEL, Density
 from src.ui.workbench.workbench import Workbench
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
+from uadas_core.services.guidance_service import GuidanceService
+from uadas_core.services.settings_service import SettingsService
+from uadas_core.services.workspace_service import Dataset
 
 if TYPE_CHECKING:
     from src.ui.theme_manager import ThemeManager
@@ -83,7 +83,7 @@ class GuidanceController:
         self._dock_manager = dock_manager
         self._binder = binder
         # Set by set_theme_manager -- constructed after this controller, by
-        # src/core/app.py, the same reason MainWindow's own theme manager
+        # src/app.py, the same reason MainWindow's own theme manager
         # reference is attached post-construction (see MainWindow.
         # attach_theme_manager's docstring).
         self._theme_manager: ThemeManager | None = None
@@ -117,10 +117,10 @@ class GuidanceController:
         """Trigger the real, shared ``QAction`` for a ``GuidancePanel`` suggestion.
 
         Milestone 26's own acceptance criterion -- every ``Suggestion.action_id``
-        :class:`~src.services.guidance_service.GuidanceService` can ever produce resolves in
+        :class:`~uadas_core.services.guidance_service.GuidanceService` can ever produce resolves in
         :mod:`~src.ui.actions.action_registry` -- is what makes ``action_for(action_id)``
         below safe to call unconditionally: an unknown id would raise
-        :class:`~src.core.exceptions.ServiceError`, the correct "this should never happen"
+        :class:`~uadas_core.core.exceptions.ServiceError`, the correct "this should never happen"
         failure mode here, not a silently swallowed no-op.
         """
         self._binder.action_for(action_id).trigger()

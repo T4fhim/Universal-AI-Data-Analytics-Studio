@@ -1,2 +1,2 @@
 # File: tests/cleaning/__init__.py
-"""Tests for src.cleaning: cleaning operations."""
+"""Tests for uadas_core.cleaning: cleaning operations."""

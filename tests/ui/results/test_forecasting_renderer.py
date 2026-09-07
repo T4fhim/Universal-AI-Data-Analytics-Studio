@@ -13,9 +13,6 @@ from __future__ import annotations
 import pandas as pd
 import plotly.graph_objects as go
 
-from src.core.expertise_level import ExpertiseLevel
-from src.forecasting.exponential_smoothing import forecast_exponential_smoothing
-from src.forecasting.model_comparison import compare_forecast_models
 from src.ui.results.base_result_renderer import (
     FigureSection,
     KeyValueSection,
@@ -25,6 +22,9 @@ from src.ui.results.renderers.forecasting import (
     ForecastResultRenderer,
     ModelComparisonResultRenderer,
 )
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.forecasting.exponential_smoothing import forecast_exponential_smoothing
+from uadas_core.forecasting.model_comparison import compare_forecast_models
 
 
 def _series(n: int = 20) -> pd.DataFrame:

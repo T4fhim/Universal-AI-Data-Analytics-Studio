@@ -18,8 +18,8 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QApplication, QMainWindow
 
-from src.services.project_service import Project
 from src.ui.controllers.project_controller import ProjectController
+from uadas_core.services.project_service import Project
 
 
 class _FakeProjectService:

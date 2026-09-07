@@ -1,7 +1,7 @@
 # File: src/ui/widgets/lineage_view.py
 """Renders a dataset's ancestry/descent as a real tree -- previously orphaned data made visible.
 
-:meth:`~src.services.workspace_service.WorkspaceService.get_lineage` and :meth:`~src.services.
+:meth:`~uadas_core.services.workspace_service.WorkspaceService.get_lineage` and :meth:`~uadas_core.services.
 workspace_service.WorkspaceService.get_children` have existed since milestone 3a, but nothing in
 ``src/ui/`` ever called either before this milestone -- a cleaning operation's
 ``parent_dataset_id``/``derivation_description`` were recorded and then never shown to a user
@@ -20,8 +20,8 @@ compose alongside it -- unlike :class:`~src.ui.widgets.data_table.data_table_vie
 which legitimately needs to be a container because it *does* have more than one child widget.
 
 **Takes already-fetched data, not a service reference.** :meth:`show_lineage` accepts the plain
-``list[Dataset]`` results :meth:`~src.services.workspace_service.WorkspaceService.get_lineage`/
-:meth:`~src.services.workspace_service.WorkspaceService.get_children` already return, rather than
+``list[Dataset]`` results :meth:`~uadas_core.services.workspace_service.WorkspaceService.get_lineage`/
+:meth:`~uadas_core.services.workspace_service.WorkspaceService.get_children` already return, rather than
 a ``WorkspaceService`` instance to query itself -- this package must never import
 ``src.ui.controllers`` (enforced by ``tests/ui/test_import_layering.py``'s
 ``_WIDGET_LIKE_PACKAGES`` rule) and, more importantly, matches every other stage-page widget's
@@ -29,7 +29,7 @@ a ``WorkspaceService`` instance to query itself -- this package must never impor
 ``src/ui/workbench/__init__.py``: the caller (a controller) resolves the live data, this widget
 only renders whatever it is handed.
 
-**Only one level of descendants, deliberately.** :meth:`~src.services.workspace_service.
+**Only one level of descendants, deliberately.** :meth:`~uadas_core.services.workspace_service.
 WorkspaceService.get_children` itself only ever returns *direct* children, not a recursive
 subtree -- calling it again for each child to build a deeper tree would need this widget to hold
 a live service reference (the exact thing the paragraph above says it must not do). A caller
@@ -49,7 +49,7 @@ from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
 from src.ui.a11y.accessible import describe
 
 if TYPE_CHECKING:
-    from src.services.workspace_service import Dataset
+    from uadas_core.services.workspace_service import Dataset
 
 # Mirrors DockManager._populate_dataset_items's own Qt.ItemDataRole.UserRole convention for
 # stashing a dataset_id on a tree item -- NOT DisplayRole (0), which would silently overwrite
@@ -95,14 +95,14 @@ class LineageView(QTreeWidget):
         """Render ``ancestors`` (root first) -> ``target`` -> ``descendants`` as a nested tree.
 
         Args:
-            ancestors: :meth:`~src.services.workspace_service.WorkspaceService.get_lineage`'s
+            ancestors: :meth:`~uadas_core.services.workspace_service.WorkspaceService.get_lineage`'s
                 return value for ``target`` -- root-first, each one the parent of the next,
                 ending immediately before ``target`` itself.
             target: The dataset this lineage is centered on -- rendered as the deepest ancestor
                 item's child (or as the tree's own root item, if ``ancestors`` is empty). ``None``
                 clears the tree back to its initial placeholder, the same "nothing to show yet"
                 state a freshly constructed view starts in.
-            descendants: :meth:`~src.services.workspace_service.WorkspaceService.get_children`'s
+            descendants: :meth:`~uadas_core.services.workspace_service.WorkspaceService.get_children`'s
                 return value for ``target`` -- rendered as ``target``'s own children. See this
                 module's own docstring for why this is only one level deep.
         """

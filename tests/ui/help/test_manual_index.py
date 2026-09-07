@@ -15,9 +15,9 @@ from pathlib import Path
 
 import pytest
 
-from src.core.exceptions import ServiceError
 from src.ui.help import manual_index as manual_index_module
 from src.ui.help.manual_index import ManualIndex
+from uadas_core.core.exceptions import ServiceError
 
 
 @pytest.fixture()

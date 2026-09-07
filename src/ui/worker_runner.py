@@ -30,8 +30,8 @@ from typing import Any
 from PySide6.QtCore import QObject, Qt, QThreadPool
 from PySide6.QtWidgets import QMessageBox, QWidget
 
-from src.core.logger import get_logger
 from src.workers import BaseWorker
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 
@@ -40,9 +40,9 @@ def _guarded(label: str, callback: Callable[..., None]) -> Callable[..., None]:
     """Wrap a ``WorkerRunner.run()`` callback so it can never fail silently.
 
     Real, previously-undetected defect this fixes: a dataset load's own reader
-    logged success (``src.readers.csv_reader | Read CSV file ...``), but
+    logged success (``uadas_core.readers.csv_reader | Read CSV file ...``), but
     neither of ``DatasetController.load_dataset``'s own log lines
-    (``Added dataset to workspace`` from :class:`~src.services.workspace_service.
+    (``Added dataset to workspace`` from :class:`~uadas_core.services.workspace_service.
     WorkspaceService`, then ``Dataset opened via UI``) ever appeared -- meaning
     ``on_result`` started running and then stopped, silently, partway through.
     :class:`~src.workers.base_worker.BaseWorker`'s own docstring already names

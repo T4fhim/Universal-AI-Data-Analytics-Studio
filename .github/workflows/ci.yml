@@ -68,10 +68,10 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: black --check
-        run: python -m black --check src/ tests/
+        run: python -m black --check src/ uadas_core/ tests/
 
       - name: isort --check-only
-        run: python -m isort --check-only src/ tests/
+        run: python -m isort --check-only src/ uadas_core/ tests/
 
       - name: mypy (clean packages)
         # Scoped, not repo-wide: this scope was frozen at four foundation
@@ -114,7 +114,7 @@ jobs:
         # mypy using their type signatures for checking the modules listed
         # here while not holding them responsible for fixing debt in modules
         # they merely call into.
-        run: python -m mypy src/core src/services src/analysis src/database
+        run: python -m mypy uadas_core/core uadas_core/services uadas_core/analysis uadas_core/database
           src/workers src/ui/theme src/ui/a11y src/ui/web src/ui/actions
           src/ui/controllers src/ui/workbench src/ui/widgets src/ui/results
           src/ui/dialogs src/ui/help src/ui/command_stack.py
@@ -304,7 +304,10 @@ jobs:
         run: python -m pip install ruff==0.16.3 bandit==1.9.4 black==26.5.1 isort==8.0.1
 
       - name: ruff check
-        run: python -m ruff check src/ tests/
+        run: python -m ruff check src/ uadas_core/ tests/
+
+      - name: import-linter (uadas_core stays Qt-free)
+        run: lint-imports
 
       - name: bandit
         # `bandit -r src -q` has a pre-existing set of accepted low/medium
@@ -323,13 +326,13 @@ jobs:
         #                                 REMOVED from this skip list in
         #                                 Phase 1.8, which gates execute_query
         #                                 behind an explicit capability.
-        run: python -m bandit -r src -q --skip B101,B107,B608
+        run: python -m bandit -r src uadas_core -q --skip B101,B107,B608
 
       - name: black --check
-        run: python -m black --check src/ tests/
+        run: python -m black --check src/ uadas_core/ tests/
 
       - name: isort --check-only
-        run: python -m isort --check-only src/ tests/
+        run: python -m isort --check-only src/ uadas_core/ tests/
 
   dco:
     # Phase 0.8: Developer Certificate of Origin. Every commit introduced

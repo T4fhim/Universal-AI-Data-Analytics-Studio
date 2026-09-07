@@ -11,7 +11,7 @@ the session (the exact defect the plan's Context section names as its own top co
 Holds no service references (see this package's ``__init__`` docstring): every method here
 takes plain, already-computed data and either renders it or emits a signal. The one exception
 worth naming is that :meth:`update_pipeline_state` imports nothing new to do this -- it works
-entirely off :class:`~src.services.analysis_orchestrator_service.AnalysisLog`/``StageProposal``,
+entirely off :class:`~uadas_core.services.analysis_orchestrator_service.AnalysisLog`/``StageProposal``,
 both plain dataclasses with no Qt or service-instance dependency of their own.
 """
 
@@ -19,16 +19,16 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QHBoxLayout, QStackedWidget, QWidget
 
-from src.core.logger import get_logger
-from src.services.analysis_orchestrator_service import (
-    AnalysisLog,
-    PipelineStage,
-    StageProposal,
-)
 from src.ui.workbench.pages.welcome_page import WelcomePage
 from src.ui.workbench.stage_page import StagePage
 from src.ui.workbench.stage_rail import StageRail
 from src.ui.workbench.stage_registry import get_stage_page_class, list_registered_stages
+from uadas_core.core.logger import get_logger
+from uadas_core.services.analysis_orchestrator_service import (
+    AnalysisLog,
+    PipelineStage,
+    StageProposal,
+)
 
 _logger = get_logger(__name__)
 
@@ -146,17 +146,17 @@ class Workbench(QWidget):
             dataset_active: Whether a dataset is currently active. When ``True``,
                 ``PipelineStage.UPLOAD`` is shown complete on the rail -- UPLOAD is never
                 itself run through
-                :meth:`~src.services.analysis_orchestrator_service.AnalysisOrchestratorService.run_stage`
+                :meth:`~uadas_core.services.analysis_orchestrator_service.AnalysisOrchestratorService.run_stage`
                 (see that module's ``_AUTO_PROPOSED_STAGES`` comment), so "a dataset exists"
                 is the only signal this method has for it. When ``False``, the workbench
                 switches to the welcome page -- this is the "opening a dataset transitions
                 the center pane" behavior; closing the active dataset (there is currently no
                 UI action that does this) would transition back.
             log: The active dataset's
-                :class:`~src.services.analysis_orchestrator_service.AnalysisLog`, or ``None``
+                :class:`~uadas_core.services.analysis_orchestrator_service.AnalysisLog`, or ``None``
                 if no dataset is active.
             proposal: The current
-                :class:`~src.services.analysis_orchestrator_service.StageProposal`, or
+                :class:`~uadas_core.services.analysis_orchestrator_service.StageProposal`, or
                 ``None`` if no dataset is active.
         """
         completed = set(log.completed_stages()) if log is not None else set()

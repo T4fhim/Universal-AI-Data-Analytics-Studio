@@ -10,9 +10,6 @@ than dumping ``transformed``/``labels`` in full.
 
 from __future__ import annotations
 
-from src.analysis.clustering import ClusteringResult
-from src.analysis.pca import PcaResult
-from src.core.expertise_level import ExpertiseLevel
 from src.ui.results.base_result_renderer import (
     BaseResultRenderer,
     KeyValueSection,
@@ -20,10 +17,13 @@ from src.ui.results.base_result_renderer import (
     ResultSection,
     TableSection,
 )
+from uadas_core.analysis.clustering import ClusteringResult
+from uadas_core.analysis.pca import PcaResult
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 
 class PcaResultRenderer(BaseResultRenderer):
-    """Renderer for :class:`~src.analysis.pca.PcaResult`."""
+    """Renderer for :class:`~uadas_core.analysis.pca.PcaResult`."""
 
     @classmethod
     def title(cls, result: PcaResult) -> str:
@@ -81,7 +81,7 @@ class PcaResultRenderer(BaseResultRenderer):
 
 
 class ClusteringResultRenderer(BaseResultRenderer):
-    """Renderer for :class:`~src.analysis.clustering.ClusteringResult`."""
+    """Renderer for :class:`~uadas_core.analysis.clustering.ClusteringResult`."""
 
     @classmethod
     def title(cls, result: ClusteringResult) -> str:

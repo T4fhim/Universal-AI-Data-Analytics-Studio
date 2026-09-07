@@ -1,13 +1,13 @@
 # File: tests/ai/test_provider_rotation.py
 """Covers milestone 29's ``ai.active_provider_index`` wiring: previously stored, never read.
 
-Before this milestone, :meth:`~src.ai.provider_rotation.ProviderRotationService.
+Before this milestone, :meth:`~uadas_core.ai.provider_rotation.ProviderRotationService.
 from_config_profiles` always started at index 0 regardless of what ``ai.active_provider_index``
 said -- confirmed directly against the pre-milestone-29 source before writing this test, not
-assumed. These tests exercise :class:`~src.ai.provider_rotation.ProviderRotationService`
-directly (not through a real :class:`~src.ai.llm_provider.BaseLLMProvider`) since
+assumed. These tests exercise :class:`~uadas_core.ai.provider_rotation.ProviderRotationService`
+directly (not through a real :class:`~uadas_core.ai.llm_provider.BaseLLMProvider`) since
 ``active_profile``/``_index`` bookkeeping is independent of which provider type is configured --
-:meth:`~src.ai.provider_rotation.ProviderRotationService.current_provider` (which does
+:meth:`~uadas_core.ai.provider_rotation.ProviderRotationService.current_provider` (which does
 construct a real provider client) is exercised by ``tests/ai/test_assistant_service.py`` instead.
 """
 
@@ -15,8 +15,11 @@ from __future__ import annotations
 
 import pytest
 
-from src.ai.provider_rotation import ProviderRotationService, ResolvedProviderProfile
-from src.core.exceptions import ServiceError
+from uadas_core.ai.provider_rotation import (
+    ProviderRotationService,
+    ResolvedProviderProfile,
+)
+from uadas_core.core.exceptions import ServiceError
 
 _PROFILES = [
     ResolvedProviderProfile(name="first", provider_type="anthropic", api_key="k1"),

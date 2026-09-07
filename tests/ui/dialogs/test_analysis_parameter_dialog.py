@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QLineEdit
 
-from src.ai.tool_registry import get_tool_by_name
 from src.ui.dialogs.analysis_parameter_dialog import AnalysisParameterDialog
+from uadas_core.ai.tool_registry import get_tool_by_name
 
 
 def test_column_shaped_fields_become_combo_boxes_of_real_columns(

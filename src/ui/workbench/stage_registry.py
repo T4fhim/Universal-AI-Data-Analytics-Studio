@@ -1,18 +1,18 @@
 # File: src/ui/workbench/stage_registry.py
 """The registry of which :class:`StagePage` renders each pipeline stage.
 
-Mirrors :mod:`src.visualization.chart_registry`'s shape exactly, per this overhaul's
+Mirrors :mod:`uadas_core.visualization.chart_registry`'s shape exactly, per this overhaul's
 cross-cutting rule 3 ("new registries mirror chart_registry.py exactly"): a frozen
 dataclass registration, a module-level ``_REGISTRY`` dict, ``register_stage_page`` raising
-:class:`~src.core.exceptions.ServiceError` on a duplicate stage, plus ``get_stage_page_class``/
+:class:`~uadas_core.core.exceptions.ServiceError` on a duplicate stage, plus ``get_stage_page_class``/
 ``list_registered_stages``/``unregister_stage_page``.
 
-Only stages with an actually-built page register here. :class:`~src.services.
+Only stages with an actually-built page register here. :class:`~uadas_core.services.
 analysis_orchestrator_service.PipelineStage` has ten members; milestone 20 shipped pages for
 UNDERSTAND, REPORT, and REPRODUCE, milestone 22 added EXPLORE/ANALYZE/EXPLAIN, milestone 23 added
 CLEAN, milestone 24 added VISUALIZE, and milestone 25 adds PREDICT (UPLOAD has no page at all --
 it is represented by the welcome page, which is not itself a stage page since "no dataset yet"
-has no :class:`~src.services.analysis_orchestrator_service.PipelineStage` value that fits it).
+has no :class:`~uadas_core.services.analysis_orchestrator_service.PipelineStage` value that fits it).
 :class:`~src.ui.workbench.workbench.Workbench` asks this registry which stages have real
 content and simply does not switch its stack to a stage with none -- see
 :meth:`~src.ui.workbench.workbench.Workbench._on_stage_selected`.
@@ -22,10 +22,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.core.exceptions import ServiceError
-from src.core.logger import get_logger
-from src.services.analysis_orchestrator_service import PipelineStage
 from src.ui.workbench.stage_page import StagePage
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.core.logger import get_logger
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
 
 _logger = get_logger(__name__)
 
@@ -35,7 +35,7 @@ class StagePageRegistration:
     """One registered stage page.
 
     Attributes:
-        stage: The :class:`~src.services.analysis_orchestrator_service.PipelineStage`
+        stage: The :class:`~uadas_core.services.analysis_orchestrator_service.PipelineStage`
             this page renders.
         page_class: The :class:`~src.ui.workbench.stage_page.StagePage` subclass.
     """
@@ -52,11 +52,11 @@ def register_stage_page(stage: PipelineStage, page_class: type[StagePage]) -> No
 
     Raises:
         ServiceError: If ``stage`` is already registered (matching
-            :func:`~src.visualization.chart_registry.register_chart`'s own "no
+            :func:`~uadas_core.visualization.chart_registry.register_chart`'s own "no
             last-registration-wins" convention), or if ``page_class.stage`` does
             not equal ``stage`` -- a page class registered under the wrong stage
             would silently mislabel itself (e.g. its guidance card would never
-            receive :class:`~src.services.analysis_orchestrator_service.StageProposal`
+            receive :class:`~uadas_core.services.analysis_orchestrator_service.StageProposal`
             updates, since :class:`~src.ui.workbench.workbench.Workbench` matches
             proposals against ``page_class.stage``, not the registry key).
     """
@@ -81,7 +81,7 @@ def get_stage_page_class(stage: PipelineStage) -> type[StagePage] | None:
     """Return the registered page class for ``stage``, or ``None`` if none is registered.
 
     Returns ``None`` rather than raising -- unlike
-    :func:`~src.visualization.chart_registry.get_chart`, an unregistered stage is an
+    :func:`~uadas_core.visualization.chart_registry.get_chart`, an unregistered stage is an
     expected, ordinary state here (most of the ten stages have no page yet), not a caller
     error to report loudly.
     """
@@ -106,19 +106,19 @@ def _register_builtins() -> None:
     :mod:`~src.ui.workbench.pages.understand_page` and its siblings import
     :class:`StagePage` from this package's sibling module, not from here, so there is no
     real import cycle either way; the local import is kept purely to match
-    :func:`~src.visualization.chart_registry._register_builtins`'s own "populate at the
+    :func:`~uadas_core.visualization.chart_registry._register_builtins`'s own "populate at the
     bottom, after every name this function needs already exists" shape.
 
     Milestone 22 adds EXPLORE/ANALYZE/EXPLAIN -- see
     :mod:`~src.ui.workbench.pages.analyze_page`'s own docstring for why these pages call
-    :mod:`src.analysis` directly rather than through the orchestrator's ``run_stage``, and for
+    :mod:`uadas_core.analysis` directly rather than through the orchestrator's ``run_stage``, and for
     the real integration gap this leaves (``main_window.py`` does not yet wire their
     ``set_dataset``/``run_*`` methods to a live dataset-changed signal the way
     :class:`~src.ui.controllers.pipeline_controller.PipelineController` does for UNDERSTAND).
 
     Milestone 23 adds CLEAN -- see :mod:`~src.ui.workbench.pages.clean_page`'s own docstring for
-    why it dispatches through :mod:`~src.cleaning.operation_registry` directly rather than
-    :mod:`src.ai.tool_registry`, unlike EXPLORE/ANALYZE/EXPLAIN.
+    why it dispatches through :mod:`~uadas_core.cleaning.operation_registry` directly rather than
+    :mod:`uadas_core.ai.tool_registry`, unlike EXPLORE/ANALYZE/EXPLAIN.
 
     Milestone 24 adds VISUALIZE -- see :mod:`~src.ui.workbench.pages.visualize_page`'s own
     docstring for its column-picker/recommendation/chart+table-split shape.
