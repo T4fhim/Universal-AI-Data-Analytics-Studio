@@ -105,6 +105,11 @@ jobs:
         # `cast()` calls at its new DependencyContainer.resolve() call sites to stay clean --
         # see that module's own comment for why cast(), not a blind `type: ignore`.
         #
+        # Web-transition Phase 1.2 adds uadas_core/jobs (the Qt-free JobRunner
+        # protocol + ThreadPoolExecutor implementation + the default-runner
+        # bridge) -- a new, genuinely clean package, folded in per the same
+        # convention rather than left to go stale.
+        #
         # --follow-imports=silent: several of these modules (e.g.
         # controllers/*, actions/action_context.py) import the services
         # layer (ProjectService/WorkspaceService/SettingsService/
@@ -115,6 +120,7 @@ jobs:
         # here while not holding them responsible for fixing debt in modules
         # they merely call into.
         run: python -m mypy uadas_core/core uadas_core/services uadas_core/analysis uadas_core/database uadas_core/results
+          uadas_core/jobs
           src/workers src/ui/theme src/ui/a11y src/ui/web src/ui/actions
           src/ui/controllers src/ui/workbench src/ui/widgets src/ui/results
           src/ui/dialogs src/ui/help src/ui/command_stack.py
