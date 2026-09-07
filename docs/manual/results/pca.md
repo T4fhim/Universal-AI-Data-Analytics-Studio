@@ -7,7 +7,7 @@ anchors:
 
 # Principal Component Analysis (PCA)
 
-`src.analysis.pca.compute_pca` -- via scikit-learn. Reduces a set of numeric columns to a
+`uadas_core.analysis.pca.compute_pca` -- via scikit-learn. Reduces a set of numeric columns to a
 smaller number of uncorrelated components that capture as much of the original variance as
 possible.
 

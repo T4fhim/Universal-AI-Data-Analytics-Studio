@@ -6,7 +6,7 @@ anchors:
 
 # JSON Reader
 
-`src.readers.json_reader.JsonReader` -- `.json`.
+`uadas_core.readers.json_reader.JsonReader` -- `.json`.
 
 JSON does not guarantee tabular structure the way a CSV file's rows and columns do. This
 reader handles three shapes, in order of how directly tabular they are:

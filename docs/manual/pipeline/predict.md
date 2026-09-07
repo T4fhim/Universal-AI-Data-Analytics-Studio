@@ -11,7 +11,7 @@ forecast it -- Automatic Model Competition runs every applicable model and picks
 by holdout accuracy.
 
 Pick one of the five forecasters directly, or run **Automatic Model Competition**
-(`src.forecasting.model_comparison.compare_forecast_models`), which fits every candidate model
+(`uadas_core.forecasting.model_comparison.compare_forecast_models`), which fits every candidate model
 against a held-out tail of the series, scores each by how well it predicted values it did not
 see, and reports the best-ranked one -- while still fitting every model's *actual* returned
 forecast on the full series (the holdout split is only used to choose which model to trust).

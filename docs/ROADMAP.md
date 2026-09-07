@@ -28,7 +28,7 @@ every milestone is separately git-tagged; this is reconstructed from in-code cit
   from its 1a placeholder to actually construct `QApplication` and enter the Qt event loop.
 - **2a** — First three file readers: CSV/TSV, JSON, plain text. `Dataset` extended from a
   name/path placeholder to hold real loaded data. Type-inference ambiguous-column detection
-  introduced (`src/readers/type_inference.py`), revised twice during this milestone per its own
+  introduced (`uadas_core/readers/type_inference.py`), revised twice during this milestone per its own
   docstring.
 - **2b** — Excel and SQLite readers — the first two formats with a genuine multi-table concept,
   which is why `BaseReader.list_tables()` and `read()`'s `table_name` parameter were added at
@@ -43,20 +43,20 @@ every milestone is separately git-tagged; this is reconstructed from in-code cit
   operations' "never mutate in place" contract.
 - **3b** — `ProjectService` extended to track which datasets are source-file-backed, per its own
   docstring ("as of milestone 3b — which source-file-backed" datasets a project references).
-- **Analysis module** (`src/analysis/`) — column/dataset profiling, correlation, aggregation,
+- **Analysis module** (`uadas_core/analysis/`) — column/dataset profiling, correlation, aggregation,
   crosstab. No explicit milestone number is cited in this package's own docstrings, but its
   module docstring states it depends on `core`, `services`, and `readers`, placing it after the
   reader milestones above.
-- **Forecasting module** (`src/forecasting/`) — exponential smoothing and Prophet-based
+- **Forecasting module** (`uadas_core/forecasting/`) — exponential smoothing and Prophet-based
   forecasting. Likewise undated in its own docstrings.
 - **5a** — Chart-building backend: `BaseChart`, categorical (bar/pie), continuous, and
   distribution chart types, plus dashboard composition (`dashboard_renderer.py`) — backend only,
-  no UI embedding yet at this point per `src/visualization/__init__.py`'s own docstring.
+  no UI embedding yet at this point per `uadas_core/visualization/__init__.py`'s own docstring.
 - **5b** — Chart UI embedding: `ChartView` (QWebEngineView-based rendering via temp-file HTML),
   the Chart dock in `DockManager`, and `CreateVisualizationDialog`. `Visualization`'s
   `chart_type`/`chart_parameters` fields are recorded at this point for a not-yet-built
   "rebuild against updated data" feature, per `workspace_service.py`'s own docstring.
-- **AI assistant layer** (`src/ai/`) — `BaseLLMProvider` abstraction (Anthropic, Gemini, Groq
+- **AI assistant layer** (`uadas_core/ai/`) — `BaseLLMProvider` abstraction (Anthropic, Gemini, Groq
   providers), `tool_registry.py` (wraps existing cleaning/analysis/forecasting functions as
   LLM-callable tools, inventing no new capability), and `AssistantService` (the provider-neutral
   tool-dispatch loop). Per `tool_registry.py`'s own docstring, every tool it exposes "calls
@@ -66,29 +66,29 @@ every milestone is separately git-tagged; this is reconstructed from in-code cit
   report generation off the UI thread.
 - **7** — Provider-agnostic AI config: `ai.providers` profile list (replacing a single
   provider/api key pair), Groq multi-key rotation.
-- **8** — Progressive Expertise: `src/core/expertise_level.py`'s `ExpertiseLevel` enum, and
-  `src/analysis/explanation.py`'s `Explanation` shape the AI layer fills in about an
+- **8** — Progressive Expertise: `uadas_core/core/expertise_level.py`'s `ExpertiseLevel` enum, and
+  `uadas_core/analysis/explanation.py`'s `Explanation` shape the AI layer fills in about an
   already-computed result.
 - **9** — Guided Universal Data Scientist pipeline: `AnalysisOrchestratorService`,
   `PipelineStage`, `AnalysisLog`/`AnalysisLogEntry` (the Reproducible Analysis record every later
   reporting feature replays).
 - **10** — Foundational UI overhaul: AI chat panel, multi-chart tabs, tree-based Dataset Explorer,
   wired Console dock.
-- **11** — Statistics & forecasting expansion: `src/analysis/` gained t-tests, ANOVA, chi-square,
-  linear regression, normality checks, PCA, k-means; `src/forecasting/` gained linear-regression,
+- **11** — Statistics & forecasting expansion: `uadas_core/analysis/` gained t-tests, ANOVA, chi-square,
+  linear regression, normality checks, PCA, k-means; `uadas_core/forecasting/` gained linear-regression,
   ARIMA (`pmdarima`), and Random Forest forecasters plus `model_comparison.py`'s Automatic Model
-  Competition across all five methods; `src/visualization/` gained Heatmap/Bubble/Treemap/Radar/
+  Competition across all five methods; `uadas_core/visualization/` gained Heatmap/Bubble/Treemap/Radar/
   Waterfall/Funnel charts and `chart_recommender.py`'s Smart Visualization Selection.
-- **12** — Plugin system: `src/plugins/` (`PluginManifest`, `discover_plugins`, `PluginManager`),
+- **12** — Plugin system: `uadas_core/plugins/` (`PluginManifest`, `discover_plugins`, `PluginManager`),
   plus the shared `chart_registry.py`/`operation_registry.py`/extended `reader_registry.py` every
   plugin category registers into.
-- **13** — Reporting: `src/reports/` (`BaseReportExporter` and PDF/HTML/Word/Excel exporters,
-  each rendering a shared `ReportContent`), `src/services/report_service.py` (replays a dataset's
+- **13** — Reporting: `uadas_core/reports/` (`BaseReportExporter` and PDF/HTML/Word/Excel exporters,
+  each rendering a shared `ReportContent`), `uadas_core/services/report_service.py` (replays a dataset's
   `AnalysisLog` into a report — Reproducible Analysis and Reporting share the same underlying
   data), and the "Generate Report" wizard in the Analysis menu.
-- **14** — Additional readers/database connectivity: seven more `src/readers/` formats (ODS,
+- **14** — Additional readers/database connectivity: seven more `uadas_core/readers/` formats (ODS,
   YAML, Parquet, Feather, PowerPoint, HTML tables, ZIP/GZIP), bringing the reader count to
-  sixteen; `src/database/` (`BaseDatabaseConnection` — a second deliberate exception to the
+  sixteen; `uadas_core/database/` (`BaseDatabaseConnection` — a second deliberate exception to the
   stateless `Base*` pattern alongside `BaseLLMProvider` — with PostgreSQL/MySQL/SQL Server/
   Oracle/DuckDB connectors, `ConnectionProfile` deliberately holding no password field, and
   `DatabaseReader`, which does not subclass `BaseReader` since a live connection has no path to
@@ -120,7 +120,7 @@ Still genuinely absent (carried into web-transition scope, not desktop):
 - **Association rules.** Explicitly deferred in milestone 11 (no `mlxtend` dependency).
 - **Report-format plugin extensibility and a `forecast_models`/`ai_providers` plugin category.**
   Both deliberately excluded from milestone 12's plugin system — see
-  `src/plugins/plugin_manifest.py`'s `SUPPORTED_CATEGORIES` and `src/services/report_service.py`'s
+  `uadas_core/plugins/plugin_manifest.py`'s `SUPPORTED_CATEGORIES` and `uadas_core/services/report_service.py`'s
   own docstrings for why.
 - **Orchestrator REPORT-stage UI.** `AnalysisOrchestratorService` is registered in the dependency
   container but was never resolved by any UI code before milestone 13 — "Generate Report" is

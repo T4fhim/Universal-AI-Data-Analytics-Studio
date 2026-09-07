@@ -6,7 +6,7 @@ anchors:
 
 # ARIMA / SARIMA
 
-`src.forecasting.arima_forecast.forecast_arima` -- via `pmdarima`'s `auto_arima` over
+`uadas_core.forecasting.arima_forecast.forecast_arima` -- via `pmdarima`'s `auto_arima` over
 `statsmodels`.
 
 Uses `auto_arima` rather than requiring you to specify `(p, d, q)` orders directly -- like this

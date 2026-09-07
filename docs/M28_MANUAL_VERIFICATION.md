@@ -35,7 +35,7 @@ and, from the plan's "Tools: CI, screen readers, profiling, previews" section:
   `TOKENS_BY_NAME`, so this was already true and is now additionally exercised via
   `audit_widget_tree`'s own contrast rule in `tests/ui/a11y/test_audit.py`.
 - `accessibility.reduced_motion` and `accessibility.base_font_size` are real `config.yaml` keys
-  (default `false` / `13`), applied at startup (`src/core/app.py`) and live from the Settings dialog
+  (default `false` / `13`), applied at startup (`src/app.py`) and live from the Settings dialog
   (`ThemeController.apply_theme_from_settings`), and actually change runtime behavior: reduced motion
   swaps the status bar's indeterminate ("marquee") busy indicator for a static, fully-filled bar
   (`ApplicationStatusBar.set_reduced_motion`) — the one piece of continuous animation that existed

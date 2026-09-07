@@ -7,7 +7,7 @@ anchors:
 
 # One-Way ANOVA
 
-`src.analysis.anova.one_way_anova` -- via `scipy.stats`. The multi-group equivalent of the
+`uadas_core.analysis.anova.one_way_anova` -- via `scipy.stats`. The multi-group equivalent of the
 [t-test](t_test.md): compares the means of three or more groups (split by one categorical
 column) on a single numeric measure, in one test, rather than running repeated pairwise
 t-tests, which would inflate the false-positive rate.

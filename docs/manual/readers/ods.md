@@ -6,7 +6,7 @@ anchors:
 
 # OpenDocument Spreadsheet Reader
 
-`src.readers.ods_reader.OdsReader` -- `.ods`.
+`uadas_core.readers.ods_reader.OdsReader` -- `.ods`.
 
 Same multi-table shape as [the Excel reader](excel.md) (one sheet per read) -- the two formats
 differ only in container format, not in the "workbook with one or more worksheets" concept, so

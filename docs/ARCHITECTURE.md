@@ -39,10 +39,10 @@ Dependency direction is one-way down this list: `core` depends on nothing else i
 
 ## Application startup sequence
 
-`main.py` → `Application.create()` (`src/core/app.py`) → `bootstrap()` (`src/core/bootstrap.py`),
+`main.py` → `Application.create()` (`src/app.py`) → `bootstrap()` (`uadas_core/core/bootstrap.py`),
 in a fixed order:
 
-1. **`AppConfig.load()`** (`src/core/config.py`) — reads `config/config.yaml`; self-healing,
+1. **`AppConfig.load()`** (`uadas_core/core/config.py`) — reads `config/config.yaml`; self-healing,
    writes a default file if missing or empty. Deliberately does not import the project logger,
    since logging configuration is itself sourced from config — it uses a bare
    `logging.getLogger` for its own bootstrap-time messages.
@@ -61,7 +61,7 @@ configured theme via `ThemeManager`, builds `MainWindow`, and enters the Qt even
 
 ## Dependency container
 
-`src/core/dependency_container.py` is a minimal service locator: `register(key, factory,
+`uadas_core/core/dependency_container.py` is a minimal service locator: `register(key, factory,
 singleton=True)` / `resolve(key)`. Keys are conventionally the service's type. Registration is
 lazy — a factory only runs on first `resolve()` call, and (for singletons) only once. New
 session-wide services are registered in `bootstrap.py` alongside the existing ones, not
@@ -75,10 +75,10 @@ validated before real work happens.
 
 | Base class | Package | Concrete implementations (current) |
 |---|---|---|
-| `BaseReader` | `src/readers/base_reader.py` | CSV, JSON, Text, Excel, SQLite, PDF, Word, XML, Image |
-| `BaseOperation` | `src/cleaning/base_operation.py` | duplicates, missing values, text normalization, type conversion |
-| `BaseChart` | `src/visualization/base_chart.py` | categorical (bar/pie), continuous, distribution charts |
-| `BaseLLMProvider` | `src/ai/llm_provider.py` | Anthropic, Gemini, Groq |
+| `BaseReader` | `uadas_core/readers/base_reader.py` | CSV, JSON, Text, Excel, SQLite, PDF, Word, XML, Image |
+| `BaseOperation` | `uadas_core/cleaning/base_operation.py` | duplicates, missing values, text normalization, type conversion |
+| `BaseChart` | `uadas_core/visualization/base_chart.py` | categorical (bar/pie), continuous, distribution charts |
+| `BaseLLMProvider` | `uadas_core/ai/llm_provider.py` | Anthropic, Gemini, Groq |
 
 `BaseLLMProvider` is the one exception to "stateless classmethod-only" — it holds a real SDK
 client and conversation history, since a provider genuinely needs instance state. Each provider
@@ -92,7 +92,7 @@ explaining the change. This is what makes dataset lineage (and eventually undo) 
 
 ## Workspace model
 
-`WorkspaceService` (`src/services/workspace_service.py`) is the session-scoped, in-memory
+`WorkspaceService` (`uadas_core/services/workspace_service.py`) is the session-scoped, in-memory
 registry of everything loaded or created during a run. It does not read files or build charts
 itself — it only tracks what other layers produced.
 
@@ -112,7 +112,7 @@ against.
 
 ## Configuration
 
-`_default_config_dict()` in `src/core/config.py` is the single source of truth for the config
+`_default_config_dict()` in `uadas_core/core/config.py` is the single source of truth for the config
 shape; `validate_config_structure()` checks both a freshly loaded file and any write from
 `SettingsService`. `AppConfig` is a frozen dataclass — read through its typed properties, not
 by indexing a raw dict. **Adding a new config key requires updating three places together**:
@@ -120,7 +120,7 @@ by indexing a raw dict. **Adding a new config key requires updating three places
 
 ## Exceptions
 
-Every custom exception inherits from `ApplicationError` (`src/core/exceptions.py`). Current
+Every custom exception inherits from `ApplicationError` (`uadas_core/core/exceptions.py`). Current
 categories: `ReaderError`, `ServiceError`, `ConfigError`, `DependencyResolutionError`,
 `ApplicationStateError`, `BootstrapError`. A new subclass is added only when a caller genuinely
 needs to catch that specific failure mode.
@@ -128,7 +128,7 @@ needs to catch that specific failure mode.
 ## Path resolution
 
 All fixed paths (`config/`, `logs/`, `projects/`) are anchored to the project root via
-`src/core/constants.py`'s `PROJECT_ROOT`, derived from that file's own location rather than
+`uadas_core/core/constants.py`'s `PROJECT_ROOT`, derived from that file's own location rather than
 `Path.cwd()` — so behavior doesn't depend on the working directory the app is launched from.
 
 ## PySide6/Qt layer specifics

@@ -6,7 +6,7 @@ anchors:
 
 # Text Reader
 
-`src.readers.text_reader.TextReader` -- `.txt`.
+`uadas_core.readers.text_reader.TextReader` -- `.txt`.
 
 A `.txt` file has no inherent tabular structure. This reader handles the two situations that
 actually occur in practice, honestly rather than forcing every text file into the same shape:

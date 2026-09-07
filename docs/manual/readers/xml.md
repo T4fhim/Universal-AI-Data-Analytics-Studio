@@ -6,7 +6,7 @@ anchors:
 
 # XML Reader
 
-`src.readers.xml_reader.XmlReader` -- `.xml`.
+`uadas_core.readers.xml_reader.XmlReader` -- `.xml`.
 
 XML has no single canonical "this is a table" shape the way JSON's array-of-objects does. This
 reader's strategy: find the child tag name that repeats most often directly under the document

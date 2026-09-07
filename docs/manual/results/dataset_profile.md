@@ -7,9 +7,9 @@ anchors:
 
 # Dataset Profile
 
-`src.analysis.dataset_profile.profile_dataset` -- the result of the
+`uadas_core.analysis.dataset_profile.profile_dataset` -- the result of the
 [Understand](../pipeline/understand.md) stage. Aggregates a per-column profile
-(`src.analysis.column_profile.profile_column`) plus dataset-wide statistics.
+(`uadas_core.analysis.column_profile.profile_column`) plus dataset-wide statistics.
 
 ## Result
 

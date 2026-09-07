@@ -6,7 +6,7 @@ anchors:
 
 # Cross-Tabulation
 
-`src.analysis.crosstab.cross_tabulate`, run from the [Explore](../pipeline/explore.md) stage.
+`uadas_core.analysis.crosstab.cross_tabulate`, run from the [Explore](../pipeline/explore.md) stage.
 
 Builds a frequency table between two categorical columns. By default it reports raw counts;
 set normalization to `index` (each row sums to 1), `columns` (each column sums to 1), or `all`

@@ -9,7 +9,7 @@ anchors:
 Second stage of the guided pipeline. **Rationale:** profile the dataset first -- row/column
 counts, missing values, and types -- before deciding what cleaning or analysis makes sense.
 
-Clicking **Run** calls `src.analysis.dataset_profile.profile_dataset` against the active
+Clicking **Run** calls `uadas_core.analysis.dataset_profile.profile_dataset` against the active
 dataset and shows:
 
 - Row and column counts.

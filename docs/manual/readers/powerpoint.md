@@ -6,7 +6,7 @@ anchors:
 
 # PowerPoint Reader
 
-`src.readers.powerpoint_reader.PowerPointReader` -- `.pptx`.
+`uadas_core.readers.powerpoint_reader.PowerPointReader` -- `.pptx`.
 
 Multi-table, like [the Excel reader](excel.md), but the "tables" here are PowerPoint table
 shapes scattered across slides rather than worksheets -- a deck can have zero, one, or many

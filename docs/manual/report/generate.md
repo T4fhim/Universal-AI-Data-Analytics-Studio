@@ -10,7 +10,7 @@ anchors:
 dataset.
 
 Exports the active dataset's recorded analysis log as a document, via
-`src.services.report_service.ReportService`. This does not compute anything new -- a report is
+`uadas_core.services.report_service.ReportService`. This does not compute anything new -- a report is
 a replay of what has already run (Reproducible Analysis's own underlying data), shaped into
 whichever format you choose:
 

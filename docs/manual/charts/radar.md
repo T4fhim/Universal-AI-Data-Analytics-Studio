@@ -6,7 +6,7 @@ anchors:
 
 # Radar Chart
 
-`src.visualization.advanced_charts.RadarChart`. **Required:** a category column (labels each
+`uadas_core.visualization.advanced_charts.RadarChart`. **Required:** a category column (labels each
 trace, e.g. a product name) and at least 3 numeric value columns (the radar's axes).
 
 Each row of the dataset becomes one radar trace -- appropriate for a small number of rows (a

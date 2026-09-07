@@ -9,7 +9,7 @@ anchors:
 **File > Open Dataset...**, or **Ctrl+Shift+O**.
 
 Loads a file into the workspace as a new, active `Dataset`. The right reader is chosen
-automatically from the file's extension (`src.readers.reader_registry.get_reader_for_path`) --
+automatically from the file's extension (`uadas_core.readers.reader_registry.get_reader_for_path`) --
 there is nothing to configure about *which* reader is used, only, for a multi-table source,
 *which table* within it. Sixteen formats are supported:
 

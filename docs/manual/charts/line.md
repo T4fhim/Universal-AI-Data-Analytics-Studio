@@ -6,7 +6,7 @@ anchors:
 
 # Line Chart
 
-`src.visualization.continuous_charts.LineChart`. **Required:** a y (value) column.
+`uadas_core.visualization.continuous_charts.LineChart`. **Required:** a y (value) column.
 **Optional:** an x column (defaults to row order/index).
 
 Above 5,000 rows, the line is downsampled to about 1,000 points for a responsive chart --

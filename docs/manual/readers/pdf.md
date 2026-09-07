@@ -6,7 +6,7 @@ anchors:
 
 # PDF Reader
 
-`src.readers.pdf_reader.PdfReader` -- `.pdf`.
+`uadas_core.readers.pdf_reader.PdfReader` -- `.pdf`.
 
 A genuinely different kind of reader from the format-native ones: a PDF is a page-layout
 format that may contain zero, one, or many tables embedded among arbitrary prose and images.

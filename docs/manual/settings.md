@@ -8,7 +8,7 @@ anchors:
 
 **File > Settings...**, or **Ctrl+,**.
 
-Edits `config.yaml` through a typed, validated form (`src.services.settings_service.
+Edits `config.yaml` through a typed, validated form (`uadas_core.services.settings_service.
 SettingsService`) rather than by hand. Changes take effect immediately in memory as you make
 them, but are only written to disk when you click **Save** -- **Cancel** discards everything
 changed during this dialog session and reloads whatever is currently on disk.

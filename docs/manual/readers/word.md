@@ -6,7 +6,7 @@ anchors:
 
 # Word Reader
 
-`src.readers.word_reader.WordReader` -- `.docx`.
+`uadas_core.readers.word_reader.WordReader` -- `.docx`.
 
 Faces the same fundamental problem as [the PDF reader](pdf.md) -- a document may contain zero,
 one, or many tables embedded among prose -- but the extraction itself is more straightforward:

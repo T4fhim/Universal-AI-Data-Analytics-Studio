@@ -6,7 +6,7 @@ anchors:
 
 # CSV / TSV Reader
 
-`src.readers.csv_reader.CsvReader` -- `.csv`, `.tsv`.
+`uadas_core.readers.csv_reader.CsvReader` -- `.csv`, `.tsv`.
 
 Handles the general "delimited text" case, not just literal comma-separated files: the
 delimiter is detected via Python's `csv.Sniffer` rather than assumed to be a comma, so a

@@ -7,7 +7,7 @@ anchors:
 
 # Linear Regression
 
-`src.analysis.regression.linear_regression` -- ordinary least squares (simple or multiple), via
+`uadas_core.analysis.regression.linear_regression` -- ordinary least squares (simple or multiple), via
 `statsmodels`, not scikit-learn: the inferential statistics below (p-values, R-squared)
 `statsmodels`' `OLS` reports natively, which is exactly what the AI explanation layer and this
 result card need -- scikit-learn's own `LinearRegression` deliberately omits them, since it

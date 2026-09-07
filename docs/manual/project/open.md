@@ -8,7 +8,7 @@ anchors:
 
 **File > Open Project...**, or **Ctrl+O**.
 
-Loads a `*.uads.json` project file (`src.services.project_service.ProjectService.open_project`)
+Loads a `*.uads.json` project file (`uadas_core.services.project_service.ProjectService.open_project`)
 and makes it the active project. Every dataset recorded in the file is then re-read from its
 original source path and added to the workspace -- this happens on a background worker thread,
 so the window stays responsive while several files are re-read.

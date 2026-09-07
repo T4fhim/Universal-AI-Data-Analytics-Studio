@@ -6,7 +6,7 @@ anchors:
 
 # The AI Assistant Layer
 
-The chat panel (`src.ai.assistant_service.AssistantService`) is scoped narrowly: it can clean,
+The chat panel (`uadas_core.ai.assistant_service.AssistantService`) is scoped narrowly: it can clean,
 profile, and statistically analyze your currently active dataset -- nothing else. It has no
 general web or knowledge-base access, and is instructed to say so plainly if asked something
 outside that scope rather than guessing. Every stage of the guided pipeline is fully usable
@@ -24,7 +24,7 @@ interpretation layer performs its own calculation.
 ## Tool calling
 
 The assistant calls into the exact same functions the guided pipeline's own stage pages call
-directly (`src.analysis`, `src.forecasting`, `src.cleaning`), via `src.ai.tool_registry` --
+directly (`uadas_core.analysis`, `uadas_core.forecasting`, `uadas_core.cleaning`), via `uadas_core.ai.tool_registry` --
 every tool is a thin wrapper with no assistant-specific bypass of any validation those functions
 already enforce (column existence, type checks, minimum row counts). A cleaning tool never
 mutates your active dataset: like every cleaning operation, it returns a new, derived dataset

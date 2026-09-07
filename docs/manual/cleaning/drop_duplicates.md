@@ -6,7 +6,7 @@ anchors:
 
 # Drop Duplicates
 
-`src.cleaning.duplicates.DropDuplicates`.
+`uadas_core.cleaning.duplicates.DropDuplicates`.
 
 Removes duplicate rows, considering the columns you specify -- or every column if none are
 specified (two rows are duplicates only if every column matches, matching pandas' own
