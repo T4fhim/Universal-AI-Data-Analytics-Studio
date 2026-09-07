@@ -19,6 +19,7 @@ advances to the next rather than failing the whole conversation turn.
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -144,30 +145,41 @@ class ProviderRotationService:
 
     @classmethod
     def from_config_profiles(
-        cls, config_profiles: list[dict[str, Any]], active_index: int = 0
+        cls,
+        config_profiles: list[dict[str, Any]],
+        active_index: int = 0,
+        secrets: Mapping[str, str] | None = None,
     ) -> ProviderRotationService:
         """Build from the ``ai.providers`` config shape (see :mod:`uadas_core.core.config`).
 
-        Resolves each profile's ``api_key_env_var`` through
-        ``os.environ`` once, here — a profile with no configured
-        environment variable (or one that names a variable that isn't
-        set) resolves to an empty-string key, which is what
-        :class:`~uadas_core.ai.llm_provider.OllamaProvider` expects anyway
-        (it ignores its ``api_key`` argument entirely) and which any
-        other provider will simply fail authentication on, surfacing a
-        clear error rather than silently doing nothing.
+        Resolves each profile's ``api_key_env_var`` name once, here — a
+        profile with no configured variable (or one naming a variable the
+        source does not hold) resolves to an empty-string key, which is
+        what :class:`~uadas_core.ai.llm_provider.OllamaProvider` expects
+        anyway (it ignores its ``api_key`` argument entirely) and which
+        any other provider will simply fail authentication on, surfacing
+        a clear error rather than silently doing nothing.
 
         Args:
             config_profiles: The ``ai.providers`` list.
             active_index: Mirrors ``ai.active_provider_index`` -- see :meth:`__init__`'s own
                 ``start_index`` docstring for the out-of-range handling.
+            secrets: Optional explicit credential source. When given, each
+                ``api_key_env_var`` name is looked up in this mapping
+                instead of the process environment — this is how the
+                Phase 3 web server injects keys from Django settings / a
+                secrets manager without the desktop assumption that
+                credentials live in ``os.environ`` of the running
+                process. When ``None`` (the desktop default), ``os.environ``
+                is read, exactly as before.
         """
+        source: Mapping[str, str] = os.environ if secrets is None else secrets
         resolved = [
             ResolvedProviderProfile(
                 name=profile["name"],
                 provider_type=profile["provider_type"],
                 api_key=(
-                    os.environ.get(profile["api_key_env_var"], "")
+                    source.get(profile["api_key_env_var"], "")
                     if profile.get("api_key_env_var")
                     else ""
                 ),
