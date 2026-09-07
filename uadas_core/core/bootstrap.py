@@ -39,6 +39,9 @@ from uadas_core.core.constants import CONFIG_FILE_PATH, LOG_DIR
 from uadas_core.core.dependency_container import DependencyContainer
 from uadas_core.core.exceptions import BootstrapError
 from uadas_core.core.logger import configure_logging, get_logger
+from uadas_core.jobs import set_default_job_runner
+from uadas_core.jobs.job_runner import JobRunner
+from uadas_core.jobs.thread_pool_executor_job_runner import ThreadPoolExecutorJobRunner
 from uadas_core.plugins.plugin_manager import PluginManager
 from uadas_core.services.analysis_orchestrator_service import (
     AnalysisOrchestratorService,
@@ -222,6 +225,25 @@ def bootstrap(
     plugin_manager.load_plugins()
     container.register(PluginManager, lambda: plugin_manager, singleton=True)
     logger.debug("Registered PluginManager into the dependency container.")
+
+    # Web-transition Phase 1.2: the Qt-free background-job runner. Registered
+    # after PluginManager (plans/phase-1-2-jobrunner-design.md section 4) so a
+    # plugin cannot resolve it mid-load before it exists, matching the
+    # "construct in dependency order" reasoning every block above already uses.
+    #
+    # Two registration paths, on purpose:
+    #  * container.register(JobRunner, ...) is the real DI wiring every new
+    #    consumer should use (resolve JobRunner from the container).
+    #  * set_default_job_runner() is a Phase-1.2-only bridge so
+    #    src.workers.base_worker.BaseWorker.run() can reach the SAME instance
+    #    without a change to BaseWorker's public __init__ signature (de-risking
+    #    plan Control A10). Both must hand out the identical object -- asserted
+    #    by tests/core/test_bootstrap.py. The bridge dies with BaseWorker in
+    #    Phase 2; see uadas_core.jobs.__init__'s docstring.
+    job_runner = ThreadPoolExecutorJobRunner(max_workers=4)
+    container.register(JobRunner, lambda: job_runner, singleton=True)
+    set_default_job_runner(job_runner)
+    logger.debug("Registered JobRunner into the dependency container.")
 
     context = BootstrapContext(config=config, container=container, state=state)
 
