@@ -1,22 +1,22 @@
-# File: src/ui/results/renderers/generic.py
-"""The fallback renderer -- what :func:`~src.ui.results.result_renderer_registry.get_renderer`
+# File: uadas_core/results/renderers/generic.py
+"""The fallback renderer -- what :func:`~uadas_core.results.result_renderer_registry.get_renderer`
 returns for a result type nobody registered a dedicated renderer for.
 
 Handles two real shapes rather than just stringifying everything:
 
 * ``pandas.DataFrame`` -- :func:`~uadas_core.analysis.aggregation.aggregate` and
   :func:`~uadas_core.analysis.crosstab.cross_tabulate` are the two :mod:`uadas_core.analysis` functions with
-  no dedicated result dataclass (see :mod:`~src.ui.results.result_renderer_registry`'s own
+  no dedicated result dataclass (see :mod:`~uadas_core.results.result_renderer_registry`'s own
   docstring); both return a plain ``DataFrame``, which this renderer turns into a real
-  :class:`~src.ui.results.base_result_renderer.TableSection` rather than a wall of ``repr()``
+  :class:`~uadas_core.results.base_result_renderer.TableSection` rather than a wall of ``repr()``
   text.
 * ``dict`` -- a defensive path for a JSON-friendly dict (the shape :mod:`uadas_core.ai.tool_registry`'s
   own handlers return) reaching a renderer directly, rendered as a
-  :class:`~src.ui.results.base_result_renderer.KeyValueSection`.
+  :class:`~uadas_core.results.base_result_renderer.KeyValueSection`.
 
-Anything else falls through to a plain :class:`~src.ui.results.base_result_renderer.ProseSection`
+Anything else falls through to a plain :class:`~uadas_core.results.base_result_renderer.ProseSection`
 holding ``repr(result)`` -- deliberately unpolished rather than raising, since a renderer that
-cannot fail is what makes :meth:`~src.ui.results.result_renderer_registry.get_renderer`'s own
+cannot fail is what makes :meth:`~uadas_core.results.result_renderer_registry.get_renderer`'s own
 "never raises" guarantee actually hold.
 """
 
@@ -26,14 +26,14 @@ from typing import Any
 
 import pandas as pd
 
-from src.ui.results.base_result_renderer import (
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.results.base_result_renderer import (
     BaseResultRenderer,
     KeyValueSection,
     ProseSection,
     ResultSection,
     TableSection,
 )
-from uadas_core.core.expertise_level import ExpertiseLevel
 
 # Cap on rows rendered from a DataFrame result -- a generic fallback has no result-specific
 # reason to know a "reasonable" size the way, say, a correlation matrix renderer would; this

@@ -1,11 +1,11 @@
-# File: src/ui/results/renderers/forecasting.py
+# File: uadas_core/results/renderers/forecasting.py
 """Renders :class:`~uadas_core.forecasting.exponential_smoothing.ForecastResult` and
 :class:`~uadas_core.forecasting.model_comparison.ModelComparisonResult` -- milestone 25's own two
 result types.
 
-The first :mod:`~src.ui.results.renderers` module to return a :class:`~src.ui.results.
+The first :mod:`~uadas_core.results.renderers` module to return a :class:`~src.ui.results.
 base_result_renderer.FigureSection` -- every renderer before this one (:mod:`~src.ui.results.
-renderers.regression`, :mod:`~src.ui.results.renderers.multivariate`, and siblings) summarizes
+renderers.regression`, :mod:`~uadas_core.results.renderers.multivariate`, and siblings) summarizes
 its result as tables and metrics only. A forecast's own shape genuinely needs a chart: a table of
 projected numbers does not communicate "does this trend look right" the way seeing history and
 projection on the same axes does, so :class:`ForecastResultRenderer` and
@@ -26,20 +26,20 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.ui.results.base_result_renderer import (
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.forecasting.exponential_smoothing import ForecastResult
+from uadas_core.forecasting.model_comparison import ModelComparisonResult
+from uadas_core.results.base_result_renderer import (
     BaseResultRenderer,
     FigureSection,
     KeyValueSection,
     ResultSection,
     TableSection,
 )
-from uadas_core.core.expertise_level import ExpertiseLevel
-from uadas_core.forecasting.exponential_smoothing import ForecastResult
-from uadas_core.forecasting.model_comparison import ModelComparisonResult
 from uadas_core.visualization.forecast_charts import ForecastChart
 
 # Forecast tables can run long for a large `periods` value -- capped for the same reason
-# src.ui.results.renderers.generic._MAX_TABLE_ROWS caps a DataFrame result: keeping ResultCard's
+# uadas_core.results.renderers.generic._MAX_TABLE_ROWS caps a DataFrame result: keeping ResultCard's
 # QTableWidget construction cheap, not a statement that later rows are unimportant.
 _MAX_FORECAST_ROWS = 200
 

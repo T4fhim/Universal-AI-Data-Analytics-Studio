@@ -105,10 +105,10 @@ class AssistantTurnResult:
             — captured here too, unmodified, so
             :class:`~src.ui.widgets.chat_panel.ChatPanel` can hand
             each one to :class:`~src.ui.results.result_card.ResultCard`
-            via :func:`~src.ui.results.result_renderer_registry.
+            via :func:`~uadas_core.results.result_renderer_registry.
             get_renderer` — the *same* rendering path a stage page
             uses, not a second one built for the chat panel. Per
-            :mod:`src.ui.results.renderers.generic`'s own docstring,
+            :mod:`uadas_core.results.renderers.generic`'s own docstring,
             a plain ``dict`` reaching that registry resolves to
             ``GenericResultRenderer``'s dedicated dict branch — this
             is that "defensive path" actually being exercised, not

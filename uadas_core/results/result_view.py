@@ -1,11 +1,11 @@
-# File: src/ui/results/result_view.py
-"""Shared, Qt-free display-formatting helpers every renderer in :mod:`~src.ui.results.renderers`
+# File: uadas_core/results/result_view.py
+"""Shared, Qt-free display-formatting helpers every renderer in :mod:`~uadas_core.results.renderers`
 may use.
 
 Per the plan's R5 mitigation ("`results/renderers/` imports only `uadas_core.analysis`/
 `uadas_core.forecasting`/`result_view` and never Qt"): renderers format numbers into display strings
-themselves (see :mod:`~src.ui.results.base_result_renderer`'s own docstring on why a
-:class:`~src.ui.results.base_result_renderer.MetricSection` already carries a formatted
+themselves (see :mod:`~uadas_core.results.base_result_renderer`'s own docstring on why a
+:class:`~uadas_core.results.base_result_renderer.MetricSection` already carries a formatted
 ``value``, not a raw ``float``), and this module is where that formatting logic is shared rather
 than copy-pasted per renderer file -- a p-value or a percentage should read the same way whether
 it came from a t-test or a chi-square test. Kept dependency-free (standard library only) so it
@@ -36,7 +36,7 @@ def format_number(value: float, *, decimals: int = 4) -> str:
 
 def significance_caption(p_value: float, significant: bool) -> str:
     """The standard "p = ..., significant/not significant at 0.05" caption used by every
-    hypothesis-test renderer's p-value :class:`~src.ui.results.base_result_renderer.MetricSection`.
+    hypothesis-test renderer's p-value :class:`~uadas_core.results.base_result_renderer.MetricSection`.
     """
     verdict = (
         "statistically significant" if significant else "not statistically significant"

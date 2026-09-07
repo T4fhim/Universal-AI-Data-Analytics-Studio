@@ -1,4 +1,4 @@
-# File: src/ui/results/renderers/multivariate.py
+# File: uadas_core/results/renderers/multivariate.py
 """Renderers for PCA and k-means clustering -- the two multi-column, multi-row result types.
 
 Grouped together because both operate over a set of numeric columns at once (rather than one or
@@ -10,16 +10,16 @@ than dumping ``transformed``/``labels`` in full.
 
 from __future__ import annotations
 
-from src.ui.results.base_result_renderer import (
+from uadas_core.analysis.clustering import ClusteringResult
+from uadas_core.analysis.pca import PcaResult
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.results.base_result_renderer import (
     BaseResultRenderer,
     KeyValueSection,
     MetricSection,
     ResultSection,
     TableSection,
 )
-from uadas_core.analysis.clustering import ClusteringResult
-from uadas_core.analysis.pca import PcaResult
-from uadas_core.core.expertise_level import ExpertiseLevel
 
 
 class PcaResultRenderer(BaseResultRenderer):

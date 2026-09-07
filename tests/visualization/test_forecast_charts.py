@@ -2,7 +2,7 @@
 """Tests for uadas_core.visualization.forecast_charts.ForecastChart -- milestone 25's own chart type.
 
 Uses real ForecastResult objects produced by real forecasters (not hand-built fixtures) so this
-test exercises the exact shape src.ui.results.renderers.forecasting hands to ForecastChart.build
+test exercises the exact shape uadas_core.results.renderers.forecasting hands to ForecastChart.build
 in the running application.
 """
 

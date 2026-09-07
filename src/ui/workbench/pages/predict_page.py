@@ -13,8 +13,8 @@ Like :class:`~src.ui.workbench.pages.analyze_page.AnalyzePage`, this page calls 
 :mod:`uadas_core.forecasting`'s own functions rather than through :mod:`uadas_core.ai.tool_registry`'s
 handlers -- those handlers convert the typed ``ForecastResult``/``ModelComparisonResult`` into a
 plain JSON dict (see :func:`~uadas_core.ai.tool_registry._forecast_result_to_dict`), which would defeat
-:mod:`~src.ui.results.result_renderer_registry`'s type-based dispatch to
-:mod:`~src.ui.results.renderers.forecasting`'s two dedicated renderers. It does still reuse
+:mod:`~uadas_core.results.result_renderer_registry`'s type-based dispatch to
+:mod:`~uadas_core.results.renderers.forecasting`'s two dedicated renderers. It does still reuse
 :class:`~uadas_core.ai.tool_registry.ToolDefinition`'s ``input_schema`` (via
 :class:`~src.ui.dialogs.analysis_parameter_dialog.AnalysisParameterDialog`, the same generic
 parameter form ``AnalyzePage``/``ExplorePage`` already use) purely for the parameter *form* --

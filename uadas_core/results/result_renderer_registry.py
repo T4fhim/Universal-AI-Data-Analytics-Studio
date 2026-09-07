@@ -1,4 +1,4 @@
-# File: src/ui/results/result_renderer_registry.py
+# File: uadas_core/results/result_renderer_registry.py
 """The registry that resolves an analysis-result object to its renderer (milestone 22).
 
 Mirrors :mod:`uadas_core.visualization.chart_registry` exactly, per this overhaul's cross-cutting rule
@@ -18,7 +18,7 @@ then MRO walk, then a generic fallback"):
 2. Walk ``type(result).__mro__[1:]`` (every ancestor, nearest first) for a registered type --
    lets a future result subclass inherit its base class's renderer without an explicit
    registration, the same way Python's own method resolution works.
-3. :class:`~src.ui.results.renderers.generic.GenericResultRenderer` -- never raises. A plain
+3. :class:`~uadas_core.results.renderers.generic.GenericResultRenderer` -- never raises. A plain
    ``pandas.DataFrame`` (``aggregate``/``cross_tabulate``'s return type -- neither has a
    dedicated result dataclass, unlike every other :mod:`uadas_core.analysis` function) and any future
    analysis function's result both fall through to this, which is *why* :meth:`get_renderer`
@@ -28,26 +28,6 @@ then MRO walk, then a generic fallback"):
 """
 
 from __future__ import annotations
-
-from src.ui.results.base_result_renderer import BaseResultRenderer
-from src.ui.results.renderers.correlation import CorrelationResultRenderer
-from src.ui.results.renderers.forecasting import (
-    ForecastResultRenderer,
-    ModelComparisonResultRenderer,
-)
-from src.ui.results.renderers.generic import GenericResultRenderer
-from src.ui.results.renderers.multivariate import (
-    ClusteringResultRenderer,
-    PcaResultRenderer,
-)
-from src.ui.results.renderers.profiling import DatasetProfileRenderer
-from src.ui.results.renderers.regression import RegressionResultRenderer
-from src.ui.results.renderers.statistical_tests import (
-    AnovaResultRenderer,
-    ChiSquareResultRenderer,
-    NormalityResultRenderer,
-    TTestResultRenderer,
-)
 
 # Imported only for their types (registration keys), not called directly here -- keeping the
 # import list explicit rather than a wildcard so a reader can see, at a glance, exactly which
@@ -65,6 +45,25 @@ from uadas_core.core.exceptions import ServiceError
 from uadas_core.core.logger import get_logger
 from uadas_core.forecasting.exponential_smoothing import ForecastResult
 from uadas_core.forecasting.model_comparison import ModelComparisonResult
+from uadas_core.results.base_result_renderer import BaseResultRenderer
+from uadas_core.results.renderers.correlation import CorrelationResultRenderer
+from uadas_core.results.renderers.forecasting import (
+    ForecastResultRenderer,
+    ModelComparisonResultRenderer,
+)
+from uadas_core.results.renderers.generic import GenericResultRenderer
+from uadas_core.results.renderers.multivariate import (
+    ClusteringResultRenderer,
+    PcaResultRenderer,
+)
+from uadas_core.results.renderers.profiling import DatasetProfileRenderer
+from uadas_core.results.renderers.regression import RegressionResultRenderer
+from uadas_core.results.renderers.statistical_tests import (
+    AnovaResultRenderer,
+    ChiSquareResultRenderer,
+    NormalityResultRenderer,
+    TTestResultRenderer,
+)
 
 _logger = get_logger(__name__)
 
@@ -78,7 +77,7 @@ def register_renderer(
 
     Args:
         result_type: The exact result dataclass this renderer knows how to render.
-        renderer_class: A :class:`~src.ui.results.base_result_renderer.BaseResultRenderer`
+        renderer_class: A :class:`~uadas_core.results.base_result_renderer.BaseResultRenderer`
             subclass.
 
     Raises:
@@ -106,7 +105,7 @@ def get_renderer(result_type: type) -> type[BaseResultRenderer]:
     """Resolve ``result_type`` to its renderer: exact match, then MRO walk, then generic fallback.
 
     Never raises -- see this module's own docstring for why an unrenderable result degrades to
-    :class:`~src.ui.results.renderers.generic.GenericResultRenderer` instead of erroring.
+    :class:`~uadas_core.results.renderers.generic.GenericResultRenderer` instead of erroring.
     """
     exact = _REGISTRY.get(result_type)
     if exact is not None:
@@ -136,7 +135,7 @@ def _register_builtins() -> None:
     Called once at import time, bottom of this module -- matching :func:`~uadas_core.visualization.
     chart_registry._register_builtins`'s own shape. Covers all 12 :mod:`uadas_core.analysis` functions'
     result types except ``aggregate``/``cross_tabulate`` (both return a plain ``pandas.
-    DataFrame``, which needs no dedicated renderer -- :class:`~src.ui.results.renderers.generic.
+    DataFrame``, which needs no dedicated renderer -- :class:`~uadas_core.results.renderers.generic.
     GenericResultRenderer` already renders a ``DataFrame`` as a :class:`~src.ui.results.
     base_result_renderer.TableSection`, and it is the registry's own fallback, so no explicit
     registration entry is needed for it).

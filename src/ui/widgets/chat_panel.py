@@ -242,7 +242,7 @@ class ChatPanel(QWidget):
                 :class:`~src.ui.results.result_card.ResultCard` and
                 calls its real :meth:`~src.ui.results.result_card.
                 ResultCard.display`, which itself resolves ``result``
-                via :func:`~src.ui.results.result_renderer_registry.
+                via :func:`~uadas_core.results.result_renderer_registry.
                 get_renderer` — the identical path
                 :mod:`~src.ui.workbench.pages.analyze_page` uses. This
                 method deliberately does not branch on ``type(result)``

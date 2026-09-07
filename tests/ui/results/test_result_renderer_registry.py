@@ -11,9 +11,6 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from src.ui.results import result_renderer_registry
-from src.ui.results.renderers.generic import GenericResultRenderer
-from src.ui.results.renderers.profiling import DatasetProfileRenderer
 from uadas_core.ai.tool_registry import TOOLS
 from uadas_core.analysis.aggregation import aggregate
 from uadas_core.analysis.anova import AnovaResult, one_way_anova
@@ -27,6 +24,9 @@ from uadas_core.analysis.pca import PcaResult, compute_pca
 from uadas_core.analysis.regression import RegressionResult, linear_regression
 from uadas_core.analysis.t_test import TTestResult, independent_t_test, paired_t_test
 from uadas_core.core.exceptions import ServiceError
+from uadas_core.results import result_renderer_registry
+from uadas_core.results.renderers.generic import GenericResultRenderer
+from uadas_core.results.renderers.profiling import DatasetProfileRenderer
 from uadas_core.services.workspace_service import Dataset
 
 
@@ -165,7 +165,7 @@ def test_unregister_then_reregister_round_trips() -> None:
             result_renderer_registry.get_renderer(TTestResult) is GenericResultRenderer
         )
     finally:
-        from src.ui.results.renderers.statistical_tests import TTestResultRenderer
+        from uadas_core.results.renderers.statistical_tests import TTestResultRenderer
 
         result_renderer_registry.register_renderer(TTestResult, TTestResultRenderer)
     assert (

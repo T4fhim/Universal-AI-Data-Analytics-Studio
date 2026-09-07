@@ -72,6 +72,13 @@ case (the new package `__init__.py`), which passes.
 regression from the move (Risk A abort criterion still applies to everything except this
 one documented +1).
 
+**Post-1.5 (lift `src/ui/results/` renderers → `uadas_core/results/`):** ~11 renderer modules
+leave `src/ui/`, so the two `src/ui/`-scoped meta-tests (`test_module_size.py`,
+`test_i18n_wrapped_strings.py`) correctly stop parametrizing over them — collected drops to
+**~1469** (−19). `test_import_layering.py` (which scans both trees since 1.1) still covers the
+renderers, now via its `uadas_core` branch. Not widening the size/i18n tests to `uadas_core/`
+in 1.5 — that's separate hygiene, not the mechanical lift. Suite outcome must stay all-green.
+
 ---
 
 ## Environment

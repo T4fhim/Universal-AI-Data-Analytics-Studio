@@ -41,7 +41,7 @@ the same kind of object.
 **Qt-free by construction.** Nothing here imports PySide6. A :class:`CommandStack` is exercised
 end to end -- push, undo, redo, the "never re-mutates" guarantee -- against a real
 :class:`~uadas_core.services.workspace_service.WorkspaceService` with zero ``QApplication``, matching how
-:mod:`~src.ui.results.result_renderer_registry`'s own tests need no ``qapp`` fixture either (see
+:mod:`~uadas_core.results.result_renderer_registry`'s own tests need no ``qapp`` fixture either (see
 that package's own test suite).
 """
 

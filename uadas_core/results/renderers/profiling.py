@@ -1,4 +1,4 @@
-# File: src/ui/results/renderers/profiling.py
+# File: uadas_core/results/renderers/profiling.py
 """Renders :class:`~uadas_core.analysis.dataset_profile.DatasetProfile` -- ``profile_dataset``'s result.
 
 The first result renderer this milestone shipped a real caller for --
@@ -13,15 +13,15 @@ migrating it is not attempted here.
 
 from __future__ import annotations
 
-from src.ui.results.base_result_renderer import (
+from uadas_core.analysis.dataset_profile import DatasetProfile
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.results.base_result_renderer import (
     BaseResultRenderer,
     KeyValueSection,
     ProseSection,
     ResultSection,
     TableSection,
 )
-from uadas_core.analysis.dataset_profile import DatasetProfile
-from uadas_core.core.expertise_level import ExpertiseLevel
 
 
 class DatasetProfileRenderer(BaseResultRenderer):

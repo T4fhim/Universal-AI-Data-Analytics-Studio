@@ -13,7 +13,7 @@ through the UI at all, despite :mod:`uadas_core.cleaning` having existed since m
 :class:`~src.ui.workbench.pages.analyze_page.AnalyzePage`/:class:`~src.ui.workbench.pages.
 explore_page.ExplorePage` call :mod:`uadas_core.analysis` functions directly rather than through
 :mod:`uadas_core.ai.tool_registry`'s handlers because those handlers convert a typed result dataclass
-into a JSON dict, which would defeat :mod:`~src.ui.results.result_renderer_registry`'s
+into a JSON dict, which would defeat :mod:`~uadas_core.results.result_renderer_registry`'s
 type-dispatch (see ``AnalyzePage``'s own docstring). Cleaning operations have no such problem --
 :mod:`uadas_core.ai.tool_registry`'s own cleaning handlers (``_drop_missing_values`` and its four
 siblings) are thin pass-throughs that already return the real, typed

@@ -1,10 +1,10 @@
-# File: src/ui/results/base_result_renderer.py
+# File: uadas_core/results/base_result_renderer.py
 """The `ResultSection` vocabulary and the `Base*`-shaped renderer contract (milestone 22).
 
 Mirrors :class:`~uadas_core.readers.base_reader.BaseReader`, :class:`~uadas_core.cleaning.base_operation.
 BaseOperation`, and :class:`~uadas_core.visualization.base_chart.BaseChart` exactly, per CLAUDE.md's
 "``Base*`` extension-point pattern": stateless, classmethod-only -- a renderer is never
-instantiated, it is held as a class in :mod:`~src.ui.results.result_renderer_registry`'s
+instantiated, it is held as a class in :mod:`~uadas_core.results.result_renderer_registry`'s
 registry, the same way a chart class is held in ``chart_registry``.
 
 The one deliberate departure from those three is *what* a renderer returns. ``BaseChart.build``

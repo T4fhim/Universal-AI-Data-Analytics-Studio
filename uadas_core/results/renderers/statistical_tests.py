@@ -1,4 +1,4 @@
-# File: src/ui/results/renderers/statistical_tests.py
+# File: uadas_core/results/renderers/statistical_tests.py
 """Renderers for the four hypothesis-test result types: t-test, ANOVA, chi-square, normality.
 
 Grouped together (rather than one file each) because they share a real shape: a test statistic,
@@ -13,7 +13,12 @@ p-value, and an ``AssumptionsSection`` -- with no API key configured") is what
 
 from __future__ import annotations
 
-from src.ui.results.base_result_renderer import (
+from uadas_core.analysis.anova import AnovaResult
+from uadas_core.analysis.chi_square import ChiSquareResult
+from uadas_core.analysis.normality import NormalityResult
+from uadas_core.analysis.t_test import TTestResult
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.results.base_result_renderer import (
     AssumptionsSection,
     BaseResultRenderer,
     KeyValueSection,
@@ -21,12 +26,7 @@ from src.ui.results.base_result_renderer import (
     ResultSection,
     TableSection,
 )
-from src.ui.results.result_view import significance_caption
-from uadas_core.analysis.anova import AnovaResult
-from uadas_core.analysis.chi_square import ChiSquareResult
-from uadas_core.analysis.normality import NormalityResult
-from uadas_core.analysis.t_test import TTestResult
-from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.results.result_view import significance_caption
 
 # Named per test_type -- an independent t-test additionally assumes equal variance only when
 # the caller opted into Student's (rather than Welch's) formulation, which TTestResult does not

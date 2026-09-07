@@ -10,10 +10,10 @@ deliberately, not as a shortcut: ``run_stage`` returns an :class:`~uadas_core.se
 analysis_orchestrator_service.AnalysisLogEntry` whose ``outputs`` is a JSON-friendly ``dict``
 (see that class's own docstring), because :mod:`uadas_core.ai.tool_registry` handlers convert every
 analysis dataclass to a plain dict before returning it. Handing a ``dict`` to :class:`~src.ui.
-results.result_card.ResultCard` would defeat :mod:`~src.ui.results.result_renderer_registry`'s
-entire type-based dispatch (every renderer in :mod:`~src.ui.results.renderers` is keyed on the
+results.result_card.ResultCard` would defeat :mod:`~uadas_core.results.result_renderer_registry`'s
+entire type-based dispatch (every renderer in :mod:`~uadas_core.results.renderers` is keyed on the
 *real* result dataclass -- ``TTestResult``, not ``dict``) -- it would resolve to
-:class:`~src.ui.results.renderers.generic.GenericResultRenderer`'s dict branch every time,
+:class:`~uadas_core.results.renderers.generic.GenericResultRenderer`'s dict branch every time,
 regardless of which test ran. Calling :mod:`uadas_core.analysis` directly keeps the typed result object
 intact end to end. Recording these runs into the pipeline's own :class:`~uadas_core.services.
 analysis_orchestrator_service.AnalysisLog` (so they show up in Reproducible Analysis /
