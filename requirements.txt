@@ -104,6 +104,11 @@ ruff==0.16.3
 pre-commit==4.6.2
 
 bandit==1.9.4
+# Desktop->web transition Phase 1: enforces the `.importlinter` contract that the
+# Qt-free carve-out packages (the future `uadas_core`) never import PySide6/PyQt
+# or Django. Pinned like the other lint tools above; run via `lint-imports`, and
+# wired into CI's `lint` job in the same commit as Phase 1.1's `git mv`.
+import-linter==2.15
 # Milestone 28 follow-up (Tier 1 UIA verification, tests/ui/a11y/
 # test_uia_integration.py): the real Windows UI Automation driver. Windows-
 # only by nature of what it wraps (win32com/comtypes underneath) -- this
