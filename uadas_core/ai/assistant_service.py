@@ -38,6 +38,20 @@ from uadas_core.services.workspace_service import (
 
 _logger = get_logger(__name__)
 
+# Hard ceiling on how many provider round-trips a single
+# :meth:`AssistantService.send_message` call may make while the model
+# keeps requesting tool calls. Without it the dispatch loop is
+# ``while True`` — a model that malfunctions (or is adversarially
+# steered) into emitting a tool call on every turn would spin
+# indefinitely, one paid API request per iteration, until the process
+# is killed. 25 is far above any legitimate chained analysis (the
+# system prompt's own worked example is a 2-step chain; real sessions
+# rarely exceed a handful) while still terminating a runaway loop
+# quickly. Hitting it raises :class:`ServiceError` — a stuck
+# conversation is a failure to surface, not a state to silently
+# truncate and return as if it were a real answer.
+_MAX_TOOL_ITERATIONS = 25
+
 # Scoped to "answer thoroughly about the active dataset using the
 # available tools," not "answer any question about anything." Within
 # that scope, explicitly instructed not to dodge or give up on a
@@ -272,7 +286,10 @@ class AssistantService:
         new_tool_results: list[Any] = []
         tool_schemas = get_anthropic_tool_schemas()
 
-        while True:
+        # Bounded, not ``while True``: see :data:`_MAX_TOOL_ITERATIONS`.
+        # A tool-call-free turn returns from inside the loop; exhausting
+        # the range means the model never stopped asking for tools.
+        for _iteration in range(_MAX_TOOL_ITERATIONS):
             turn, raw_response = self._send_with_rotation(tool_schemas, user_message)
             provider = self._rotation.current_provider()
             self._history = provider.append_assistant_turn(self._history, raw_response)
@@ -303,6 +320,19 @@ class AssistantService:
                 results.append((call, result_text))
 
             self._history = provider.append_tool_results(self._history, results)
+
+        # Fell out of the bounded loop: the model asked for a tool call
+        # on every one of _MAX_TOOL_ITERATIONS rounds without ever
+        # returning a final answer. Any datasets/visualizations produced
+        # so far are already registered in WorkspaceService (that
+        # happens in _execute_tool as they are created); this only
+        # abandons the reply.
+        raise ServiceError(
+            f"The assistant made {_MAX_TOOL_ITERATIONS} rounds of tool "
+            f"calls in a single turn without reaching a final answer and "
+            f"was stopped to avoid an unbounded loop of API calls. Try "
+            f"rephrasing the question or narrowing it to fewer steps."
+        )
 
     def _send_with_rotation(
         self, tool_schemas: list[dict[str, Any]], original_user_message: str

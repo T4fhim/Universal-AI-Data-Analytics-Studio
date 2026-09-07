@@ -50,12 +50,14 @@ catching a mistake.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
 import pytest
 
 from tests.ai.conftest import make_provider
-from uadas_core.ai.assistant_service import AssistantService
-from uadas_core.ai.llm_provider import LLMTurn, PendingToolCall
+from uadas_core.ai.assistant_service import _MAX_TOOL_ITERATIONS, AssistantService
+from uadas_core.ai.llm_provider import BaseLLMProvider, LLMTurn, PendingToolCall
 from uadas_core.ai.tool_registry import get_anthropic_tool_schemas
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.services.workspace_service import Dataset, WorkspaceService
@@ -416,3 +418,80 @@ def test_send_message_raises_service_error_when_no_active_dataset(
 
     with pytest.raises(ServiceError, match="No active dataset"):
         service.send_message("Anything.")
+
+
+# -- The tool-dispatch loop is bounded (web-transition Phase 1.8 security fix) ---
+
+
+class _NeverStopsProvider(BaseLLMProvider):
+    """A provider that requests a tool call on every turn, without end.
+
+    Stands in for a malfunctioning or adversarially-steered model whose
+    every response is another tool call — the exact input that turned
+    the old ``while True`` dispatch loop in
+    :meth:`~uadas_core.ai.assistant_service.AssistantService.send_message`
+    into an unbounded sequence of paid API requests. ``send_count``
+    records how many rounds ``AssistantService`` made before it gave up.
+    """
+
+    def __init__(self) -> None:
+        self.send_count = 0
+
+    def send(
+        self,
+        history: list[Any],
+        system_prompt: str,
+        tool_schemas: list[dict[str, Any]],
+    ) -> tuple[LLMTurn, Any]:
+        self.send_count += 1
+        turn = LLMTurn(
+            text="",
+            tool_calls=[
+                PendingToolCall(
+                    call_id=str(self.send_count),
+                    name="not_a_real_tool",
+                    arguments={},
+                )
+            ],
+        )
+        return turn, turn
+
+    def append_user_message(self, history: list[Any], text: str) -> list[Any]:
+        return history
+
+    def append_assistant_turn(self, history: list[Any], raw_response: Any) -> list[Any]:
+        return history
+
+    def append_tool_results(
+        self, history: list[Any], results: list[tuple[PendingToolCall, str]]
+    ) -> list[Any]:
+        return history
+
+
+def test_send_message_stops_after_max_tool_iterations_instead_of_looping_forever(
+    workspace: WorkspaceService,
+    active_dataset: Dataset,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A model that never stops asking for tools fails the turn, bounded — it does not spin.
+
+    Red before the Phase 1.8 fix: the dispatch loop was ``while True``,
+    so this call never returned. Green after: it raises ``ServiceError``
+    once ``_MAX_TOOL_ITERATIONS`` rounds have been made, and the
+    provider was called exactly that many times — not one more.
+    """
+    import uadas_core.ai.provider_rotation as provider_rotation_module
+
+    fake = _NeverStopsProvider()
+    monkeypatch.setattr(
+        provider_rotation_module,
+        "create_provider",
+        lambda provider_name, api_key, model=None: fake,
+    )
+
+    service = AssistantService("anthropic", _FAKE_API_KEY, workspace)
+
+    with pytest.raises(ServiceError, match=str(_MAX_TOOL_ITERATIONS)):
+        service.send_message("Keep calling tools forever, please.")
+
+    assert fake.send_count == _MAX_TOOL_ITERATIONS
