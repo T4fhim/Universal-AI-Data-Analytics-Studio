@@ -5,6 +5,10 @@ uadas_core/results/. Runs from the scratchpad. Final form copied to scripts/.
 MOVE  -> uadas_core/results/ :  base_result_renderer.py  result_view.py
                                 result_renderer_registry.py  renderers/  (+ new __init__.py)
 STAY  in src/ui/results/     :  __init__.py  result_card.py  explanation_panel.py  (Qt)
+
+Known limitation: the rewrite regexes match on a single line, so a Sphinx
+``:mod:``/``:class:`` role that wraps ``src.ui.results.`` at a line break is not
+rewritten -- those were fixed by hand in the follow-up to the 1.5 review.
 """
 
 from __future__ import annotations
@@ -70,7 +74,7 @@ def rewrites():
         if not base.exists():
             continue
         for p in base.rglob("*.py"):
-            if "__pycache__" in p.parts:
+            if "__pycache__" in p.parts or p.resolve() == Path(__file__).resolve():
                 continue
             o = p.read_text(encoding="utf-8")
             w = RE_FROM_IMPORT.sub(

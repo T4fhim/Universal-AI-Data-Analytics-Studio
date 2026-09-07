@@ -3,8 +3,8 @@
 :class:`~uadas_core.forecasting.model_comparison.ModelComparisonResult` -- milestone 25's own two
 result types.
 
-The first :mod:`~uadas_core.results.renderers` module to return a :class:`~src.ui.results.
-base_result_renderer.FigureSection` -- every renderer before this one (:mod:`~src.ui.results.
+The first :mod:`~uadas_core.results.renderers` module to return a :class:`~uadas_core.results.
+base_result_renderer.FigureSection` -- every renderer before this one (:mod:`~uadas_core.results.
 renderers.regression`, :mod:`~uadas_core.results.renderers.multivariate`, and siblings) summarizes
 its result as tables and metrics only. A forecast's own shape genuinely needs a chart: a table of
 projected numbers does not communicate "does this trend look right" the way seeing history and

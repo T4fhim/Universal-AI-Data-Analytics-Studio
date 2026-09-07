@@ -136,7 +136,7 @@ def _register_builtins() -> None:
     chart_registry._register_builtins`'s own shape. Covers all 12 :mod:`uadas_core.analysis` functions'
     result types except ``aggregate``/``cross_tabulate`` (both return a plain ``pandas.
     DataFrame``, which needs no dedicated renderer -- :class:`~uadas_core.results.renderers.generic.
-    GenericResultRenderer` already renders a ``DataFrame`` as a :class:`~src.ui.results.
+    GenericResultRenderer` already renders a ``DataFrame`` as a :class:`~uadas_core.results.
     base_result_renderer.TableSection`, and it is the registry's own fallback, so no explicit
     registration entry is needed for it).
     """

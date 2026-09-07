@@ -9,7 +9,7 @@ themselves (see :mod:`~uadas_core.results.base_result_renderer`'s own docstring 
 ``value``, not a raw ``float``), and this module is where that formatting logic is shared rather
 than copy-pasted per renderer file -- a p-value or a percentage should read the same way whether
 it came from a t-test or a chi-square test. Kept dependency-free (standard library only) so it
-can sit on the Qt-free side of the renderer/widget boundary :mod:`~src.ui.results.
+can sit on the Qt-free side of the renderer/widget boundary :mod:`~uadas_core.results.
 base_result_renderer` documents, alongside those renderers rather than alongside
 :class:`~src.ui.results.result_card.ResultCard`.
 """
