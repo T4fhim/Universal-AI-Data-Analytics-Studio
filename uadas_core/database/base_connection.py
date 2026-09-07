@@ -91,11 +91,27 @@ class BaseDatabaseConnection(ABC):
             ``profile`` or anywhere else. Ignored by
             :class:`~uadas_core.database.duckdb_connection.DuckDbConnection`
             (file-based, no authentication).
+        allow_arbitrary_queries: Capability flag gating
+            :meth:`execute_query`. Off by default: :meth:`list_tables`
+            and :meth:`read_table` (name-scoped, identifier-quoted) are
+            always available, but running caller-supplied SQL text is a
+            distinct, higher privilege — in a multi-user web deployment
+            (Phase 3) an AI tool call or an untrusted request must not
+            reach it just because a connection object exists. Only a
+            caller that explicitly constructs the connection with this
+            ``True`` (today: the desktop "Connect to Database" dialog's
+            query box) may call :meth:`execute_query`.
     """
 
-    def __init__(self, profile: ConnectionProfile, password: str = "") -> None:
+    def __init__(
+        self,
+        profile: ConnectionProfile,
+        password: str = "",
+        allow_arbitrary_queries: bool = False,
+    ) -> None:
         self._profile = profile
         self._password = password
+        self._allow_arbitrary_queries = allow_arbitrary_queries
         self._engine: sqlalchemy.Engine | None = None
 
     @property
@@ -255,10 +271,19 @@ class BaseDatabaseConnection(ABC):
             row_limit: Maximum rows to read back from the result.
 
         Raises:
-            ServiceError: If not connected or the query fails (syntax
-                error, permission denied, etc. — the underlying
-                database's own error message is preserved).
+            ServiceError: If this connection was not constructed with
+                ``allow_arbitrary_queries=True`` (checked first, before
+                the engine is even opened), if not connected, or if the
+                query fails (syntax error, permission denied, etc. — the
+                underlying database's own error message is preserved).
         """
+        if not self._allow_arbitrary_queries:
+            raise ServiceError(
+                f"Connection '{self._profile.name}' is not permitted to run "
+                f"arbitrary SQL. It was opened for table browsing only; "
+                f"re-open it with the query capability enabled to use "
+                f"execute_query()."
+            )
         if self._engine is None:
             self.connect()
         assert self._engine is not None
