@@ -329,9 +329,11 @@ jobs:
         #   B608 hardcoded_sql_expressions — 2 intentional query-construction
         #                                 sites (base_connection.py,
         #                                 sqlite_reader.py), confidence Low.
-        #                                 REMOVED from this skip list in
-        #                                 Phase 1.8, which gates execute_query
-        #                                 behind an explicit capability.
+        #                                 Phase 1.8 gates execute_query behind
+        #                                 an explicit capability but still
+        #                                 builds the query from a string, so
+        #                                 B608 stays skipped (confirmed by
+        #                                 security-reviewer).
         run: python -m bandit -r src uadas_core -q --skip B101,B107,B608
 
       - name: black --check
