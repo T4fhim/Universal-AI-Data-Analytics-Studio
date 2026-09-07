@@ -241,3 +241,36 @@ def _wait_until(predicate: Callable[[], bool], timeout: float = 2.0) -> None:
             return
         time.sleep(0.005)
     raise AssertionError("condition not met within timeout")
+
+
+# --- 1.2 code-review follow-ups -------------------------------------------------
+
+
+def test_resolve_job_runner_falls_back_to_one_cached_pool_without_bootstrap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No bootstrap => a single lazily-built local pool, cached (double-checked lock).
+
+    Covers the review-flagged gap: nothing exercised the ``_resolve_job_runner``
+    fallback branch. Repeated calls must return the *same* object so concurrent
+    ``QThreadPool`` workers cannot end up on separate pools (8 threads instead of 4).
+    """
+    import src.workers.base_worker as bw
+    from uadas_core.jobs.thread_pool_executor_job_runner import (
+        ThreadPoolExecutorJobRunner,
+    )
+
+    monkeypatch.setattr(jobs_pkg, "_default_job_runner", None)
+    monkeypatch.setattr(bw, "_fallback_job_runner", None)
+
+    first = bw._resolve_job_runner()
+    second = bw._resolve_job_runner()
+    assert isinstance(first, ThreadPoolExecutorJobRunner)
+    assert first is second
+
+
+# The companion deadlock guard (``_on_finished`` wraps ``signals.finished.emit()``
+# in try/finally so ``done.set()`` always runs, even if a ``finished`` slot raises)
+# is verified by inspection + code review rather than a live test: pytest-qt
+# auto-fails any test in which a Qt slot raises, so exercising the raising-slot
+# path here would fail the harness regardless of the guard.

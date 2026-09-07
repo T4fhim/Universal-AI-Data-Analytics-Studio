@@ -31,6 +31,7 @@ deleted in Phase 2; nothing new should be built on it.
 from __future__ import annotations
 
 import threading
+import traceback  # used by run()'s synchronous-raise guard
 from collections.abc import Callable
 from typing import Any
 
@@ -55,6 +56,7 @@ _logger = get_logger(__name__)
 # global in a shell that is deleted in Phase 2 — deliberately scoped, noted
 # for the 1.3 de-globalization pass alongside ``uadas_core.jobs``'s own bridge.
 _fallback_job_runner: JobRunner | None = None
+_fallback_lock = threading.Lock()
 
 
 def _resolve_job_runner() -> JobRunner:
@@ -63,8 +65,14 @@ def _resolve_job_runner() -> JobRunner:
     try:
         return get_default_job_runner()
     except RuntimeError:
+        # Double-checked lock: two QThreadPool worker threads that both hit
+        # this branch before either assigns would otherwise build two pools
+        # (max_workers=4 -> 8 threads). The fast path stays lock-free once
+        # the singleton exists.
         if _fallback_job_runner is None:
-            _fallback_job_runner = ThreadPoolExecutorJobRunner()
+            with _fallback_lock:
+                if _fallback_job_runner is None:
+                    _fallback_job_runner = ThreadPoolExecutorJobRunner()
         return _fallback_job_runner
 
 
@@ -210,8 +218,12 @@ class BaseWorker(QRunnable):
             # posted while this worker (and self.signals) is still held
             # alive by the run() frame on the stack -- see __init__'s
             # setAutoDelete(False) comment for the race this closes.
-            self.signals.finished.emit()
-            done.set()
+            # try/finally: a raising `finished` slot must never leave the
+            # pool thread stuck forever on done.wait().
+            try:
+                self.signals.finished.emit()
+            finally:
+                done.set()
 
         # report_progress is intentionally NOT forwarded to the JobRunner:
         # __init__ (unchanged) already injected self._emit_progress into
@@ -219,13 +231,23 @@ class BaseWorker(QRunnable):
         # asked for progress, so self._kwargs already carries everything fn
         # needs. Passing report_progress here too would just make the
         # runner overwrite that with an equivalent forwarder.
-        _resolve_job_runner().run(
-            self._fn,
-            *self._args,
-            on_result=_on_result,
-            on_error=_on_error,
-            on_finished=_on_finished,
-            **self._kwargs,
-        )
+        try:
+            _resolve_job_runner().run(
+                self._fn,
+                *self._args,
+                on_result=_on_result,
+                on_error=_on_error,
+                on_finished=_on_finished,
+                **self._kwargs,
+            )
+        except Exception as exc:  # noqa: BLE001
+            # runner.run() itself raised synchronously (e.g. its executor was
+            # shut down, or bad kwargs to submit). Without this the async
+            # callbacks never fire and done.wait() below hangs the pool
+            # thread. _on_finished()'s own finally still guarantees done.set().
+            try:
+                _on_error(exc, traceback.format_exc())
+            finally:
+                _on_finished()
 
         done.wait()
