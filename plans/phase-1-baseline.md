@@ -85,6 +85,18 @@ JobRunner tests, +3 structural from `test_import_layering` parametrizing over th
 byte-identical. `WorkerSignals` + `BaseWorker.__init__` + `src/ui/worker_runner.py`
 byte-for-byte unchanged (A10). Independently re-verified by the orchestrator 2026-09-07.
 
+**Post-1.2 review fixups (`caa5d0b`):** +1 caching regression test → **1406 passed / 92 / 0**.
+
+**Post-1.8 (four security fixes):** four named behaviour changes (A10 does not apply to 1.8),
+each test-guarded. Strictly additive to the test count — **+7 authored tests**, no source
+modules added so no `test_import_layering` structural delta. Suite **1413 passed / 92 skipped /
+0 failed** (inv-1 `test_worker_runner` 10; inv-2 **1403 passed, 92 skipped, 3 deselected, 0
+failed**, process exit `139` = the same post-clean-result Windows/Qt teardown SIGSEGV the inv-2
+note above describes → CI-green-equivalent under `Max(exit1, exit2)`). Wall clock inv-2 ~6.5
+min. `bandit -r src uadas_core -q --skip B101,B107,B608` → exit 0. The +7: iteration-cap (1),
+zip-slip traversal + symlink (2), injected-secrets + env-fallback (2), SQL-capability refused
+on `execute_query` + on `read_query` (2). Any *other* delta would be a regression.
+
 ---
 
 ## Environment
