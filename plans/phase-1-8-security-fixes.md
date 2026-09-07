@@ -1,8 +1,10 @@
 # Phase 1.8 — Four Security Fixes (as-built record)
 
-**Status:** implemented 2026-09-07 on `phase-1/extract-uadas-core` · `security-reviewer`
-scoped the set before implementation (verdict: APPROVE, one addition to Fix 2) · a
-`security-reviewer` verification pass follows the commits below.
+**Status:** DONE 2026-09-07 on `phase-1/extract-uadas-core`. `security-reviewer` scoped the set
+before implementation (APPROVE, one addition to Fix 2) and ran the post-implementation
+verification pass: **all four CONFIRMED FIXED, overall APPROVE, no follow-ups** (it also caught
+one stale `ci.yml` comment predicting a B608 removal that correctly did not happen — fixed in
+`20ad6b3`). Commits: `6b8a628` `88587b4` `12c7564` `779e7e6` `23d5167` `20ad6b3`.
 
 **Nature:** Part D step 5. Unlike steps 1.1 / 1.2 / 1.3 / 1.5, this step **does** change
 behaviour — four named, test-guarded changes. Each is one commit with its own red-then-green
