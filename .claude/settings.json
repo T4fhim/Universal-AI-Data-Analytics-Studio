@@ -21,7 +21,7 @@
           {
             "type": "command",
             "timeout": 900,
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$stdin = [Console]::In.ReadToEnd(); $event = $stdin | ConvertFrom-Json; if ($event.tool_input.command -match '^\\s*git\\s+commit\\b') { & '$CLAUDE_PROJECT_DIR\\.claude\\hooks\\pre-commit-check.ps1'; exit $LASTEXITCODE }; exit 0\""
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"$stdin = [Console]::In.ReadToEnd(); $event = $stdin | ConvertFrom-Json; if ($event.tool_input.command -match 'git\\s+commit(?![\\w-])') { & '$CLAUDE_PROJECT_DIR\\.claude\\hooks\\pre-commit-check.ps1'; exit $LASTEXITCODE }; exit 0\""
           }
         ]
       },
