@@ -76,8 +76,14 @@ one documented +1).
 leave `src/ui/`, so the two `src/ui/`-scoped meta-tests (`test_module_size.py`,
 `test_i18n_wrapped_strings.py`) correctly stop parametrizing over them — collected drops to
 **~1469** (−19). `test_import_layering.py` (which scans both trees since 1.1) still covers the
-renderers, now via its `uadas_core` branch. Not widening the size/i18n tests to `uadas_core/`
-in 1.5 — that's separate hygiene, not the mechanical lift. Suite outcome must stay all-green.
+renderers, now via its `uadas_core` branch. Suite **1374 passed / 92 skipped / 0 failed**.
+
+**Post-1.2 (JobRunner):** strictly additive — new `uadas_core/jobs/` package + its tests.
+Suite **1405 passed / 92 skipped / 0 failed** (inv-2: 1395, was 1364, **+31**: +28 authored
+JobRunner tests, +3 structural from `test_import_layering` parametrizing over the 3 new
+`uadas_core/jobs/*.py` modules — same mechanism as the Phase 1.1 `+1`). Screenshot
+byte-identical. `WorkerSignals` + `BaseWorker.__init__` + `src/ui/worker_runner.py`
+byte-for-byte unchanged (A10). Independently re-verified by the orchestrator 2026-09-07.
 
 ---
 
