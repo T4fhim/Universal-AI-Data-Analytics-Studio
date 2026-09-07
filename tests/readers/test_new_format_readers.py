@@ -335,3 +335,62 @@ def test_archive_reader_missing_file_raises(tmp_path: Path) -> None:
 
     with pytest.raises(ReaderError):
         ArchiveReader.read(tmp_path / "does_not_exist.zip")
+
+
+# -- Zip-slip hardening (web-transition Phase 1.8 security fix) -----------------
+
+
+def test_archive_reader_rejects_a_path_traversal_entry(tmp_path: Path) -> None:
+    """A crafted ``../`` entry must be refused, not silently sanitised and parsed.
+
+    Red before the Phase 1.8 fix: ``list_tables`` returned the traversal
+    name and ``read(..., table_name="../evil.csv")`` extracted it (CPython
+    rewrites it to land inside the temp dir) and returned a Dataset.
+    Green after: the entry is dropped from ``list_tables`` and an explicit
+    request for it raises ``ReaderError``.
+    """
+    from uadas_core.readers.archive_reader import ArchiveReader
+
+    inner_csv = tmp_path / "inner.csv"
+    inner_csv.write_text("a,b\n1,2\n3,4\n", encoding="utf-8")
+
+    zip_path = tmp_path / "malicious.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.write(inner_csv, arcname="inner.csv")
+        archive.writestr(zipfile.ZipInfo("../evil_traversal.csv"), "a,b\n9,9\n")
+
+    assert ArchiveReader.list_tables(zip_path) == ["inner.csv"]
+
+    with pytest.raises(ReaderError, match=r"escapes|traversal|\.\."):
+        ArchiveReader.read(zip_path, table_name="../evil_traversal.csv")
+
+    # The escape target was never written anywhere outside the archive.
+    assert not (tmp_path.parent / "evil_traversal.csv").exists()
+
+
+def test_archive_reader_rejects_a_symlink_entry(tmp_path: Path) -> None:
+    """A ZIP symlink entry must be refused — ``extract`` does not neutralise it portably.
+
+    Red before the Phase 1.8 fix: the symlink entry appeared in
+    ``list_tables`` and was handed to a reader. Green after: it is
+    dropped from ``list_tables`` and an explicit request raises
+    ``ReaderError`` naming it as a symlink.
+    """
+    from uadas_core.readers.archive_reader import ArchiveReader
+
+    inner_csv = tmp_path / "inner.csv"
+    inner_csv.write_text("a,b\n1,2\n3,4\n", encoding="utf-8")
+
+    symlink_entry = zipfile.ZipInfo("link.csv")
+    symlink_entry.create_system = 3  # Unix
+    symlink_entry.external_attr = 0o120777 << 16  # S_IFLNK | rwxrwxrwx
+
+    zip_path = tmp_path / "with_symlink.zip"
+    with zipfile.ZipFile(zip_path, "w") as archive:
+        archive.write(inner_csv, arcname="inner.csv")
+        archive.writestr(symlink_entry, "/etc/passwd")
+
+    assert ArchiveReader.list_tables(zip_path) == ["inner.csv"]
+
+    with pytest.raises(ReaderError, match="symlink"):
+        ArchiveReader.read(zip_path, table_name="link.csv")

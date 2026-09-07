@@ -40,7 +40,7 @@ import gzip
 import shutil
 import tempfile
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from uadas_core.core.exceptions import ReaderError
 from uadas_core.core.logger import get_logger
@@ -52,6 +52,75 @@ _logger = get_logger(__name__)
 _ZIP_EXTENSIONS = {".zip"}
 _GZIP_EXTENSIONS = {".gz", ".gzip"}
 _ARCHIVE_EXTENSIONS = _ZIP_EXTENSIONS | _GZIP_EXTENSIONS
+
+# Unix file-type bits for a symlink, as stored in the high 16 bits of a
+# ZIP entry's ``external_attr``. ``ZipInfo.is_symlink()`` only exists on
+# newer CPython, so the mode is inspected directly to stay version-proof.
+_S_IFLNK = 0o120000
+_S_IFMT = 0o170000
+
+
+def _zipinfo_is_symlink(info: zipfile.ZipInfo) -> bool:
+    """True if this ZIP entry is a symlink rather than a regular file/dir."""
+    return (info.external_attr >> 16) & _S_IFMT == _S_IFLNK
+
+
+def _reject_unsafe_archive_member(name: str, *, is_symlink: bool = False) -> None:
+    """Raise :class:`ReaderError` if ``name`` could write outside the extraction dir.
+
+    A ZIP's entry names are attacker-controlled — a crafted archive can
+    carry ``../../../etc/cron.d/x``, an absolute path, a Windows drive
+    (``C:\\...``), or a symlink whose target escapes the sandbox
+    ("zip-slip"). CPython's :meth:`zipfile.ZipFile.extract` sanitises
+    ``..`` and leading slashes *silently* on modern versions, so without
+    this guard a malicious entry is not blocked, merely quietly rewritten
+    to land inside the temp dir and then parsed as data. Rejecting it
+    outright — and refusing symlink entries, which ``extract`` does not
+    neutralise consistently across platforms — is the defence the
+    de-risking plan's Phase 1.8 calls for. Applied both when listing an
+    archive's tables and again immediately before extraction.
+    """
+    if is_symlink:
+        raise ReaderError(
+            f"Refusing to read archive entry {name!r}: it is a symlink, "
+            f"which could point outside the extraction directory."
+        )
+    normalised = name.replace("\\", "/")
+    if (
+        PurePosixPath(normalised).is_absolute()
+        or ".." in PurePosixPath(normalised).parts
+        or ":" in normalised.split("/", 1)[0]
+    ):
+        raise ReaderError(
+            f"Refusing to read archive entry {name!r}: the path escapes "
+            f"the extraction directory (absolute path, drive letter, or "
+            f"'..' traversal component)."
+        )
+
+
+def _is_safe_archive_member(name: str) -> bool:
+    """Boolean form of :func:`_reject_unsafe_archive_member` for list comprehensions.
+
+    Used by :meth:`ArchiveReader.list_tables` to drop unsafe entries the
+    same way it already drops entries no reader recognises — quietly,
+    since a hostile entry alongside real data does not make the whole
+    archive unreadable. :meth:`ArchiveReader.read` still calls the
+    raising form so an explicit ``table_name`` request for such an entry
+    gets a clear error rather than "no such entry".
+    """
+    try:
+        _reject_unsafe_archive_member(name)
+    except ReaderError:
+        return False
+    return True
+
+
+def _is_within(child: Path, parent: Path) -> bool:
+    """True if ``child`` resolves to a path inside ``parent`` (no escape via ``..``/symlink)."""
+    try:
+        return child.resolve().is_relative_to(parent.resolve())
+    except OSError:
+        return False
 
 
 class ArchiveReader(BaseReader):
@@ -87,7 +156,13 @@ class ArchiveReader(BaseReader):
 
         try:
             with zipfile.ZipFile(path) as archive:
-                names = [n for n in archive.namelist() if not n.endswith("/")]
+                names = [
+                    info.filename
+                    for info in archive.infolist()
+                    if not info.is_dir()
+                    and not _zipinfo_is_symlink(info)
+                    and _is_safe_archive_member(info.filename)
+                ]
         except zipfile.BadZipFile as exc:
             raise ReaderError(f"{path} is not a valid ZIP archive: {exc}") from exc
 
@@ -126,6 +201,11 @@ class ArchiveReader(BaseReader):
     @classmethod
     def _read_gzip(cls, path: Path) -> Dataset:
         inner_name = cls._gzip_inner_name(path)
+        # Defence-in-depth: _gzip_inner_name only ever returns a single
+        # path component (``path.stem``), so this cannot currently fire —
+        # but it keeps the "an inner name is never trusted as a path"
+        # rule uniform across both archive formats.
+        _reject_unsafe_archive_member(inner_name)
         extracted_dir = Path(tempfile.mkdtemp())
         inner_path = extracted_dir / inner_name
 
@@ -157,20 +237,44 @@ class ArchiveReader(BaseReader):
                     f"file(s) ({', '.join(readable_names)}); specify "
                     f"which one to read via the table_name argument."
                 )
-        elif table_name not in readable_names:
-            raise ReaderError(
-                f"{path} has no readable entry named '{table_name}'. "
-                f"Available entries: {', '.join(readable_names)}."
-            )
+        else:
+            # An explicit request for a traversal/absolute/drive-letter
+            # name gets this specific error rather than the generic "no
+            # such entry" that list_tables()'s silent filtering (which
+            # already dropped it from readable_names) would otherwise
+            # produce.
+            _reject_unsafe_archive_member(table_name)
+            if table_name not in readable_names:
+                raise ReaderError(
+                    f"{path} has no readable entry named '{table_name}'. "
+                    f"Available entries: {', '.join(readable_names)}."
+                )
 
         try:
             with zipfile.ZipFile(path) as archive:
+                # Re-check against the real ZipInfo now that we hold it:
+                # the symlink bit is only visible here, and list_tables()
+                # and this method open the file separately.
+                _reject_unsafe_archive_member(
+                    table_name,
+                    is_symlink=_zipinfo_is_symlink(archive.getinfo(table_name)),
+                )
                 extracted_dir = Path(tempfile.mkdtemp())
                 extracted_path = Path(archive.extract(table_name, path=extracted_dir))
         except (zipfile.BadZipFile, OSError) as exc:
             raise ReaderError(
                 f"Failed to extract '{table_name}' from {path}: {exc}"
             ) from exc
+
+        # Belt-and-suspenders: even if some future zipfile change let a
+        # crafted name through the checks above, refuse to hand a path
+        # outside the temp dir to a reader.
+        if not _is_within(extracted_path, extracted_dir):
+            shutil.rmtree(extracted_dir, ignore_errors=True)
+            raise ReaderError(
+                f"Refusing to read '{table_name}' from {path}: extraction "
+                f"landed outside the temporary directory."
+            )
 
         try:
             dataset = cls._read_with_matching_reader(extracted_path, table_name)
