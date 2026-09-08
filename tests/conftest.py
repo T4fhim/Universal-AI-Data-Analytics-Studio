@@ -23,6 +23,24 @@ from pathlib import Path
 import pytest
 
 import uadas_core.core.logger as logger_module
+from uadas_core.cleaning import operation_registry
+from uadas_core.results import result_renderer_registry
+from uadas_core.visualization import chart_registry
+
+# web-transition 1.3: the cleaning-operation, chart, and result-renderer registries
+# no longer populate their built-ins as a module-import side effect (see
+# plans/phase-1-3-startup-graph.md §9) -- bootstrap() does. The test suite needs
+# them seeded independently of bootstrap(): many tests read a registry without
+# booting, and tests/ui/help/test_manual_anti_rot.py builds a
+# @pytest.mark.parametrize id list from list_renderers() at *collection* time, so
+# a fixture (which runs only once collection is done) is too late. Doing it here,
+# at root-conftest import, runs before any test module is collected. Each
+# _register_builtins() is idempotent, so a test that calls bootstrap() is
+# unaffected. This is the test harness explicitly initialising state it needs --
+# it replaces the old registry-module import side effect, relocated here.
+operation_registry._register_builtins()
+chart_registry._register_builtins()
+result_renderer_registry._register_builtins()
 
 
 @pytest.fixture()
@@ -70,25 +88,3 @@ def reset_logging_state():
     _reset()
     yield
     _reset()
-
-
-@pytest.fixture(scope="session", autouse=True)
-def _seed_builtin_registries() -> None:
-    """Populate the built-in registries once per test session.
-
-    web-transition 1.3 moved
-    ``uadas_core.cleaning.operation_registry._register_builtins()`` (and, in later
-    1.3 commits, the chart and result-renderer equivalents) off module import into
-    :func:`uadas_core.core.bootstrap.bootstrap`. Tests that read one of those
-    registries without calling ``bootstrap()`` -- ``tests/cleaning``,
-    ``tests/visualization``, ``tests/plugins``, several ``tests/ui`` modules, and
-    the ``tests/services`` / ``tests/ai`` tiers via
-    ``uadas_core.ai.tool_registry`` -- need it seeded here. Each
-    ``_register_builtins()`` is idempotent, so a test that *does* call
-    ``bootstrap()`` is unaffected.
-    """
-    from uadas_core.cleaning import operation_registry
-    from uadas_core.visualization import chart_registry
-
-    operation_registry._register_builtins()
-    chart_registry._register_builtins()

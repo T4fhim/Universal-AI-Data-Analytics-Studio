@@ -69,6 +69,16 @@ _logger = get_logger(__name__)
 
 _REGISTRY: dict[type, type[BaseResultRenderer]] = {}
 
+# Web-transition 1.3: the built-ins are populated by
+# :func:`uadas_core.core.bootstrap.bootstrap` rather than as a side effect of
+# importing this module, so importing it has no global-state effect (see
+# plans/phase-1-3-startup-graph.md §9). This flag makes :func:`_register_builtins`
+# a no-op after its first successful call: ``bootstrap()`` runs several times per
+# pytest session and ``tests/conftest.py``'s session-autouse
+# ``_seed_builtin_registries`` fixture also calls it. Mirrors
+# :data:`uadas_core.core.logger._configured`.
+_builtins_registered: bool = False
+
 
 def register_renderer(
     result_type: type, renderer_class: type[BaseResultRenderer]
@@ -130,16 +140,25 @@ def unregister_renderer(result_type: type) -> None:
 
 
 def _register_builtins() -> None:
-    """Populate the registry with every renderer built as of milestone 22.
+    """Populate the registry with every built-in result renderer.
 
-    Called once at import time, bottom of this module -- matching :func:`~uadas_core.visualization.
-    chart_registry._register_builtins`'s own shape. Covers all 12 :mod:`uadas_core.analysis` functions'
-    result types except ``aggregate``/``cross_tabulate`` (both return a plain ``pandas.
-    DataFrame``, which needs no dedicated renderer -- :class:`~uadas_core.results.renderers.generic.
-    GenericResultRenderer` already renders a ``DataFrame`` as a :class:`~uadas_core.results.
-    base_result_renderer.TableSection`, and it is the registry's own fallback, so no explicit
-    registration entry is needed for it).
+    Called from :func:`uadas_core.core.bootstrap.bootstrap` (web-transition 1.3
+    moved this off module import so importing this module has no global-state
+    side effect). Idempotent via the module-level ``_builtins_registered`` guard,
+    so the repeated ``bootstrap()`` calls in the test suite and
+    ``tests/conftest.py``'s session-autouse seed fixture are both safe. Same
+    shape as :func:`~uadas_core.visualization.chart_registry._register_builtins`.
+    Covers all 12 :mod:`uadas_core.analysis` functions' result types except
+    ``aggregate``/``cross_tabulate`` (both return a plain ``pandas.DataFrame``,
+    which needs no dedicated renderer --
+    :class:`~uadas_core.results.renderers.generic.GenericResultRenderer` already
+    renders a ``DataFrame`` as a
+    :class:`~uadas_core.results.base_result_renderer.TableSection`, and it is the
+    registry's own fallback, so no explicit registration entry is needed for it).
     """
+    global _builtins_registered
+    if _builtins_registered:
+        return
     register_renderer(DatasetProfile, DatasetProfileRenderer)
     register_renderer(CorrelationResult, CorrelationResultRenderer)
     register_renderer(TTestResult, TTestResultRenderer)
@@ -152,6 +171,4 @@ def _register_builtins() -> None:
     # Milestone 25: the PREDICT stage's two result types.
     register_renderer(ForecastResult, ForecastResultRenderer)
     register_renderer(ModelComparisonResult, ModelComparisonResultRenderer)
-
-
-_register_builtins()
+    _builtins_registered = True

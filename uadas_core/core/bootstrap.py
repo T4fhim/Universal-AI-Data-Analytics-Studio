@@ -44,6 +44,7 @@ from uadas_core.jobs import set_default_job_runner
 from uadas_core.jobs.job_runner import JobRunner
 from uadas_core.jobs.thread_pool_executor_job_runner import ThreadPoolExecutorJobRunner
 from uadas_core.plugins.plugin_manager import PluginManager
+from uadas_core.results import result_renderer_registry
 from uadas_core.services.analysis_orchestrator_service import (
     AnalysisOrchestratorService,
 )
@@ -152,7 +153,10 @@ def bootstrap(
     # operations and chart types into these same registries.
     operation_registry._register_builtins()
     chart_registry._register_builtins()
-    logger.debug("Registered built-in cleaning operations and chart types.")
+    result_renderer_registry._register_builtins()
+    logger.debug(
+        "Registered built-in cleaning operations, chart types, and result renderers."
+    )
 
     # Step 5: milestone 1b-i's services. Constructed after
     # ApplicationState for consistency with the "core services first"
