@@ -289,7 +289,28 @@ fixes the `_CHART_BUILDERS` import-time snapshot (Task 3, named A10 exemption be
   registered`. Each `_register_builtins()` gets a module-level `_builtins_registered: bool`
   flag, mirroring `uadas_core/core/logger.py::_configured`.
 
-- **A10 behaviour-change exemption (Task 3) — `_CHART_BUILDERS`.** *(Filled in at Task 3.)*
+- **A10 behaviour-change exemption (Task 3) — live chart-registry reads.** Two module-level
+  dicts were frozen from the chart registry at *their* import time and never refreshed:
+  `uadas_core/ai/tool_registry.py::_CHART_BUILDERS` (fed `_build_chart`'s dispatch at `:424-429`
+  and `build_chart`'s `chart_type` enum in the `TOOLS` literal at `:836`) and
+  `src/ui/dialogs/create_visualization_dialog.py::_CHART_REGISTRY` (fed the dialog's chart-type
+  combo and field layout). Once `chart_registry._register_builtins()` moved into `bootstrap()`
+  — which runs *after* both modules import — both snapshots were empty, so Task 3 had to convert
+  them in the same commit:
+  - `_CHART_BUILDERS` → `_chart_builders()` function (live `list_charts()` read); `_build_chart`
+    calls it; `get_anthropic_tool_schemas()` refreshes the `build_chart` enum per call via a new
+    `_live_input_schema()` helper (returns a copy — never mutates the shared `TOOLS` entry).
+  - `_CHART_REGISTRY` → `_chart_registry()` function (live `list_dialog_charts()` read); the
+    dialog's 3 call sites updated.
+  **Observable behaviour change:** a chart a plugin registers during `bootstrap()` now appears
+  in the AI `build_chart` tool schema *and* the create-visualization dialog — previously it
+  reached neither. No built-in chart's schema or dialog entry changes. Same class of scoped,
+  test-guarded change as the four 1.8 security fixes. Guarded by
+  `tests/ai/test_tool_registry_chart_builders.py` (B-4, red→green) + the existing
+  `tests/ui/dialogs/test_create_visualization_dialog.py` / `tests/ui/workbench/test_visualize_page.py`
+  suites. Also fixed a latent pre-existing leak: `tests/visualization/test_chart_registry.py
+  ::test_register_chart_new_name_succeeds` now `unregister_chart()`s in a `finally` (it was
+  polluting `list_charts()` for every later test — masked only by collection order).
 
 - **`logger._configured` — KEPT (Task 5).** *(Filled in at Task 5.)*
 - **`constants.py` path constants — KEPT / CANNOT convert (Task 5).** *(Filled in at Task 5.)*

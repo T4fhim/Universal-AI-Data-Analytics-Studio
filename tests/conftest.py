@@ -88,5 +88,7 @@ def _seed_builtin_registries() -> None:
     ``bootstrap()`` is unaffected.
     """
     from uadas_core.cleaning import operation_registry
+    from uadas_core.visualization import chart_registry
 
     operation_registry._register_builtins()
+    chart_registry._register_builtins()

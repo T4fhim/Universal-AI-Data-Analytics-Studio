@@ -45,6 +45,7 @@ from uadas_core.visualization.chart_registry import display_name_for, list_dialo
 
 _logger = get_logger(__name__)
 
+
 # Milestone 12: sourced from uadas_core.visualization.chart_registry rather
 # than a dict this dialog maintained independently — see that
 # module's own docstring for why. Each entry: (builder class,
@@ -55,17 +56,25 @@ _logger = get_logger(__name__)
 # list_dialog_charts()'s entries appear here — as of milestone 24
 # that is every registered chart type (see this module's own
 # docstring for why Treemap/Radar are no longer excluded).
-_CHART_REGISTRY: dict[
-    str, tuple[type[BaseChart], list[str], list[str], frozenset[str]]
-] = {
-    display_name_for(name): (
-        registration.chart_class,
-        list(registration.required_fields),
-        list(registration.optional_fields),
-        frozenset(registration.list_fields),
-    )
-    for name, registration in list_dialog_charts().items()
-}
+#
+# Web-transition 1.3: this was a module-level dict frozen at import. Because
+# chart_registry._register_builtins() now runs inside bootstrap() -- after this
+# module imports -- the frozen snapshot was empty. Recomputed per call so the
+# dialog always offers whatever chart types are registered now (built-ins plus
+# any plugin charts) -- the same live-read fix applied to tool_registry's
+# _chart_builders() in this commit.
+def _chart_registry() -> (
+    dict[str, tuple[type[BaseChart], list[str], list[str], frozenset[str]]]
+):
+    return {
+        display_name_for(name): (
+            registration.chart_class,
+            list(registration.required_fields),
+            list(registration.optional_fields),
+            frozenset(registration.list_fields),
+        )
+        for name, registration in list_dialog_charts().items()
+    }
 
 
 class CreateVisualizationDialog(QDialog):
@@ -95,7 +104,7 @@ class CreateVisualizationDialog(QDialog):
         layout.addRow("Title (optional):", self._title_field)
 
         self._chart_type_combo = QComboBox(self)
-        self._chart_type_combo.addItems(list(_CHART_REGISTRY.keys()))
+        self._chart_type_combo.addItems(list(_chart_registry().keys()))
         self._chart_type_combo.currentTextChanged.connect(self._rebuild_column_fields)
         layout.addRow("Chart type:", self._chart_type_combo)
 
@@ -134,9 +143,9 @@ class CreateVisualizationDialog(QDialog):
             self._column_field_layout.removeRow(0)
         self._column_fields.clear()
 
-        _builder_class, required_fields, optional_fields, list_fields = _CHART_REGISTRY[
-            chart_type_name
-        ]
+        _builder_class, required_fields, optional_fields, list_fields = (
+            _chart_registry()[chart_type_name]
+        )
 
         for field_name in required_fields:
             if field_name in list_fields:
@@ -171,7 +180,7 @@ class CreateVisualizationDialog(QDialog):
 
     def _on_accept(self) -> None:
         chart_type_name = self._chart_type_combo.currentText()
-        builder_class, required_fields, _optional, _list_fields = _CHART_REGISTRY[
+        builder_class, required_fields, _optional, _list_fields = _chart_registry()[
             chart_type_name
         ]
 

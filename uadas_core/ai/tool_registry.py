@@ -50,18 +50,28 @@ from uadas_core.forecasting.random_forest_forecast import forecast_random_forest
 from uadas_core.services.workspace_service import Dataset
 from uadas_core.visualization.chart_registry import list_charts
 
+
 # Milestone 12: sourced from uadas_core.visualization.chart_registry, the one
 # shared registry both this module and
 # src.ui.dialogs.create_visualization_dialog now read from — see that
 # module's own docstring for why a single registry replaced the two
 # independently hand-maintained dicts this used to be (one of them
-# duplicated here). A plugin-registered chart type becomes usable by
-# the AI assistant automatically the moment
-# uadas_core.plugins.plugin_manager.PluginManager registers it, with no edit
-# to this file required.
-_CHART_BUILDERS: dict[str, type] = {
-    name: registration.chart_class for name, registration in list_charts().items()
-}
+# duplicated here).
+#
+# Web-transition 1.3 (named Control-A10 behaviour-change exemption, the same
+# class of scoped, test-guarded change as the four 1.8 security fixes): this was
+# a module-level dict frozen at import from list_charts(). Because
+# chart_registry._register_builtins() now runs inside bootstrap() -- after this
+# module is imported -- and plugins register their chart types during
+# bootstrap() too, a frozen snapshot was always empty of plugin charts (and,
+# post-1.3, empty of the built-ins as well at import time). _chart_builders() is
+# recomputed on every call so the AI tool schema (get_anthropic_tool_schemas)
+# and _build_chart's dispatch both see whatever is registered *now*.
+def _chart_builders() -> dict[str, type]:
+    """Live name -> chart-class map from :mod:`uadas_core.visualization.chart_registry`."""
+    return {
+        name: registration.chart_class for name, registration in list_charts().items()
+    }
 
 
 @dataclass
@@ -421,12 +431,13 @@ def _build_chart(
     ``Dataset`` result (registering it into ``WorkspaceService`` rather
     than trying to JSON-serialize a figure object).
     """
-    if chart_type not in _CHART_BUILDERS:
+    builders = _chart_builders()
+    if chart_type not in builders:
         raise ServiceError(
             f"Unknown chart_type: {chart_type!r}. Must be one of: "
-            f"{', '.join(sorted(_CHART_BUILDERS))}."
+            f"{', '.join(sorted(builders))}."
         )
-    builder = _CHART_BUILDERS[chart_type]
+    builder = builders[chart_type]
     figure = builder.build(dataset.dataframe, **chart_kwargs)
     if title:
         figure.update_layout(title=title)
@@ -833,7 +844,10 @@ TOOLS: list[ToolDefinition] = [
             "properties": {
                 "chart_type": {
                     "type": "string",
-                    "enum": sorted(_CHART_BUILDERS.keys()),
+                    # Import-time value = the built-ins; get_anthropic_tool_schemas()
+                    # refreshes this from the live registry per call via
+                    # _live_input_schema(), so plugin chart types are included.
+                    "enum": sorted(_chart_builders()),
                 },
                 "title": {"type": "string"},
                 "category_column": {
@@ -886,10 +900,38 @@ TOOLS: list[ToolDefinition] = [
 ]
 
 
+def _live_input_schema(tool: ToolDefinition) -> dict[str, Any]:
+    """``tool.input_schema`` with any registry-derived field refreshed to a live value.
+
+    Web-transition 1.3: ``build_chart``'s ``chart_type`` enum is baked into the
+    ``TOOLS`` list literal at import (from :func:`_chart_builders`), so a chart a
+    plugin registers during ``bootstrap()`` -- which runs after this module is
+    imported -- would never reach the schema the assistant sees. This recomputes
+    that one enum from the live chart registry; every other tool's schema is
+    returned unchanged. Returns a shallow copy for ``build_chart`` so the shared
+    ``TOOLS`` entry is never mutated.
+    """
+    if tool.name != "build_chart":
+        return tool.input_schema
+    schema = tool.input_schema
+    chart_type_field = {
+        **schema["properties"]["chart_type"],
+        "enum": sorted(_chart_builders()),
+    }
+    return {
+        **schema,
+        "properties": {**schema["properties"], "chart_type": chart_type_field},
+    }
+
+
 def get_anthropic_tool_schemas() -> list[dict[str, Any]]:
     """Return every tool's schema in the exact shape the Anthropic API's ``tools`` parameter expects."""
     return [
-        {"name": t.name, "description": t.description, "input_schema": t.input_schema}
+        {
+            "name": t.name,
+            "description": t.description,
+            "input_schema": _live_input_schema(t),
+        }
         for t in TOOLS
     ]
 

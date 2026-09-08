@@ -83,6 +83,16 @@ class ChartRegistration:
 
 _REGISTRY: dict[str, ChartRegistration] = {}
 
+# Web-transition 1.3: the built-ins are populated by
+# :func:`uadas_core.core.bootstrap.bootstrap` rather than as a side effect of
+# importing this module, so importing it has no global-state effect (see
+# plans/phase-1-3-startup-graph.md §9). This flag makes :func:`_register_builtins`
+# a no-op after its first successful call: ``bootstrap()`` runs several times per
+# pytest session and ``tests/conftest.py``'s session-autouse
+# ``_seed_builtin_registries`` fixture also calls it. Mirrors
+# :data:`uadas_core.core.logger._configured`.
+_builtins_registered: bool = False
+
 
 def register_chart(name: str, registration: ChartRegistration) -> None:
     """Register a chart type under ``name``.
@@ -160,18 +170,21 @@ def display_name_for(name: str) -> str:
 
 
 def _register_builtins() -> None:
-    """Populate the registry with every chart type built before milestone 12.
+    """Populate the registry with every built-in chart type.
 
-    Called once at import time (bottom of this module) rather than
-    left for each consumer to trigger — the registry should be fully
-    populated with built-ins before either
-    :mod:`~uadas_core.ai.tool_registry` or
-    :mod:`~src.ui.dialogs.create_visualization_dialog` first reads
-    from it, and both already import this module at their own import
-    time, so import-time population is the simplest way to guarantee
-    that ordering without adding an explicit "initialize the registry"
-    call every entry point would need to remember to make.
+    Called from :func:`uadas_core.core.bootstrap.bootstrap` (web-transition 1.3
+    moved this off module import so importing this module has no global-state
+    side effect). Idempotent via the module-level ``_builtins_registered`` guard,
+    so the repeated ``bootstrap()`` calls in the test suite and
+    ``tests/conftest.py``'s session-autouse seed fixture are both safe.
+    :mod:`~uadas_core.ai.tool_registry` and
+    :mod:`~src.ui.dialogs.create_visualization_dialog` read this registry live
+    (see :func:`~uadas_core.ai.tool_registry._chart_builders`), so they no longer
+    depend on it being populated at their own import time.
     """
+    global _builtins_registered
+    if _builtins_registered:
+        return
     register_chart(
         "bar", ChartRegistration(BarChart, ("category_column",), ("value_column",))
     )
@@ -218,6 +231,4 @@ def _register_builtins() -> None:
     register_chart(
         "funnel", ChartRegistration(FunnelChart, ("stage_column", "value_column"))
     )
-
-
-_register_builtins()
+    _builtins_registered = True

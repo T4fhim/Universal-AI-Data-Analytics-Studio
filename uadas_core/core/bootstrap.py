@@ -53,6 +53,7 @@ from uadas_core.services.project_service import ProjectService
 from uadas_core.services.report_service import ReportService
 from uadas_core.services.settings_service import SettingsService
 from uadas_core.services.workspace_service import WorkspaceService
+from uadas_core.visualization import chart_registry
 
 
 @dataclass(frozen=True)
@@ -150,7 +151,8 @@ def bootstrap(
     # plugin_manager.load_plugins() below, which registers plugin-provided
     # operations and chart types into these same registries.
     operation_registry._register_builtins()
-    logger.debug("Registered built-in cleaning operations.")
+    chart_registry._register_builtins()
+    logger.debug("Registered built-in cleaning operations and chart types.")
 
     # Step 5: milestone 1b-i's services. Constructed after
     # ApplicationState for consistency with the "core services first"
