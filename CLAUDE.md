@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Working method:** read [docs/RESOURCE_ORCHESTRATION.md](docs/RESOURCE_ORCHESTRATION.md) each
+session alongside this file — it is the standing doctrine for phase→resource routing (which
+agent / skill / model tier / MCP for which kind of work), the delegation rules, the hooks that
+already run automatically, and the living-truth discipline for this repo's lagging plan docs.
+
 ## What this is
 
 Universal AI Data Analytics & Visualization Studio — a PySide6 desktop app for importing, cleaning,
