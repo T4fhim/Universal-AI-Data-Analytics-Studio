@@ -49,9 +49,21 @@ in a fixed order:
 2. **`configure_logging()`** — must run only after config is loaded, since log level/rotation
    settings come from it.
 3. **`DependencyContainer` constructed**, `AppConfig` and `ApplicationState` registered into it.
-4. **`SettingsService`, `ProjectService`, `WorkspaceService` constructed and registered** into
+4. **Built-in registries populated** — `bootstrap()` calls `_register_builtins()` on
+   `uadas_core/cleaning/operation_registry.py`, `uadas_core/visualization/chart_registry.py`, and
+   `uadas_core/results/result_renderer_registry.py`. Before the desktop→web transition's step 1.3
+   these ran as a side effect of *importing* each registry module; they now run here so that
+   importing `uadas_core` has no global-state effect (Phase-3 backend / multi-instance
+   readiness). Each `_register_builtins()` is idempotent (a module-level `_builtins_registered`
+   flag, mirroring `logger._configured`). Must precede step 6 — `PluginManager.load_plugins()`
+   registers plugin-provided operations and chart types into these same registries. The test
+   suite seeds them from `tests/conftest.py` (module level) instead of calling `bootstrap()`.
+5. **`SettingsService`, `ProjectService`, `WorkspaceService` constructed and registered** into
    the same container — one instance per running process, so every consumer resolves the same
-   instance rather than each constructing its own.
+   instance rather than each constructing its own. `AnalysisOrchestratorService`,
+   `GuidanceService`, `ReportService`, `DatabaseConnectionService` follow, each in dependency
+   order.
+6. **`PluginManager` constructed and `load_plugins()` run**, then `JobRunner` registered.
 
 `bootstrap()` returns a `BootstrapContext` (config, container, state). `Application.run()` is
 the only place a `QApplication` is constructed — before doing so it forces software OpenGL

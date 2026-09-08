@@ -312,5 +312,44 @@ fixes the `_CHART_BUILDERS` import-time snapshot (Task 3, named A10 exemption be
   ::test_register_chart_new_name_succeeds` now `unregister_chart()`s in a `finally` (it was
   polluting `list_charts()` for every later test — masked only by collection order).
 
-- **`logger._configured` — KEPT (Task 5).** *(Filled in at Task 5.)*
-- **`constants.py` path constants — KEPT / CANNOT convert (Task 5).** *(Filled in at Task 5.)*
+- **`result_renderer_registry` — Task 4.** Same treatment as operations/charts: `_register_builtins()`
+  off import into `bootstrap()`, `_builtins_registered` guard. No frozen-at-import consumer
+  (`src/ui/results/result_card.py` imports the *function* `get_renderer` and calls it live in a
+  method), so no `_CHART_BUILDERS`-style entanglement. Its `bootstrap()` position relative to
+  `load_plugins()` is not load-bearing (corrected invariant 7 — no renderer plugin category);
+  it only has to precede the first `get_renderer()`, which is UI runtime.
+
+- **Seed fixture → module-level (Task 4).** The registry seeding in `tests/conftest.py` started as
+  a `scope="session", autouse=True` fixture (Tasks 2–3) but moved to a **module-level call at
+  conftest import** in Task 4. `tests/ui/help/test_manual_anti_rot.py` builds a
+  `@pytest.mark.parametrize` id list from `list_renderers()` at *collection* time; a fixture runs
+  after collection, so once `result_renderer_registry` stopped self-populating at import, that
+  test collapsed to one skipped "empty parameter set" placeholder — a pass/skip count regression
+  (A9). Module-level conftest code runs before any test module is collected. General rule for
+  future registry de-globalization: **an autouse fixture does not cover collection-time
+  parametrize/id-list reads; module-level conftest execution does.**
+
+- **`logger._configured` — KEPT (§7d).** A single-call-site idempotence guard for
+  `configure_logging()` with no dependency chain; `tests/conftest.py::reset_logging_state`
+  already resets it per-test. Converting it to container-resolved state adds indirection for
+  zero benefit and would ripple to that fixture. Evaluated, deliberately unchanged.
+
+- **`constants.py` `PROJECT_ROOT` + derived path constants — CANNOT convert (§3a row 6 / §7d).**
+  `tests/ui/test_module_size.py`, `tests/ui/test_i18n_wrapped_strings.py`,
+  `tests/ui/test_import_layering.py` read `PROJECT_ROOT` at pytest **collection** time to build
+  `@pytest.mark.parametrize` id lists over source files. Container-resolving it makes those lists
+  unbuildable at collection → the collected-test count changes → instant A9 abort. They are
+  immutable (`Path(__file__).resolve().parents[2]`), computed once — not "global mutable state"
+  like the registries. Evaluated, deliberately unchanged. *(Cosmetic follow-up, not 1.3:
+  `constants.py:12-13` docstring still says "→ src → project root"; `parents[2]` is numerically
+  still correct post-1.1.)*
+
+## 10. Result
+
+Commits `0443013` (B-3 test) · `54c69fa` (operations) · `746897e` (charts + `_CHART_BUILDERS`) ·
+`efa61ce` (renderers) · Task-5 close-out. Suite `1413 → 1419` passed / 92 skipped / 0 failed
+(+2 B-3, +4 B-4; every registry move and the two conftest fixtures add 0). `screenshot_app_state.py`
+byte-identical throughout. `mypy` (CI list) clean. `bandit` clean. One named A10 exemption
+(Task 3, live chart-registry reads). Importing `uadas_core` now has **no** registry-population
+side effect — `bootstrap()` (or, in the test suite, `tests/conftest.py`) is the single place it
+happens.
