@@ -22,6 +22,17 @@ if (-not (Test-Path $py)) {
     exit 2
 }
 
+# Fast path: a commit that stages no .py file cannot change pytest or bandit
+# outcomes (both scan Python only), so skip the ~7-minute two-stage suite for
+# docs / plans / markdown / workflow-yaml commits. Any staged .py -- including
+# under tests/ or a conftest -- runs the full gate. Deletions count too (a
+# removed module can break an import-layering test).
+$stagedPy = @(& git diff --cached --name-only) | Where-Object { $_ -match '\.py$' }
+if (-not $stagedPy) {
+    Write-Host "pre-commit-check: no .py files staged -- skipping pytest/bandit."
+    exit 0
+}
+
 Write-Host "Running pytest..."
 # NOT a bare `python -m pytest`: verified directly (2026-09-01) that this exact bare
 # invocation can report a fully clean pytest summary (e.g. "1384 passed, 103 skipped,
