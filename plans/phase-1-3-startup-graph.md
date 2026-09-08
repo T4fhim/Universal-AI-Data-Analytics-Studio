@@ -256,3 +256,40 @@ first test and A9 forbids a test-count delta, so the conclusion holds.
    object construction? external calls?).
 5. Plugin-disable path: `PluginManager` calling `unregister_chart/operation/renderer` against a
    container-resolved registration.
+
+*(1–2 moot: those modules stay as-is under the opus-narrowed scope. 3: resolved by §3a —
+`guidance_service.py:55` imports `display_name_for`, not `list_charts`. 4: resolved by §3a
+row 4 — dict write + one `_logger.debug` per registration, no construction. 5: `PluginManager`
+keeps calling the module-level `unregister_*`; the registry modules keep their module-level
+`_REGISTRY` — 1.3 only moves *when* `_register_builtins()` runs, not *where* the dict lives.)*
+
+---
+
+## 9. As-built (Phase 1.3 — filled in during execution)
+
+**Executable plan:** `plans/phase-1-3-plan.md` (6 tasks, one commit each).
+
+**Scope, as narrowed by opus verification and confirmed against the tree 2026-09-08:** 1.3 does
+**not** convert any `_REGISTRY` to a container instance. It moves the import-time
+`_register_builtins()` call into `bootstrap()` for the three registries that have one
+(`cleaning/operation_registry`, `visualization/chart_registry`,
+`results/result_renderer_registry`), makes each `_register_builtins()` idempotent, adds a
+session-autouse seed fixture in `tests/conftest.py` for the non-bootstrapping test tiers, and
+fixes the `_CHART_BUILDERS` import-time snapshot (Task 3, named A10 exemption below).
+
+- **`reader_registry._PLUGIN_READERS` — no-op (Task 1).** Already container-safe (empty list at
+  import, populated by `PluginManager.load_plugins()`). `tests/readers/test_reader_registry.py`
+  lines 69/75/82/91 monkeypatch that exact module attribute — converting it would force test
+  edits inside an A9/A10-frozen step for zero benefit. Task 1 is the B-3 characterization test
+  (`tests/core/test_startup_registry_characterization.py`) + this note only.
+
+- **Idempotency is mandatory (Tasks 2–4).** `tests/core/test_bootstrap.py` calls `bootstrap()`
+  five times in one pytest session (lines 37/47/100/124/135). Moving `_register_builtins()`
+  into `bootstrap()` without a guard makes the 2nd call raise `ServiceError: already
+  registered`. Each `_register_builtins()` gets a module-level `_builtins_registered: bool`
+  flag, mirroring `uadas_core/core/logger.py::_configured`.
+
+- **A10 behaviour-change exemption (Task 3) — `_CHART_BUILDERS`.** *(Filled in at Task 3.)*
+
+- **`logger._configured` — KEPT (Task 5).** *(Filled in at Task 5.)*
+- **`constants.py` path constants — KEPT / CANNOT convert (Task 5).** *(Filled in at Task 5.)*
