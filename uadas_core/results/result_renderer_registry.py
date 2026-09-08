@@ -74,8 +74,8 @@ _REGISTRY: dict[type, type[BaseResultRenderer]] = {}
 # importing this module, so importing it has no global-state effect (see
 # plans/phase-1-3-startup-graph.md §9). This flag makes :func:`_register_builtins`
 # a no-op after its first successful call: ``bootstrap()`` runs several times per
-# pytest session and ``tests/conftest.py``'s session-autouse
-# ``_seed_builtin_registries`` fixture also calls it. Mirrors
+# pytest session and ``tests/conftest.py`` also seeds the built-in registries, at
+# module import (before test collection). Mirrors
 # :data:`uadas_core.core.logger._configured`.
 _builtins_registered: bool = False
 
@@ -145,9 +145,9 @@ def _register_builtins() -> None:
     Called from :func:`uadas_core.core.bootstrap.bootstrap` (web-transition 1.3
     moved this off module import so importing this module has no global-state
     side effect). Idempotent via the module-level ``_builtins_registered`` guard,
-    so the repeated ``bootstrap()`` calls in the test suite and
-    ``tests/conftest.py``'s session-autouse seed fixture are both safe. Same
-    shape as :func:`~uadas_core.visualization.chart_registry._register_builtins`.
+    so the repeated ``bootstrap()`` calls in the test suite and the module-level
+    registry seeding in ``tests/conftest.py`` are both safe. Same shape as
+    :func:`~uadas_core.visualization.chart_registry._register_builtins`.
     Covers all 12 :mod:`uadas_core.analysis` functions' result types except
     ``aggregate``/``cross_tabulate`` (both return a plain ``pandas.DataFrame``,
     which needs no dedicated renderer --

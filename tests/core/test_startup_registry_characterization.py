@@ -13,10 +13,10 @@ snapshot, two things every 1.3 commit must keep true:
 2. ``bootstrap()`` still resolves every service it registers, as singletons.
 
 It deliberately does not assert the registries are *empty* without ``bootstrap()``
--- ``tests/conftest.py``'s session-autouse ``_seed_builtin_registries`` fixture
-(added in the same phase) seeds them for the many tests that read a registry
-without booting, so emptiness is not observable inside the suite. The snapshot of
-*contents* is the regression signal, not the trigger mechanism.
+-- ``tests/conftest.py`` seeds them at module import (before test collection) for
+the many tests that read a registry without booting, so emptiness is not
+observable inside the suite. The snapshot of *contents* is the regression signal,
+not the trigger mechanism.
 """
 
 from __future__ import annotations
