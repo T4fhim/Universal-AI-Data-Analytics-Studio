@@ -15,15 +15,23 @@ folded into CI's scope even though they were kept clean).
 ## How to reproduce these numbers
 
 ```powershell
-python -m mypy src/ --ignore-missing-imports --follow-imports=silent
+# Post web-transition-1.1: the Qt-free packages moved to uadas_core/, so the
+# reproduce command must cover BOTH trees. `mypy src/` alone now misses ~113 files.
+python -m mypy src/ uadas_core/ --ignore-missing-imports --follow-imports=silent --no-incremental
 ```
 
-As of this document's commit: **72 errors in 19 files** (down from 79
-before this remediation pass fixed 7 genuine, narrowly-scoped bugs in
-`src/ui/controllers/pipeline_controller.py`,
-`src/ui/widgets/data_table/pandas_table_model.py`, and
-`src/ui/dialogs/create_visualization_dialog.py` -- see git history for the
-commit that introduced this document for the exact diffs).
+**Rolling count (web-transition Phase 1):**
+- Milestone-19-27 remediation-pass commit: 72 errors / 19 files (`mypy src/` only), down from 79.
+- **2026-09-08 (post web-transition 1.1/1.2/1.5/1.8, two-tree `--no-incremental`): 74 errors /
+  19 files** (checked 213 source files). `src/ui/main_window.py` = **31** of them, all the
+  single `DependencyContainer.resolve() -> object` root cause below (was 29; +2 from 1.2/1.8
+  code). The other 43 are unrelated pre-existing debt (`uadas_core/ai/llm_provider.py` 8,
+  `uadas_core/reports/word_exporter.py` 7, `uadas_core/visualization/advanced_charts.py` 6,
+  the `cleaning/*` + `visualization/*` chart modules, `plugin_loader.py` 3, …).
+- **web-transition 1.4** clears `main_window.py`'s 31 by adding the typed generic `resolve`
+  `@overload` pair to `DependencyContainer` → expected **43 / ~18**. 1.4 records the
+  before/after `mypy src/ui/main_window.py` count here rather than adding that Phase-2-doomed
+  file to CI's scope (it folds `uadas_core/core/dependency_container.py` in instead).
 
 ## Excluded packages, categorized
 

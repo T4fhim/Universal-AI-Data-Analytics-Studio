@@ -1,6 +1,100 @@
 # Phase 1.7 — Provenance DAG & Recipe Format
 
-**Status:** R0.4 design doc · produced 2026-09-07 (architect) · **needs `architect` sign-off against the Phase 5 feature list before any 1.7 code** (Gate verdict).
+**Status:** R0.4 design doc · produced 2026-09-07 (repo `architect`) · **R0.4 sign-off 2026-09-08
+by `ecc:architect` (opus, NOT the author — the prior "architect APPROVE" was self-review, an A3
+violation): APPROVE-WITH-CHANGES.** The core shape (dataset-node / transform-edge / Recipe =
+DAG-minus-data) is right and serves F2/F3. **Six changes below, two blocking, must land in this
+doc before the C-2 prototype is written.** 1.7 is last in Part D order, so this does not block
+1.3/1.4/1.6.
+
+---
+
+## §R0.4 sign-off — required changes (2026-09-08)
+
+**BLOCKING 1 — the source is a *set* of logs, not one.** `AnalysisOrchestratorService._logs:
+dict[str, AnalysisLog]` (`uadas_core/services/analysis_orchestrator_service.py:246`) — one log
+**per dataset**. `run_stage` appends to the caller's `dataset_id` log (`:368,:395`); a CLEAN
+entry lands in the **parent's** log with `new_dataset_id` in `outputs` (`:418-421`); work on
+the derived dataset lands in the **derived** log. `reproduce()` switches `current_dataset_id`
+after each CLEAN (`:488-489`). Persistence agrees: `project.contents["analysis_logs"]` is
+`{dataset_id: log_dict}` (`project_service.py:352-353,:377`). **→ converter signature must be
+`analysis_logs_to_dag(logs: Iterable[AnalysisLog], datasets: Mapping[str, DatasetMeta]) -> Dag`.**
+An edge's `to_dataset_id` = `entry.outputs["new_dataset_id"]`; its `from_dataset_id` = the
+**enclosing log's** `dataset_id` (not recoverable from the entry alone). C-2 must include ≥1
+multi-log fixture or it proves nothing about the case that actually occurs.
+
+**BLOCKING 2 — §3.1's "real payload" is fabricated.** It puts three entries under one
+`dataset_id` where the third (`analyze`, `row_count: 3`) evidently ran against the *derived*
+dataset — `run_stage` would have written that into the derived dataset's log. Replace with a
+two-log payload (root `[understand, clean]`; derived `[analyze]`) or restore `row_count` to 5.
+Shipping a hand-written payload into a design doc violates the living-truth discipline.
+
+**CHANGE 3 — node-per-dataset can't serve F1** ("every dataset, transform, **test, chart and
+forecast** is an inspectable node; click any node"). Under §1 a chart / t-test is an
+*annotation* with no identity. Add a third element: an `artifact` node per non-CLEAN entry
+hanging off its dataset node, carrying `{entry_index, stage, tool_name, timestamp}` + (VISUALIZE)
+the `visualization_id` the orchestrator already emits (`:431`). ~15 lines, no Recipe impact.
+Needed for F1 and F9 (comment-on-a-step).
+
+**CHANGE 4 — DAG ≠ Recipe.** F1 wants "click a node → see the data as it was"; F10 says "the
+server stores the DAG, never the data". Resolve: the **DAG retains `outputs` verbatim** (every
+`tool_registry` handler returns a plain dict — `:121-123,:142-145,:158,:165`); only the
+**Recipe** drops them. F10 then reads "server stores Recipe + DAG topology; result payloads and
+data are client-side."
+
+**CHANGE 5 — stale refs + a wrong rationale.** The field-source header (lines 10-12) cites
+`src/services/…` / `src/analysis/…` — now `uadas_core/…`; `AnalysisLogEntry` is `:138-187`,
+`AnalysisLog` `:190-225`. The `Unverified` bullet "all `outputs` JSON-serializable —
+`_summarize_result` wraps non-dicts" has a wrong rationale: the fallback is
+`return {"result": result}` (`:434`), which does not serialize an arbitrary object — it holds
+only because every current handler already returns a dict. Add a `json.dumps(log.to_dict())`
+assertion to C-2 so the claim is enforced.
+
+**CHANGE 6 — `steps[].id` is positional (`"s1"`, `"s2"`).** F2 (re-point at next month's file)
+and F9 (comments anchored to steps) need ids stable across re-export. Make it content-derived
+(`hash(stage, tool_name, canonical inputs, ordinal)`) or write one line declaring positional
+ids out of scope for 1.7.
+
+**Confirmed as-is (no change):** `Explanation` / `AnalysisLogEntry` / `AnalysisLog` are all
+plain `@dataclass` (value-based `__eq__`), so `Explanation(**e.to_dict()) == e` is a real proof;
+`Explanation` has **no `from_dict`** (class body ends `explanation.py:93`) — 1.7 adding it is a
+genuine gap. The §5 scope fence and the timestamp-validation fix are well drawn — keep verbatim.
+
+---
+
+## §C-2 fixture inventory (2026-09-08, `ecc:code-explorer`)
+
+**No `@pytest.fixture` returns an `AnalysisLog`.** Every log in the suite is built inline via
+`AnalysisLog(...)` / `AnalysisLogEntry(...)`, produced by `AnalysisOrchestratorService.run_stage`,
+or written as a `to_dict()`-shaped dict. The C-2 "every fixture round-trips" target = the
+log-shapes these tests build:
+
+- **`tests/services/test_analysis_orchestrator_service.py`** — `::test_run_stage_understand…:66`
+  (1 UNDERSTAND entry), `::…_clean…:85` (1 CLEAN, `outputs.new_dataset_id`), `::…_visualize…:103`
+  (1 VISUALIZE), `::…_explain…:127` (1 EXPLAIN, `tool_name=None`, `Explanation` dict),
+  `::test_propose_next_stage_reaches_report…:165` (7-entry multi-stage log incl. EXPLAIN
+  `Explanation(what="done")`), `::test_reproduce_replays…:204` (2-entry UNDERSTAND+CLEAN then
+  `reproduce()`), **`::test_analysis_log_round_trips_through_to_dict_from_dict:235`** (the
+  existing dict round-trip test — 1-entry), `::test_load_log_installs_a_restored_log:249`.
+- **`tests/services/test_project_service_analysis_log.py`** — `:16`, `:38` (empty), `:46` (real
+  file save/reopen) — all `to_dict`-shaped dicts, `explanation: None`.
+- **`tests/services/test_report_service.py`** — `:91`, `:117` — 2-entry logs with populated
+  `Explanation`.
+- **`tests/services/test_guidance_service.py`** — `:128` (≤8-entry loop), `:259` (5-entry) — log
+  content not asserted.
+- **`tests/ui/controllers/test_pipeline_controller.py`** — `:79`, `:109`, `:161` (persist only
+  non-empty), `:181` (persist→restore), **`:218`** (real project-file round trip preserves the log).
+- **`tests/ui/workbench/test_workbench.py`** — 7 tests build **empty** `AnalysisLog(dataset_id="d1")`.
+- **`tests/ui/workbench/test_pages.py::test_report_page_update_log…:68`** — the one fully-populated
+  `AnalysisLogEntry` built inline (all fields incl. an ISO `timestamp`).
+- **`Explanation`-only:** `tests/ui/workbench/test_explain_page.py` (`:13`,`:22`),
+  `tests/ui/results/test_explanation_panel.py` (`_make_explanation` helper `:26` = all 7 fields;
+  `::test_every_level_has_at_least_one_expanded_field:97` parametrized over every `ExpertiseLevel`).
+
+Canonical: `AnalysisLogEntry` `@dataclass` `uadas_core/services/analysis_orchestrator_service.py:138`
+(`to_dict`:168, `from_dict`:179 — keeps `explanation` as a plain dict); `AnalysisLog` `:190`
+(`to_dict`:214, `from_dict`:221); `Explanation` `@dataclass` `uadas_core/analysis/explanation.py:29`
+(`to_dict`:76, **no `from_dict`**).
 
 **Purpose.** Reshape the flat per-dataset `AnalysisLog` into a lineage DAG, and define a
 portable **Recipe** (the DAG minus the data) that can be replayed on a fresh dataset. This is

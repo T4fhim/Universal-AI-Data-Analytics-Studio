@@ -55,3 +55,6 @@ dist/
 
 # superpowers SDD ledger + review-package scratch
 .superpowers/
+
+# graphify knowledge-graph output (rebuilt on demand via `graphify update .`)
+graphify-out/

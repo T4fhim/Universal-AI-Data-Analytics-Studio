@@ -27,12 +27,17 @@ Every sub-step 1.1 … 1.7 is one pass of this loop. No sub-step overlaps anothe
    read is never evidence (A4).
 5. **Review.** `superpowers` `review-package` → a **fresh agent that did not write it**
    (mapping in section 2). Fix loop <= 5 rounds; rulings recorded in the ledger.
-6. **Sub-PR.** The sub-step's commits go up as one PR into `phase-1/extract-uadas-core`. Its
-   own CI run (`test` + `lint` + `uia_integration`) must be green **and** the reviewer signed
-   off before the next sub-step starts (A2).
-7. **Baseline check.** After 1.1, and after every behaviour-frozen step (1.2 / 1.3 / 1.5), the
-   full suite must reproduce `plans/phase-1-baseline.md` **exactly** — 1381 passed / 103
-   skipped / 0 failed, 1487 collected. One test's difference = abort (A9 / Risk A).
+6. **Sub-PR / A3 sign-off.** *(Amended 2026-09-08 — decision recorded in
+   `.superpowers/sdd/phase-1/progress.md`.)* No per-step GitHub sub-PRs: all work stays on
+   `phase-1/extract-uadas-core` (Control A1 keeps `main` safe the whole time). Each sub-step's
+   commit range + its independent reviewer + verdict is recorded in the SDD ledger; 1.1 / 1.5 /
+   1.2 / 1.8 were retro-filled. A sub-step's own CI run (`test` + `lint` + `linux-import` +
+   `uia_integration`) must still be green before the next sub-step starts (A2) — checked via `gh`.
+7. **Baseline check.** After every behaviour-frozen step (1.2 / 1.3), the full suite must
+   reproduce **the *rolling* baseline in `plans/phase-1-baseline.md`** — currently
+   **1413 passed / 92 skipped / 0 failed** (post-1.8), *not* the R0.1 `1381 / 103 / 0` this line
+   used to quote. Any delta *other than* a documented new test = abort (A9 / Risk A). The
+   R0.1 figure is history; `plans/phase-1-baseline.md`'s tail is the live number.
 
 **Model tiers** (always passed explicitly): mechanical steps (1.1, 1.5) — orchestrator-run
 codemod + cheap-tier `code-reviewer`. Refactor steps (1.2, 1.3) — standard `implementer` +

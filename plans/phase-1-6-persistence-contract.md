@@ -1,6 +1,57 @@
 # Phase 1.6 — Persistence Contract
 
-**Status:** R0.4 design doc · produced 2026-09-07 (architect) · **needs reviewer + `security-reviewer` sign-off before any 1.6 code** (Gate verdict).
+**Status:** R0.4 design doc · produced 2026-09-07 (architect) · **R0.4 sign-off 2026-09-08:
+`code-reviewer` = APPROVE-WITH-CHANGES · `security-reviewer` = APPROVE-WITH-CHANGES.** The
+design is directionally sound; a revision pass folding in the changes in "§R0.4 sign-off" below
+must land before any 1.6 code. (The earlier "architect APPROVE" was the architect signing off
+its own doc — an A3 violation; this supersedes it.)
+
+---
+
+## §R0.4 sign-off — required changes before implementation
+
+Both reviews `APPROVE-WITH-CHANGES` (2026-09-08, agents that did not author the doc). Fold these
+into the doc, then it is ready:
+
+**From `code-reviewer`:**
+1. **Re-verify every `file:line` citation against the current `uadas_core/` tree** — they are
+   pre-1.1 `src/` paths and several are off by ~10 lines (`project_service.py` skip logic is
+   `uadas_core/services/project_service.py:288-290`; `add_dataset` is `workspace_service.py:229-262`).
+2. **BLOCKING — `DashboardTile` has no `tile_id`.** The current dataclass
+   (`uadas_core/services/workspace_service.py:168-180`) is `{visualization_id, row, column}` only,
+   but the SQLite schema needs `tile_id TEXT PRIMARY KEY`. Add
+   `tile_id: str = field(default_factory=lambda: str(uuid.uuid4()))` — a documented 1.6 dataclass
+   change, not a test detail.
+3. **Figure re-derivation API** — the real call is
+   `chart_registry.get_chart(chart_type).chart_class.build(dataframe, **params)` (module-level,
+   `chart_registry.py:118`). State it exactly. Part D order is 1.3 → 1.4 → 1.6, so
+   `chart_registry` may already be a container instance by 1.6 — the persistence layer takes it
+   injected (per `plans/phase-1-resource-plan.md` "Coupling flag"), not imported.
+4. **Acyclic `parent_dataset_id` check** — before implementing, run the suite and confirm no
+   existing fixture/project builds a cycle; document that as a verified precondition. If one
+   exists, decide fixture-fix vs. graceful-handle rather than a silent `ServiceError` on load.
+5. **Strengthen the C-3 assertion** from "figure is not None and has data" to
+   `v2.figure.to_json() == fig.to_json()` (structural round-trip, catches param-application bugs).
+6. **FK on `parent_dataset_id` vs. the non-cascading workspace model** — `close_dataset()` does
+   not cascade, so an orphaned `parent_dataset_id` is normal state that a SQL FK would reject.
+   Pick **Option A** (drop the FK, comment that orphans are expected — matches the workspace
+   model) unless there's a reason for B (exclude orphans on save). State the choice.
+
+**From `security-reviewer` (B608 is `--skip`ped in CI, so this review is the only SQL gate):**
+7. **CRITICAL — mandate parameterized SQL.** The doc must state: all SQL uses `sqlite3` `?`
+   placeholders, never f-strings / `.format` / interpolation; every value passed separately.
+8. **HIGH — validate `dataset_id` on load before path-join.** A hand-edited/corrupt `.db` row
+   could carry `dataset_id = "../../etc/passwd"`. The loader must reject any `dataset_id` that is
+   not a well-formed uuid4 before it is joined into a Parquet path; the base dir must be
+   caller-constrained, not user-controlled.
+9. Validate `chart_parameters` on load — only keys the `ChartRegistration` declares; list-typed
+   fields are actually lists; unknown chart_type raises, not silently degrades.
+10. State the pyarrow/fastparquet minimum versions (Parquet-deserialization CVE class) or
+    delegate to `requirements.txt` with a note.
+11. State load-time behaviour when a persisted chart's columns no longer exist in the dataset
+    (hard error with a clear message vs. documented graceful-degrade).
+12. State the single-threaded SQLite assumption + "local non-networked storage only" for 1.6.
+13. Extend the C-3 test with a cycle-creation case that must be rejected.
 
 **Purpose.** Define the save/load round-trip contract for datasets (incl. *derived* datasets),
 visualizations, and dashboards — and the test that proves it. The current code
