@@ -33,6 +33,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from uadas_core.cleaning import operation_registry
 from uadas_core.core.application_state import ApplicationState
 from uadas_core.core.config import AppConfig
 from uadas_core.core.constants import CONFIG_FILE_PATH, LOG_DIR
@@ -141,6 +142,15 @@ def bootstrap(
     state = ApplicationState()
     container.register(ApplicationState, lambda: state, singleton=True)
     logger.debug("Registered ApplicationState into the dependency container.")
+
+    # Web-transition 1.3: populate the built-in cleaning operations / chart types
+    # / result renderers here rather than as a module-import side effect of their
+    # registry modules (plans/phase-1-3-startup-graph.md §9). Each
+    # _register_builtins() is idempotent. Must run before
+    # plugin_manager.load_plugins() below, which registers plugin-provided
+    # operations and chart types into these same registries.
+    operation_registry._register_builtins()
+    logger.debug("Registered built-in cleaning operations.")
 
     # Step 5: milestone 1b-i's services. Constructed after
     # ApplicationState for consistency with the "core services first"

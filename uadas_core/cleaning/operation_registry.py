@@ -34,6 +34,17 @@ _logger = get_logger(__name__)
 
 _REGISTRY: dict[str, type[BaseOperation]] = {}
 
+# Web-transition 1.3: the built-ins are populated by
+# :func:`uadas_core.core.bootstrap.bootstrap` rather than as a side effect of
+# importing this module, so importing it has no global-state effect (Phase-3 /
+# multi-instance readiness -- see plans/phase-1-3-startup-graph.md §9). This flag
+# makes :func:`_register_builtins` a no-op after its first successful call:
+# ``bootstrap()`` runs several times per pytest session
+# (``tests/core/test_bootstrap.py``) and ``tests/conftest.py``'s session-autouse
+# ``_seed_builtin_registries`` fixture also calls it. Mirrors
+# :data:`uadas_core.core.logger._configured`.
+_builtins_registered: bool = False
+
 
 def register_operation(name: str, operation_class: type[BaseOperation]) -> None:
     """Register a cleaning operation under ``name``.
@@ -90,16 +101,22 @@ def list_operations() -> dict[str, type[BaseOperation]]:
 
 
 def _register_builtins() -> None:
-    """Populate the registry with every cleaning operation built before milestone 12.
+    """Populate the registry with every built-in cleaning operation.
 
-    Called at import time, same reasoning as
+    Called from :func:`uadas_core.core.bootstrap.bootstrap` (web-transition 1.3
+    moved this off module import so importing this module has no global-state
+    side effect). Idempotent via the module-level ``_builtins_registered`` guard,
+    so the repeated ``bootstrap()`` calls in the test suite and
+    ``tests/conftest.py``'s session-autouse seed fixture are both safe. Same
+    reasoning as
     :func:`~uadas_core.visualization.chart_registry._register_builtins`.
     """
+    global _builtins_registered
+    if _builtins_registered:
+        return
     register_operation("drop_missing_values", DropMissingValues)
     register_operation("fill_missing_values", FillMissingValues)
     register_operation("drop_duplicates", DropDuplicates)
     register_operation("normalize_text", NormalizeText)
     register_operation("convert_type", ConvertType)
-
-
-_register_builtins()
+    _builtins_registered = True

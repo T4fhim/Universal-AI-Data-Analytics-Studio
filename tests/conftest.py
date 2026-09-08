@@ -70,3 +70,23 @@ def reset_logging_state():
     _reset()
     yield
     _reset()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _seed_builtin_registries() -> None:
+    """Populate the built-in registries once per test session.
+
+    web-transition 1.3 moved
+    ``uadas_core.cleaning.operation_registry._register_builtins()`` (and, in later
+    1.3 commits, the chart and result-renderer equivalents) off module import into
+    :func:`uadas_core.core.bootstrap.bootstrap`. Tests that read one of those
+    registries without calling ``bootstrap()`` -- ``tests/cleaning``,
+    ``tests/visualization``, ``tests/plugins``, several ``tests/ui`` modules, and
+    the ``tests/services`` / ``tests/ai`` tiers via
+    ``uadas_core.ai.tool_registry`` -- need it seeded here. Each
+    ``_register_builtins()`` is idempotent, so a test that *does* call
+    ``bootstrap()`` is unaffected.
+    """
+    from uadas_core.cleaning import operation_registry
+
+    operation_registry._register_builtins()
