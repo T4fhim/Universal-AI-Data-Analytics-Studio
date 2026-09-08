@@ -345,6 +345,57 @@ jobs:
       - name: isort --check-only
         run: python -m isort --check-only src/ uadas_core/ tests/
 
+  linux_import:
+    # Web-transition Phase 1 DoD, bullets 1-2 (plans/phase-1-derisking-and-readiness.md
+    # Part E): uadas_core must import and its non-UI tests must pass on
+    # Linux with PySide6 absent -- the Phase-3 web-backend target. Built in
+    # the Phase-1 pre-flight (2026-09-08) rather than deferred to the final
+    # gate, so steps 1.3-1.7 get continuous Qt-free feedback under the
+    # no-rebase rule (A7) instead of a big-bang check after ~25 commits.
+    #
+    # Not `pip install -r requirements.txt` verbatim: that file pins
+    # `pywinauto` (Windows-only) and `pytest-qt` / `PySide6` (the Qt layer
+    # this job exists to prove uadas_core does NOT need). unixodbc-dev and
+    # libmagic1 are the OS packages pyodbc / python-magic need to build.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: OS deps for pyodbc / python-magic
+        run: sudo apt-get update && sudo apt-get install -y unixodbc-dev libmagic1
+
+      - name: Install runtime deps minus PySide6 / pywinauto / pytest-qt
+        run: |
+          grep -vE '^(PySide6|pywinauto|pytest-qt)([<>=!~ ]|$)' requirements.txt > requirements-linux.txt
+          python -m pip install -r requirements-linux.txt
+
+      - name: Assert PySide6 is not importable
+        run: |
+          python - <<'PY'
+          import importlib.util, sys
+          spec = importlib.util.find_spec("PySide6")
+          print("PySide6 spec:", spec)
+          sys.exit(1 if spec is not None else 0)
+          PY
+
+      - name: import uadas_core with no PySide6
+        run: |
+          python -c "import uadas_core; import uadas_core.core.bootstrap; import uadas_core.services.workspace_service; import uadas_core.ai.assistant_service; import uadas_core.visualization.chart_registry; import uadas_core.database.base_connection; print('uadas_core imports clean without PySide6')"
+
+      - name: pytest -- non-UI subset, PySide6-free
+        env:
+          QT_QPA_PLATFORM: offscreen
+        # Everything except the tests/ui/ tree (which constructs real Qt
+        # widgets) and the uia_integration marker. If this drifts, the fix
+        # is a real Qt import leaking into uadas_core -- which lint-imports
+        # would also catch -- not a broadening of this ignore.
+        run: python -m pytest tests/ -q -m "not uia_integration" --ignore=tests/ui -p no:cacheprovider
+
   dco:
     # Phase 0.8: Developer Certificate of Origin. Every commit introduced
     # by a pull request must carry a `Signed-off-by:` trailer matching its
