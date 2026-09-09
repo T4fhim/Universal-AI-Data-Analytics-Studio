@@ -394,3 +394,59 @@ active silent failure introduced); repo `code-reviewer` on `746897e` (the A10 co
 - `get_anthropic_tool_schemas()` returns the shared `tool.input_schema` by reference for every
   non-`build_chart` tool — pre-existing; a caller mutating one would corrupt `TOOLS`. Not
   introduced by 1.3.
+
+---
+
+## 12. Phase 1.4 as-built + end-of-range review
+
+**Scope (per §7b):** typed generic `DependencyContainer.resolve()` only. `Session` / per-request
+scope stays deferred to Phase 3.
+
+**Commits:** `49a539d` (typed `resolve()` overload pair + `src/app.py` cast removal + `ci.yml`
+mypy-scope add + `MYPY_DEBT.md` / `web-transition-glass-box-studio.md` doc updates) ·
+`85130d7` (review fixups — docstring candour + comment-rot).
+
+**As-built:**
+- `uadas_core/core/dependency_container.py`: `resolve()` is now
+  `@overload def resolve(self, key: type[T]) -> T` / `@overload def resolve(self, key: object) -> Any`
+  with a `-> Any` implementation (was `-> object`). `-> Any` fallback, not `-> object`: the latter
+  trips mypy `overload-overlap` on this module, which is CI-mypy-scoped. Runtime body byte-for-byte
+  unchanged (A10). `register()` / `is_registered()` untouched (`key: object`). Class docstring gains
+  the Phase-3 `(session, type)` seam note **and** two honesty caveats (see below).
+- `src/app.py`: 3 `cast(ServiceType, container.resolve(ServiceType))` calls in `run()` → plain
+  `container.resolve(...)`; `from typing import cast` dropped; added to CI's mypy list in `ci.yml`.
+- **mypy:** `mypy src/ui/main_window.py` **31 → 2** (the 29 `resolve() -> object` errors cleared;
+  the 2 left — `:292` `Callable[[], bool]` vs `Callable[[], None]`, `:510` `ThemeTokens | None` —
+  are unrelated pre-existing debt, so `main_window.py` stays off CI's scope). Two-tree
+  `mypy src/ uadas_core/` **74 → 44 / 19 → 18 files**. CI mypy list **147 → 148** files, clean.
+- **A10 / A9:** screenshot byte-identical (16,294 B); full suite **1420 / 92 / 0**, zero
+  test-count delta (typing-only change, no new tests). `black` / `isort` / `bandit` clean.
+
+**End-of-range review (`cfe1275..49a539d`, all non-author — A3):**
+- repo `code-reviewer` = **APPROVE** (one nit: `ci.yml:104` milestone-29 comment still said
+  `src/core/app.py` → fixed in `85130d7`).
+- `ecc:python-reviewer` = **Approve** (no CRITICAL/HIGH/MEDIUM; LOW-1: stale `src/app.py`
+  `config`-property docstring → fixed in `85130d7`; LOW-2: 2nd overload duplicating the impl
+  signature is the standard idiom, no action).
+- `ecc:type-design-analyzer` = **safe to ship** (Encapsulation 4 / Invariant-expression 2 /
+  Usefulness 4 / Enforcement 3). Must-fix (doc honesty) → applied in `85130d7`. See deferred.
+- repo `architect` = **SOUND-WITH-NOTES** (no action items; boundary stays framework-agnostic,
+  Phase-3 subclass/wrapper for `(session, type)` keys is cleanly buildable on the untouched
+  `register(key: object)` path).
+
+**Deferred (recorded, not scheduled — revisit when the trigger arrives):**
+- **Symmetric typed `register()` overload** (`register(key: type[T], factory: Callable[[], T])`
+  + an `object` fallback) — would catch `register(X, factory_returning_Y)`, which `resolve()`'s
+  typing now trusts. Blocked on choosing a sanctioned protocol-key registration pattern: the
+  typed arm's `type[T]` collides with `register(JobRunner, …)` at `bootstrap.py:260`
+  (`JobRunner` is a `Protocol` → mypy `type-abstract`). A deliberate mini-step, not a drive-by
+  (`ecc:type-design-analyzer`).
+- **`ServiceKey[T]` / `Scope` token** returned by `register()` so `resolve()` is *checked*
+  rather than trusting the key-is-the-type convention — the natural home for Phase-3's
+  per-request `(session, type)` scoping; build against a real consumer.
+- **`resolve(Protocol | ABC key)` → mypy `type-abstract`.** Latent today (`JobRunner`'s only
+  `resolve()` sites are in tests, outside CI's mypy scope). The day an in-scope module resolves
+  a Protocol key it needs `cast(type[Thing], Thing)` at that call site — now documented in the
+  `DependencyContainer` class docstring.
+- Whether the non-type `resolve()` path should yield `object` (forcing callers to narrow)
+  instead of `Any` — reconsider in Phase 3.
