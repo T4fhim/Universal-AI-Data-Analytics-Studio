@@ -212,6 +212,35 @@ class Dashboard:
     dashboard_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
 
+def _reject_parent_cycles(datasets: list[Dataset]) -> None:
+    """Raise :class:`ServiceError` if ``parent_dataset_id`` links form a cycle.
+
+    Used by :meth:`WorkspaceService.load_snapshot` (the restore path) rather
+    than by :meth:`WorkspaceService.add_dataset`: an interactive caller cannot
+    realistically build a cycle one ``add_dataset`` at a time, but a
+    hand-edited persisted workspace can, so the check belongs on the load
+    boundary. A ``parent_dataset_id`` that is not among ``datasets`` is a
+    *dangling* reference, not a cycle — it is a clean stop (mirrors
+    :meth:`get_lineage`'s own non-cascading tolerance), so only a *revisited*
+    id is an error.
+    """
+    parents: dict[str, str | None] = {
+        d.dataset_id: d.parent_dataset_id for d in datasets
+    }
+    for start in parents:
+        seen: set[str] = {start}
+        path: list[str] = [start]
+        current = parents[start]
+        while current is not None:
+            path.append(current)
+            if current in seen:
+                raise ServiceError(f"parent_dataset_id cycle: {' -> '.join(path)}")
+            seen.add(current)
+            if current not in parents:
+                break  # dangling parent: allowed, stop this walk
+            current = parents[current]
+
+
 class WorkspaceService:
     """Tracks loaded datasets and the active dataset/visualization for a session.
 
@@ -230,6 +259,45 @@ class WorkspaceService:
         self._dashboards: dict[str, Dashboard] = {}
         self._active_dataset_id: str | None = None
         self._active_visualization_id: str | None = None
+
+    # -- Restore -----------------------------------------------------------
+
+    def load_snapshot(
+        self,
+        datasets: list[Dataset],
+        visualizations: list[Visualization],
+        dashboards: list[Dashboard],
+    ) -> None:
+        """Replace all workspace state with a restored snapshot.
+
+        The restore peer of :meth:`add_dataset` / :meth:`add_visualization` /
+        :meth:`add_dashboard`. Those reject dangling references because an
+        interactive caller creating one is a bug; a *persisted* dangling
+        ``parent_dataset_id`` or tile ``visualization_id`` is normal
+        (:meth:`close_dataset` / :meth:`close_visualization` are
+        non-cascading — see their docstrings), so this path installs the
+        three lists as-is rather than re-running those referential-integrity
+        checks. It still rejects a ``parent_dataset_id`` *cycle* (via
+        :func:`_reject_parent_cycles`), which is only reachable through a
+        hand-edited persisted workspace. ``datasets`` must already be
+        topologically ordered (parents before children);
+        :class:`~uadas_core.persistence.persistence_service.PersistenceService`
+        guarantees that. Active dataset / visualization are cleared — a
+        restored snapshot does not persist the session's selection.
+        """
+        _reject_parent_cycles(datasets)
+        self._datasets = {d.dataset_id: d for d in datasets}
+        self._visualizations = {v.visualization_id: v for v in visualizations}
+        self._dashboards = {d.dashboard_id: d for d in dashboards}
+        self._active_dataset_id = None
+        self._active_visualization_id = None
+        _logger.info(
+            "Restored workspace snapshot: %d dataset(s), %d visualization(s), "
+            "%d dashboard(s).",
+            len(self._datasets),
+            len(self._visualizations),
+            len(self._dashboards),
+        )
 
     # -- Datasets ------------------------------------------------------------
 
