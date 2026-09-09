@@ -683,7 +683,11 @@ def _rebuild_visualization(
         dataset_id=record["dataset_id"],
         figure=figure,
         chart_type=chart_type,
-        chart_parameters=raw,
+        # `filtered`, not `raw`: unknown/noise keys (a stray `method`, a
+        # `title` on a chart whose build() has no such parameter) are dropped
+        # from the round-tripped object too, not just from the build() call --
+        # otherwise they persist forever across save/load cycles (contract §2.3).
+        chart_parameters=filtered,
         visualization_id=record["visualization_id"],
     )
 
