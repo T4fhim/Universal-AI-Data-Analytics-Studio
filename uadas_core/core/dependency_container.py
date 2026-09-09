@@ -18,7 +18,7 @@ application actually uses.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TypeVar
+from typing import Any, TypeVar, overload
 
 from uadas_core.core.exceptions import DependencyResolutionError
 from uadas_core.core.logger import get_logger
@@ -57,6 +57,16 @@ class DependencyContainer:
     registration happens before the first resolution — there is no
     requirement to register every service up front before any
     resolution occurs.
+
+    A key is conventionally a service *type*, and :meth:`resolve` is
+    typed for that case (``resolve(SettingsService) -> SettingsService``).
+    Any hashable value is still accepted, though, and that non-type path
+    is deliberate headroom: it is the seam a later phase's per-request
+    scoping is expected to use, keying on a ``(session, type)`` composite
+    once an HTTP request is a real resolution scope. The web-transition
+    plan (step 1.4) intentionally builds only the typed-resolution half
+    here; the request-scoped half is designed in Phase 3 against a real
+    consumer rather than speculatively now.
     """
 
     def __init__(self) -> None:
@@ -99,7 +109,13 @@ class DependencyContainer:
         self._instances.pop(key, None)
         _logger.debug("Registered %s (singleton=%s)", _describe_key(key), singleton)
 
-    def resolve(self, key: object) -> object:
+    @overload
+    def resolve(self, key: type[T]) -> T: ...
+
+    @overload
+    def resolve(self, key: object) -> Any: ...
+
+    def resolve(self, key: object) -> Any:
         """Resolve and return an instance for ``key``.
 
         For singleton registrations, returns the cached instance if
@@ -109,6 +125,14 @@ class DependencyContainer:
 
         Args:
             key: The identifier a service was registered under.
+                Passing a **type** (the conventional case) is typed:
+                ``resolve(SettingsService)`` is statically known to
+                return a ``SettingsService``, so call sites do not need
+                a ``cast``. Passing any other hashable key falls back
+                to the second overload and returns
+                :data:`~typing.Any` — the runtime behaviour is
+                identical either way; only what the type checker infers
+                differs.
 
         Raises:
             DependencyResolutionError: If ``key`` was never registered,

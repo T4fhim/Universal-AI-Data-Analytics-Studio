@@ -16,7 +16,6 @@ said it would, rather than restructuring this class or changing how
 from __future__ import annotations
 
 import sys
-from typing import cast
 
 from PySide6.QtWidgets import QApplication
 
@@ -152,17 +151,16 @@ class Application:
         # docstring for the full reasoning. Parented to main_window so it is torn down with the
         # window rather than needing an explicit stop() call in closeEvent.
         #
-        # cast(), not a bare resolve() call: DependencyContainer.resolve() returns `object`
-        # (the same "resolve() -> object gap" src/ui/main_window.py's own construction lives
-        # with -- see .github/workflows/ci.yml's mypy-scope comment) -- every resolve() call
-        # here is registered with exactly this type in uadas_core/core/bootstrap.py, so a cast is a
-        # documented, narrow correction, not a blind type: ignore.
-        settings_service = cast(
-            SettingsService, self._context.container.resolve(SettingsService)
-        )
+        # web-transition 1.4: DependencyContainer.resolve() gained a typed
+        # `resolve(key: type[T]) -> T` overload, so resolving by service class
+        # is statically known to return that class. The cast() calls this block
+        # used to need (documented then in .github/workflows/ci.yml's mypy-scope
+        # comment) are gone, and src/app.py joined that mypy scope in the same
+        # step so the win stays enforced.
+        settings_service = self._context.container.resolve(SettingsService)
         AutosaveTimer(
-            cast(ProjectService, self._context.container.resolve(ProjectService)),
-            cast(WorkspaceService, self._context.container.resolve(WorkspaceService)),
+            self._context.container.resolve(ProjectService),
+            self._context.container.resolve(WorkspaceService),
             settings_service,
             parent=main_window,
         )

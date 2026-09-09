@@ -23,34 +23,47 @@ python -m mypy src/ uadas_core/ --ignore-missing-imports --follow-imports=silent
 **Rolling count (web-transition Phase 1):**
 - Milestone-19-27 remediation-pass commit: 72 errors / 19 files (`mypy src/` only), down from 79.
 - **2026-09-08 (post web-transition 1.1/1.2/1.5/1.8, two-tree `--no-incremental`): 74 errors /
-  19 files** (checked 213 source files). `src/ui/main_window.py` = **31** of them, all the
-  single `DependencyContainer.resolve() -> object` root cause below (was 29; +2 from 1.2/1.8
-  code). The other 43 are unrelated pre-existing debt (`uadas_core/ai/llm_provider.py` 8,
+  19 files** (checked 213 source files). `src/ui/main_window.py` = **31** of them — 29 the
+  single `DependencyContainer.resolve() -> object` root cause below, + 2 unrelated (a
+  `Callable[[], bool]` vs `Callable[[], None]` callback arg at `:292`, a `ThemeTokens | None`
+  at `:510`). The other 43 are unrelated pre-existing debt (`uadas_core/ai/llm_provider.py` 8,
   `uadas_core/reports/word_exporter.py` 7, `uadas_core/visualization/advanced_charts.py` 6,
   the `cleaning/*` + `visualization/*` chart modules, `plugin_loader.py` 3, …).
-- **web-transition 1.4** clears `main_window.py`'s 31 by adding the typed generic `resolve`
-  `@overload` pair to `DependencyContainer` → expected **43 / ~18**. 1.4 records the
-  before/after `mypy src/ui/main_window.py` count here rather than adding that Phase-2-doomed
-  file to CI's scope (it folds `uadas_core/core/dependency_container.py` in instead).
+- **2026-09-09 (post web-transition 1.4, two-tree `--no-incremental`): 44 errors / 18 files**
+  (checked 213). Phase 1.4 added a typed `resolve(key: type[T]) -> T` / `-> Any` `@overload`
+  pair to `DependencyContainer` — `-> Any` fallback deliberately, not `-> object` (which would
+  trip `overload-overlap` on `dependency_container.py`, itself in CI's mypy scope). Effect:
+  **`mypy src/ui/main_window.py` 31 → 2** (the 29 `resolve() -> object` errors gone; the 2
+  named above remain, genuinely separate root causes), and one further `resolve()`-derived
+  error elsewhere in the full-tree run cleared (74 → 44 overall, 19 → 18 files).
+  `src/ui/main_window.py` still carries 2 errors so it stays **off** CI's scope; instead
+  **`src/app.py` was added** to CI's mypy list — the generic let it drop 3 `cast()` calls, it
+  survives Phase 2, and it had silently lost coverage at the 1.1 carve-out (covered via
+  `src/core`, which then left the list). Folding
+  `uadas_core/core/dependency_container.py` in was a no-op — `uadas_core/core` is already
+  entry #1.
 
 ## Excluded packages, categorized
 
-### `src/ui/main_window.py` -- 29 errors, all one root cause
+### `src/ui/main_window.py` -- 2 errors (was 31; 29 fixed in web-transition 1.4)
 
-Every error here is `"object" has no attribute "..."` or `Argument N ...
-has incompatible type "object"; expected "<ServiceType>"`. This is
-`DependencyContainer.resolve()` returning `object` (see
-`docs/ARCHITECTURE.md`'s dependency-container section) -- every
+Until Phase 1.4 this was 31 errors, 29 of them one root cause:
+`DependencyContainer.resolve()` returned `object` (see
+`docs/ARCHITECTURE.md`'s dependency-container section), so every
 `resolve(...)` call site in `main_window.py`'s `_build_controllers`/
-`_build_services` wiring loses the concrete service type and mypy correctly
-flags every attribute access and constructor argument built from that
-result. This is an architecture-level typing gap, not a bug in
-`main_window.py` itself, and fixing it means adding a typed
-`resolve(self, key: type[T]) -> T` overload (or an equivalent generic
-registration API) to `DependencyContainer` itself -- real, but
-out-of-scope for a remediation pass whose brief was "narrowly-scoped
-fixes, not sweeping changes." Flagged here as a recommendation for
-whichever milestone next touches `DependencyContainer`.
+`_build_services` wiring lost the concrete service type and mypy flagged
+every attribute access and constructor argument built from that result.
+Phase 1.4 added the typed `resolve(self, key: type[T]) -> T` overload to
+`DependencyContainer` (see that module + `.github/workflows/ci.yml`'s
+mypy-scope comment), clearing all 29.
+
+The 2 that remain are unrelated pre-existing debt, not the resolve gap:
+`:292` passes a `Callable[[], bool]` where a `Callable[[], None]` is
+expected (a callback whose return value is ignored at the call site);
+`:510` passes `ThemeTokens | None` where `IconProvider.set_tokens` wants a
+non-optional `ThemeTokens` (a missing `None` guard). Both are small,
+independent fixes; `main_window.py` is Phase-2-doomed so neither is
+scheduled, and the file stays off CI's mypy list until they're gone.
 
 ### `uadas_core/ai/` -- 9 errors (`llm_provider.py`: 8, `tool_registry.py`: 1)
 

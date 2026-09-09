@@ -110,6 +110,16 @@ jobs:
         # bridge) -- a new, genuinely clean package, folded in per the same
         # convention rather than left to go stale.
         #
+        # Web-transition Phase 1.4 adds src/app.py explicitly. It was covered
+        # transitively via `src/core` until the 1.1 carve-out moved that
+        # package to uadas_core/ and dropped `src/core` from this list --
+        # silently un-scoping the composition root (the milestone-29 comment
+        # below about "src/core/app.py already covered via src/core" went
+        # stale then). 1.4 gave DependencyContainer.resolve() a typed
+        # `resolve(key: type[T]) -> T` overload, which let src/app.py drop the
+        # three cast() calls it carried at its resolve() sites; naming it here
+        # re-scopes it and keeps that clean state enforced.
+        #
         # --follow-imports=silent: several of these modules (e.g.
         # controllers/*, actions/action_context.py) import the services
         # layer (ProjectService/WorkspaceService/SettingsService/
@@ -121,6 +131,7 @@ jobs:
         # they merely call into.
         run: python -m mypy uadas_core/core uadas_core/services uadas_core/analysis uadas_core/database uadas_core/results
           uadas_core/jobs
+          src/app.py
           src/workers src/ui/theme src/ui/a11y src/ui/web src/ui/actions
           src/ui/controllers src/ui/workbench src/ui/widgets src/ui/results
           src/ui/dialogs src/ui/help src/ui/command_stack.py
