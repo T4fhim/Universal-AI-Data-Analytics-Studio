@@ -289,8 +289,10 @@ Eight tests, one behaviour each. The `PersistenceService` API used throughout:
    and no file outside `base` is opened (assert via a `monkeypatch` on `pd.read_parquet` /
    path check).
 6. **`test_a_visualization_whose_column_no_longer_exists_is_a_rebuild_failure_not_a_load_abort`** —
-   persist a viz whose `chart_parameters` names a column, then drop that column from the frame
-   before load (rewrite the parquet); `load_workspace` succeeds, the dataset loads,
+   persist a viz whose `chart_parameters` names a column, then rewrite the parquet so that
+   column is gone **while keeping the frame's row/column counts unchanged** (rename it — a
+   *shape* change is a §1.2 checksum failure and would abort the whole load, which test 8
+   covers and this test must not trip). `load_workspace` succeeds, the dataset loads,
    `viz.visualization_id in WorkspaceSnapshot.rebuild_failures`, `snapshot.visualizations == []`.
 7. **`test_dangling_tile_visualization_id_round_trips`** — dashboard tile pointing at a
    `visualization_id` that is never added / is closed; after `load_workspace` +
