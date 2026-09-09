@@ -22,6 +22,12 @@ must follow, in the only order that avoids circular initialization:
    two independent "recent projects" lists that don't know about each
    other).
 
+Later milestones register further session-wide services into this same
+container in dependency order — most recently the Qt-free
+:class:`~uadas_core.persistence.persistence_service.PersistenceService`
+(web-transition 1.6), which serializes a workspace snapshot to a
+per-project SQLite + Parquet store and reads it back.
+
 The result is a :class:`BootstrapContext` — a small, immutable bundle
 handed to :mod:`src.app`, which is the only other module that
 should call :func:`bootstrap`. Nothing downstream of ``app.py`` should
@@ -43,6 +49,7 @@ from uadas_core.core.logger import configure_logging, get_logger
 from uadas_core.jobs import set_default_job_runner
 from uadas_core.jobs.job_runner import JobRunner
 from uadas_core.jobs.thread_pool_executor_job_runner import ThreadPoolExecutorJobRunner
+from uadas_core.persistence.persistence_service import PersistenceService
 from uadas_core.plugins.plugin_manager import PluginManager
 from uadas_core.results import result_renderer_registry
 from uadas_core.services.analysis_orchestrator_service import (
@@ -260,6 +267,16 @@ def bootstrap(
     container.register(JobRunner, lambda: job_runner, singleton=True)
     set_default_job_runner(job_runner)
     logger.debug("Registered JobRunner into the dependency container.")
+
+    # Web-transition Phase 1.6: the Qt-free workspace persistence layer
+    # (plans/phase-1-6-persistence-contract.md §5). Stateless -- its storage
+    # base is a per-call argument, so it has no constructor dependencies and is
+    # registered as a bare singleton. Placed last, after every service whose
+    # plain-data output (`Dataset` / `Visualization` / `Dashboard` lists) it
+    # serializes, matching the "construct in dependency order" reasoning used
+    # throughout this function.
+    container.register(PersistenceService, lambda: PersistenceService(), singleton=True)
+    logger.debug("Registered PersistenceService into the dependency container.")
 
     context = BootstrapContext(config=config, container=container, state=state)
 

@@ -63,7 +63,9 @@ in a fixed order:
    instance rather than each constructing its own. `AnalysisOrchestratorService`,
    `GuidanceService`, `ReportService`, `DatabaseConnectionService` follow, each in dependency
    order.
-6. **`PluginManager` constructed and `load_plugins()` run**, then `JobRunner` registered.
+6. **`PluginManager` constructed and `load_plugins()` run**, then `JobRunner` registered, then
+   `PersistenceService` registered (web-transition 1.6 — the Qt-free workspace save/load
+   singleton; last, since it only serializes the plain-data output of the services above).
 
 `bootstrap()` returns a `BootstrapContext` (config, container, state). `Application.run()` is
 the only place a `QApplication` is constructed — before doing so it forces software OpenGL
@@ -121,6 +123,38 @@ itself — it only tracks what other layers produced.
 it — orphaned references are treated as normal, expected state that dependent lookups
 (`get_lineage`, `get_dashboard_tiles`) handle gracefully rather than as corruption to guard
 against.
+
+## Persistence
+
+`uadas_core/persistence/persistence_service.py` (`PersistenceService`, web-transition 1.6)
+round-trips a workspace to a per-project `<project-stem>.workspace/` directory beside the
+`.uads.json`: a `workspace.db` (SQLite metadata — `datasets`, `visualizations`, `dashboards`,
+`dashboard_tiles`) plus one `{dataset_id}.parquet` per dataset frame. It supersedes
+`ProjectService.record_datasets`, which persisted only `{name, source_path}` and dropped
+derived datasets (no `source_path` to re-read from).
+
+- **Stateless bootstrap singleton.** Two pure verbs —
+  `save_workspace(datasets, visualizations, dashboards, base) -> SaveReport` and
+  `load_workspace(base) -> WorkspaceSnapshot` — that take/return plain data, so the desktop
+  shell runs them on a worker thread. State is installed back into the live `WorkspaceService`
+  singleton on the UI thread via the new **`WorkspaceService.load_snapshot(...)`** restore
+  entry point (the non-interactive peer of `add_dataset`/`add_visualization`/`add_dashboard`:
+  it installs the lists as-is, tolerating dangling `parent_dataset_id` / tile
+  `visualization_id`, and only rejects a `parent_dataset_id` cycle).
+- **Figures are never stored** — each `Visualization` figure is re-derived on load through
+  `chart_registry` (a figure is a pure function of frame + params; storing it only creates
+  stale-figure bugs). A figure that cannot be rebuilt (column gone, plugin chart disabled) is
+  isolated: dropped, its id returned in `WorkspaceSnapshot.rebuild_failures`, the rest of the
+  project still loads. Structural corruption (unreadable `.db`, non-uuid4 `dataset_id`,
+  `parent_dataset_id` cycle, row/column-count checksum mismatch, missing frame) aborts the
+  whole load with `ServiceError`.
+- **Non-cascading orphans round-trip** unchanged — a derived dataset whose parent was closed,
+  a dashboard tile pointing at a closed visualization. No FK is declared on
+  `datasets.parent_dataset_id` or `dashboard_tiles.visualization_id` for exactly that reason.
+- Save is atomic (`workspace.db.tmp` → `os.replace`) and full-replace (orphaned `.parquet`
+  frames are garbage-collected); Save-As is just a full `save_workspace` to the new base.
+- `dataset_id` is uuid4-validated before it is ever joined into a filesystem path; all SQL is
+  `?`-parameterized against a static DDL string.
 
 ## Configuration
 

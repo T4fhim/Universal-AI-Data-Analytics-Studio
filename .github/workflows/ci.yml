@@ -112,6 +112,10 @@ jobs:
         # bridge) -- a new, genuinely clean package, folded in per the same
         # convention rather than left to go stale.
         #
+        # Web-transition Phase 1.6 adds uadas_core/persistence (the Qt-free
+        # workspace save/load layer -- SQLite metadata + Parquet frames) --
+        # a new, genuinely clean package, folded in per the same convention.
+        #
         # Web-transition Phase 1.4 adds src/app.py explicitly. It was covered
         # transitively via `src/core` until the 1.1 carve-out moved that
         # package to uadas_core/ and dropped `src/core` from this list --
@@ -131,7 +135,7 @@ jobs:
         # mypy using their type signatures for checking the modules listed
         # here while not holding them responsible for fixing debt in modules
         # they merely call into.
-        run: python -m mypy uadas_core/core uadas_core/services uadas_core/analysis uadas_core/database uadas_core/results
+        run: python -m mypy uadas_core/core uadas_core/services uadas_core/analysis uadas_core/database uadas_core/results uadas_core/persistence
           uadas_core/jobs
           src/app.py
           src/workers src/ui/theme src/ui/a11y src/ui/web src/ui/actions
