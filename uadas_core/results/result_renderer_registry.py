@@ -76,7 +76,9 @@ _REGISTRY: dict[type, type[BaseResultRenderer]] = {}
 # a no-op after its first successful call: ``bootstrap()`` runs several times per
 # pytest session and ``tests/conftest.py`` also seeds the built-in registries, at
 # module import (before test collection). Mirrors
-# :data:`uadas_core.core.logger._configured`.
+# :data:`uadas_core.core.logger._configured`. One-shot seed: a later
+# ``unregister_renderer`` of a built-in is not restored by calling this again
+# (and ``get_renderer`` then degrades silently to the generic renderer).
 _builtins_registered: bool = False
 
 

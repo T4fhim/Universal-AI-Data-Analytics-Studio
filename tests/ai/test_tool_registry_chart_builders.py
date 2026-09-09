@@ -66,14 +66,29 @@ def test_get_anthropic_tool_schemas_does_not_mutate_the_shared_tools_entry(
 
 
 def test_build_chart_handler_dispatches_a_post_import_registered_chart(
-    probe_chart: str,
+    probe_chart: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    class _StubDataset:
-        dataframe = None
+    """The handler resolves a post-import-registered chart to its builder and calls it.
 
-    # _build_chart must get past its "Unknown chart_type" guard for the probe.
-    # It then fails inside HistogramChart.build() for lack of a real dataframe --
-    # that later failure is fine; "Unknown chart_type" must not be the reason.
-    with pytest.raises(Exception) as excinfo:
-        _build_chart(_StubDataset(), probe_chart)
-    assert "Unknown chart_type" not in str(excinfo.value)
+    Positive-path assertion: the probe is registered with ``HistogramChart``, so
+    ``_build_chart`` must look it up live and invoke ``HistogramChart.build`` with
+    the dataset's dataframe -- not raise ``Unknown chart_type``.
+    """
+    import plotly.graph_objects as go
+
+    calls: list[tuple[object, dict[str, object]]] = []
+    sentinel = go.Figure()
+
+    def _record(dataframe: object, **kwargs: object) -> go.Figure:
+        calls.append((dataframe, kwargs))
+        return sentinel
+
+    monkeypatch.setattr(HistogramChart, "build", staticmethod(_record))
+
+    class _StubDataset:
+        dataframe = "DATAFRAME_SENTINEL"
+
+    result = _build_chart(_StubDataset(), probe_chart)
+
+    assert result is sentinel
+    assert calls == [("DATAFRAME_SENTINEL", {})]

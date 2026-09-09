@@ -130,7 +130,7 @@ class AnalysisParameterDialog(QDialog):
         # group_by, path_columns, ...) still matches _is_column_field's name heuristic but
         # needs the comma-separated free-text path below instead, since QComboBox has no
         # built-in multi-select (the same limitation
-        # CreateVisualizationDialog._CHART_REGISTRY's own dialog_compatible=False exists to
+        # CreateVisualizationDialog._chart_registry()'s dialog_compatible=False exists to
         # route around for chart types with a list-typed field).
         if _is_column_field(field_name) and schema.get("type") != "array":
             combo = QComboBox(self)

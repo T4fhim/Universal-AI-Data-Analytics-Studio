@@ -21,6 +21,8 @@ not the trigger mechanism.
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 from uadas_core.cleaning.operation_registry import list_operations
@@ -86,6 +88,9 @@ def test_bootstrap_populates_the_three_builtin_registries(
     bootstrap(config_path=config_path, log_dir=log_dir)
 
     assert set(list_operations()) == _BUILTIN_OPERATION_NAMES
+    # Superset, not equality: other test tiers (and future plugins) may add chart
+    # types into the process-global registry; the guarantee 1.3 pins is only that
+    # every built-in is present.
     assert set(list_charts()) >= _BUILTIN_CHART_NAMES
     # 11 built-in renderers as of milestone 25 (see result_renderer_registry
     # ._register_builtins); aggregate/cross_tabulate fall through to the generic.
@@ -102,3 +107,27 @@ def test_bootstrap_resolves_every_registered_service_as_a_singleton(
         first = context.container.resolve(service_type)
         assert first is not None, service_type.__name__
         assert context.container.resolve(service_type) is first, service_type.__name__
+
+
+def test_importing_a_registry_module_has_no_population_side_effect() -> None:
+    """The actual goal of Phase 1.3: importing a registry leaves it empty.
+
+    In-process this is unobservable -- ``tests/conftest.py`` seeds all three
+    registries at collection time -- so this runs a fresh interpreter. A future
+    commit that re-adds a module-bottom ``_register_builtins()`` call would fail
+    here (and only here) rather than passing the whole suite.
+    """
+    probe = (
+        "import uadas_core.cleaning.operation_registry as o, "
+        "uadas_core.visualization.chart_registry as c, "
+        "uadas_core.results.result_renderer_registry as r; "
+        "sizes = (len(o._REGISTRY), len(c._REGISTRY), len(r._REGISTRY)); "
+        "assert sizes == (0, 0, 0), sizes"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stderr

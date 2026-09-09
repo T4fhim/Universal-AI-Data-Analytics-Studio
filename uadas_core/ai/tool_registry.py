@@ -48,6 +48,7 @@ from uadas_core.forecasting.model_comparison import compare_forecast_models
 from uadas_core.forecasting.prophet_forecast import forecast_prophet
 from uadas_core.forecasting.random_forest_forecast import forecast_random_forest
 from uadas_core.services.workspace_service import Dataset
+from uadas_core.visualization.base_chart import BaseChart
 from uadas_core.visualization.chart_registry import list_charts
 
 
@@ -67,7 +68,7 @@ from uadas_core.visualization.chart_registry import list_charts
 # post-1.3, empty of the built-ins as well at import time). _chart_builders() is
 # recomputed on every call so the AI tool schema (get_anthropic_tool_schemas)
 # and _build_chart's dispatch both see whatever is registered *now*.
-def _chart_builders() -> dict[str, type]:
+def _chart_builders() -> dict[str, type[BaseChart]]:
     """Live name -> chart-class map from :mod:`uadas_core.visualization.chart_registry`."""
     return {
         name: registration.chart_class for name, registration in list_charts().items()
@@ -844,10 +845,14 @@ TOOLS: list[ToolDefinition] = [
             "properties": {
                 "chart_type": {
                     "type": "string",
-                    # Import-time value = the built-ins; get_anthropic_tool_schemas()
-                    # refreshes this from the live registry per call via
-                    # _live_input_schema(), so plugin chart types are included.
-                    "enum": sorted(_chart_builders()),
+                    # Empty here on purpose: web-transition 1.3 moved chart-registry
+                    # population into bootstrap(), which runs *after* this module is
+                    # imported, so any value computed now would be []. The real enum is
+                    # filled in per call by get_anthropic_tool_schemas() ->
+                    # _live_input_schema(). A caller reading get_tool_by_name(
+                    # "build_chart").input_schema directly gets this empty list -- no
+                    # such caller exists today (see test_tool_registry_chart_builders).
+                    "enum": [],
                 },
                 "title": {"type": "string"},
                 "category_column": {
@@ -910,6 +915,11 @@ def _live_input_schema(tool: ToolDefinition) -> dict[str, Any]:
     that one enum from the live chart registry; every other tool's schema is
     returned unchanged. Returns a shallow copy for ``build_chart`` so the shared
     ``TOOLS`` entry is never mutated.
+
+    This is a whitelist of one. Any *future* tool whose ``input_schema`` enum is
+    derived from a registry (operations, renderers, ...) must be handled here too,
+    or the assistant will silently see a stale enum -- the same bug 1.3 fixed for
+    ``build_chart``.
     """
     if tool.name != "build_chart":
         return tool.input_schema

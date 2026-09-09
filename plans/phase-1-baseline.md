@@ -97,26 +97,28 @@ min. `bandit -r src uadas_core -q --skip B101,B107,B608` → exit 0. The +7: ite
 zip-slip traversal + symlink (2), injected-secrets + env-fallback (2), SQL-capability refused
 on `execute_query` + on `read_query` (2). Any *other* delta would be a regression.
 
-**Post-1.3 (de-globalize registries — commits `0443013` `54c69fa` `746897e` `efa61ce` + close-out):**
-behaviour-frozen (A10) except **one named exemption** in `746897e` (Task 3): `tool_registry`'s
-`_CHART_BUILDERS` and `create_visualization_dialog`'s `_CHART_REGISTRY` — both frozen-at-import
-chart snapshots — became live functions, so a plugin chart registered during `bootstrap()` now
-reaches the AI `build_chart` tool and the create-visualization dialog (it reached neither before).
-No built-in chart's schema/entry changes. **Test count +6 authored, no other delta:** +2 B-3
-(`tests/core/test_startup_registry_characterization.py`), +4 B-4
-(`tests/ai/test_tool_registry_chart_builders.py`); the three `_register_builtins()` moves, the two
-`tests/conftest.py` seeding changes, and the `test_chart_registry.py` leak-cleanup fix each add 0
-collected tests. Suite **1419 passed / 92 skipped / 0 failed** (inv-1 `test_worker_runner` 10;
-inv-2 **1409 passed, 92 skipped, 3 deselected, 0 failed**, process exit `139` = the usual
-post-clean Windows/Qt teardown SIGSEGV → CI-green-equivalent). `screenshot_app_state.py`
-byte-identical (16,294 bytes). `mypy` (CI list, 147 files) clean. `bandit -r src uadas_core -q
---skip B101,B107,B608` → exit 0.
+**Post-1.3 (de-globalize registries — commits `0443013` `54c69fa` `746897e` `efa61ce` `e5c3fee`
+`b4ca38c` + review-fixups):** behaviour-frozen (A10) except **one named exemption** in `746897e`
+(Task 3): `tool_registry`'s `_CHART_BUILDERS` and `create_visualization_dialog`'s `_CHART_REGISTRY`
+— both frozen-at-import chart snapshots — became live functions, so a plugin chart registered
+during `bootstrap()` now reaches the AI `build_chart` tool and the create-visualization dialog
+(it reached neither before). No built-in chart's schema/entry changes. **Test count +7 authored,
+no other delta:** +2 B-3 (`tests/core/test_startup_registry_characterization.py`), +4 B-4
+(`tests/ai/test_tool_registry_chart_builders.py`), +1 import-side-effect subprocess guard (also
+in the B-3 file, from the review-fixups commit); the three `_register_builtins()` moves, the
+`tests/conftest.py` seeding, and the `test_chart_registry.py` leak-cleanup fix each add 0
+collected tests. Suite **1420 passed / 92 skipped / 0 failed** (inv-1 `test_worker_runner` 10;
+inv-2 **1410 passed, 92 skipped, 3 deselected, 0 failed**, process exit `0` on the fixup run —
+earlier 1.3 runs exited `139`, the usual post-clean Windows/Qt teardown SIGSEGV; both are
+CI-green-equivalent under `Max(exit1, exit2)`). `screenshot_app_state.py` byte-identical (16,294
+bytes) at every commit. `mypy` (CI list, 147 files) clean. `bandit -r src uadas_core -q --skip
+B101,B107,B608` → exit 0.
 
 **Collected-count refresh (was stale here since 1.2/1.8):** `pytest -m "not uia_integration"
---collect-only` = **1511 selected / 1514 collected** (3 deselected = the `uia_integration`
-tests) as of `efa61ce`. The R0.1 "1484 / 1487" and post-1.1 "1485 / 1488" figures earlier in
-this file were never updated for 1.2's +31, 1.8's +7, or 1.3's +6; the **passed / skipped**
-chain (`1413 → 1419`) is the live A9 signal, not the collected line.
+--collect-only` = **1512 selected / 1515 collected** (3 deselected = the `uia_integration`
+tests) as of the review-fixups commit. The R0.1 "1484 / 1487" and post-1.1 "1485 / 1488" figures
+earlier in this file were never updated for 1.2's +31, 1.8's +7, or 1.3's +7; the
+**passed / skipped** chain (`1413 → 1420`) is the live A9 signal, not the collected line.
 
 ---
 

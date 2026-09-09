@@ -20,8 +20,9 @@ chart types from this dialog entirely, even though their column requirements are
 exactly as expressible as any other chart's. Now a field named in
 :attr:`~uadas_core.visualization.chart_registry.ChartRegistration.list_fields` gets a
 :class:`~src.ui.widgets.column_multi_select.ColumnMultiSelect` instead, and
-``chart_registry._register_builtins`` flips both chart types' ``dialog_compatible`` back to
-``True`` (its default) now that this dialog can actually represent their fields.
+``chart_registry._register_builtins`` now registers treemap/radar with the default
+``dialog_compatible=True`` (milestone 12 had set them ``False``) now that this dialog can
+actually represent their fields.
 """
 
 from __future__ import annotations
@@ -66,6 +67,12 @@ _logger = get_logger(__name__)
 def _chart_registry() -> (
     dict[str, tuple[type[BaseChart], list[str], list[str], frozenset[str]]]
 ):
+    """Live display-name -> (builder, required, optional, list-typed) map.
+
+    Recomputed per call so the dialog reflects whatever ``list_dialog_charts()``
+    returns now -- see the module comment above for why this replaced a frozen
+    module-level dict in web-transition 1.3.
+    """
     return {
         display_name_for(name): (
             registration.chart_class,

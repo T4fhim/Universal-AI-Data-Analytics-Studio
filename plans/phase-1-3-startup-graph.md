@@ -347,9 +347,50 @@ fixes the `_CHART_BUILDERS` import-time snapshot (Task 3, named A10 exemption be
 ## 10. Result
 
 Commits `0443013` (B-3 test) · `54c69fa` (operations) · `746897e` (charts + `_CHART_BUILDERS`) ·
-`efa61ce` (renderers) · Task-5 close-out. Suite `1413 → 1419` passed / 92 skipped / 0 failed
-(+2 B-3, +4 B-4; every registry move and the two conftest fixtures add 0). `screenshot_app_state.py`
-byte-identical throughout. `mypy` (CI list) clean. `bandit` clean. One named A10 exemption
-(Task 3, live chart-registry reads). Importing `uadas_core` now has **no** registry-population
-side effect — `bootstrap()` (or, in the test suite, `tests/conftest.py`) is the single place it
-happens.
+`efa61ce` (renderers) · `e5c3fee` close-out · `b4ca38c` comment-rot fix · review-fixups (§11).
+Suite `1413 → 1420` passed / 92 skipped / 0 failed (+2 B-3, +4 B-4, +1 import-side-effect guard;
+every registry move and the conftest seeding add 0). `screenshot_app_state.py` byte-identical
+throughout. `mypy` (CI list) clean. `bandit` clean. One named A10 exemption (Task 3, live
+chart-registry reads). Importing `uadas_core` now has **no** registry-population side effect —
+`bootstrap()` (or, in the test suite, `tests/conftest.py`) is the single place it happens.
+
+## 11. End-of-range review + deferred follow-ups
+
+**Reviewers (all over `cf3231c..HEAD`, non-authors — A3):** `architect` = SOUND-WITH-NOTES;
+`ecc:python-reviewer` = Approve (no CRITICAL/HIGH); `ecc:silent-failure-hunter` = APPROVE (no
+active silent failure introduced); repo `code-reviewer` on `746897e` (the A10 commit) = APPROVE.
+
+**Applied in the review-fixups commit:**
+- `tests/core/test_startup_registry_characterization.py`: new subprocess test —
+  `import uadas_core.{operation,chart,result_renderer}_registry` in a fresh interpreter leaves
+  each `_REGISTRY` empty. Guards 1.3's actual goal ("no import side effect"), which was otherwise
+  unguarded — `tests/conftest.py` seeds every tier in-process, so a re-added module-bottom
+  `_register_builtins()` would pass the whole suite. Fails there and only there.
+- `tests/ai/test_tool_registry_chart_builders.py`: the dispatch test replaced its
+  `pytest.raises(Exception)` + substring check with a positive-path assertion (monkeypatch
+  `HistogramChart.build` to a sentinel, assert it is called with the dataframe).
+- `uadas_core/ai/tool_registry.py`: `build_chart`'s `chart_type` enum in the `TOOLS` literal is
+  now `[]` explicitly (it already evaluated to `[]` at import — the registry is empty then) with
+  a comment that the real value is filled per call by `get_anthropic_tool_schemas()`; a warning
+  on `_live_input_schema()` that it is a one-tool whitelist and any *future* registry-derived
+  enum must be added there; `_chart_builders()` return type tightened to `dict[str, type[BaseChart]]`.
+- Doc-rot: `create_visualization_dialog.py` module docstring ("`_register_builtins` flips
+  `dialog_compatible`" — it does not) + a docstring for `_chart_registry()`;
+  `analysis_parameter_dialog.py` `_CHART_REGISTRY` → `_chart_registry()`; a one-line caveat on
+  each registry's `_builtins_registered` flag (one-shot seed; `unregister_*` of a built-in is not
+  restored — and for renderers, `get_renderer()` then degrades silently to the generic).
+
+**Deferred (genuinely YAGNI / pre-existing — no follow-up scheduled, revisit if the trigger arrives):**
+- `_register_builtins(force=…)` / a test reset helper — no test uses the `clear(); repopulate`
+  idiom; add the parameter when one needs it.
+- `_live_input_schema()` as a declarative `ToolDefinition.dynamic_enums` marker rather than a
+  name check — worth doing when a *second* registry-derived-enum tool exists; today it would be
+  one entry.
+- A `_logger.debug` in `result_renderer_registry.get_renderer()` on the generic fallback — the
+  silent fallback predates 1.3 and is not reachable in any real flow post-1.3 (bootstrap owns
+  population); a log-line addition in a behaviour-frozen step is not worth it here.
+- `_ChartRegistryEntry` tuple type-alias / `NamedTuple` for `create_visualization_dialog`'s
+  4-tuple — pre-existing positional unpacking; a clean refactor but out of 1.3's scope.
+- `get_anthropic_tool_schemas()` returns the shared `tool.input_schema` by reference for every
+  non-`build_chart` tool — pre-existing; a caller mutating one would corrupt `TOOLS`. Not
+  introduced by 1.3.
