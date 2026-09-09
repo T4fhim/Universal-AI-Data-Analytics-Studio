@@ -120,6 +120,29 @@ tests) as of the review-fixups commit. The R0.1 "1484 / 1487" and post-1.1 "1485
 earlier in this file were never updated for 1.2's +31, 1.8's +7, or 1.3's +7; the
 **passed / skipped** chain (`1413 → 1420`) is the live A9 signal, not the collected line.
 
+**Post-1.4 (typed generic `DependencyContainer.resolve()` — commits `49a539d` `85130d7`
+`a0442e0`):** typing-only, **zero test-count delta** — suite stays **1420 passed / 92 skipped
+/ 0 failed**. `mypy src/ui/main_window.py` 31 → 2; CI mypy list 147 → 148 files (added
+`src/app.py`); screenshot byte-identical.
+
+**Post-1.6 (persistence layer — commits `b6e22f4`…`45500ae`):** additive greenfield
+`uadas_core/persistence/` + two additive `workspace_service.py` items (`DashboardTile.tile_id`,
+`WorkspaceService.load_snapshot`) + a `bootstrap()` registration line + the `ProjectController`
+save/open wiring. Suite **1420 → 1438 passed / 92 skipped / 0 failed** (inv-1
+`test_worker_runner` 10; inv-2 **1428 passed, 92 skipped, 3 deselected, 0 failed**, process
+exit `139` — the usual post-clean-result Windows/Qt teardown SIGSEGV, CI-green-equivalent under
+`Max(exit1, exit2)`). **The +18 breakdown:** +8 C-3 (`tests/persistence/test_persistence_service.py`),
++6 `tests/services/test_workspace_service.py` (1 `tile_id` + 5 `load_snapshot`), +2
+`tests/ui/controllers/test_project_controller.py` (rewritten 3 → 5 — the milestone-19
+`_warn_about_skipped_datasets` behaviour is removed in 1.6, contract §9), +2 structural from
+`test_import_layering` parametrising over the 2 new `uadas_core/persistence/*.py` modules (same
+mechanism as 1.1/1.2). Any *other* delta would be a regression. `screenshot_app_state.py`
+byte-identical (16,294 bytes) — persistence adds no visible UI. `mypy` CI list (+
+`uadas_core/persistence`) → **Success** (150 source files). `bandit -r src uadas_core -q --skip
+B101,B107,B608` → exit 0 (B608 off — the `security-reviewer` ×2 end-of-range pass is the SQL
+gate; both APPROVE). `lint-imports` → 1 kept / 0 broken (`uadas_core/persistence` is Qt-free).
+No `test_module_size` delta (that guard is `src/ui/`-only).
+
 ---
 
 ## Environment
