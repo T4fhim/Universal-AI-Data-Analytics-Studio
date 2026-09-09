@@ -498,3 +498,67 @@ fidelity through Parquet. Anything here is rejected in review.
   from `test_import_layering` parametrising over the 2 new `uadas_core/persistence/*.py`
   modules (same mechanism as 1.1/1.2). No `test_module_size` delta (that guard is
   `src/ui/`-only).
+
+---
+
+## 10. As-built + end-of-range review
+
+**Commits** (`f8e71e6..`): `b6e22f4` tile_id · `a922b69` load_snapshot · `dccffd6` C-3 red ·
+`6b6e3d6` PersistenceService · `13760bd` bootstrap+CI+docs · `f765393` §4 test-6 wording ·
+`358b2d5` code-reviewer fix (round-tripped `chart_parameters` = `filtered` not `raw`) ·
+`ca45552` Part B shell wiring + `test_project_controller.py` rewrite · plus a security-fixups
+commit (below).
+
+**As-built vs the contract:**
+- 8 C-3 tests (§4). Test 6 renames a column rather than dropping it (a drop trips the §1.2
+  checksum → whole-load abort, which contradicts test 6's per-viz intent — `f765393`).
+- The loader reconstructs `Visualization.chart_parameters` from the `inspect.signature`
+  **`filtered`** set, not the raw JSON, so producer-noise keys (`method`, a `title` on a
+  chart whose `build()` lacks it) do not persist across save/load cycles (`358b2d5`).
+- Two `parent_dataset_id` cycle checks — `workspace_service._reject_parent_cycles` (list form,
+  `load_snapshot`) and `persistence_service._reject_parent_dataset_id_cycles` (dict form,
+  `load_workspace`) — deliberately separate (no cross-module private import; different
+  boundaries) with cross-referencing comments.
+- Part B: `_warn_about_skipped_datasets` (milestone-19) **removed** — 1.6 persists derived
+  datasets, so its message is false; `_warn_about_skipped_visualizations` is its 1.6
+  counterpart. `test_project_controller.py` rewritten 3→5 tests (real `WorkspaceService` +
+  `PersistenceService` + a synchronous worker-runner fake).
+- Suite **1420 → 1438** (+8 C-3, +6 `workspace_service` unit, +2 controller, +2 structural).
+  `mypy` CI list (+`uadas_core/persistence`) clean. `bandit --skip B101,B107,B608` exit 0.
+  `lint-imports` 1 kept / 0 broken. `screenshot_app_state.py` byte-identical (16,294 B).
+
+**End-of-range review (all non-author, over `f8e71e6..ca45552`):**
+- `ecc:security-reviewer` (SQL construction — the *only* injection gate, B608 is CI-`--skip`ped)
+  = **APPROVE**. §6.1 mandate met (every value a `?` placeholder, static DDL, no dynamic
+  identifiers). 3 LOW defense-in-depth items → all applied in the security-fixups commit:
+  (1) read URI built via `Path.as_uri()` not raw f-string interpolation (a workspace dir name
+  with `?`/`#`/`%` can no longer inject SQLite URI params); (2) `PRAGMA foreign_keys = ON` on
+  the write connection so a future orphan-filter regression fails loud with `IntegrityError`
+  instead of writing a silently-inconsistent `.db`; (3) `_UUID4_RE`-validate `dataset_id` on
+  the **save** path too (was load-only), for symmetry.
+- `security-reviewer` (filesystem paths) = **APPROVE**, clean — uuid4 strictly precedes every
+  path join; `_gc_orphan_parquet` glob is non-recursive and `unlink()` removes the symlink not
+  its target; `os.replace` operands both under `base`; `_workspace_base` uses `Path.name` so a
+  filename cannot carry a separator; `base` never persisted; `source_path` is metadata-only
+  (never opened by the persistence layer); Parquet errors → `ServiceError`.
+- `architect` (boundaries) = **SOUND** — `uadas_core/persistence` Qt-free; `ProjectController`
+  seam correct, `ProjectService` untouched; `load_snapshot` a clean restore peer that does not
+  weaken interactive-caller invariants; per-call `base` is the right Phase-3 seam;
+  `chart_registry`-seeded ordering coupling documented (§5.5), no pre-bootstrap path.
+- `code-reviewer` (full range) = **APPROVE** — threading split correct (lists snapshotted UI-
+  side, callbacks queued to the UI thread); `open_project_at_path` callback ordering unchanged
+  (the legacy reload was already async); error dialogs name the partial-success state; the 5
+  rewritten tests exercise the wiring incl. the real round-trip.
+
+**Deferred (recorded, not scheduled):**
+- **Unify the two cycle checks** into a shared public helper
+  (`uadas_core/core/validation.py::validate_parent_dataset_id_acyclic(...)`). `architect`:
+  do this *after* 1.6, once the pattern is proven stable over a release — premature extraction
+  now. Drift risk is low (both covered by C-3 + `load_snapshot` tests) and both carry
+  cross-referencing comments.
+- `uadas_core/readers/sqlite_reader.py:84` still builds its read-only URI with a raw
+  `f"file:{path}?mode=ro"` — the same LOW-1 the persistence layer just hardened. A consistency
+  follow-up if that reader is ever revisited; not in 1.6 scope (untouched by 1.6, has its own
+  tests).
+- `PRAGMA foreign_keys` is set on the **write** connection only. The read connection issues
+  only `SELECT`s (FKs irrelevant), so this is sufficient; revisit if load ever mutates.

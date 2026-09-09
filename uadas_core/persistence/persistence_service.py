@@ -208,6 +208,18 @@ class PersistenceService:
 
         class_to_name = _class_name_to_registry_name()
 
+        for dataset in datasets:
+            if not _UUID4_RE.match(dataset.dataset_id):
+                # Symmetry with load's §6.2 check: dataset_id is joined into a
+                # filesystem path (``base / f"{id}.parquet"``) below and feeds
+                # ``_gc_orphan_parquet``'s saved-id set. Today it is always a
+                # uuid4 (contract §8), but a Dataset built with a crafted id
+                # would otherwise write outside ``base``.
+                raise ServiceError(
+                    f"Refusing to save: dataset_id {dataset.dataset_id!r} is not "
+                    f"a uuid4 and would be joined into a filesystem path."
+                )
+
         saved_ids = {dataset.dataset_id for dataset in datasets}
         kept_visualizations: list[Visualization] = []
         skipped_visualization_ids: list[str] = []
@@ -231,6 +243,13 @@ class PersistenceService:
         except sqlite3.Error as exc:
             raise ServiceError(f"Could not open {temp_db} for writing: {exc}") from exc
         try:
+            # SQLite ignores FOREIGN KEY clauses unless this is set per-connection.
+            # Must precede executescript() (which issues an implicit COMMIT). Save
+            # already filters orphan visualizations (kept_visualizations above) and
+            # only writes tiles for dashboards being written, so this only bites if
+            # that filter logic regresses -- turning a silently inconsistent
+            # workspace.db into a loud IntegrityError (caught -> ServiceError below).
+            connection.execute("PRAGMA foreign_keys = ON")
             connection.executescript(_SCHEMA)
 
             dataset_rows = [
@@ -354,9 +373,14 @@ class PersistenceService:
             raise ServiceError(f"No workspace database found at {db_path}.")
 
         try:
-            # Read-only URI connection, mirroring
-            # uadas_core.readers.sqlite_reader — a load must never mutate the file.
-            connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+            # Read-only URI connection -- a load must never mutate the file.
+            # ``Path.as_uri()`` percent-encodes ``?`` / ``#`` / ``%`` / spaces, so a
+            # workspace directory name containing those cannot inject SQLite URI
+            # query parameters (``vfs=``, ``mode=rwc``, ...). ``base`` is caller-
+            # supplied and never read from the persisted artifact, so this is
+            # defense in depth; still cheaper than reasoning about it. (The older
+            # uadas_core.readers.sqlite_reader still uses a raw f-string here.)
+            connection = sqlite3.connect(f"{db_path.as_uri()}?mode=ro", uri=True)
         except sqlite3.Error as exc:
             raise ServiceError(
                 f"Could not open workspace database {db_path}: {exc}"
