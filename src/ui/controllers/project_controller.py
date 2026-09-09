@@ -21,6 +21,11 @@ from src.ui.ui_state_bus import UiStateBus
 from src.ui.worker_runner import WorkerRunner
 from uadas_core.core.exceptions import ApplicationError
 from uadas_core.core.logger import get_logger
+from uadas_core.persistence.persistence_service import (
+    PersistenceService,
+    SaveReport,
+    WorkspaceSnapshot,
+)
 from uadas_core.readers.reader_registry import get_reader_for_path
 from uadas_core.services.project_service import Project, ProjectService
 from uadas_core.services.workspace_service import WorkspaceService
@@ -113,6 +118,7 @@ class ProjectController:
         parent: QWidget,
         project_service: ProjectService,
         workspace_service: WorkspaceService,
+        persistence_service: PersistenceService,
         dock_manager: DockManager,
         status_bar: ApplicationStatusBar,
         state_bus: UiStateBus,
@@ -124,6 +130,7 @@ class ProjectController:
         self._parent = parent
         self._project_service = project_service
         self._workspace_service = workspace_service
+        self._persistence_service = persistence_service
         self._dock_manager = dock_manager
         self._status_bar = status_bar
         self._state_bus = state_bus
@@ -201,7 +208,25 @@ class ProjectController:
             on_open=self.open_recent_project,
         )
         self._state_bus.request_refresh()  # has_project just became True
-        self._reload_project_datasets(project)
+
+        # Web-transition 1.6: a project saved by 1.6+ has a <stem>.workspace/
+        # directory holding the full workspace (derived datasets, visualizations,
+        # dashboards). Restore from it and skip the legacy reader-reload -- running
+        # both would produce duplicate root datasets with different ids. A project
+        # saved before 1.6 has no such directory; fall back to re-reading each
+        # recorded source file as before.
+        if self._workspace_base(project).is_dir():
+            self._status_bar.show_busy("Restoring workspace…")
+            self._worker_runner.run(
+                self._persistence_service.load_workspace,
+                self._workspace_base(project),
+                on_result=self._on_workspace_loaded,
+                on_error=self._on_workspace_load_error,
+                on_finished=self._status_bar.hide_busy,
+            )
+        else:
+            self._reload_project_datasets(project)
+
         if self._on_project_opened is not None:
             self._on_project_opened(project)
 
@@ -300,7 +325,12 @@ class ProjectController:
             self.save_project_as()
             return
 
-        skipped_names = self._project_service.record_datasets(
+        # record_datasets still writes the legacy {name, source_path} list into
+        # the .uads.json (the pre-1.6 fallback open path uses it), but its
+        # return value -- derived datasets it could not record -- is no longer
+        # surfaced: web-transition 1.6 persists exactly those to
+        # <project>.workspace/ via _persist_workspace below.
+        self._project_service.record_datasets(
             project, self._workspace_service.list_datasets()
         )
         if self._on_before_save is not None:
@@ -314,7 +344,7 @@ class ProjectController:
             return
 
         self._status_bar.show_message(f"Saved project: {project.name}")
-        self._warn_about_skipped_datasets(skipped_names)
+        self._persist_workspace(project)
 
     def save_project_as(self) -> None:
         project = self._project_service.get_active_project()
@@ -331,7 +361,10 @@ class ProjectController:
         if not file_path_str:
             return  # user cancelled the dialog
 
-        skipped_names = self._project_service.record_datasets(
+        # See save_project: record_datasets still populates the .uads.json list
+        # for the fallback open path; its skipped-derived-datasets return is not
+        # surfaced because _persist_workspace persists those to the workspace DB.
+        self._project_service.record_datasets(
             project, self._workspace_service.list_datasets()
         )
         if self._on_before_save is not None:
@@ -349,28 +382,129 @@ class ProjectController:
             self._project_service.get_recent_projects(),
             on_open=self.open_recent_project,
         )
-        self._warn_about_skipped_datasets(skipped_names)
+        self._persist_workspace(project)
 
-    def _warn_about_skipped_datasets(self, skipped_names: list[str]) -> None:
-        """Surface :meth:`ProjectService.record_datasets`'s skipped-dataset names.
+    # -- Workspace persistence (web-transition 1.6) --------------------------
+    #
+    # Milestone 19 added ``_warn_about_skipped_datasets`` here, which surfaced
+    # ``record_datasets``'s return value -- derived (source-file-less) datasets
+    # it could not record into the ``.uads.json``. Web-transition 1.6 removed
+    # that warning: those datasets are now persisted in full to
+    # ``<project>.workspace/`` by :meth:`_persist_workspace`, so "were not saved"
+    # is no longer true. ``_warn_about_skipped_visualizations`` below is its
+    # 1.6 counterpart, for the one thing a full-replace save genuinely drops.
 
-        Milestone 19: before this, ``record_datasets``'s return value
-        (dataset names skipped because they have no ``source_path`` --
-        derived datasets, not yet persistable per milestone 3a's own
-        scope) was discarded entirely at both call sites -- a save that
-        silently dropped a derived dataset from the project file gave the
-        user no indication anything was left out. A warning-severity
-        dialog (not critical): the save itself succeeded, this only names
-        what could not be included in it.
+    def _workspace_base(self, project: Project) -> Path:
+        """Return the ``<project-stem>.workspace/`` directory beside ``project.path``.
+
+        The persistence layer's per-project store (SQLite ``workspace.db`` +
+        ``<dataset_id>.parquet`` frames). ``project.path`` is always set by the time
+        this is called -- both save paths route a path-less project through Save-As
+        first, and open only reaches here after a successful ``open_project``.
+        ``.uads.json`` is stripped if present, else the whole file name is used, so
+        ``foo.json`` deterministically yields ``foo.json.workspace`` (see
+        ``plans/phase-1-6-persistence-contract.md`` §5.1).
         """
-        if not skipped_names:
+        assert project.path is not None  # documented precondition, above
+        name = project.path.name
+        stem = name[: -len(".uads.json")] if name.endswith(".uads.json") else name
+        return project.path.parent / f"{stem}.workspace"
+
+    def _persist_workspace(self, project: Project) -> None:
+        """Persist the full workspace to ``<project>.workspace/`` on a worker thread.
+
+        Web-transition 1.6. Runs after ``ProjectService.save_project`` has written the
+        ``.uads.json``. The dataset / visualization / dashboard lists are snapshotted
+        here on the UI thread and handed to ``PersistenceService.save_workspace`` as
+        plain data -- the worker never touches the live, non-thread-safe
+        ``WorkspaceService``, mirroring ``_reload_project_datasets``'s own split.
+        """
+        base = self._workspace_base(project)
+        self._status_bar.show_busy("Saving workspace…")
+        self._worker_runner.run(
+            self._persistence_service.save_workspace,
+            self._workspace_service.list_datasets(),
+            self._workspace_service.list_visualizations(),
+            self._workspace_service.list_dashboards(),
+            base,
+            on_result=self._on_workspace_saved,
+            on_error=self._on_workspace_save_error,
+            on_finished=self._status_bar.hide_busy,
+        )
+
+    def _on_workspace_saved(self, report: SaveReport) -> None:
+        """UI-thread handler for a completed ``save_workspace``."""
+        self._warn_about_skipped_visualizations(report.skipped_visualization_ids)
+
+    def _on_workspace_save_error(self, exc: Exception, traceback_text: str) -> None:
+        _logger.error("Failed to persist workspace: %s\n%s", exc, traceback_text)
+        QMessageBox.critical(
+            self._parent,
+            "Failed to Save Workspace",
+            f"The project file was saved, but its workspace data (datasets, "
+            f"visualizations, dashboards) could not be written: {exc}",
+        )
+
+    def _warn_about_skipped_visualizations(self, skipped_ids: list[str]) -> None:
+        """Surface visualizations ``save_workspace`` could not persist.
+
+        A visualization whose dataset has been closed has no frame to save from, so it
+        is skipped (``plans/phase-1-6-persistence-contract.md`` §2.4). Warning, not
+        critical: the save itself succeeded. Because save is full-replace, such a
+        visualization is gone on the next save -- worth telling the user. This is the
+        1.6 counterpart of the milestone-19 skipped-datasets warning that 1.6 removed
+        (see the section comment above).
+        """
+        if not skipped_ids:
             return
-        names_text = "\n".join(f"• {name}" for name in skipped_names)
+        ids_text = "\n".join(f"• {vid}" for vid in skipped_ids)
         QMessageBox.warning(
             self._parent,
-            "Some Datasets Were Not Saved",
-            f"The project was saved, but the following dataset(s) could "
-            f"not be included because they have no source file (they were "
-            f"created by a cleaning operation or another in-app "
-            f"transformation, not loaded from disk):\n\n{names_text}",
+            "Some Visualizations Were Not Saved",
+            f"The project was saved, but the following visualization(s) could "
+            f"not be included because the dataset they chart has been "
+            f"closed:\n\n{ids_text}",
+        )
+
+    def _on_workspace_loaded(self, snapshot: WorkspaceSnapshot) -> None:
+        """UI-thread handler for a completed ``load_workspace``: install the snapshot.
+
+        Runs on the UI thread (queued signal), so mutating ``WorkspaceService`` via
+        :meth:`~uadas_core.services.workspace_service.WorkspaceService.load_snapshot`
+        and refreshing the docks is safe here -- the same UI-thread/worker-thread
+        split as :meth:`_on_datasets_reloaded`.
+        """
+        self._workspace_service.load_snapshot(
+            snapshot.datasets, snapshot.visualizations, snapshot.dashboards
+        )
+        self._dock_manager.refresh_dataset_list(self._workspace_service.list_datasets())
+        self._state_bus.request_refresh()
+        self._dock_manager.append_console_message(
+            f"Restored workspace: {len(snapshot.datasets)} dataset(s), "
+            f"{len(snapshot.visualizations)} visualization(s), "
+            f"{len(snapshot.dashboards)} dashboard(s)"
+            + (
+                f"; {len(snapshot.rebuild_failures)} visualization(s) could not "
+                f"be rebuilt."
+                if snapshot.rebuild_failures
+                else "."
+            )
+        )
+        if snapshot.rebuild_failures:
+            failures_text = "\n".join(f"• {vid}" for vid in snapshot.rebuild_failures)
+            QMessageBox.warning(
+                self._parent,
+                "Some Visualizations Could Not Be Restored",
+                f"The project's workspace was restored, but the following "
+                f"visualization(s) could not be rebuilt (their chart type or a "
+                f"column they use is no longer available):\n\n{failures_text}",
+            )
+
+    def _on_workspace_load_error(self, exc: Exception, traceback_text: str) -> None:
+        _logger.error("Failed to restore workspace: %s\n%s", exc, traceback_text)
+        QMessageBox.critical(
+            self._parent,
+            "Failed to Restore Workspace",
+            f"The project opened, but its saved workspace data could not be "
+            f"restored: {exc}",
         )

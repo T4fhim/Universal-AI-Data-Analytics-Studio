@@ -82,6 +82,7 @@ from uadas_core.core.constants import (
     DEFAULT_WINDOW_WIDTH,
 )
 from uadas_core.core.logger import get_logger
+from uadas_core.persistence.persistence_service import PersistenceService
 from uadas_core.plugins.plugin_manager import PluginManager
 from uadas_core.services.analysis_orchestrator_service import (
     AnalysisOrchestratorService,
@@ -117,6 +118,7 @@ class MainWindow(QMainWindow):
         self._settings_service = context.container.resolve(SettingsService)
         self._project_service = context.container.resolve(ProjectService)
         self._workspace_service = context.container.resolve(WorkspaceService)
+        self._persistence_service = context.container.resolve(PersistenceService)
         self._plugin_manager = context.container.resolve(PluginManager)
         self._orchestrator_service = context.container.resolve(
             AnalysisOrchestratorService
@@ -216,6 +218,7 @@ class MainWindow(QMainWindow):
             self,
             self._project_service,
             self._workspace_service,
+            self._persistence_service,
             self._dock_manager,
             self._status_bar,
             self._state_bus,
