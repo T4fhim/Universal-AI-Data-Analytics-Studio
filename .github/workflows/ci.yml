@@ -101,9 +101,11 @@ jobs:
         #
         # Milestone 29 adds src/ui/help (the new manual/anchor-resolution leaf package) and
         # src/ui/autosave_timer.py (the new standalone module) -- both genuinely clean, per
-        # this same convention. src/core/app.py (already covered via `src/core`) needed two
-        # `cast()` calls at its new DependencyContainer.resolve() call sites to stay clean --
-        # see that module's own comment for why cast(), not a blind `type: ignore`.
+        # this same convention. src/app.py (then src/core/app.py, covered transitively via
+        # `src/core`) needed two `cast()` calls at its DependencyContainer.resolve() call
+        # sites to stay clean -- both removed in web-transition 1.4 once resolve() gained a
+        # typed overload; src/app.py is named explicitly in the list now (see the 1.4 note
+        # below).
         #
         # Web-transition Phase 1.2 adds uadas_core/jobs (the Qt-free JobRunner
         # protocol + ThreadPoolExecutor implementation + the default-runner

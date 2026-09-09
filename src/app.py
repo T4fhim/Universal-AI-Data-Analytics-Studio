@@ -75,8 +75,10 @@ class Application:
         directly. Return type is intentionally left to inference here
         rather than imported and annotated explicitly, to avoid this
         file importing ``AppConfig`` for a type-hint-only purpose it
-        does not otherwise need; this can be tightened once mypy or a
-        similar checker is wired into the project's tooling.
+        does not otherwise need. mypy checks this module as of
+        web-transition 1.4 (see ``.github/workflows/ci.yml``) and infers
+        ``AppConfig`` correctly from ``BootstrapContext.config``, so an
+        explicit annotation would buy only that unwanted import.
         """
         return self._context.config
 

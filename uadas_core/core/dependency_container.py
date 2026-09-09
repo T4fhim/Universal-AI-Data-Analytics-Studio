@@ -67,6 +67,24 @@ class DependencyContainer:
     plan (step 1.4) intentionally builds only the typed-resolution half
     here; the request-scoped half is designed in Phase 3 against a real
     consumer rather than speculatively now.
+
+    Two honesty caveats on that typing. First, :meth:`register` does not
+    correlate a key with its factory's return type — ``register(X, ...)``
+    accepts a factory returning anything, so ``resolve(X) -> X`` is a
+    trusted *convention*, not a checked guarantee; a mismatched
+    registration is caught by review, not by the type checker. Second,
+    the typed overload's parameter is ``type[T]``, which mypy treats as
+    instantiable, so resolving by a :class:`~typing.Protocol` or abstract
+    class as key trips ``type-abstract`` at the call site and needs a
+    ``cast(type[Thing], Thing)`` there. The one such key today is
+    :class:`~uadas_core.jobs.job_runner.JobRunner` (a ``Protocol``); its
+    only ``resolve()`` sites are in tests, which are outside CI's mypy
+    scope, so this stays latent until an in-scope module resolves it.
+    Closing both gaps (a symmetric typed :meth:`register` overload; a
+    ``ServiceKey[T]`` token that makes ``resolve`` sound rather than
+    trusting) is deferred — the first is coupled to picking a sanctioned
+    protocol-key pattern, the second belongs with the Phase-3 scoping
+    work.
     """
 
     def __init__(self) -> None:
