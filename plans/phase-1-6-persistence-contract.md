@@ -1,51 +1,75 @@
 # Phase 1.6 — Persistence Contract
 
 **Status:** R0.4 design doc · produced 2026-09-07 (architect) · R0.4 sign-off 2026-09-08
-(`code-reviewer` = APPROVE-WITH-CHANGES · `security-reviewer` = APPROVE-WITH-CHANGES) ·
-**R0.4 changes FOLDED IN 2026-09-09** (this revision). The §0 disposition table maps every
-review item to where it now lives. Ready for the executable plan + implementation once an
-`ecc:architect` (opus, non-author) pass confirms this revision is implementation-ready.
+(`code-reviewer` + `security-reviewer`, both APPROVE-WITH-CHANGES) · **R0.4 changes folded
+2026-09-09** (rev 1) · **`ecc:architect` (opus, non-author) verification 2026-09-09 =
+CONCERNS → all 4 blocking defects (B1–B4) + 9 must-fix items resolved in this rev 2.**
+The §0 disposition table maps every review item to where it lives. Ready for the executable
+plan + `implementer`.
 
 **Purpose.** Define the save/load round-trip contract for datasets (including *derived*
-datasets), visualizations, and dashboards — and the characterization test (Control C-3) that
-proves it. The current code (`uadas_core/services/project_service.py:285-302`,
-`record_datasets`) persists only `{name, source_path}` per dataset and **explicitly skips
-derived datasets** (`if dataset.source_path is None: … skipped`, line 288). 1.6 closes that
-gap with a serialization layer *alongside* `WorkspaceService` — additive, changing no existing
-behaviour for existing callers except the two documented dataclass/guard changes in §9.
+datasets), visualizations, and dashboards — and the characterization tests (Control C-3) that
+prove it. Today `uadas_core/services/project_service.py::record_datasets` (`:246-302`) persists
+only `{name, source_path}` per dataset and **explicitly skips derived datasets**
+(`if dataset.source_path is None: … skipped`, `:288`). 1.6 closes that gap with a
+serialization layer *alongside* `WorkspaceService` — additive, changing no existing behaviour
+for existing callers except the changes enumerated in §9.
 
 ---
 
-## §0. R0.4 review-item disposition
+## §0. Review-item disposition
 
-| # | Source | Item | Where addressed in this revision |
-|---|---|---|---|
-| 1 | code-reviewer | Re-verify every `file:line` citation against the current `uadas_core/` tree | Done throughout; verified 2026-09-09 against HEAD `a0442e0`. Key ones: `Dataset` fields `workspace_service.py:102-111`; `Visualization` `:160-165`; `DashboardTile` `:168-181` (fields `:178-180`); `Dashboard` `:183-206`; `add_dataset` parent check `:249-257`; `close_dataset` non-cascade docstring `:273-280`; `record_datasets` skip `project_service.py:287-293` (the `source_path is None` test is line 288); `chart_registry.get_chart` `:129`; `ChartRegistration` `:41-81`. |
-| 2 | code-reviewer | **BLOCKING** — `DashboardTile` has no `tile_id` | §3 + §9. Add `tile_id: str = field(default_factory=lambda: str(uuid.uuid4()))` as a **trailing** field on the dataclass (`workspace_service.py`). Verified every `DashboardTile(...)` call site (2: `visualization_controller.py:183`, `tests/ui/controllers/test_visualization_controller.py:78`) uses keyword args, so a trailing defaulted field is backward-compatible. |
-| 3 | code-reviewer | Figure re-derivation API — state it exactly | §2.2. Real call: `chart_registry.get_chart(<registry_name>).chart_class.build(dataframe, **chart_parameters)` (`get_chart` is module-level, `chart_registry.py:129`; `chart_class` is `ChartRegistration.chart_class`, `:77`). **1.3 kept `chart_registry` as module-level functions (did NOT convert it to a container instance — startup-graph §7d), so the persistence layer imports it directly** (a Qt-free `uadas_core` peer; `lint-imports` clean; already imported by the `linux_import` CI job). No injection. |
-| 4 | code-reviewer | Acyclic `parent_dataset_id` — verify precondition, decide fixture-fix vs graceful | §1.3. Verified precondition: no existing fixture/project builds a `parent_dataset_id` cycle (in-session cycles are already unconstructible via `add_dataset` alone — it requires the parent to be loaded first — so a cycle needs post-hoc `.parent_dataset_id` mutation or a corrupt `.db`). Decision: **two guards** — (a) a cheap forward check in `add_dataset` (walk ancestors of the proposed parent; if the new `dataset_id` appears, raise `ServiceError`), (b) the loader validates the full chain and raises a clear `ServiceError` on any cycle (defends a hand-edited/corrupt `.db`). Not a silent failure either way. |
-| 5 | code-reviewer | Strengthen C-3 assertion to structural figure round-trip | §4. `v2.figure.to_json() == fig.to_json()` (rebuild vs original), not "figure is not None". |
-| 6 | code-reviewer | FK on `parent_dataset_id` vs non-cascading model | §1.2. **Option A** — **drop** the `parent_dataset_id` FK; a derived dataset whose parent was closed is normal state (matches `close_dataset`'s documented non-cascade) and is still fully persistable (own frame + metadata). Comment in the DDL. |
-| 7 | security-reviewer | **CRITICAL** — mandate parameterized SQL | §6.1. Absolute rule: `sqlite3` `?` placeholders only; never f-string / `%` / `.format` / `+` into SQL text. B608 is `--skip`ped in CI so this review + the security-reviewer×2 gate are the only SQL checks. |
-| 8 | security-reviewer | **HIGH** — validate `dataset_id` is uuid4 before path-join on load | §6.2. Loader rejects any `dataset_id` that is not a canonical uuid4 string *before* it is joined into a Parquet path. Base dir is caller-supplied (constructor arg), never read from a row. |
-| 9 | security-reviewer | Validate `chart_parameters` on load | §2.3. Keys must be a subset of the `ChartRegistration`'s `required_fields ∪ optional_fields`; every `list_fields` value must be a `list`; every `required_fields` key must be present; unknown `chart_type` raises (`get_chart` already does). |
-| 10 | security-reviewer | pyarrow/fastparquet minimum versions | §6.3. Delegated to `requirements.txt` (both already listed, unpinned) with a note: Parquet deserialisation is a CVE class; keep current. 1.6 does not itself pin (a repo-wide pin decision, out of scope). |
-| 11 | security-reviewer | Load behaviour when a persisted chart's columns no longer exist | §2.2. **Hard error** — `ServiceError` naming the `visualization_id`, `chart_type`, and the missing column parameter(s). No silent degrade. |
-| 12 | security-reviewer | State the single-threaded SQLite + local-storage assumption | §6.4. |
-| 13 | security-reviewer | Extend C-3 with a cycle-creation case that must be rejected | §4 (second test, `test_load_rejects_a_parent_dataset_id_cycle`). |
+### From R0.4 `code-reviewer` (6)
 
-**Additional issue found while folding (2026-09-09), not in the review list:**
+| # | Item | Resolution |
+|---|---|---|
+| 1 | Re-verify `file:line` citations against `uadas_core/` | Done; verified 2026-09-09 at HEAD `f5dd2d4`. Key: `Dataset` `workspace_service.py:39-120` (fields `:102-111`, `dataset_id` uuid4 factory `:109`, `row_count`/`column_count` `init=False` recomputed in `__post_init__:113-120`); `Visualization` `:123-165` (`figure` non-optional no-default `:162`); `DashboardTile` `:168-181`; `Dashboard` `:183-206`; `add_dataset` `:229-262` (parent-exists check `:249-257`, **no duplicate-id guard** — `:259`); `add_visualization` dataset check `:385-390`; `add_dashboard` tile check `:462-472`; `close_dataset` non-cascade `:264-295` (docstring `:273-280`); `get_lineage` orphan-tolerant `:308-334`; `get_dashboard_tiles` lenient `:507-534`. `record_datasets` `:246-302`. `chart_registry.get_chart` `:129`, `list_charts` `:158`, `ChartRegistration` `:41-81` (`chart_class` `:77`). `BarChart.build(cls, dataframe, category_column, value_column=None, title=None)` `categorical_charts.py:50-56` (concrete builds take **named params, no `**kwargs`**). |
+| 2 | **BLOCKING** — `DashboardTile` has no `tile_id` | §3 + §9. `tile_id: str = field(default_factory=lambda: str(uuid.uuid4()))` as a **trailing** field. Every call site (`visualization_controller.py:183`, `tests/ui/controllers/test_visualization_controller.py:78`) uses kwargs → backward-compatible. |
+| 3 | Figure re-derivation API — state exactly | §2.2. `chart_registry.get_chart(<registry_name>).chart_class.build(dataframe, **filtered_params)`. 1.3 kept `chart_registry` module-level (startup-graph §7d), so `PersistenceService` imports it directly (Qt-free `uadas_core` peer; `lint-imports` clean; already imported by the `linux_import` CI job, `ci.yml:401`). No injection. |
+| 4 | Acyclic `parent_dataset_id` — verify precondition, decide | §1.3. **Corrected precondition:** an in-session cycle *is* constructible — `add_dataset` has no duplicate-id guard (`:259`), so `add(A)`→`add(B, parent=A)`→`add(A', dataset_id=A.id, parent=B.id)` closes one. Decision: **loader-side check only** (walk each dataset's ancestry with a visited-set; a repeat = cycle → `ServiceError`). **No `add_dataset` change** — an interactive re-add-with-duplicate-id is exotic, not a user flow, and the real threat (a hand-edited `.db`) is fully covered by the loader + `load_snapshot` check. |
+| 5 | Strengthen C-3 figure assertion | §4 test 1: `v2.figure.to_json() == fig.to_json()`. Safe — `ChartView` themes via JS on the loaded page, not by mutating the `Figure`. |
+| 6 | FK on `parent_dataset_id` vs non-cascading model | §1.2. **Option A** — drop the `parent_dataset_id` FK. It is *descriptive lineage* (`Dataset` docstring `:92-99`), an orphaned parent is normal (`close_dataset:273-280`), and the derived row is still fully persistable. The `visualizations.dataset_id` FK is **kept** (§2.4) — that is a *functional* dependency (no frame → no `figure`). |
 
-`Visualization.chart_type` is stored **inconsistently** across the current tree:
-`src/ui/dialogs/create_visualization_dialog.py:238` writes `builder_class.__name__` (a *class*
-name, e.g. `"BarChart"`), while `src/ui/workbench/pages/visualize_page.py:439`,
-`uadas_core/ai/assistant_service.py:483`, `uadas_core/services/analysis_orchestrator_service.py:427`
-and `uadas_core/visualization/chart_recommender.py` all write the *registry* name (e.g.
-`"bar"`). `chart_registry.get_chart()` only accepts registry names. **Resolution (§2.1):** the
-persistence layer **normalises `chart_type` to the registry name on save** — if the stored
-value is not already a registry key, reverse-look-up by `chart_class.__name__` over
-`list_charts()`; if it matches neither, raise `ServiceError` on save naming the value. On load
-the value is always a registry name.
+### From R0.4 `security-reviewer` (7)
+
+| # | Item | Resolution |
+|---|---|---|
+| 7 | **CRITICAL** — parameterized SQL | §6.1. `?` placeholders only, `executemany` for bulk; DDL is static literals. B608 is CI-`--skip`ped (`ci.yml:353`) so the `security-reviewer` ×2 gate is the only SQL check — called out in the plan. |
+| 8 | **HIGH** — validate `dataset_id` is uuid4 before path-join | §6.2 + §4 test 5. Regex `^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$` on every `dataset_id` before it touches a path. `base` is a call argument, never a persisted value. |
+| 9 | Validate `chart_parameters` on load | §2.3. Allow-list is `inspect.signature(chart_class.build)` (the real accepted kwargs). Unknown keys (producer noise — `chart_type`, `title` on a chart that lacks it, `method`) are **dropped with a debug log**, not raised. A missing no-default param, or a `list_fields` value that is not a `list`, is a **per-visualization rebuild failure** (§2.2), not a whole-load abort. |
+| 10 | pyarrow/fastparquet min versions | §6.3. Both in `requirements.txt` (`:48-49`), unpinned; delegated there with a "Parquet deser is a CVE class, keep current" note. 1.6 adds no pin (repo-wide call, out of scope). |
+| 11 | Load behaviour when a chart's columns no longer exist | §2.2. **Per-visualization** rebuild failure — the viz is dropped from the snapshot and its id is returned in `WorkspaceSnapshot.rebuild_failures`; the rest of the project loads. Whole-load abort is reserved for *structural* corruption (cycle, non-uuid4 id, unreadable `.db`, missing dataset frame). |
+| 12 | Single-threaded SQLite + local-storage assumption | §6.4. |
+| 13 | C-3 with a cycle-creation case | §4 test 2 + tests 3–7 (see §4). |
+
+### From `ecc:architect` opus verification (rev 2)
+
+| ID | Defect | Resolution |
+|---|---|---|
+| B1 | Loader can't re-enter the orphan states the contract guarantees — `add_dataset:249-257` rejects a dangling `parent_dataset_id`, `add_dashboard:462-472` rejects a tile with an unknown `visualization_id` | §2.5 + §9. New **`WorkspaceService.load_snapshot(datasets, visualizations, dashboards)`** restore entry point: clears current state, installs the three lists **directly** (tolerating dangling `parent_dataset_id` and dangling tile `visualization_id` — that is the point), re-runs the acyclic check. Datasets are inserted parents-first; the loader returns them topologically ordered. |
+| B2 | `load_workspace() -> WorkspaceService` returning a *new* instance — but `WorkspaceService` is a `bootstrap()` singleton (`bootstrap.py:178`) that `AssistantService` / controllers / etc. hold | §5. `load_workspace(base) -> WorkspaceSnapshot` is **pure** — returns plain objects, touches no `WorkspaceService`. `ProjectController` runs it on a **worker thread** (mirroring `_read_recorded_datasets`, `project_controller.py:236-249`) then calls `workspace_service.load_snapshot(...)` on the **UI thread** (mirroring `_on_datasets_reloaded`, `:251-267`). `save_workspace` takes **plain lists** too (§5) so the worker never reads a live `WorkspaceService`. |
+| B3 | §2.3's allow-list (`required_fields ∪ optional_fields`, column names only) rejects every real viz — real `chart_parameters` carry `title` (`visualize_page.py:417`, `create_visualization_dialog.py:219`), and AI/orchestrator store `dict(tool_input)` verbatim incl. `chart_type`/`title`/`method` (`assistant_service.py:484`, `analysis_orchestrator_service.py:428`); `build(**params)` would `TypeError` on `chart_type` | §2.3 rewritten to the `inspect.signature` allow-list with silent drop of unknowns (item 9). §2.2 states the filter runs *before* `build(**filtered)`. |
+| B4 | `{base}` derivation, Save-As relocation, orphan-Parquet GC, save atomicity all unspecified | §5.1 (`{base}` = `<project-stem>.workspace/` beside the `.uads.json`), §5.2 (Save-As = full `save_workspace` to the new base; old dir left behind, like the old `.uads.json`), §5.3 (GC: `save_workspace` deletes `.parquet` whose stem is not a saved `dataset_id`), §5.4 (atomicity: `workspace.db` written to `.tmp` then `os.replace`; a partial frame is a per-dataset structural failure on load — accepted risk, noted). |
+| Q3 | class-name→registry-name reverse map is silently last-wins on class collision | §2.1 — build the map with collision detection; two registrations sharing a `chart_class.__name__` → `ServiceError` on save. |
+| Q5 | whole-load abort on one rebuild failure contradicts the `_read_recorded_datasets` precedent | §5 — `load_workspace` returns `(… , rebuild_failures: list[str])`; per-viz, not whole-load. |
+| Q7 | routing persistence through `ProjectService` violates its "no `WorkspaceService` dependency" contract (`project_service.py:9-19`) | §5 + §9. `PersistenceService` is registered in `bootstrap()` and called by **`ProjectController`** (already holds both services, already does this shape at `:303-305`). `ProjectService` is **untouched**. `analysis_logs` stays in `.uads.json` (1.7). |
+| — | `add_dataset` insertion must be topological; load phase-ordered (datasets → visualizations → dashboards) | §2.5 states both. |
+| — | `column` is a SQLite keyword | §3 DDL quotes it as `"column"` (static identifier in static DDL — no §6.1 conflict). |
+| — | `save_workspace`'s skipped list / `load_workspace`'s failures must be surfaced by the shell, like `_warn_about_skipped_datasets` (`project_controller.py:354-372`) | §9 desktop-shell touchpoint. |
+| — | after 1.6, `open_project_at_path` would run *both* `_reload_project_datasets` and `load_workspace` → duplicate root datasets, different ids | §9 — if the `.workspace/` dir exists, `load_workspace` **replaces** the legacy reader-reload; the legacy path runs only for pre-1.6 projects (no `.workspace/`). |
+| — | autosave (`autosave_timer.py:122-126`) would mean a periodic multi-second UI-thread freeze writing N Parquet files | §9 — **autosave does not call `save_workspace` in 1.6** (keeps the cheap `.uads.json` metadata autosave only). Documented 1.6 limitation; async workspace autosave is a later enhancement. |
+
+### Chart_type storage inconsistency (found while folding, not in any review list)
+
+`Visualization.chart_type` is stored as a chart *class* name (`"BarChart"`) by
+`src/ui/dialogs/create_visualization_dialog.py:238` (`builder_class.__name__`) but as a
+*registry* name (`"bar"`) by `visualize_page.py:439`, `assistant_service.py:483`,
+`analysis_orchestrator_service.py:427`, `chart_recommender.py`. `get_chart()` only accepts
+registry names. **§2.1:** the persistence layer normalises `chart_type` to the registry name
+on save (passthrough → reverse-map by class name → `ServiceError`). The producer bug is
+**not** fixed in 1.6 (it is `src/ui/`, Phase-2-doomed; out of a persistence step's scope) —
+the reverse-map is a labelled compat read path. Round-trip is therefore *not* identity for a
+legacy class-name value (`"BarChart"` in → `"bar"` out); §4's equality semantics say so.
 
 ---
 
@@ -55,15 +79,16 @@ Field source: `uadas_core/services/workspace_service.py:102-111`.
 
 ### 1.1 DataFrame → Parquet
 
-- **Key:** `{base}/{dataset_id}.parquet`, where `dataset_id` is the uuid4 from
-  `Dataset.dataset_id` (`field(default_factory=lambda: str(uuid.uuid4()))`, line 109).
-  Derived from `dataset_id`, **never from `name`** — `name` is user-editable and a
-  path-traversal / object-key-injection surface (matters now for the filesystem; more in
-  Phase 3 with object storage).
+- **Key:** `{base}/{dataset_id}.parquet`; `dataset_id` is the uuid4 from `Dataset.dataset_id`
+  (`:109`). Derived from `dataset_id`, **never** from `name` (user-editable; traversal /
+  object-key-injection surface — matters now for the FS, more in Phase 3 with object storage).
 - **Write:** `dataframe.to_parquet(path, index=False)` (pyarrow/fastparquet — both deps).
+  `index=False` drops any non-default index; accepted (cleaning ops already
+  `reset_index(drop=True)` — `missing_values.py:78`, `duplicates.py:67`).
 - **Read:** `pd.read_parquet(path)` (mirrors `uadas_core/readers/parquet_reader.py`).
-- **`base` is caller-constrained:** the `PersistenceService` constructor takes the base
-  directory; nothing derives it from a persisted row (§6.2).
+- **dtype fidelity (§8):** standard dtypes round-trip; `category` / tz-aware `datetime` /
+  all-null `object` columns are known Parquet round-trip hazards — `DataFrame.equals()` is
+  dtype-strict, so C-3 uses simple int/str/float frames.
 
 ### 1.2 Metadata row — SQLite table `datasets`
 
@@ -73,102 +98,128 @@ CREATE TABLE datasets (
   name                  TEXT NOT NULL,      -- Dataset.name
   source_path           TEXT,               -- Dataset.source_path; NULL for derived datasets
   source_format         TEXT NOT NULL,      -- Dataset.source_format ("csv"|"json"|"parquet"|…)
-  row_count             INTEGER NOT NULL,   -- Dataset.row_count  (invariant: == len(df) on load)
-  column_count          INTEGER NOT NULL,   -- Dataset.column_count (invariant: == len(df.columns))
+  row_count             INTEGER NOT NULL,   -- checksum only (see below)
+  column_count          INTEGER NOT NULL,   -- checksum only
   read_warnings         TEXT NOT NULL,      -- JSON array of strings; "[]" when empty
   parent_dataset_id     TEXT,               -- Dataset.parent_dataset_id; NULL if root
-  derivation_description TEXT               -- Dataset.derivation_description; NULL iff parent is NULL
-  -- NO FOREIGN KEY on parent_dataset_id (R0.4 item 6, Option A): close_dataset() does not
-  -- cascade, so a derived dataset whose parent has been closed is normal, expected state.
-  -- It is still persisted in full (frame + metadata); a SQL FK would wrongly reject it.
+  derivation_description TEXT               -- Dataset.derivation_description
+  -- NO FOREIGN KEY on parent_dataset_id (R0.4 item 6): close_dataset() is non-cascading,
+  -- so a derived dataset whose parent was closed is normal state and must round-trip; a
+  -- SQL FK would wrongly reject it on save.
+  -- derivation_description is NULL for a root dataset by convention (nothing on the
+  -- Dataset dataclass enforces the "NULL iff parent NULL" pairing).
 );
 ```
 
-Rows with `parent_dataset_id IS NOT NULL` are persisted **in full** — DataFrame as Parquet
-*and* metadata — so lineage survives a round trip (this is the core gap 1.6 closes;
-`record_datasets` currently drops them).
+- `row_count` / `column_count` are `field(init=False)` on `Dataset`, recomputed in
+  `__post_init__` from the loaded frame. The persisted columns are a **verification
+  checksum**: on load, after `read_parquet`, assert `stored_row_count == len(df)` and
+  `stored_column_count == len(df.columns)` — a mismatch is *structural* corruption
+  (`ServiceError`, whole-load abort), the frame and metadata disagree.
+- Rows with `parent_dataset_id IS NOT NULL` are persisted **in full** (frame + metadata) —
+  the core gap 1.6 closes.
 
-### 1.3 Acyclic `parent_dataset_id`
+### 1.3 Acyclic `parent_dataset_id` (loader-side only)
 
-- **Precondition (verified 2026-09-09):** no current fixture or checked-in project builds a
-  `parent_dataset_id` cycle. `add_dataset` (`workspace_service.py:249-257`) today only checks
-  the parent is loaded; a cycle cannot be built by `add_dataset` calls alone (the parent must
-  exist first), so today's only cycle routes are post-hoc `.parent_dataset_id` mutation or a
-  corrupt `.db`.
-- **Guard (a) — `add_dataset`:** before inserting, walk the ancestor chain from
-  `dataset.parent_dataset_id`; if `dataset.dataset_id` is reached, raise
-  `ServiceError("… would create a parent_dataset_id cycle")`. O(depth), no dataclass change.
-- **Guard (b) — loader:** after reading all `datasets` rows, validate the `parent_dataset_id`
-  graph is acyclic; on a cycle raise `ServiceError` naming the ids in the cycle. The workspace
-  is not partially populated (fail the whole `load_workspace`).
+After reading all `datasets` rows, for each dataset walk `parent_dataset_id` with a
+visited-set; revisiting an id is a cycle → `ServiceError` naming the ids. Whole-load abort
+(not a partial workspace). A dangling `parent_dataset_id` (parent not among the rows) is
+**not** an error — it is stopped at, exactly like `get_lineage` (`workspace_service.py:328-334`).
+No `add_dataset` change (R0.4 item 4 corrected).
 
 ---
 
-## 2. `Visualization` → record (figure NOT stored, re-derived on load)
+## 2. `Visualization` → record (figure NOT stored; re-derived on load)
 
 Field source: `uadas_core/services/workspace_service.py:160-165`.
 
 ```sql
 CREATE TABLE visualizations (
   visualization_id  TEXT PRIMARY KEY,   -- Visualization.visualization_id (uuid4)
-  dataset_id        TEXT NOT NULL,      -- Visualization.dataset_id (saved set only; see 2.4)
+  dataset_id        TEXT NOT NULL,      -- saved-datasets set only (see 2.4)
   name              TEXT NOT NULL,      -- Visualization.name
-  chart_type        TEXT NOT NULL,      -- registry name AFTER normalisation (see 2.1), e.g. "bar"
-  chart_parameters  TEXT NOT NULL,      -- Visualization.chart_parameters, JSON object
+  chart_type        TEXT NOT NULL,      -- registry name AFTER normalisation (2.1), e.g. "bar"
+  chart_parameters  TEXT NOT NULL,      -- Visualization.chart_parameters, JSON object, verbatim
   FOREIGN KEY (dataset_id) REFERENCES datasets(dataset_id)
-  -- FK kept: save excludes any visualization whose dataset_id is not in the saved set
-  -- (§2.4), so this reference is always satisfiable on load.
+  -- FK kept: save skips any viz whose dataset_id is not in the saved set (2.4), so this
+  -- reference is always satisfiable on load.
 );
 ```
 
 ### 2.1 `chart_type` normalisation on save
 
-`chart_type` in a live `Visualization` is either a registry name (`"bar"`, from VisualizePage
-/ AI / orchestrator / recommender) or a chart *class* name (`"BarChart"`, from the legacy
-`CreateVisualizationDialog`). On save:
+For each `Visualization`:
 
-1. if `chart_type in list_charts()` → store as-is;
-2. else build `{reg.chart_class.__name__: name for name, reg in list_charts().items()}` and
-   look `chart_type` up in it → store the resolved registry name;
-3. else raise `ServiceError(f"Visualization {vid}: chart_type {chart_type!r} is neither a "
+1. `chart_type in list_charts()` → store as-is;
+2. else build `class_to_name = {}` from `list_charts()`; for each `(name, reg)` add
+   `reg.chart_class.__name__ → name`, **raising `ServiceError` if that class name is already
+   a key** (two registrations, same class name — ambiguous). Look `chart_type` up → store the
+   resolved registry name;
+3. else `ServiceError(f"Visualization {vid}: chart_type {chart_type!r} is neither a "
    f"registered chart name nor a known chart class")`.
 
-The stored value is therefore always a registry name.
+Stored `chart_type` is always a registry name.
 
-### 2.2 Figure re-derivation on load
+### 2.2 Figure re-derivation on load (per-visualization failure isolation)
+
+For each `visualizations` row, in a `try` that collects failures:
 
 ```python
-registration = chart_registry.get_chart(chart_type)          # ServiceError if unknown
-figure = registration.chart_class.build(dataset.dataframe, **chart_parameters)
+registration = chart_registry.get_chart(chart_type)          # unknown -> failure
+raw = json.loads(chart_parameters)                            # non-dict -> failure
+accepted = set(inspect.signature(registration.chart_class.build).parameters) - {"cls", "dataframe"}
+filtered = {k: v for k, v in raw.items() if k in accepted}    # drops chart_type/title/method noise (debug-log the drops)
+# required = params of build() with no default; every one must be in `filtered` -> else failure
+# every key in registration.list_fields present in `filtered` must be a list -> else failure
+figure = registration.chart_class.build(dataset.dataframe, **filtered)   # ServiceError (missing column) -> failure
 ```
 
-- `dataset` is the already-loaded `Dataset` for `visualizations.dataset_id`.
-- **Missing columns (R0.4 item 11):** if `build()` raises because a `chart_parameters` column
-  is not in `dataset.dataframe.columns`, the loader re-raises as
-  `ServiceError(f"Visualization {vid} ({chart_type}) cannot be rebuilt: column(s) {missing} "
-  f"no longer exist in dataset {dataset_id}")`. Hard error, not a silent skip.
-- Rationale for not storing the figure: figures are large, are a pure function of
-  (data + params), and persisting them creates stale-figure bugs.
+- `dataset` is the already-loaded `Dataset` for `dataset_id`.
+- Any failure above → the viz is **omitted** from `WorkspaceSnapshot.visualizations` and its
+  `visualization_id` is appended to `WorkspaceSnapshot.rebuild_failures`. The rest of the
+  project loads. (R0.4 item 11 + architect Q5.)
+- Not stored because figures are large and are a pure function of (data + params); storing
+  them creates stale-figure bugs.
 
-### 2.3 `chart_parameters` validation on load (R0.4 item 9)
+### 2.3 `chart_parameters` validation — see 2.2
 
-Before `build()`:
+The allow-list is the real `build()` signature, not the registration's column-field tuples
+(those are column names only; real params also carry `title` / `method` / a stray
+`chart_type`). Unknown keys are dropped (debug-logged), not rejected — they are known
+producer noise. Genuinely broken params (missing required, wrong list type) are per-viz
+failures.
 
-- `json.loads(chart_parameters)` must yield a `dict`;
-- every key must be in `set(registration.required_fields) | set(registration.optional_fields)`
-  — an unknown key raises `ServiceError`;
-- every `registration.required_fields` name must be present;
-- every value whose key is in `registration.list_fields` must be a `list` (raise otherwise);
-- unknown `chart_type` already raises via `get_chart`.
-
-### 2.4 Orphaned visualizations excluded on save
+### 2.4 Orphaned visualizations skipped on save
 
 `close_dataset` does not cascade to visualizations, so a live `Visualization` may reference a
-`dataset_id` that is no longer in the workspace. Such a visualization has no data to rebuild
-from. **On save, a visualization whose `dataset_id` is not among the saved datasets is
-skipped**; `save_workspace` returns the list of skipped `visualization_id`s (mirrors
-`record_datasets`'s skipped-names return). This keeps the `visualizations.dataset_id` FK
-sound and `Visualization.figure` non-optional on load.
+`dataset_id` no longer in the workspace — it has no frame to rebuild from. On save such a viz
+is **skipped**; `save_workspace` returns `SaveReport.skipped_visualization_ids`. This keeps the
+`visualizations.dataset_id` FK sound and `Visualization.figure` non-optional on load.
+**Consequence (state in the shell):** under full-replace save a skipped viz is destroyed on
+the *next* save — the shell must surface `skipped_visualization_ids` the way
+`_warn_about_skipped_datasets` (`project_controller.py:354-372`) surfaces skipped datasets.
+
+### 2.5 Restore path — `WorkspaceService.load_snapshot` (architect B1)
+
+New method (additive; §9):
+
+```python
+def load_snapshot(self, datasets: list[Dataset],
+                  visualizations: list[Visualization],
+                  dashboards: list[Dashboard]) -> None:
+    """Replace all workspace state with a restored snapshot.
+
+    Unlike add_dataset / add_visualization / add_dashboard (interactive callers, which
+    reject dangling references), this restore path INSTALLS the three lists directly and
+    TOLERATES a dangling parent_dataset_id or a dangling tile visualization_id — those are
+    normal persisted states (close_dataset / close_visualization are non-cascading). It
+    still rejects a parent_dataset_id CYCLE (ServiceError). Active dataset / visualization
+    are cleared. `datasets` must be topologically ordered (parents before children); the
+    loader guarantees this.
+    """
+```
+
+`ProjectController` calls it on the UI thread with the three lists off `WorkspaceSnapshot`.
 
 ---
 
@@ -179,119 +230,134 @@ Field source: `uadas_core/services/workspace_service.py:168-206`.
 ```sql
 CREATE TABLE dashboards (
   dashboard_id TEXT PRIMARY KEY,        -- Dashboard.dashboard_id (uuid4)
-  name         TEXT NOT NULL            -- Dashboard.name
+  name         TEXT NOT NULL
 );
 CREATE TABLE dashboard_tiles (
-  tile_id          TEXT PRIMARY KEY,    -- DashboardTile.tile_id  (NEW in 1.6 — see §9)
-  dashboard_id     TEXT NOT NULL,       -- parent Dashboard
-  visualization_id TEXT NOT NULL,       -- DashboardTile.visualization_id
-  row              INTEGER NOT NULL,    -- DashboardTile.row  (0-indexed)
-  column           INTEGER NOT NULL,    -- DashboardTile.column (0-indexed)
+  tile_id          TEXT PRIMARY KEY,    -- DashboardTile.tile_id  (NEW in 1.6 — §9)
+  dashboard_id     TEXT NOT NULL,
+  visualization_id TEXT NOT NULL,       -- may dangle (see below)
+  row              INTEGER NOT NULL,
+  "column"         INTEGER NOT NULL,    -- quoted: `column` is a SQLite keyword
   ordinal          INTEGER NOT NULL,    -- position within Dashboard.tiles (list order)
   FOREIGN KEY (dashboard_id) REFERENCES dashboards(dashboard_id)
-  -- NO FK on visualization_id: a tile pointing at a since-closed (or save-skipped, §2.4)
-  -- visualization is normal state per CLAUDE.md's non-cascading rule and
-  -- workspace_service.py:273-280 / get_dashboard_tiles (:507-534), which resolve leniently.
+  -- NO FK on visualization_id: a tile pointing at a since-closed or save-skipped (2.4)
+  -- visualization is normal state (CLAUDE.md non-cascading rule; get_dashboard_tiles
+  -- :507-534 resolves leniently). load_snapshot (2.5) re-installs such tiles unchanged.
 );
 ```
 
-- **`tile_id`** is the stable row identity. It is generated by the dataclass default
-  (`str(uuid.uuid4())`) when a `DashboardTile` is constructed without one, so existing call
-  sites are unaffected (§9).
-- **`ordinal`** preserves `Dashboard.tiles` list order across the round trip; the loader sorts
-  tiles by `ordinal` when rebuilding the list.
-- A tile with a dangling `visualization_id` **must survive the round trip** — persisted as-is,
-  resolved leniently at render time.
+- **`tile_id`** — stable row identity; the dataclass default (`str(uuid.uuid4())`) fills it
+  when a `DashboardTile` is built without one, so existing call sites are unaffected.
+- **`ordinal`** — the loader sorts tiles by `ordinal` when rebuilding `Dashboard.tiles`.
+- A dangling-`visualization_id` tile **round-trips unchanged**.
 
 ---
 
-## 4. Save → load round-trip contract — the C-3 tests (written first, red→green)
+## 4. C-3 tests (written first, red→green) — `tests/persistence/test_persistence_service.py`
 
-`tests/persistence/test_persistence_service.py`. Two tests.
+Seven tests. The `PersistenceService` API used throughout:
+`save_workspace(datasets, visualizations, dashboards, base) -> SaveReport` and
+`load_workspace(base) -> WorkspaceSnapshot` (§5).
+
+1. **`test_workspace_round_trips_including_a_derived_dataset`** — happy path. root + derived
+   (`parent_dataset_id` set, `source_path=None`) + a `"bar"` viz on the derived + a dashboard
+   with one tile. Assert: root/derived frames `DataFrame.equals`; `derived.parent_dataset_id`
+   and `derivation_description` preserved; `derived.source_path is None`; `viz.chart_type`,
+   `viz.chart_parameters` preserved; `v2.figure.to_json() == fig.to_json()`;
+   `tile.tile_id` / `row` / `column` / order preserved; `SaveReport.skipped_visualization_ids == []`;
+   `WorkspaceSnapshot.rebuild_failures == []`. Also assert `stored row_count/column_count`
+   matched (checksum) by loading with a deliberately-truncated frame in a sub-case → structural
+   `ServiceError`.
+2. **`test_load_rejects_a_parent_dataset_id_cycle`** — save a valid A/B (B.parent=A), then
+   `UPDATE datasets SET parent_dataset_id = :b WHERE dataset_id = :a` directly; `load_workspace`
+   → `ServiceError` matching `"cycle"`.
+3. **`test_chart_type_class_name_is_normalised_to_registry_name_on_save`** — viz created with
+   `chart_type="BarChart"` (legacy form); after round-trip `v2.chart_type == "bar"`.
+4. **`test_visualization_on_a_closed_dataset_is_skipped_on_save`** — add dataset D + viz V on
+   D, `close_dataset(D)`, save; `SaveReport.skipped_visualization_ids == [V.visualization_id]`;
+   `load_workspace` has no V.
+5. **`test_load_rejects_a_non_uuid4_dataset_id_before_any_path_join`** (security item 8) —
+   `UPDATE datasets SET dataset_id = '../../etc/passwd' …`; `load_workspace` → `ServiceError`,
+   and no file outside `base` is opened (assert via a `monkeypatch` on `pd.read_parquet` /
+   path check).
+6. **`test_a_visualization_whose_column_no_longer_exists_is_a_rebuild_failure_not_a_load_abort`** —
+   persist a viz whose `chart_parameters` names a column, then drop that column from the frame
+   before load (rewrite the parquet); `load_workspace` succeeds, the dataset loads,
+   `viz.visualization_id in WorkspaceSnapshot.rebuild_failures`, `snapshot.visualizations == []`.
+7. **`test_dangling_tile_visualization_id_round_trips`** — dashboard tile pointing at a
+   `visualization_id` that is never added / is closed; after `load_workspace` +
+   `WorkspaceService.load_snapshot(...)`, `get_dashboard_tiles` returns the tile paired with
+   `None` (not an exception, not dropped).
+
+**Equality semantics:** scalars `==`; DataFrames `DataFrame.equals()` (NaN-safe); figures
+`fig.to_json()` string equality on a rebuild; collections `==`; nullable fields
+both-`None`-or-both-equal. **`chart_type` is *not* identity** for a legacy class-name input
+(`"BarChart"` → `"bar"`), by design (§2.1).
+
+---
+
+## 5. `PersistenceService` — API, storage, base derivation
 
 ```python
-def test_workspace_round_trips_including_a_derived_dataset(tmp_path):
-    ws1 = WorkspaceService()
+@dataclass
+class SaveReport:
+    skipped_visualization_ids: list[str]
 
-    root = Dataset(name="sales", dataframe=pd.DataFrame({"region": ["e", "w"], "rev": [100, 200]}),
-                   source_format="csv", source_path=Path("data/sales.csv"))
-    ws1.add_dataset(root)
+@dataclass
+class WorkspaceSnapshot:
+    datasets: list[Dataset]            # topologically ordered, parents before children
+    visualizations: list[Visualization]  # figure already rebuilt; excludes rebuild failures
+    dashboards: list[Dashboard]
+    rebuild_failures: list[str]        # visualization_ids that could not be rebuilt
 
-    derived = Dataset(name="sales_clean", dataframe=root.dataframe.iloc[:1].copy(),
-                      source_format="csv", source_path=None,
-                      parent_dataset_id=root.dataset_id,
-                      derivation_description="first row only")
-    ws1.add_dataset(derived)
-
-    fig = chart_registry.get_chart("bar").chart_class.build(
-        derived.dataframe, category_column="region", value_column="rev")
-    viz = Visualization(name="by region", dataset_id=derived.dataset_id, figure=fig,
-                        chart_type="bar",
-                        chart_parameters={"category_column": "region", "value_column": "rev"})
-    ws1.add_visualization(viz)
-
-    dash = Dashboard(name="Q4", tiles=[DashboardTile(visualization_id=viz.visualization_id,
-                                                     row=0, column=0)])
-    ws1.add_dashboard(dash)
-
-    skipped = PersistenceService(tmp_path).save_workspace(ws1)
-    assert skipped == []
-    ws2 = PersistenceService(tmp_path).load_workspace()
-
-    r2 = ws2.get_dataset(root.dataset_id)
-    assert (r2.name, r2.dataset_id, r2.source_path) == (root.name, root.dataset_id, root.source_path)
-    assert r2.row_count == root.row_count and r2.column_count == root.column_count
-    assert r2.dataframe.equals(root.dataframe)
-    assert r2.parent_dataset_id is None
-
-    d2 = ws2.get_dataset(derived.dataset_id)                 # currently dropped entirely
-    assert d2.dataframe.equals(derived.dataframe)
-    assert d2.source_path is None
-    assert d2.parent_dataset_id == root.dataset_id           # lineage preserved
-    assert d2.derivation_description == "first row only"
-
-    v2 = ws2.get_visualization(viz.visualization_id)
-    assert (v2.chart_type, v2.chart_parameters) == ("bar", viz.chart_parameters)
-    assert v2.figure.to_json() == fig.to_json()              # structural figure round-trip
-
-    tiles2 = ws2.get_dashboard_tiles(dash.dashboard_id)
-    assert (tiles2[0][0].visualization_id, tiles2[0][0].row, tiles2[0][0].column) \
-        == (viz.visualization_id, 0, 0)
-    assert tiles2[0][0].tile_id == dash.tiles[0].tile_id     # tile identity preserved
-
-
-def test_load_rejects_a_parent_dataset_id_cycle(tmp_path):
-    """A hand-edited / corrupt .db whose datasets rows form a parent cycle is rejected
-    on load with a clear ServiceError, not a hang or a silent partial workspace."""
-    svc = PersistenceService(tmp_path)
-    # ... build a valid saved workspace with datasets A and B (B.parent = A) ...
-    # ... then UPDATE the datasets table directly: set A.parent_dataset_id = B.dataset_id ...
-    with pytest.raises(ServiceError, match="cycle"):
-        svc.load_workspace()
+class PersistenceService:
+    """Stateless. Registered as a bootstrap() singleton; base location is a per-call arg."""
+    def save_workspace(self, datasets: list[Dataset], visualizations: list[Visualization],
+                       dashboards: list[Dashboard], base: Path) -> SaveReport: ...
+    def load_workspace(self, base: Path) -> WorkspaceSnapshot: ...   # pure; touches no WorkspaceService
 ```
 
-**Equality semantics:** scalars `==`; DataFrames `DataFrame.equals()` (NaN-safe, value-wise);
-figures `fig.to_json()` string equality on a rebuild (structure, not identity); collections
-list/dict `==`; nullable fields both-`None`-or-both-equal.
+`save_workspace` / `load_workspace` take **plain lists / return plain data** so
+`ProjectController` can run them on a worker thread without touching the non-thread-safe
+`WorkspaceService` (architect B2). Both raise `ServiceError` for **structural** problems
+(unreadable/corrupt `.db`; a `parent_dataset_id` cycle; a non-uuid4 `dataset_id`; a
+`row_count`/`column_count` checksum mismatch; a `datasets` row whose `.parquet` is missing).
+Per-visualization rebuild problems are collected in `rebuild_failures`, never raised.
+Every `sqlite3.Error` / `OSError` / pyarrow exception is caught and re-raised as `ServiceError`
+(repo convention).
 
----
+### 5.1 `{base}` derivation
 
-## 5. Storage substrate + module
+`base = project.path.parent / (project_stem + ".workspace")`, where `project_stem` is
+`project.path.name` with the trailing `".uads.json"` removed. Contains `workspace.db` and
+`{dataset_id}.parquet` files. Two different `.uads.json` files in one folder get two different
+`.workspace/` dirs — no collision.
 
-**1.6 (desktop):** one SQLite file per project (`{base}/workspace.db`) and Parquet frames
-under the same `{base}` as `{dataset_id}.parquet`. Local filesystem only. Full-replace write
-(no deltas): `save_workspace` recreates the schema and rewrites everything.
+### 5.2 Save-As
 
-**Phase 3 (web):** metadata → Postgres (per-tenant), frames → S3-compatible object store, key
-`datasets/<tenant_id>/<dataset_id>.parquet`. Out of scope for 1.6, noted so the 1.6 API
-(a `PersistenceService` with a caller-supplied base location and `save_workspace` /
-`load_workspace` verbs) does not close that door.
+`save_workspace` is full-replace from live state, so Save-As is just
+`PersistenceService().save_workspace(<lists>, <new base>)`. The old `.workspace/` dir is left
+in place (as the old `.uads.json` is). No frame-copy logic needed.
 
-**New module:** `uadas_core/persistence/persistence_service.py` (+ `uadas_core/persistence/__init__.py`).
-`ProjectService` gains a call into it on open/save; the desktop shell wires
-open → `load_workspace()`, save → `save_workspace()`. `PersistenceService` imports
-`uadas_core.visualization.chart_registry` directly (§0 item 3) and `pandas` / `sqlite3` /
-`json` / `uuid` from the stdlib + deps. No Qt, no framework — `lint-imports` stays green.
+### 5.3 Orphan-Parquet GC
+
+At the end of `save_workspace`, delete every `*.parquet` in `base` whose stem is not one of
+the `dataset_id`s just written. Covers frames for datasets closed since the last save.
+
+### 5.4 Atomicity
+
+`workspace.db` is built at `base/workspace.db.tmp` then `os.replace`d onto `workspace.db`
+(atomic on one filesystem). Parquet frames are written directly; a crash mid-frame-write
+leaves a partial `.parquet`, which the next `load_workspace` catches as a *structural*
+failure for that dataset (checksum/read error). Accepted risk for 1.6 desktop-local use;
+Phase 3's object store + Postgres transaction removes it.
+
+### 5.5 Ordering coupling
+
+`load_workspace` calls `chart_registry.get_chart(...)`, so it depends on the built-in charts
+having been registered — i.e. on `bootstrap()` (and plugin load) having run first. This is a
+real post-1.3 ordering coupling; the desktop shell already satisfies it (open happens well
+after `bootstrap()`).
 
 ---
 
@@ -299,33 +365,41 @@ open → `load_workspace()`, save → `save_workspace()`. `PersistenceService` i
 
 ### 6.1 Parameterized SQL (R0.4 item 7 — CRITICAL)
 
-Every SQL statement uses `sqlite3` `?` placeholders. No value is ever formatted, `%`-ed,
-`.format`-ed, or concatenated into SQL text — not table contents, not `dataset_id`, not
-`name`. `executemany` for bulk inserts. Schema DDL is static string literals with no
-interpolation. (CI `bandit` `--skip`s B608, so this is enforced only by review + the
-`security-reviewer` ×2 gate — call it out in the plan.)
+`?` placeholders for every value; `executemany` for bulk insert; DDL is static string
+literals. Nothing — not `name`, not `dataset_id`, not `chart_parameters` — is ever
+formatted/`%`/`.format`/`+`-ed into SQL text. (B608 is CI-`--skip`ped, `ci.yml:353`, so this
++ the `security-reviewer` ×2 gate are the only SQL checks — the plan calls this out.)
 
 ### 6.2 `dataset_id` validation before path-join (R0.4 item 8 — HIGH)
 
-On load, before `{base}/{dataset_id}.parquet` is constructed for any row, `dataset_id` must
-match a canonical uuid4 (`uuid.UUID(value, version=4)` round-trips to the same string, or an
-explicit regex `^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`).
-A row failing this raises `ServiceError` and aborts the load — a corrupt/hand-edited row
-carrying `dataset_id = "../../etc/passwd"` never reaches a path join. `base` is the
-constructor argument, never a persisted value.
+On load, before `{base}/{dataset_id}.parquet` is built for any row, `dataset_id` must match
+`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`. A failing row →
+`ServiceError`, load aborts, no path is joined. `base` is the call argument, never a
+persisted value. Tested (§4 test 5).
 
 ### 6.3 Parquet dependency versions (R0.4 item 10)
 
-`pyarrow` and `fastparquet` are in `requirements.txt` (unpinned). Parquet deserialisation is
-a known CVE class; the versions should be kept current. 1.6 does not add a pin (repo-wide
-policy call, out of scope) — noted here so the decision is explicit, not forgotten.
+`pyarrow` + `fastparquet` in `requirements.txt` (`:48-49`), unpinned. Parquet deserialisation
+is a known CVE class — keep current. 1.6 adds no pin (repo-wide policy call, out of scope);
+noted so the decision is explicit.
 
 ### 6.4 Concurrency / locality (R0.4 item 12)
 
-1.6 assumes a **single writer, single process, local non-networked filesystem**. No
-cross-process locking, no WAL tuning, no retry/backoff on `sqlite3.OperationalError:
-database is locked`. SQLite on a network share or with AV interference is out of scope for
-local-desktop use; Phase 3's Postgres removes the concern.
+Single writer, single process, local non-networked filesystem. No cross-process locking, no
+WAL tuning, no retry on `database is locked`. Network shares / AV interference out of scope;
+Phase 3's Postgres removes it.
+
+### 6.5 Retention
+
+A closed dataset's `.parquet` is removed on the next `save_workspace` (§5.3), not on
+`close_dataset` (persistence does not observe the live workspace). Between close and next save
+the frame remains on local disk. Acceptable for 1.6 local-desktop; Phase 3 revisits with the
+object store's lifecycle rules.
+
+### 6.6 Out of scope for §6
+
+File permissions / umask on the created `.db` and `.parquet` (local-desktop; inherits the
+process default). Encryption at rest.
 
 ---
 
@@ -333,48 +407,68 @@ local-desktop use; Phase 3's Postgres removes the concern.
 
 Remote object storage · incremental/delta save · version history / restore-points ·
 compression or encryption beyond Parquet's own · chunked/streaming DataFrames · multi-writer
-concurrency / ACID beyond SQLite's default · `chart_type` rename/removal migration · pinning
-Parquet deps · `AnalysisLog` / `Recipe` persistence (that is 1.7) · persisting active
-dataset/visualization selection · persisting `read_warnings` semantics beyond a JSON blob.
-Anything here is rejected in review.
+concurrency / ACID beyond SQLite · `chart_type` rename/removal migration · **fixing the
+`create_visualization_dialog.py:238` class-name producer bug** (Phase-2 UI) · pinning Parquet
+deps · `AnalysisLog` / `Recipe` persistence — that is 1.7; `record_analysis_log` /
+`project.contents["analysis_logs"]` stay in `.uads.json` untouched · persisting the active
+dataset/visualization selection · async / worker-thread autosave of the workspace DB ·
+Save-As frame-copy (full re-save covers it) · category/tz-datetime/all-null-object dtype
+fidelity through Parquet. Anything here is rejected in review.
 
 ---
 
 ## 8. Assumptions / unverified
 
-- `dataset_id` is *always* a `uuid4()` today (`workspace_service.py:109`). §6.2 enforces it
+- `dataset_id` is always uuid4 today (`workspace_service.py:109`); §6.2 enforces it
   defensively on load regardless.
-- Figure re-derivation assumes the dataset's column names/dtypes are stable between save and
-  load. §2.2 turns a mismatch into a clear hard error rather than a crash.
-- `chart_parameters` may nest dicts (advanced Plotly config); JSON round-trip is assumed
-  lossless for JSON-native types only. Non-JSON-native values in `chart_parameters` are out
-  of scope (no current chart produces them).
-- Column order: Parquet preserves it; params look up by name, so a reorder is cosmetically
-  visible but not breaking. Accepted.
-- `read_warnings` is a `list[str]`; stored as a JSON array, `"[]"` when empty.
-- SQLite file-locking edge cases on Windows network shares — out of scope (§6.4).
+- `chart_parameters` is JSON-native (str/num/bool/list/dict/null). No current producer emits
+  a non-JSON value. Nested dicts round-trip as-is.
+- Figure re-derivation assumes stable column names/dtypes between save and load; §2.2 turns a
+  mismatch into a per-viz failure, not a crash.
+- **Plugin charts:** a project saved with a plugin chart enabled stores that chart's registry
+  name; if the plugin is disabled at load, `get_chart` fails → that viz is a per-viz
+  `rebuild_failure` (not a whole-load abort). Datasets and other viz still load.
+- Standard pandas dtypes round-trip through `to_parquet`/`read_parquet`;
+  `category`/tz-aware-`datetime`/all-null-`object` do not reliably — C-3 avoids them; a real
+  project hitting one surfaces as a per-dataset structural failure (checksum) or a per-viz
+  failure, never silent corruption.
+- `to_parquet(index=False)` discards a non-default index; accepted (cleaning ops reset it).
+- SQLite file-locking edge cases on network shares — out of scope (§6.4).
 
 ---
 
 ## 9. Multi-file touchpoints
 
 - **`uadas_core/services/workspace_service.py`** —
-  (1) `DashboardTile` gains `tile_id: str = field(default_factory=lambda: str(uuid.uuid4()))`
-  as a trailing field (R0.4 item 2, BLOCKING). Docstring updated.
-  (2) `add_dataset` gains the forward acyclic-`parent_dataset_id` check (§1.3 guard a).
-  Both are documented 1.6 changes; the existing suite must stay green (any new assertions are
-  additive test files).
-- **`uadas_core/services/project_service.py`** — a call into `PersistenceService` on
-  open/save; `record_datasets` stops being the persistence path for datasets (it may remain
-  for the `.uads.json` recent-list metadata — decided in the plan). Stop skipping derived
-  datasets.
-- **desktop shell** (`src/ui/` open/save wiring) — open → `load_workspace()`,
-  save → `save_workspace()`. Exact wiring file(s) identified in the plan.
-- **new** `uadas_core/persistence/__init__.py`, `uadas_core/persistence/persistence_service.py`.
-- **new** `tests/persistence/__init__.py` (if the suite needs it),
-  `tests/persistence/test_persistence_service.py` (the two C-3 tests).
+  (1) `DashboardTile` gains a trailing `tile_id: str = field(default_factory=lambda: str(uuid.uuid4()))` (R0.4 item 2). Docstring updated.
+  (2) **new** `WorkspaceService.load_snapshot(datasets, visualizations, dashboards)` — the
+  restore entry point (§2.5). Additive; existing methods unchanged.
+  *(No `add_dataset` cycle-guard — R0.4 item 4 corrected to loader-only.)*
+- **new** `uadas_core/persistence/__init__.py`, `uadas_core/persistence/persistence_service.py`
+  (`PersistenceService`, `SaveReport`, `WorkspaceSnapshot`).
+- **`uadas_core/core/bootstrap.py`** — register `PersistenceService` as a singleton
+  (`container.register(PersistenceService, lambda: PersistenceService(), singleton=True)`),
+  after the other services. Its startup-sequence step is documented in `docs/ARCHITECTURE.md`.
+- **`src/ui/controllers/project_controller.py`** — inject `PersistenceService` (new
+  `__init__` arg, wired in `main_window.py::_build_controllers`). `save_project` /
+  `save_project_as`: after `save_project`, snapshot the workspace lists on the UI thread and
+  run `save_workspace(...)` on a worker; on completion surface
+  `SaveReport.skipped_visualization_ids` via `_warn_about_skipped_datasets`-style messaging.
+  `open_project_at_path`: **if the `.workspace/` dir exists**, run `load_workspace(base)` on a
+  worker and `workspace_service.load_snapshot(...)` on the UI thread (replacing the legacy
+  `_reload_project_datasets` reader-reload for that project), then surface
+  `rebuild_failures`; **else** fall back to `_reload_project_datasets` (pre-1.6 project).
+- **`src/ui/main_window.py`** — `_build_controllers` resolves `PersistenceService` from the
+  container and passes it to `ProjectController` (typed since 1.4).
+- **`src/ui/autosave_timer.py`** — **unchanged**; autosave keeps saving only `.uads.json`
+  metadata in 1.6 (documented limitation; §7).
 - **`.github/workflows/ci.yml`** — add `uadas_core/persistence` to the `mypy (clean packages)`
   list (new genuinely-clean package, per that step's growth convention).
-- **`plans/phase-1-baseline.md`** — record the post-1.6 suite count (additive: the new
-  persistence tests; any structural `test_import_layering` delta from the 2 new
-  `uadas_core/persistence/*.py` modules, same mechanism as 1.1/1.2).
+- **`docs/ARCHITECTURE.md`** — persistence layer + its bootstrap registration + the
+  open/save wiring in the startup / workspace sections.
+- **new** `tests/persistence/__init__.py`, `tests/persistence/test_persistence_service.py`
+  (the seven C-3 tests).
+- **`plans/phase-1-baseline.md`** — post-1.6 suite count: +7 authored tests, +2 structural
+  from `test_import_layering` parametrising over the 2 new `uadas_core/persistence/*.py`
+  modules (same mechanism as 1.1/1.2). No `test_module_size` delta (that guard is
+  `src/ui/`-only).
