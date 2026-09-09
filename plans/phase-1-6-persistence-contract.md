@@ -3,9 +3,10 @@
 **Status:** R0.4 design doc · produced 2026-09-07 (architect) · R0.4 sign-off 2026-09-08
 (`code-reviewer` + `security-reviewer`, both APPROVE-WITH-CHANGES) · **R0.4 changes folded
 2026-09-09** (rev 1) · **`ecc:architect` (opus, non-author) verification 2026-09-09 =
-CONCERNS → all 4 blocking defects (B1–B4) + 9 must-fix items resolved in this rev 2.**
-The §0 disposition table maps every review item to where it lives. Ready for the executable
-plan + `implementer`.
+CONCERNS → B1–B4 + 9 must-fix resolved in rev 2 → re-check = implementation-ready YES, 3
+wording fixes + 4 precision nits applied in rev 2.1** (no design rework).
+The §0 disposition table maps every review item to where it lives. **Ready for the executable
+plan + `implementer`.**
 
 **Purpose.** Define the save/load round-trip contract for datasets (including *derived*
 datasets), visualizations, and dashboards — and the characterization tests (Control C-3) that
@@ -167,10 +168,17 @@ For each `visualizations` row, in a `try` that collects failures:
 ```python
 registration = chart_registry.get_chart(chart_type)          # unknown -> failure
 raw = json.loads(chart_parameters)                            # non-dict -> failure
-accepted = set(inspect.signature(registration.chart_class.build).parameters) - {"cls", "dataframe"}
-filtered = {k: v for k, v in raw.items() if k in accepted}    # drops chart_type/title/method noise (debug-log the drops)
-# required = params of build() with no default; every one must be in `filtered` -> else failure
-# every key in registration.list_fields present in `filtered` must be a list -> else failure
+raw.pop("chart_type", None)                                   # never a build() param; drop unconditionally
+sig = inspect.signature(registration.chart_class.build)
+if any(p.kind is p.VAR_KEYWORD for p in sig.parameters.values()):   # a plugin build(**kwargs)
+    accepted = set(registration.required_fields) | set(registration.optional_fields) | {"title"}
+    required = set(registration.required_fields)
+else:
+    accepted = set(sig.parameters) - {"cls", "dataframe"}
+    required = {p for p in accepted if sig.parameters[p].default is inspect.Parameter.empty}
+filtered = {k: v for k, v in raw.items() if k in accepted}    # drops title/method noise (debug-log the drops)
+# every name in `required` must be in `filtered` -> else per-viz failure
+# every key in registration.list_fields present in `filtered` must be a list -> else per-viz failure
 figure = registration.chart_class.build(dataset.dataframe, **filtered)   # ServiceError (missing column) -> failure
 ```
 
@@ -183,11 +191,13 @@ figure = registration.chart_class.build(dataset.dataframe, **filtered)   # Servi
 
 ### 2.3 `chart_parameters` validation — see 2.2
 
-The allow-list is the real `build()` signature, not the registration's column-field tuples
-(those are column names only; real params also carry `title` / `method` / a stray
-`chart_type`). Unknown keys are dropped (debug-logged), not rejected — they are known
-producer noise. Genuinely broken params (missing required, wrong list type) are per-viz
-failures.
+The allow-list is the real `build()` signature (§2.2), not the registration's column-field
+tuples (those are column names only; real params also carry `title` / `method` / a stray
+`chart_type`). `chart_type` is dropped unconditionally; other unknown keys are dropped
+(debug-logged), not rejected — they are known producer noise. A plugin `build(**kwargs)`
+(no built-in has one) falls back to `required_fields ∪ optional_fields ∪ {"title"}`.
+Genuinely broken params (a missing *required* param, a `list_fields` value that is not a
+list) are per-viz failures.
 
 ### 2.4 Orphaned visualizations skipped on save
 
@@ -255,7 +265,7 @@ CREATE TABLE dashboard_tiles (
 
 ## 4. C-3 tests (written first, red→green) — `tests/persistence/test_persistence_service.py`
 
-Seven tests. The `PersistenceService` API used throughout:
+Eight tests, one behaviour each. The `PersistenceService` API used throughout:
 `save_workspace(datasets, visualizations, dashboards, base) -> SaveReport` and
 `load_workspace(base) -> WorkspaceSnapshot` (§5).
 
@@ -265,9 +275,7 @@ Seven tests. The `PersistenceService` API used throughout:
    and `derivation_description` preserved; `derived.source_path is None`; `viz.chart_type`,
    `viz.chart_parameters` preserved; `v2.figure.to_json() == fig.to_json()`;
    `tile.tile_id` / `row` / `column` / order preserved; `SaveReport.skipped_visualization_ids == []`;
-   `WorkspaceSnapshot.rebuild_failures == []`. Also assert `stored row_count/column_count`
-   matched (checksum) by loading with a deliberately-truncated frame in a sub-case → structural
-   `ServiceError`.
+   `WorkspaceSnapshot.rebuild_failures == []`.
 2. **`test_load_rejects_a_parent_dataset_id_cycle`** — save a valid A/B (B.parent=A), then
    `UPDATE datasets SET parent_dataset_id = :b WHERE dataset_id = :a` directly; `load_workspace`
    → `ServiceError` matching `"cycle"`.
@@ -288,6 +296,9 @@ Seven tests. The `PersistenceService` API used throughout:
    `visualization_id` that is never added / is closed; after `load_workspace` +
    `WorkspaceService.load_snapshot(...)`, `get_dashboard_tiles` returns the tile paired with
    `None` (not an exception, not dropped).
+8. **`test_row_count_checksum_mismatch_is_a_structural_load_error`** — save a workspace, then
+   overwrite one dataset's `.parquet` with a frame of a different row count; `load_workspace`
+   → `ServiceError` (metadata/frame disagree), whole-load abort — not a per-viz failure.
 
 **Equality semantics:** scalars `==`; DataFrames `DataFrame.equals()` (NaN-safe); figures
 `fig.to_json()` string equality on a rebuild; collections `==`; nullable fields
@@ -329,9 +340,11 @@ Every `sqlite3.Error` / `OSError` / pyarrow exception is caught and re-raised as
 ### 5.1 `{base}` derivation
 
 `base = project.path.parent / (project_stem + ".workspace")`, where `project_stem` is
-`project.path.name` with the trailing `".uads.json"` removed. Contains `workspace.db` and
-`{dataset_id}.parquet` files. Two different `.uads.json` files in one folder get two different
-`.workspace/` dirs — no collision.
+`project.path.name` with a trailing `".uads.json"` removed **if present**, else the full file
+name (`save_project_as` passes the chosen `Path(file_path_str)` through unmodified —
+`project_controller.py:325-341` — so `foo.json` deterministically yields
+`foo.json.workspace/`). Contains `workspace.db` and `{dataset_id}.parquet` files. Two
+different project files in one folder get two different `.workspace/` dirs — no collision.
 
 ### 5.2 Save-As
 
@@ -348,9 +361,10 @@ the `dataset_id`s just written. Covers frames for datasets closed since the last
 
 `workspace.db` is built at `base/workspace.db.tmp` then `os.replace`d onto `workspace.db`
 (atomic on one filesystem). Parquet frames are written directly; a crash mid-frame-write
-leaves a partial `.parquet`, which the next `load_workspace` catches as a *structural*
-failure for that dataset (checksum/read error). Accepted risk for 1.6 desktop-local use;
-Phase 3's object store + Postgres transaction removes it.
+leaves a partial `.parquet`. On the next `load_workspace` an unreadable or
+checksum-mismatched frame is a **structural** failure — `ServiceError`, whole-load abort
+(the §5 list; silently losing a whole dataset is worse than losing a chart). Accepted risk
+for 1.6 desktop-local use; Phase 3's object store + Postgres transaction removes it.
 
 ### 5.5 Ordering coupling
 
@@ -450,14 +464,24 @@ fidelity through Parquet. Anything here is rejected in review.
   (`container.register(PersistenceService, lambda: PersistenceService(), singleton=True)`),
   after the other services. Its startup-sequence step is documented in `docs/ARCHITECTURE.md`.
 - **`src/ui/controllers/project_controller.py`** — inject `PersistenceService` (new
-  `__init__` arg, wired in `main_window.py::_build_controllers`). `save_project` /
-  `save_project_as`: after `save_project`, snapshot the workspace lists on the UI thread and
-  run `save_workspace(...)` on a worker; on completion surface
-  `SaveReport.skipped_visualization_ids` via `_warn_about_skipped_datasets`-style messaging.
-  `open_project_at_path`: **if the `.workspace/` dir exists**, run `load_workspace(base)` on a
-  worker and `workspace_service.load_snapshot(...)` on the UI thread (replacing the legacy
-  `_reload_project_datasets` reader-reload for that project), then surface
-  `rebuild_failures`; **else** fall back to `_reload_project_datasets` (pre-1.6 project).
+  `__init__` arg, wired in `main_window.py::_build_controllers`).
+  **Save** (`save_project` / `save_project_as`): keep the existing
+  `_project_service.save_project(...)` for the `.uads.json`; then snapshot
+  `workspace_service.{list_datasets,list_visualizations,list_dashboards}()` on the UI thread
+  and run `save_workspace(...)` on a worker; in the result handler surface
+  `SaveReport.skipped_visualization_ids` via a new `_warn_about_skipped_visualizations`
+  (same shape as `_warn_about_skipped_datasets`, `:354-372`). **Suppress the existing
+  `_warn_about_skipped_datasets` call for `record_datasets`'s skipped *derived* datasets on
+  this path** — 1.6's `save_workspace` now persists those, so "could not be included" is
+  false. (Whether `record_datasets` keeps running for the `.uads.json` reload-list is decided
+  in the plan; its skipped-derived warning goes regardless.)
+  **Open** (`open_project_at_path`): **if the `.workspace/` dir exists**, run
+  `load_workspace(base)` on a worker; in the UI-thread result handler call
+  `workspace_service.load_snapshot(snap.datasets, snap.visualizations, snap.dashboards)`,
+  then `dock_manager.refresh_dataset_list(workspace_service.list_datasets())` +
+  `_state_bus.request_refresh()` (mirroring `_on_datasets_reloaded:263-267`), then surface
+  `rebuild_failures`; **skip** `_reload_project_datasets`. **Else** (no `.workspace/` —
+  pre-1.6 project) fall back to `_reload_project_datasets` unchanged.
 - **`src/ui/main_window.py`** — `_build_controllers` resolves `PersistenceService` from the
   container and passes it to `ProjectController` (typed since 1.4).
 - **`src/ui/autosave_timer.py`** — **unchanged**; autosave keeps saving only `.uads.json`
