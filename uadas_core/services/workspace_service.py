@@ -173,11 +173,18 @@ class DashboardTile:
         visualization_id: Which visualization occupies this tile.
         row: 0-indexed grid row.
         column: 0-indexed grid column.
+        tile_id: Stable identity for this tile row, used by the
+            persistence layer (Phase 1.6) as the ``dashboard_tiles``
+            primary key. Auto-generated; callers never set it. Added as
+            a trailing field with a default so every existing
+            ``DashboardTile(...)`` call site (all keyword-based) keeps
+            working unchanged.
     """
 
     visualization_id: str
     row: int
     column: int
+    tile_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
 
 @dataclass

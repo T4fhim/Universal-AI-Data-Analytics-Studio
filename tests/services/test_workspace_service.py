@@ -28,7 +28,11 @@ import pandas as pd
 import pytest
 
 from uadas_core.core.exceptions import ServiceError
-from uadas_core.services.workspace_service import Dataset, WorkspaceService
+from uadas_core.services.workspace_service import (
+    DashboardTile,
+    Dataset,
+    WorkspaceService,
+)
 
 
 def _make_dataset(name: str = "root", parent_dataset_id: str | None = None) -> Dataset:
@@ -100,3 +104,13 @@ def test_close_dataset_clears_active_dataset_without_reassigning() -> None:
     workspace.close_dataset(first.dataset_id)
 
     assert workspace.get_active_dataset() is None
+
+
+def test_dashboard_tile_gets_a_uuid4_tile_id_by_default() -> None:
+    a = DashboardTile(visualization_id="v", row=0, column=0)
+    b = DashboardTile(visualization_id="v", row=0, column=1)
+    assert len(a.tile_id) == 36 and a.tile_id != b.tile_id
+    assert (
+        DashboardTile(visualization_id="v", row=0, column=0, tile_id="fixed").tile_id
+        == "fixed"
+    )
