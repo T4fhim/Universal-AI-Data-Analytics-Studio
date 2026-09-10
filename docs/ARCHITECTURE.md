@@ -156,6 +156,31 @@ derived datasets (no `source_path` to re-read from).
 - `dataset_id` is uuid4-validated before it is ever joined into a filesystem path; all SQL is
   `?`-parameterized against a static DDL string.
 
+## Provenance DAG & Recipe
+
+`uadas_core/provenance/` (web-transition 1.7) is a Qt-free, read-only *view* over
+`AnalysisOrchestratorService`'s per-dataset `AnalysisLog` set — it changes nothing for existing
+callers and the services layer never imports it back. `analysis_logs_to_dag(logs, datasets)`
+reshapes the flat, one-log-per-dataset history into the cross-dataset lineage graph that Phase
+5's transparency features (F1 provenance graph, F2 replayable recipes, F3 time-travel/fork, F10
+local-first privacy) build on. The single predicate for "this log entry produced a derived
+dataset" is `"new_dataset_id" in entry.outputs` — never the `stage`.
+
+- **Three DAG elements.** A `DatasetNode` per dataset id mentioned anywhere in the log set
+  (missing `DatasetMeta` is synthesized `partial=True`, never raised); a `TransformEdge` per
+  dataset-producing entry (`from` = the enclosing log's id, `to` = the new id, `outputs` kept
+  verbatim); an `ArtifactNode` per non-producing entry (profile, chart, test, forecast,
+  explanation), identity `(dataset_id, entry_index)`.
+- **Recipe = DAG minus `outputs` minus data.** `analysis_logs_to_recipe` flattens the
+  root→derived chain into positional-id (`s1`, `s2`, …) steps carrying only stage / tool /
+  inputs / `produces_dataset` / explanation / origin-timestamp; `recipe_to_analysis_logs`
+  replays it onto a fresh root id, re-minting the dataset ids `outputs` used to carry.
+  `reproduce()` regenerates the real result payloads on actual re-execution. Linear chains
+  only (a forest raises); `source_dataset.schema` stays `{}` (needs a live frame).
+- **Recipe disk persistence is Phase 3.** 1.7 ships the in-memory converters plus
+  `Recipe.to_dict()` / `from_dict()` and a JSON round-trip; nothing touches `project_service`
+  or `PersistenceService` yet.
+
 ## Configuration
 
 `_default_config_dict()` in `uadas_core/core/config.py` is the single source of truth for the config
