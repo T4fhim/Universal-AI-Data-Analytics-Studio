@@ -418,15 +418,18 @@ jobs:
     # by a pull request must carry a `Signed-off-by:` trailer matching its
     # author -- see CONTRIBUTING.md for the `git commit -s` flow.
     #
-    # ADVISORY for now: the commits already on PR #2 predate this policy and
-    # are not being history-rewritten just to backfill trailers, so this job
-    # reports missing sign-offs as ::warning:: annotations and still exits 0.
-    # To make it enforcing (from the first Phase 1 commit): set
-    # DCO_ENFORCING below to "1". Nothing else changes.
+    # ENFORCING since the desktop->web transition's Phase 2 (set 2026-09-10,
+    # right after Phase 1 merged to main via PR #3). The Phase 0/1 commits
+    # that predate this policy were not history-rewritten to backfill
+    # trailers -- the job only checks commits introduced by the current PR
+    # (`git rev-list base..head`), so historical un-signed-off commits on
+    # `main` are not re-flagged. Every commit from Phase 2 onward must carry
+    # a `Signed-off-by:` matching its author (`git commit -s`); a missing one
+    # now fails the build. See CONTRIBUTING.md for the flow.
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     env:
-      DCO_ENFORCING: "0"
+      DCO_ENFORCING: "1"
     steps:
       - uses: actions/checkout@v4
         with:
