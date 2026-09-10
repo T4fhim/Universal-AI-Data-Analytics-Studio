@@ -3,7 +3,10 @@
 The checklist is `plans/phase-1-derisking-and-readiness.md` Part E. Phase 1 merges to `main`
 only when every item below passes **in a single CI run** on `phase-1/extract-uadas-core`.
 
-**Branch head:** `<final commit>` · **CI run:** `<run id>` (fill on the final push)
+**Branch head:** `a92ff21` · **CI run:** `34446843343` — `test` ✓ · `lint` ✓ · `linux_import` ✓ ·
+`uia_integration` ✓ · `dco` skipped (advisory). All 9 items below verified in that single run.
+(This commit and any later doc-only commit on the branch do not change the DoD verdict — no code
+moves after `a92ff21`.)
 **Order executed (Part D):** 1.1 → 1.5 → 1.2 → 1.8 → 1.3 → 1.4 → 1.6 → 1.7 → whole-branch
 diagnosis sweep → this DoD → one PR to `main`.
 
