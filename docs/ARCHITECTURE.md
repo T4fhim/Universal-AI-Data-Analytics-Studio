@@ -1,28 +1,39 @@
 # Architecture
 
 This document describes the architecture of Universal AI Data Analytics & Visualization Studio
-**as currently implemented in `src/`** — not the full aspirational scope described in
+as currently implemented — not the full aspirational scope described in
 [SPECIFICATION.md](../SPECIFICATION.md), which is a superset of what exists today. See
 [CLAUDE.md](../CLAUDE.md) for the canonical, actively-maintained architecture reference; this
 document expands on it for readers working outside a Claude Code session.
 
 ## Module layout and dependency direction
 
+Web-transition Phase 1 carved the Qt-free core out of `src/` into a top-level **`uadas_core/`**
+package (machine-checked by `.importlinter`: nothing in `uadas_core/` may import PySide6 / PyQt /
+Django). The PySide6 desktop shell — the part Phase 2 deletes — stays under **`src/`**.
+
 ```
-src/
-├── core/          # config, logging, DI container, bootstrap, exceptions, constants — depends on nothing else in src/
-├── services/      # SettingsService, ProjectService, WorkspaceService — depends on core
-├── readers/       # CSV/JSON/Text/Excel/SQLite/PDF/Word/XML/Image readers — depends on core, services
-├── cleaning/      # duplicate/missing-value/text/type-conversion operations — depends on core, services
-├── analysis/      # column/dataset profiling, correlation, aggregation, crosstab — depends on core, services, readers
-├── forecasting/   # exponential smoothing, Prophet — depends on core
-├── visualization/ # BaseChart + categorical/continuous/distribution charts, dashboard renderer — depends on core, services
-├── ai/            # LLM provider abstraction, tool registry, assistant service — depends on core, services, cleaning, analysis, forecasting
-├── ui/            # PySide6 main window, dialogs, widgets, dock/menu/toolbar/theme managers — depends on everything above
-├── database/      # BaseDatabaseConnection + PostgreSQL/MySQL/SQL Server/Oracle/DuckDB connectors, DatabaseReader (milestone 14)
-├── plugins/       # plugin manager + loader + built-in plugin categories (milestone 12)
-├── workers/       # BaseWorker (QRunnable) + WorkerRunner — async work off the UI thread (milestone 6)
-└── reports/       # report exporters (HTML/PDF/…) + the report-generation wizard backend (milestone 13)
+uadas_core/          # the Qt-free core (import-clean of any GUI toolkit / web framework)
+├── core/            # config, logging, DI container, bootstrap, exceptions, constants — the lowest layer
+├── services/        # SettingsService, ProjectService, WorkspaceService, AnalysisOrchestratorService — depends on core
+├── readers/         # CSV/JSON/Text/Excel/SQLite/PDF/Word/XML/Image/Archive readers — depends on core, services
+├── cleaning/        # duplicate/missing-value/text/type-conversion operations — depends on core, services
+├── analysis/        # column/dataset profiling, correlation, aggregation, crosstab, Explanation — depends on core, services, readers
+├── forecasting/     # exponential smoothing, Prophet — depends on core
+├── visualization/   # BaseChart + categorical/continuous/distribution charts, dashboard renderer — depends on core, services
+├── ai/              # LLM provider abstraction, tool registry, assistant service — depends on core, services, cleaning, analysis, forecasting
+├── database/        # BaseDatabaseConnection + Postgres/MySQL/SQL Server/Oracle/DuckDB connectors, DatabaseReader (milestone 14)
+├── plugins/         # plugin manager + loader + built-in plugin categories (milestone 12)
+├── reports/         # report exporters (HTML/PDF/…) + the report-generation wizard backend (milestone 13)
+├── results/         # Qt-free result-renderer registry + section models (lifted from src/ui/results/ in web-transition 1.5)
+├── jobs/            # JobRunner protocol + ThreadPoolExecutorJobRunner + the process-wide default runner (web-transition 1.2)
+├── persistence/     # PersistenceService — SQLite metadata + Parquet frames, per-project <stem>.workspace/ (web-transition 1.6)
+└── provenance/      # analysis_logs_to_dag / analysis_logs_to_recipe — a read-only lineage view over the AnalysisLog set (web-transition 1.7)
+
+src/                 # the PySide6 desktop shell (deleted in Phase 2)
+├── ui/              # main window, dialogs, widgets, dock/menu/toolbar/theme managers, controllers, workbench — depends on all of uadas_core/
+├── workers/         # BaseWorker (QRunnable) + WorkerRunner — marshals uadas_core.jobs callbacks onto the Qt UI thread (milestone 6)
+└── app.py           # Application composition root — builds the container via uadas_core.core.bootstrap, constructs MainWindow
 ```
 
 > `src/models/`, `src/resources/`, and `src/utils/` were empty scaffold directories that no

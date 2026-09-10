@@ -42,6 +42,18 @@ python -m mypy src/ uadas_core/ --ignore-missing-imports --follow-imports=silent
   `src/core`, which then left the list). Folding
   `uadas_core/core/dependency_container.py` in was a no-op — `uadas_core/core` is already
   entry #1.
+- **2026-09-10 (post web-transition 1.6 + 1.7 + the whole-branch diagnosis sweep, two-tree
+  `--no-incremental`): 44 errors / 18 files** (checked **218** — the +5 vs the 1.4 run are the
+  new `uadas_core/persistence/*` and `uadas_core/provenance/*` modules). **No change to the
+  error count**: 1.6 (`persistence`) and 1.7 (`provenance`) are greenfield and mypy-clean, and
+  each was folded into CI's `mypy (clean packages)` list at its own sub-step. That CI list now
+  checks **153 source files → "Success"** (1.4 `+src/app.py` → 148; 1.6 `+uadas_core/persistence`
+  → 150; 1.7 `+uadas_core/provenance` → 153). The 44 remaining two-tree errors are entirely
+  pre-existing Phase-0 debt in packages that were never on the list
+  (`uadas_core/ai/llm_provider.py`, `uadas_core/reports/word_exporter.py`,
+  `uadas_core/visualization/advanced_charts.py`, the `cleaning/*` + `visualization/*` chart
+  modules, `plugin_loader.py`, `src/ui/main_window.py` ×2, …) — untouched by Phase 1, tracked
+  here, not a Phase-1 regression.
 
 ## Excluded packages, categorized
 
