@@ -64,7 +64,25 @@ import lines, touches `mock.patch` strings).
 2. `python -m compileall uadas_core -q` -> 0
 3. `python -c "import uadas_core"` -> 0
 4. `lint-imports` -> **2 kept / 0 broken** AND contract 2's `source_modules` now names the new subpackage
-5. full suite (2-invocation, `QT_QPA_PLATFORM=offscreen`) == **1542 passed / 92 skipped / 0 failed** exactly
+5. full suite (2-invocation, `QT_QPA_PLATFORM=offscreen`) — **0 failed / 0 errors**, and the
+   collected-count delta from `1542 / 92 / 0` fully explained by the three `src/ui/**`-glob
+   policy meta-tests (`test_module_size`, `test_i18n_wrapped_strings`,
+   `test_import_layering::test_nothing_outside_ui_imports_ui`) losing the just-moved modules
+   from their parametrization (A10 collected-count caveat). No *named* test lost or newly
+   skipped. Per-commit expected counts:
+
+   | after | passed | skipped | collected (not-uia) | notes |
+   |---|---|---|---|---|
+   | baseline `9c137e3` | 1542 | 92 | 1634 | R2.1 |
+   | 2.1a theme (3 mods + `__init__`) | 1540 | 89 | 1629 | −3 module_size, −3 i18n, layering −3 `src/ui` skip → +4 `uadas_core` (incl. new `__init__.py`) |
+   | 2.1b a11y (1 mod + `__init__`) | 1539 | 88 | 1627 | −1 module_size, −1 i18n, layering −1 skip → +2 |
+   | 2.1c help (2 mods + `__init__`) | 1538 | 86 | 1624 | −2 module_size, −2 i18n, layering −2 skip → +3 |
+   | 2.1d data_table (1 mod + `__init__`) | 1537 | 85 | 1622 | same shape as 2.1b |
+   | 2.1e actions (3 mods + `__init__`) | 1535 | 82 | 1617 | same shape as 2.1a |
+
+   The 2.1b–e rows are *projected* from the 2.1a-observed mechanism; each commit's actual
+   run is diffed against its predecessor with `pytest --collect-only` + `comm`, and any
+   case lost that is **not** one of those three globs is an abort.
 6. `black --check src/ uadas_core/ tests/` · `isort --check-only ...` · the `ci.yml` mypy list · `bandit -r src uadas_core -q --skip B101,B107,B608` -> all green
 7. `python scripts/screenshot_app_state.py --output <tmp>.png` -> runs; `cmp` vs `plans/baseline-app.png` byte-identical (app still alive)
 
@@ -96,11 +114,21 @@ verified last, at exec time.
   commit — ignore, the commit succeeds.
 - After each commit: `graphify update .` (AST-only, 0 tokens).
 
+## Verified at exec-start (2026-09-10)
+
+- **All 10 modules confirmed Qt-free**, including `action_registry.py` (stdlib + `uadas_core.core.*`
+  + TYPE_CHECKING `uadas_core.services.*` only) → **2.1e does NOT split**.
+- **No `mock.patch("src.ui.…")` / dynamic-import string refs** to any of the 10 — the plan's 2.1e
+  "patch-string" caveat is moot.
+- **One stale cross-ref comment** at `uadas_core/core/constants.py:80` ("must stay in step with
+  `src.ui.theme.tokens…`") — the 2.1a codemod rewrites it.
+- **The 1542/92/0-exact assumption is wrong for 2.1** — three `tests/ui/` policy meta-tests
+  parametrize over a `src/ui/**` glob and lose the moved modules from their case lists (see the
+  per-commit expected-count table under §"Per-commit gate" and A10's collected-count caveat).
+  2.1a observed: `1540 / 89 / 0`, collected 1629. The gate is now "0 failed + delta ⊆ those three
+  globs", diffed per commit with `pytest --collect-only` + `comm`.
+
 ## Unverified (into execution)
 
-- `action_registry.py`'s exact import list — checked last; if it transitively imports Qt, 2.1e
-  splits (registry lifts, the Qt bit doesn't).
 - Whether any `tests/` file outside `tests/ui/` beyond `tests/services/test_guidance_service.py`
   imports one of the 10 — the codemod's own `grep -> 0` gate catches it either way.
-- Exact new-count after the `mock.patch("src.ui.actions...")` string rewrites in tests — must
-  stay 1542/92/0 (A10 / A9: no test-count delta).
