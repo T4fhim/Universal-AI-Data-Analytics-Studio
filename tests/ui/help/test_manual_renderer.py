@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from src.ui.help import manual_index as manual_index_module
-from src.ui.help.manual_index import ManualIndex
-from src.ui.help.manual_renderer import ManualRenderer
 from uadas_core.core.exceptions import ServiceError
+from uadas_core.help import manual_index as manual_index_module
+from uadas_core.help.manual_index import ManualIndex
+from uadas_core.help.manual_renderer import ManualRenderer
 
 
 @pytest.fixture()

@@ -6,8 +6,8 @@ Non-shipping infrastructure, alongside ``scripts/screenshot_app_state.py`` -- a 
 authoring tool a human or an agent runs after editing a page under ``docs/manual/``, never
 imported by ``src/``.
 
-Two modes, both going through the *real* rendering path (:class:`~src.ui.help.manual_index.
-ManualIndex` for frontmatter/anchor resolution, :class:`~src.ui.help.manual_renderer.
+Two modes, both going through the *real* rendering path (:class:`~uadas_core.help.manual_index.
+ManualIndex` for frontmatter/anchor resolution, :class:`~uadas_core.help.manual_renderer.
 ManualRenderer` for the Markdown-to-HTML compile) rather than a hand-rolled Markdown-to-text
 stand-in:
 
@@ -41,8 +41,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.ui.help.manual_index import ManualIndex
-from src.ui.help.manual_renderer import ManualRenderer
+from uadas_core.help.manual_index import ManualIndex
+from uadas_core.help.manual_renderer import ManualRenderer
 
 
 class PreviewManualError(Exception):

@@ -1,7 +1,7 @@
 # File: tests/ui/help/test_manual_index.py
 """Unit coverage for ManualIndex's frontmatter parsing and anchor resolution.
 
-Points :data:`~src.ui.help.manual_index.MANUAL_ROOT` at a small, hand-built temporary tree via
+Points :data:`~uadas_core.help.manual_index.MANUAL_ROOT` at a small, hand-built temporary tree via
 monkeypatch rather than exercising the real docs/manual/ content here -- the real tree's own
 correctness (every real anchor resolves, zero stub pages) is
 tests/ui/help/test_manual_anti_rot.py's job; this module is about ManualIndex's own parsing and
@@ -15,9 +15,9 @@ from pathlib import Path
 
 import pytest
 
-from src.ui.help import manual_index as manual_index_module
-from src.ui.help.manual_index import ManualIndex
 from uadas_core.core.exceptions import ServiceError
+from uadas_core.help import manual_index as manual_index_module
+from uadas_core.help.manual_index import ManualIndex
 
 
 @pytest.fixture()

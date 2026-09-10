@@ -1,4 +1,4 @@
-# File: src/ui/help/manual_index.py
+# File: uadas_core/help/manual_index.py
 """Builds and resolves the anchor -> manual-page index from ``docs/manual/*.md`` frontmatter.
 
 ``ManualIndex`` mirrors this project's ``Base*``/registry extension-point shape (see CLAUDE.md's
@@ -76,7 +76,7 @@ class ManualPage:
         body_markdown: The raw Markdown body, frontmatter stripped. Kept separate from any
             compiled HTML so a test can assert on real prose content directly (e.g. "this page
             is not a stub") without needing a Qt/``markdown_it`` round trip -- see
-            :class:`~src.ui.help.manual_renderer.ManualRenderer` for the HTML compilation step.
+            :class:`~uadas_core.help.manual_renderer.ManualRenderer` for the HTML compilation step.
     """
 
     anchor: str

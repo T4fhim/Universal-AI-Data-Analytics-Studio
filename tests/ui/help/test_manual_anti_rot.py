@@ -22,8 +22,8 @@ import pytest
 
 import src.ui.actions.builtin_actions  # noqa: F401 -- import-time registration side effect
 from src.ui.actions.action_registry import list_actions
-from src.ui.help.manual_index import ManualIndex
 from src.ui.workbench.stage_registry import get_stage_page_class, list_registered_stages
+from uadas_core.help.manual_index import ManualIndex
 from uadas_core.results.result_renderer_registry import list_renderers
 
 # A stub page would be short; every hand-authored page in docs/manual/ as of this milestone is

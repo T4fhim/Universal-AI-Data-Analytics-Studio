@@ -20,7 +20,7 @@ shape :class:`~src.ui.controllers.assistant_controller.AssistantController` alre
 relative Markdown file path (``[Clean](../pipeline/clean.md)``) rather than a second, parallel
 anchor-only link syntax, so the same files are equally readable as plain Markdown in an editor,
 on GitHub, or through this dialog. Clicking one resolves the target file back to whichever
-anchor answers it (:meth:`~src.ui.help.manual_index.ManualIndex.resolve_path`) and re-renders in
+anchor answers it (:meth:`~uadas_core.help.manual_index.ManualIndex.resolve_path`) and re-renders in
 place -- ``QTextBrowser``'s own link-following is disabled (``setOpenLinks(False)``) so a
 missing or external link fails silently rather than ``QTextBrowser`` attempting (and failing) to
 load a bare relative path as if it were a file on disk relative to the process's working
@@ -33,10 +33,10 @@ from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import QDialog, QPushButton, QTextBrowser, QVBoxLayout, QWidget
 
 from src.ui.a11y.accessible import describe
-from src.ui.help.manual_index import ManualIndex
-from src.ui.help.manual_renderer import ManualRenderer
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.core.logger import get_logger
+from uadas_core.help.manual_index import ManualIndex
+from uadas_core.help.manual_renderer import ManualRenderer
 
 _logger = get_logger(__name__)
 

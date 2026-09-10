@@ -8,12 +8,12 @@ Foundation layer, alongside :mod:`src.ui.theme`, :mod:`src.ui.a11y`, and
 
 Two independent pieces live here:
 
-* :class:`~src.ui.help.manual_index.ManualIndex` -- a pure, Qt-free anchor resolver over
+* :class:`~uadas_core.help.manual_index.ManualIndex` -- a pure, Qt-free anchor resolver over
   ``docs/manual/*.md``. Every manual page's YAML frontmatter declares the anchor(s) it answers
   for; this class builds and caches the anchor -> page mapping once, so both the running
   application and ``scripts/preview_manual.py`` (an authoring tool, not part of the shipped
   application) read from the exact same source of truth.
-* :class:`~src.ui.help.manual_renderer.ManualRenderer` -- compiles a resolved page's Markdown
+* :class:`~uadas_core.help.manual_renderer.ManualRenderer` -- compiles a resolved page's Markdown
   body into the HTML subset ``QTextBrowser`` supports, via ``markdown_it`` (already a project
   dependency for this exact purpose -- see ``requirements.txt``'s own comment).
 
