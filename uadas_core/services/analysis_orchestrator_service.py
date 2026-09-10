@@ -177,13 +177,28 @@ class AnalysisLogEntry:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AnalysisLogEntry:
+        # ``timestamp`` is written as ``datetime.now(UTC).isoformat()`` on the
+        # write path, but nothing checked it on load until Phase 1.7. A
+        # non-ISO string would otherwise ride silently into the DAG/Recipe
+        # layer (:mod:`uadas_core.provenance`), which surfaces the timestamp
+        # verbatim as an edge/step field -- fail loud here instead. Reject
+        # rather than coerce: guessing at a malformed timestamp's intent is
+        # worse than refusing the payload. ``fromisoformat`` on 3.11+ accepts
+        # a trailing ``Z``, which is the form the write path can emit.
+        timestamp = data["timestamp"]
+        try:
+            datetime.datetime.fromisoformat(timestamp)
+        except (TypeError, ValueError) as exc:
+            raise ServiceError(
+                f"AnalysisLogEntry.timestamp is not an ISO-8601 string: {timestamp!r}"
+            ) from exc
         return cls(
             stage=PipelineStage(data["stage"]),
             tool_name=data.get("tool_name"),
             inputs=dict(data.get("inputs", {})),
             outputs=dict(data.get("outputs", {})),
             explanation=data.get("explanation"),
-            timestamp=data["timestamp"],
+            timestamp=timestamp,
         )
 
 
@@ -248,6 +263,18 @@ class AnalysisOrchestratorService:
     def get_log(self, dataset_id: str) -> AnalysisLog:
         """Return ``dataset_id``'s log, creating an empty one if this is the first call for it."""
         return self._logs.setdefault(dataset_id, AnalysisLog(dataset_id=dataset_id))
+
+    def get_all_logs(self) -> list[AnalysisLog]:
+        """Every dataset's log, insertion order — the read seam :mod:`uadas_core.provenance` uses.
+
+        A CLEAN stage records its entry in the *parent* dataset's log with
+        ``new_dataset_id`` in ``outputs``; work on the derived dataset lands
+        in that dataset's own log (see :class:`AnalysisLog`). Rebuilding a
+        lineage DAG needs the whole set, not one log — and reading through
+        this accessor keeps :mod:`uadas_core.provenance` from ever touching
+        ``self._logs`` directly. Added in web-transition 1.7.
+        """
+        return list(self._logs.values())
 
     def load_log(self, log: AnalysisLog) -> None:
         """Install a log restored from a saved project.
