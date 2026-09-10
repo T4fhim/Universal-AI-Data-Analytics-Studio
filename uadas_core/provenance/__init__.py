@@ -24,12 +24,20 @@ from uadas_core.provenance.dag import (
     TransformEdge,
     analysis_logs_to_dag,
 )
+from uadas_core.provenance.recipe import (
+    Recipe,
+    RecipeStep,
+    analysis_logs_to_recipe,
+)
 
 __all__ = [
     "ArtifactNode",
     "Dag",
     "DatasetMeta",
     "DatasetNode",
+    "Recipe",
+    "RecipeStep",
     "TransformEdge",
     "analysis_logs_to_dag",
+    "analysis_logs_to_recipe",
 ]
