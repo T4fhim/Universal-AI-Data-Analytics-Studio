@@ -19,6 +19,7 @@ from uadas_core.analysis.explanation import Explanation
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.services.analysis_orchestrator_service import (
     AnalysisLog,
+    AnalysisLogEntry,
     AnalysisOrchestratorService,
     PipelineStage,
 )
@@ -260,3 +261,35 @@ def test_load_log_installs_a_restored_log(
     assert fresh.get_log(dataset.dataset_id).completed_stages() == {
         PipelineStage.UNDERSTAND
     }
+
+
+def test_from_dict_rejects_a_non_iso_timestamp() -> None:
+    bad = {
+        "stage": "understand",
+        "tool_name": "profile_dataset",
+        "inputs": {},
+        "outputs": {},
+        "explanation": None,
+        "timestamp": "last Tuesday",
+    }
+    with pytest.raises(ServiceError, match="timestamp"):
+        AnalysisLogEntry.from_dict(bad)
+
+
+def test_from_dict_accepts_a_trailing_z_timestamp() -> None:
+    ok = {
+        "stage": "understand",
+        "tool_name": "profile_dataset",
+        "inputs": {},
+        "outputs": {},
+        "explanation": None,
+        "timestamp": "2026-09-07T14:32:15Z",
+    }
+    assert AnalysisLogEntry.from_dict(ok).timestamp == "2026-09-07T14:32:15Z"
+
+
+def test_get_all_logs_returns_every_dataset_log() -> None:
+    svc = AnalysisOrchestratorService(WorkspaceService())
+    svc.get_log("root")
+    svc.get_log("derived")
+    assert {log.dataset_id for log in svc.get_all_logs()} == {"root", "derived"}
