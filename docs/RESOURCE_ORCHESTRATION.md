@@ -50,6 +50,21 @@ tiering > `resource-router` defaults. The more specific and more recently verifi
    a doc pointer as its primary context — the design docs cite pre-1.1 `src/` paths, and a
    review that finds nothing because it was pointed at empty air reads exactly like a clean
    review.
+7. **Compress high-volume subagent returns.** When a read-only specialist's output will be long
+   — a full-range review, a fixture enumeration, a whole-phase diagnosis sweep — end its prompt
+   with *"report back caveman-compressed (`caveman` full/ultra): one line per finding —
+   `file:line` · claim · fix. No prose, no preamble."* The compressed tool-result re-injected
+   into the orchestrator is ~60% smaller, which is what keeps a long multi-stage run inside the
+   token budget. Use `cavecrew-investigator` / `cavecrew-reviewer` (return is caveman by
+   construction) for locate / diff-review delegations. **Never compress** code being written, a
+   commit message the user will read, or the final user-facing summary — compression is for
+   agent→orchestrator hops only.
+8. **graphify-first for structure, grep for fields.** Once `graphify-out/graph.json` exists,
+   open any "what connects / calls / imports X" question with `graphify query|path|explain`
+   (cheaper than a fan-out `Explore`). Drop to `Grep` only for dataclass **field**-level reads
+   (`parent_dataset_id`, `derivation_description` — graphify's Python AST layer does not track
+   field access) or to edit specific lines. Re-run `graphify update .` (AST-only, 0 tokens)
+   after a sub-step lands code; a full semantic rebuild only when plan/doc `.md` churn matters.
 
 ---
 
