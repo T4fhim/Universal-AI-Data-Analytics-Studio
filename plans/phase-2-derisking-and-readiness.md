@@ -1,9 +1,11 @@
 # Phase 2 — De-Risking & Readiness Plan
 
-**Status:** DRAFT 2026-09-10 · authored the same session Phase 1 merged to `main` (merge commit
-`4d61b93`, PR #3) · **execution of sub-step 2.1+ NOT started** — begins only on an explicit
-"get to work" from the user, after the Readiness Gate (Part B) is complete and R2.3 / R2.4 /
-R2.5 have non-author reviewer sign-off.
+**Status:** 2026-09-10 · **Readiness Gate COMPLETE** — R2.1 (baseline), R2.3 (`ecc:code-explorer`
+extraction inventory → `plans/phase-2-execution-playbook.md` §5a), R2.4 (`ecc:architect` opus
+rulings → `plans/phase-2-structural-moves.md`, verdict **READY-WITH-CHANGES**, folded below),
+R2.5 (CI-transformation design → playbook §5b), R2.6 (branch `phase-2/retire-desktop-ui` cut
+from `main` @ `8ab95f6`) all done. Deliverables pending non-author `code-reviewer` sign-off,
+then sub-step 2.1 begins.
 
 **What Phase 2 is** (from
 [web-transition-glass-box-studio.md](web-transition-glass-box-studio.md#phase-2--retire-the-desktop-ui)):
@@ -99,7 +101,7 @@ python scripts/run_tests_and_exit_cleanly.py tests/ -q -m "not uia_integration" 
 python -m pytest --collect-only -q -m "not uia_integration" | Select-Object -Last 1
 python scripts/screenshot_app_state.py --output plans/baseline-app.png   # LAST screenshot before the app dies
 git ls-files 'tests/ui/*test_*.py' > plans/phase-2-deletion-manifest-tests.txt   # the A9 expected-disappearance set
-git ls-files 'src/ui/*' 'src/workers/*' 'src/core/app.py' > plans/phase-2-deletion-manifest-src.txt
+git ls-files 'src/ui/*' 'src/workers/*' 'src/app.py' > plans/phase-2-deletion-manifest-src.txt
 ```
 
 **Deliverable:** `plans/phase-2-baseline.md` — the two suite summary lines, the collected-test
@@ -121,9 +123,19 @@ A9 compares against.
 is doc-only. The merge is a merge commit whose second parent is `82f59e1`. Recorded for
 completeness — nothing to do.
 
-### R2.3 — Re-verify the extraction inventory against the current tree — NOT STARTED (blocks 2.4/2.5)
+### R2.3 — Re-verify the extraction inventory against the current tree — ✅ DONE 2026-09-10 (`ecc:code-explorer`) → `plans/phase-2-execution-playbook.md` §5a
 
-`web-transition-glass-box-studio.md`'s Phase 2 asset table has **24 rows**, written 2026-09-02
+**Result:** lift-2.1 **10** modules (the 7 lift-safe D5 modules + `actions/{action_registry,
+builtin_actions,action_context}` — the first two MUST lift because `tests/services/
+test_guidance_service.py`, a *surviving* test, imports them) · extract-2.4 **5** · phase-4-note
+**4** · already-safe/done **7** · delete-only ~78 `src/ui` + 2 `src/workers` + `main.py` +
+`src/app.py` run-path + 90 `tests/ui`. Corrections: **`src/core/` no longer exists** (Phase 1
+removed it — entry points are `main.py` + `src/app.py` only); the master table is **20 data
+rows**, not 24; `src/ui/workbench/stage_registry.py` (a named D5 module) is **NOT lift-safe** —
+it imports the Qt `StagePage` type — so it drops to delete-only + a phase-4-note.
+
+_Original R2.3 scope (for reference):_ `web-transition-glass-box-studio.md`'s Phase 2 asset
+table (**20 data rows**, lines 224-243), written 2026-09-02
 against pre-carve-out `src/…` paths. `ecc:code-explorer` (non-author) produces the definitive
 Phase 2 extraction checklist:
 
@@ -145,7 +157,33 @@ Phase 2 extraction checklist:
 Phase-4 note / already-safe / already-done), current path, target path. 2.5 may not delete
 `src/ui/` until every row is ticked and a reviewer confirms it.
 
-### R2.4 — Architect rulings on the three structural moves — NOT STARTED (blocks 2.1/2.2/2.3)
+### R2.4 — Architect rulings on the three structural moves — ✅ DONE 2026-09-10 (`ecc:architect` opus) → `plans/phase-2-structural-moves.md`
+
+**Verdict: READY-WITH-CHANGES.** Four changes, all folded into this doc + `phase-2-structural-moves.md`:
+
+1. **`Project` (`project_service.py:46`) joins the `models/` move.** Not in D1's scope, but
+   `core/application_state.py:49` imports it from `services` under `TYPE_CHECKING`, and
+   import-linter 2.15 counts `TYPE_CHECKING` edges — so without moving `Project`, `core` cannot
+   be the bottom layer of contract 3. `models/` = `models/workspace.py` (`Dataset`,
+   `Visualization`, `DashboardTile`, `Dashboard`) + `models/project.py` (`Project`) +
+   `__init__.py` re-export. `_reject_parent_cycles` stays in `workspace_service.py`.
+   `SaveReport`/`WorkspaceSnapshot`/`RecipeStep` stay put.
+2. **The `services ↔ ai` cycle does NOT fully break** by moving value types (as Risk B
+   predicted). The residual `assistant_service → workspace_service.WorkspaceService` edge is a
+   bare constructor annotation; fix = **one documented `ignore_imports` line** in contract 3,
+   plus a 2.7/Phase-3 follow-up to make it a `Protocol`. NOT a `TYPE_CHECKING` move (doesn't
+   help — 2.15 counts them).
+3. **Corrected `layers` stanza** (13 layers, `provenance` at the TOP, the flat sibling tier
+   decomposed) — the exact text is in `plans/phase-2-structural-moves.md` Ruling 3.
+4. **2.1 AND 2.2 must also extend contract 2's (`provenance-is-a-leaf`) hand-enumerated
+   `source_modules` list** — a missing entry there is a silent enforcement gap, not a CI
+   failure.
+
+Part D order confirmed — no hard dependency error. `models/` keeps pandas/plotly
+`TYPE_CHECKING`-only. `uadas_core/core/__init__.py:1` has a stale `# File: src/__init__.py`
+header (fix in 2.3).
+
+_Original R2.4 scope (for reference):_
 
 One batched `architect` pass (repo `architect` for the note, `ecc:architect` opus for the
 rulings — the §1.4 delegation rule: batch interacting rulings into one opus call), non-author:
@@ -173,10 +211,16 @@ rulings — the §1.4 delegation rule: batch interacting rulings into one opus c
 target, the `layers` stanza text, `graphify path` output showing the cycle, an `## Unverified`
 section. Reviewed by repo `code-reviewer` before 2.1.
 
-### R2.5 — The CI-transformation design — NOT STARTED (blocks 2.6)
+### R2.5 — The CI-transformation design — ✅ DONE 2026-09-10 → `plans/phase-2-execution-playbook.md` §5b
 
-Phase 2 is where CI stops being Windows-Qt-shaped. Written down before 2.6 touches
-`.github/workflows/ci.yml`:
+**Key finding:** the existing `linux_import` CI job *already* runs the exact surviving suite
+(`pytest tests/ -q -m "not uia_integration" --ignore=tests/ui` → the 451 non-`tests/ui/`
+tests). So 2.6 is **promote `linux_import` → `test`, delete the Windows `test` job +
+`uia_integration` job + `run_tests_and_exit_cleanly.py` + `screenshot_app_state.py`**, add a
+Risk-C `--collect-only` count assertion (band ≈ 451), and rewrite `pre-commit-check.ps1`'s
+suite command. Full design + rollout (C-3 run-it-first, C-4 keep-old-1-commit) in playbook §5b.
+
+_Original R2.5 scope (for reference):_ Phase 2 is where CI stops being Windows-Qt-shaped:
 
 - **What the `test` job becomes:** `ubuntu-latest`, single `python -m pytest tests/ -q`
   invocation (no `QT_QPA_PLATFORM=offscreen`, no two-invocation split, no
@@ -197,15 +241,15 @@ Phase 2 is where CI stops being Windows-Qt-shaped. Written down before 2.6 touch
 a matching update queued for `docs/RESOURCE_ORCHESTRATION.md` §2 (the CI + `0xC0000005` notes go
 stale at 2.6).
 
-### R2.6 — Branch
+### R2.6 — Branch — ✅ DONE 2026-09-10
 
-```bash
-git checkout main && git pull --ff-only     # 4d61b93 or later
-git checkout -b phase-2/retire-desktop-ui
-```
+`phase-2/retire-desktop-ui` cut from `main` @ `8ab95f6`. `plans/phase-2-baseline.md` +
+`plans/phase-2-deletion-manifest-tests.txt` (76 `test_*.py` files) +
+`plans/phase-2-deletion-manifest-src.txt` (95 files: `src/ui/**` + `src/workers/**` +
+`src/app.py` + `src/__init__.py` + `main.py`) committed.
 
-**Gate verdict:** Phase 2 execution begins only when R2.1, R2.3, R2.4, R2.5, R2.6 are all
-complete and R2.3 / R2.4 / R2.5 have non-author reviewer sign-off.
+**Gate verdict:** ✅ R2.1, R2.3, R2.4, R2.5, R2.6 all complete. Non-author `code-reviewer`
+sign-off on the R2.3/R2.4/R2.5 deliverables is the last item before sub-step 2.1.
 
 ---
 
@@ -220,7 +264,7 @@ complete and R2.3 / R2.4 / R2.5 have non-author reviewer sign-off.
 | **Control A-2** | **Lift before delete, as separate sub-steps.** 2.1 (lift the Qt-free stranded modules) and 2.4 (extract embedded data) both land and go green *before* 2.5 deletes anything. 2.5's diff is pure `git rm` — no file both moves and dies in one commit. |
 | **Control A-3** | **`graphify query "what imports src.ui.<x>"` before every deletion group**, and a `grep -rn "src\.ui\.<x>\|src/ui/<x>"` sweep re-run to zero after. `graphify update .` after each sub-step. |
 | **Control A-4** | **`ecc:refactor-cleaner` after each 2.5 deletion commit** — catches dangling imports, now-unused helpers in surviving files, stale `pyproject.toml` / `ci.yml` / `.claude/` references. |
-| **Control A-5** | **`git rm` (not filesystem delete) in one reviewable commit per logical group** (e.g. `src/ui/` tree; `tests/ui/` tree; `src/workers/` + `src/core/app.py` + `main.py` Qt path; the Qt scripts + markers; the QSS + deps). Per-file history preserved; every group `git revert`-able. |
+| **Control A-5** | **`git rm` (not filesystem delete) in one reviewable commit per logical group** (e.g. `src/ui/` tree; `tests/ui/` tree; `src/workers/` + `src/app.py` + `main.py` Qt path; the Qt scripts + markers; the QSS + deps). Per-file history preserved; every group `git revert`-able. |
 | **Verification** | ① `grep -rnE "\bPySide6\b\|\bPyQt" --include=*.py .` → **0** outside `.venv/` and history. ② fresh venv, `pip uninstall PySide6`, `python -c "import uadas_core"` → exit 0, **on Linux**. ③ surviving suite green on Linux; `collected(before) − collected(after)` == exactly the R2.1 test-deletion manifest. ④ `lint-imports` → 3 contracts `KEPT`. ⑤ branch CI green. |
 | **Abort criterion** | ② fails, or ③'s delta ≠ the manifest → `git revert` the offending deletion group, return to R2.3, re-partition. Because groups are separate commits, one bad deletion never contaminates the others. |
 
@@ -234,7 +278,8 @@ complete and R2.3 / R2.4 / R2.5 have non-author reviewer sign-off.
 | **Control B-3** | **Characterization test for `bootstrap()`** (reuse Phase 1.3's if it survives the UI deletion, else a minimal `import uadas_core; bootstrap()` resolves-every-service test) — run before and after 2.2. |
 | **Control B-4** | **`lint-imports` gains the `layers` contract in 2.3, immediately after** — so the very next commit machine-proves the cycle is gone and cannot silently return. |
 | **Verification** | characterization test green + full suite == R2.1 baseline (2.2 is behaviour-frozen, pre-deletion, so the count is unchanged here) + `graphify` shows the cut edge gone + (after 2.3) `lint-imports` `layers` contract `KEPT`. |
-| **Abort criterion** | the cycle does not actually break, or the `layers` contract cannot be made `KEPT` without further moves → stop, return to R2.4, redesign the type partition (maybe `SaveReport` / `WorkspaceSnapshot` must move too). |
+| **R2.4 outcome** | The cycle does **not** fully break by moving value types — confirmed. Residual `assistant_service → workspace_service.WorkspaceService` edge is handled by **one documented `ignore_imports`** in contract 3 (+ a 2.7/Phase-3 `Protocol` follow-up). **`Project` also moves** to `models/project.py` (needed for `core` to bottom out). Full spec: `plans/phase-2-structural-moves.md`. |
+| **Abort criterion** | `models/` + the one `ignore_imports` still can't make the `layers` contract `KEPT` (e.g. a second real `ai → services` runtime edge appears) → stop, return to R2.4, widen the partition. |
 
 ### Risk C — CI transformation (2.6) can go green while silently testing less
 
@@ -277,21 +322,31 @@ The master plan describes Phase 2 as one "mine then delete" motion. For *risk*, 
 split into the sequence below — **locked as the order of record** (`architect` may flag a hard
 dependency error at R2.4; nothing else re-opens it):
 
-1. **2.0** scope lock — R2.3 (`ecc:code-explorer` inventory) + R2.4 (`architect` structural
-   rulings) + R2.5 (CI design). No code.
-2. **2.1** lift the Qt-free stranded modules (D5) into `uadas_core/` — `git mv` + import fix +
-   `lint-imports`-guarded. Lowest risk; *reduces* what 2.5 deletes. Behaviour-frozen (A10).
-3. **2.2** extract `uadas_core/models/` (D1) — scripted import rewrite; cuts the `services↔ai`
-   cycle. Behaviour-frozen (A10).
-4. **2.3** move `bootstrap.py` to `uadas_core/bootstrap.py` + add the `layers` contract
-   (contract 3) in the same commit (D2). Behaviour-frozen (A10). After this, `uadas_core`
-   layering is machine-checked.
+1. **2.0** scope lock — R2.3 (`ecc:code-explorer` inventory → playbook §5a) + R2.4 (`ecc:architect`
+   opus rulings → `plans/phase-2-structural-moves.md`) + R2.5 (CI design → playbook §5b). **DONE.**
+2. **2.1** lift the **10** Qt-free modules (7 D5 + `actions/{action_registry,builtin_actions,
+   action_context}`) into `uadas_core/{theme,a11y,help,actions,...}` — `git mv` + import fix +
+   `lint-imports`-guarded; **also extend contract 2's `source_modules` list**. Lowest risk;
+   *reduces* what 2.5 deletes. Behaviour-frozen (A10). (`workbench/stage_registry.py` is NOT
+   lift-safe — delete-only + phase-4-note.)
+3. **2.2** extract `uadas_core/models/` (D1) — `models/workspace.py` (`Dataset`, `Visualization`,
+   `DashboardTile`, `Dashboard`) + `models/project.py` (`Project`); scripted rewrite of ~33
+   call sites (`from uadas_core.models import …`), incl. `mock.patch` targets; **extend contract
+   2's `source_modules`**. Cuts the `analysis_orchestrator_service → tool_registry →
+   workspace_service` loop; the residual `assistant_service → WorkspaceService` edge is left for
+   2.3's `ignore_imports`. Behaviour-frozen (A10).
+4. **2.3** move `bootstrap.py` → `uadas_core/bootstrap.py`, fix its `core/__init__.py:1` stale
+   header, add the corrected 13-layer `layers` contract (contract 3, with the one
+   `ignore_imports` line) + extend contract 2's `source_modules` — all in the same commit (D2).
+   Behaviour-frozen (A10). **Re-run `lint-imports` and adjust the stanza's `theme`/`help`/
+   `actions` tier placement to whatever 2.1 actually created** — don't paste blindly. After
+   this, `uadas_core` layering is machine-checked (3 contracts kept).
 5. **2.4** mine the remaining reusable assets to committed data files (design tokens, a11y rule
    catalog, action-registry data + enablement-context shape, empty/error/onboarding copy, icon
    set, chart-bridge semantics note, manual anchor index if not already a lifted module). No
    deletion. Each extract carries a fidelity test.
 6. **2.5** the deletion — `git rm` in reviewable groups: `src/ui/` tree · `tests/ui/` tree ·
-   `src/workers/` + `src/core/app.py` + `main.py`'s Qt path · the Qt-only scripts + markers +
+   `src/workers/` + `src/app.py` + `main.py`'s Qt path · the Qt-only scripts + markers +
    `tests/ui/conftest.py` + `test_uia_integration.py` · `resources/styles/*.qss*` · the dep
    drops in `requirements.txt`. `ecc:refactor-cleaner` sweep after each group. Screenshot
    parity retired here (A11).
@@ -362,7 +417,7 @@ Merges to `main` only when, in a single CI run on `phase-2/retire-desktop-ui`:
 - **Whether the `layers` contract can be `KEPT` with a flat stanza** or needs an
   `ignore_imports` allowlist — R2.4 drafts it against the post-2.2 tree; residual edges become
   Phase-3 debt, not a Phase-2 blocker.
-- **The 24-row extraction inventory is complete** — it was written 2026-09-02; R2.3's
+- **The 20-row extraction inventory is complete** — it was written 2026-09-02; R2.3's
   `code-explorer` pass is what makes it current and exhaustive.
 - **`main.py`'s exact Qt-entry shape** post-Phase-1 — R2.3 confirms what `main.py` still
   imports and how much of it is the desktop path vs. a future headless entry point.

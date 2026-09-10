@@ -64,7 +64,7 @@ Writer ≠ verifier on every row (A3).
 | 2.2 | extract `uadas_core/models/` (D1) — `Dataset`/`Visualization`/`Dashboard`/`DashboardTile` out of `workspace_service.py`; cut the `services↔ai` cycle | orchestrator (or `implementer`+worktree if R2.4 says abortable) | `architect` (boundary) + `code-reviewer` | frozen (A10) | 1 new package + fan-in import rewrite |
 | 2.3 | move `bootstrap.py` → `uadas_core/bootstrap.py`; add `[importlinter:contract:3] type = layers` in the **same commit** (D2) | orchestrator (`git mv` + `.importlinter` edit) | `architect` (layer order) + `code-reviewer` | frozen (A10) | 1 file moved + 1 contract |
 | 2.4 | mine remaining reusable assets → committed data files (tokens, a11y rules, action-registry data, enablement-context shape, empty/error/onboarding copy, icons, chart-bridge note) | inline (per R2.3 checklist) | `a11y-reviewer` (a11y extracts) + `code-reviewer` (the rest) | additive data only | ~10 data files + fidelity tests |
-| 2.5 | `git rm` — `src/ui/` · `tests/ui/` · `src/workers/` + `src/core/app.py` + `main.py` Qt path · Qt scripts/markers/`conftest.py`/`test_uia_integration.py` · `resources/styles/*.qss*` · dep drops | orchestrator (`git rm` in groups) | `ecc:refactor-cleaner` (dangling-ref sweep per group) + `code-reviewer` | **removes behaviour by design** | ~92 src + ~76 test files, 14 deps |
+| 2.5 | `git rm` — `src/ui/` · `tests/ui/` · `src/workers/` + `src/app.py` + `main.py` Qt path · Qt scripts/markers/`conftest.py`/`test_uia_integration.py` · `resources/styles/*.qss*` · dep drops | orchestrator (`git rm` in groups) | `ecc:refactor-cleaner` (dangling-ref sweep per group) + `code-reviewer` | **removes behaviour by design** | ~92 src + ~76 test files, 14 deps |
 | 2.6 | CI transformation — `test` job → `ubuntu-latest` single `pytest`; delete `run_tests_and_exit_cleanly.py` / `screenshot_app_state.py` refs; drop `uia_integration` job; rewrite `pre-commit-check.ps1`'s suite command | orchestrator (`ci.yml` + hook edit) | `code-reviewer` + Risk-C controls (collect-count assert, run-it-first, keep-old-1-commit) | infra | `ci.yml` + 1 hook |
 | 2.7 | *(optional — defer to Phase 3 if scope tightens)* D4 persistence atomicity — stage frames to `.parquet.tmp`, GC after the `.db` swap | `implementer` (worktree, test-first) | `security-reviewer` + `code-reviewer` | 1 named behaviour change (crash-safety) | small diff in `uadas_core/persistence/` |
 | 2.8 | doc + tooling sync — `ARCHITECTURE.md` / `CLAUDE.md` / `RESOURCE_ORCHESTRATION.md` / `MYPY_DEBT.md`; retire `pyside6-development` skill; fix `quality-check.ps1` ruff-vs-black; re-run `.claude/` de-stale (D8) | inline + `ecc:doc-updater` | `code-reviewer` + `ecc:comment-analyzer` (batched) | docs | ~8 files |
@@ -118,6 +118,123 @@ Writer ≠ verifier on every row (A3).
 5. **User go-ahead.**
 
 R2.3 / R2.4 / R2.5 are read-only agent passes + doc writes — cheap. Nothing else blocks.
+
+---
+
+## 5a. Extraction checklist (R2.3 — `ecc:code-explorer`, accepted 2026-09-10)
+
+Resolved against `phase-2/retire-desktop-ui` HEAD (`8ab95f6`). **`src/core/` no longer exists**
+(Phase 1 removed it) — the only entry points are `main.py` + `src/app.py`. The master plan's
+"20-row" table is **20 data rows** (`web-transition-glass-box-studio.md` lines 224-243); all 20
+resolved below. `grep PySide6|PyQt src/` = 68 files; **26 files under `src/` are Qt-free** (14
+real modules + 12 pkg `__init__`).
+
+**2.5 may not delete `src/ui/` until every `lift-2.1` row has landed (2.1) and every
+`extract-2.4` row has a committed data file (2.4), reviewer-confirmed.**
+
+### lift-2.1 — `git mv` Qt-free module -> `uadas_core/` (10 modules)
+
+| Current | Target | Why lift (not delete) |
+|---|---|---|
+| `src/ui/theme/tokens.py` | `uadas_core/theme/tokens.py` | `ThemeTokens` (3 themes), `DENSITY_BY_EXPERTISE_LEVEL`, `as_qss_mapping()`; imports only `uadas_core.core.expertise_level`. Master rows 1+2. Wide fan-in (`theme_manager`, `plotly_theme`, `chart_view`, `a11y/rules`, `dock_manager`, `main_window`, `guidance_controller`, …). |
+| `src/ui/theme/plotly_theme.py` | `uadas_core/theme/plotly_theme.py` | Master row 3. No Plotly import — pure dict; themes the `go.Figure`s `uadas_core/visualization` returns. |
+| `src/ui/theme/contrast.py` | `uadas_core/theme/contrast.py` | Master row (WCAG math). Imports only `dataclasses`. |
+| `src/ui/a11y/contrast_manifest.py` | `uadas_core/a11y/contrast_manifest.py` | `CONTRAST_REQUIREMENTS` tuple. Imports `theme/contrast`. |
+| `src/ui/help/manual_index.py` | `uadas_core/help/manual_index.py` | YAML-frontmatter index over `docs/manual/`. `re`/`yaml`/`pathlib` + `uadas_core.core.*`. Also imported by `scripts/preview_manual.py` (non-test). |
+| `src/ui/help/manual_renderer.py` | `uadas_core/help/manual_renderer.py` | `markdown_it` only + `manual_index`. |
+| `src/ui/widgets/data_table/column_formatters.py` | `uadas_core/...` (Phase-4.5 "reuse") | `datetime`/`pandas` only. Master row. |
+| `src/ui/actions/action_registry.py` | `uadas_core/actions/action_registry.py` | **MUST lift** — `tests/services/test_guidance_service.py` (a *surviving* non-`tests/ui/` test) does `from src.ui.actions.action_registry import get_action` to assert `GuidanceService`'s produced `action_id`s resolve. |
+| `src/ui/actions/builtin_actions.py` | `uadas_core/actions/builtin_actions.py` | **MUST lift** (D7 `_register_builtins()` @:269) — same surviving test imports it for its import-time registration side effect. 3 `predicate` lambdas (dashboard≥2 / can_undo / can_redo) -> a server-side expression note. |
+| `src/ui/actions/action_context.py` | `uadas_core/actions/action_context.py` | Master row 9 (`/api/capabilities` payload shape). Deps all `uadas_core.services.*`. Only Qt-`tests/ui` importers today — could instead be `extract-2.4` (the shape as data); **2.1 reviewer settles lift-vs-extract.** |
+
+### extract-2.4 — DATA embedded in a Qt file -> committed data file first (5)
+
+| Source | Data | Target / note |
+|---|---|---|
+| `src/ui/a11y/rules.py:531` `DEFAULT_RULES` | 8× `(rule_id, description)` + `Severity` StrEnum | JSON for axe-core custom rules; check *bodies* are Qt-specific, discard. File imports PySide6 -> `delete-only` after. |
+| `src/ui/a11y/accessible.py` `describe()` call-sites | **81 calls across 30 `src/ui/` files** | `{name, description, status_tip, tooltip, help_anchor}` -> `aria-label`/`aria-describedby`/`data-help-anchor` map. |
+| `src/ui/workbench/stage_rail.py:30` `_STATUS_PREFIX` | `{complete:"✓ ", proposed:"→ ", pending:"· "}` | keep the glyph encoding. |
+| `src/ui/dialogs/first_run_tour_dialog.py:31` `_BODY_HTML` | onboarding HTML | -> Markdown/JSON. |
+| `src/ui/widgets/empty_state.py` + `error_state.py` | heading/message copy | literals live at CALL SITES (`dock_manager`, `menu_bar`, `settings_dialog`, `workbench/pages/*`) -> component contract + copy port; the widgets themselves are `delete-only`. |
+| *(candidate — not a master row)* `src/ui/main_window.py::_DATASET_FILE_FILTER` | reader-format filter string (CLAUDE.md flags it as a hand-mirror of `reader_registry._BUILTIN_READERS`) | note for `/api/capabilities`, or let the web derive it from `uadas_core.readers`. 2.4 reviewer decides. |
+
+### phase-4-note — behaviour/semantics only (4)
+
+| Item | Note |
+|---|---|
+| `resources/web/chart_bridge.js` | newPlot->react, relayout-for-theme transfers. The QWebChannel wrapper `src/ui/web/chart_bridge.py` is `delete-only`. |
+| `src/ui/dialogs/analysis_parameter_dialog.py` | drive RJSF from `uadas_core/ai/tool_registry.py::ToolDefinition.input_schema` directly. Dialog `delete-only`. |
+| `src/ui/controllers/guidance_controller.py` | Qt-coupled; the expertise->density rule it encodes is already data in `tokens.py`. `delete-only`. |
+| `src/ui/theme/qss_compiler.py` | QSS-only (`string.Template` -> `base.qss.template`); Qt-free but zero web value -> `delete-only`. |
+
+### already-safe / already-done (7 — nothing to do)
+
+`uadas_core/services/analysis_orchestrator_service.py` (rows 10: `PipelineStage`/`_AUTO_PROPOSED_STAGES`/`_STAGE_RATIONALE`) · `uadas_core/services/guidance_service.py` (row 11: `Suggestion`/`_EXPERTISE_STAGE_WEIGHT`; verified **never imports `src.ui`**) · `uadas_core/ai/assistant_service.py` `AssistantTurnResult` (row 17) · `docs/manual/` 81 `.md` (row 13) · `resources/icons/` 40 + `illustrations/` 3 = 43 SVG, `currentColor` (rows 14+19) · `uadas_core/results/` renderers (lifted in Phase 1.5; `src/ui/results/result_card.py` + `explanation_panel.py` stay Qt -> `delete-only`).
+
+### delete-only (2.5)
+
+~76 remaining `src/ui/**/*.py` (all import PySide6 or Qt-coupled) + 12 pkg `__init__.py` +
+`src/workers/{base_worker,__init__}.py` + `src/app.py` `.run()` body + `main.py` (as written) +
+`src/__init__.py` + `scripts/{run_tests_and_exit_cleanly,screenshot_app_state}.py` +
+`tests/ui/**` (90 files). `scripts/preview_manual.py` -> **repoint** at the lifted
+`uadas_core/help/manual_index`, don't delete.
+
+### UNCERTAIN -> resolved this pass
+
+| Item | Resolution |
+|---|---|
+| `src/ui/workbench/stage_registry.py` (D5 said "lift") | **delete-only + `phase-4-note`.** It `import`s `src.ui.workbench.stage_page.StagePage` and its dataclass field is `page_class: type[StagePage]` — transitively Qt, not a clean `git mv`. Carry the stage->page registry *shape* as a Phase-4 note (mirrors `uadas_core/visualization/chart_registry.py`). D5's list is 8; **7 lift, 1 (`stage_registry`) does not.** |
+| `main.py` / `src/app.py::create()` | The `bootstrap()` -> `BootstrapContext` wrapper (~15 lines, all `uadas_core`) a future headless/ASGI entry could keep; only `Application.run()` is Qt. 2.5's `main.py` group decides: thin headless stub vs delete-and-let-Phase-3-recreate. |
+
+**Counts:** lift-2.1 **10** · extract-2.4 **5** (+1 candidate) · phase-4-note **4** ·
+already-safe/done **7** · delete-only ~78 `src/ui` + 2 `src/workers` + `main.py` + `src/app.py`
+run-path + 90 `tests/ui` + 3 scripts.
+
+---
+
+## 5b. CI transformation (R2.5 design — accepted 2026-09-10)
+
+The current `.github/workflows/ci.yml` has 5 jobs: `test` (windows, the two-invocation
+Qt suite), `uia_integration` (windows, pywinauto, `continue-on-error`), `lint` (ubuntu),
+`linux_import` (ubuntu, PySide6-free `import uadas_core` + `pytest tests/ --ignore=tests/ui`),
+`dco` (ubuntu). **The `linux_import` job already runs exactly the surviving suite** — `pytest
+tests/ -q -m "not uia_integration" --ignore=tests/ui` collects the **451** tests outside
+`tests/ui/` (see `plans/phase-2-baseline.md`). Phase 2's CI change is therefore mostly
+*promotion + deletion*, not authoring.
+
+### Post-Phase-2 target
+
+| Job | Change |
+|---|---|
+| **`test`** (windows) | **DELETE.** Its whole rationale — QtWebEngine, the Windows CPython/Qt `Py_Finalize()` access violation, `scripts/run_tests_and_exit_cleanly.py`, the two-invocation split, `test_worker_runner.py`-first, `PYTHONFAULTHANDLER`, `QT_QPA_PLATFORM=offscreen`, the `pytest-output.log` capture + "Post failure log to the PR" step — is Qt-specific and dies with `src/ui/`. |
+| **`uia_integration`** (windows) | **DELETE.** pywinauto/UIA, Windows-desktop-only; its subject (`tests/ui/a11y/test_uia_integration.py`) is removed in 2.5. |
+| **`linux_import`** (ubuntu) | **PROMOTE to `test`.** Rename job. Drop the "non-UI subset" framing and the `--ignore=tests/ui` / `-m "not uia_integration"` args (both targets deleted). Keep the "assert PySide6 is not importable" guard step (cheap, and it is now the *primary* proof the core is Qt-free at runtime, alongside `lint-imports`). Keep `import uadas_core` smoke. Change the install step from the `grep -vE '^(PySide6\|pywinauto\|pytest-qt)'` filter to a plain `pip install -r requirements.txt` (2.5 removes those pins from the file). **Add the Risk-C `--collect-only` count assertion:** `python -m pytest --collect-only -q tests/ \| tail -1` must report a number in the band recorded in `plans/phase-2-baseline.md` (≈ 451 ± the `src/workers/`-coupled tests 2.5 removes) — fail the job otherwise, so a silently-shrinking suite is a red check (observation 0022). |
+| **`lint`** (ubuntu) | Keep. Drop `src/` from every path — `black`/`isort`/`ruff`/`bandit` run over `uadas_core/ tests/` only (`src/` is gone). `bandit -r uadas_core -q --skip B101,B107,B608`. `lint-imports` now reports **3 kept / 0 broken** (Qt/Django forbidden · provenance-is-a-leaf · the `layers` contract from 2.3). |
+| **`dco`** (ubuntu) | Unchanged — already `DCO_ENFORCING=1`. |
+
+### `.claude/hooks/pre-commit-check.ps1`
+
+Its two-invocation `run_tests_and_exit_cleanly.py` call → a single `python -m pytest tests/ -q`
+(still Windows dev machine, but no Qt teardown AV once Qt is gone). `bandit -r src uadas_core` →
+`bandit -r uadas_core`. Stays PowerShell, stays `Bash|PowerShell` matcher.
+
+### Rollout (Risk C)
+
+1. **C-3 — prove it runs.** First commit of 2.6: add the promoted `test` job *alongside* the old
+   one (both `required`). Push. `gh run view <id> --log` must show the new Linux `test` job
+   **collected and executed** ~451 tests (not 0, not "no tests ran", not skipped).
+2. **C-2 — prove it asserts.** On a scratch branch, break one surviving test; confirm the new
+   job goes **red**. Delete the scratch branch.
+3. **C-4 — cut over.** Second commit: delete the old windows `test` job + `uia_integration` job
+   + `scripts/run_tests_and_exit_cleanly.py` + `scripts/screenshot_app_state.py` and every
+   reference to them (`ci.yml`, `CLAUDE.md`, `pre-commit-check.ps1`, `docs/`). `grep -rn
+   "run_tests_and_exit_cleanly\|screenshot_app_state" --include=*.{yml,ps1,md} .` → 0.
+
+### Docs that go stale at 2.6 (fixed in 2.8)
+
+`docs/RESOURCE_ORCHESTRATION.md` §2 (the CI job list + the `0xC0000005` note), `CLAUDE.md`
+Commands/Tests section (the whole two-invocation dance, `QT_QPA_PLATFORM` export,
+`run_tests_and_exit_cleanly.py`), `docs/ARCHITECTURE.md` (any CI description).
 
 ---
 

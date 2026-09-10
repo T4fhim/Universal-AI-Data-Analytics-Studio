@@ -39,7 +39,7 @@ re-pointed here at Phase 2 kickoff) and `plans/phase-2-execution-playbook.md`. P
     `gh run list --branch phase-2/retire-desktop-ui`.
 11. **After 2.5 there is no runnable app** (A11). `scripts/screenshot_app_state.py` and its
     baseline-diff verification are retired at 2.5 — not a resource for the back half of Phase 2.
-12. **The 24-row extraction inventory in `web-transition-glass-box-studio.md` is stale on
+12. **The 20-row extraction inventory in `web-transition-glass-box-studio.md` is stale on
     paths** (2026-09-02, pre-carve-out). R2.3's `ecc:code-explorer` pass is what makes it
     current — do not action a row from the master plan without R2.3 confirming its path.
 
@@ -120,7 +120,7 @@ moving more types → stop, return to R2.4, widen the partition.
 | Slot | Resource |
 |---|---|
 | Layer-order ruling | `ecc:architect` (opus), folded into R2.4 — the exact `[importlinter:contract:3]` `type = layers` stanza, provable `KEPT` against the *post-2.2* tree; whether an `ignore_imports` allowlist is needed for residual edges. |
-| The move | **INLINE** — `git mv uadas_core/core/bootstrap.py uadas_core/bootstrap.py`; rewrite `uadas_core.core.bootstrap` → `uadas_core.bootstrap` across `main.py`, `src/core/app.py` (alive until 2.5), tests; add the `layers` stanza to `.importlinter` **in the same commit**. |
+| The move | **INLINE** — `git mv uadas_core/core/bootstrap.py uadas_core/bootstrap.py`; rewrite `uadas_core.core.bootstrap` → `uadas_core.bootstrap` across `main.py`, `src/app.py` (alive until 2.5), tests; add the `layers` stanza to `.importlinter` **in the same commit**. |
 | Review | `architect` (layer order sound?) + repo `code-reviewer` (haiku) |
 | Verify | `lint-imports` → **3 kept / 0 broken** + `python -c "import uadas_core.bootstrap; uadas_core.bootstrap.bootstrap()"` → 0 + full suite == **1542 / 92 / 0** |
 | Exclude | everything heavier — this is a one-file move + one INI stanza. |
@@ -150,7 +150,7 @@ with the allowlist documented inline, log the residual edges as Phase-3 debt (`D
 | Slot | Resource |
 |---|---|
 | Precondition (blocking) | R2.3 checklist 100% ticked + reviewer-confirmed; 2.1 + 2.4 green on the branch. |
-| `git rm` groups | **INLINE**, one reviewable commit per group: (a) `src/ui/` tree · (b) `tests/ui/` tree · (c) `src/workers/` + `src/core/app.py` + `main.py` Qt path · (d) `scripts/run_tests_and_exit_cleanly.py` + `scripts/screenshot_app_state.py` + `tests/ui/conftest.py` + `tests/ui/a11y/test_uia_integration.py` + the `webengine`/`uia_integration` markers in `pyproject.toml` · (e) `resources/styles/*.qss*` + `resources/web/` QWebChannel wrapper · (f) `requirements.txt` dep drops. |
+| `git rm` groups | **INLINE**, one reviewable commit per group: (a) `src/ui/` tree · (b) `tests/ui/` tree · (c) `src/workers/` + `src/app.py` + `main.py` Qt path · (d) `scripts/run_tests_and_exit_cleanly.py` + `scripts/screenshot_app_state.py` + `tests/ui/conftest.py` + `tests/ui/a11y/test_uia_integration.py` + the `webengine`/`uia_integration` markers in `pyproject.toml` · (e) `resources/styles/*.qss*` + `resources/web/` QWebChannel wrapper · (f) `requirements.txt` dep drops. |
 | Blast radius per group | `graphify query "what imports <target>"` before; `grep -rn` sweep to 0 after; **`graphify update .` after each group** (the graph rots fast — playbook §5). |
 | Dangling-ref sweep | `ecc:refactor-cleaner` (sonnet) after **each** group — dead imports in surviving files, stale `pyproject.toml`/`ci.yml`/`.claude/` refs, now-unused helpers. **Report caveman-compressed** (§1.7). |
 | Dep-drop safety | per dropped name (`PySide6`, `pywinauto`, `pytest-qt`, `polars`, `dask`, `numba`, `joblib`, `networkx`, `ydata-profiling`, `watchdog`, `aiohttp`, `xgboost`, `lightgbm`, `catboost`): `grep -rn "<name>" uadas_core/ tests/` → **0** before it leaves `requirements.txt`. **Keep** `kaleido`, `reportlab`, `plotly`, `pyarrow`, `duckdb`. |
