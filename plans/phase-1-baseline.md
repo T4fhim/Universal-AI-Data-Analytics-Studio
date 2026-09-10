@@ -167,6 +167,32 @@ B101,B107,B608` → exit 0 (pure transform, no SQL / no filesystem — no direct
 machine-checked `provenance-is-a-leaf` contract: `core`/`analysis`/`services`/`persistence`/`jobs`
 must not import `uadas_core.provenance`). No `test_module_size` delta.
 
+**Post-diagnosis (whole-branch sweep — commits `7def88b` `0c4281d` `8b1d9d5`; see
+`plans/phase-1-diagnosis.md` §findings):** a 4-agent read-only sweep over `32c45ec..cde42aa`.
+`security-reviewer` verified **all four 1.8 security fixes INTACT + bypass-resistant**;
+`silent-failure-hunter` found **1 HIGH** (`_rebuild_visualization` caught `except ServiceError`
+only → a plugin/pandas exception from `build()` aborted the whole `load_workspace` instead of
+being collected per-viz) + MED/LOW; `architect` SOUND-WITH-NOTES; `test-engineer` GAPS-FOUND
+(1.6 structural-failure + `_gc_orphan_parquet` + `Dag.roots()` untested). All fixes tighten error
+paths (broaden the per-viz `build()` catch; `AnalysisLog(Entry).from_dict` + `RecipeStep.from_dict`
+raise `ServiceError` for every malformed payload; `jobs/` logs an unhandled failure and tears
+down a replaced runner) + docs (`_REGISTERED_READERS` → `_BUILTIN_READERS`; `.importlinter`
+`provenance-is-a-leaf` widened to all 14 non-provenance subpackages). Suite **1523 → 1542 passed
+/ 92 skipped / 0 failed** (`7def88b`+`0c4281d` inv-2: **1531 passed**, exit `139` = the usual
+post-clean Windows/Qt teardown SIGSEGV, CI-green-equivalent; `8b1d9d5` adds the final +1).
+**The +19 breakdown:** +5 `tests/persistence/test_persistence_service.py` (GC don't-over-delete,
+corrupt / missing `.db`, missing `.parquet`, non-`ServiceError` build → `rebuild_failures`), +3
+`tests/services/test_analysis_orchestrator_service.py` (`from_dict` unknown-stage / missing-key /
+missing-`dataset_id`), +9 `tests/provenance/test_dag.py` (`Dag.roots()` — one test parametrised
+×8 over the fixture catalog + one lost-parent case), +1
+`tests/jobs/test_thread_pool_executor_job_runner.py` (`on_error=None` → logged), +1
+`tests/provenance/test_recipe.py` (`RecipeStep.from_dict` rejects an unknown stage). Any *other*
+delta would be a regression. `screenshot_app_state.py` byte-identical (16,294 bytes). `mypy` CI
+list → **Success** (153 files, unchanged). `bandit` exit 0. `lint-imports` → **2 kept / 0
+broken** (the `provenance-is-a-leaf` contract now lists every non-provenance `uadas_core`
+subpackage, not 5 of 14). Deferred items D1–D15 recorded in `plans/phase-1-diagnosis.md`
+§findings with Phase-2/3 owners.
+
 ---
 
 ## Environment
