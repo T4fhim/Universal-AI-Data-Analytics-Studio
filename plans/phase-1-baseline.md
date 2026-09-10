@@ -143,6 +143,30 @@ B101,B107,B608` → exit 0 (B608 off — the `security-reviewer` ×2 end-of-rang
 gate; both APPROVE). `lint-imports` → 1 kept / 0 broken (`uadas_core/persistence` is Qt-free).
 No `test_module_size` delta (that guard is `src/ui/`-only).
 
+**Post-1.7 (provenance DAG & Recipe — commits `8d7d63e`…`5208d2a` [implementer], merge
+`c1a989a`, review-fix `a3bed35`; + doc commits `e887136` `68bdecc`):** additive greenfield
+`uadas_core/provenance/` (`analysis_logs_to_dag` / `analysis_logs_to_recipe` /
+`recipe_to_analysis_logs`) + `Explanation.from_dict` + `AnalysisOrchestratorService.get_all_logs`
++ an ISO-8601 timestamp check on `AnalysisLogEntry.from_dict` (spec §R0.4 CHANGE 5). The one
+existing-consumer touch: `PipelineController.restore_logs_for_project` now warns-and-skips a
+recorded log whose timestamp fails that check (a hand-edited / pre-1.7 project file still
+opens — end-of-range review B2). Suite **1438 → 1523 passed / 92 skipped / 0 failed** (inv-1
+`test_worker_runner` 10; inv-2 **1513 passed, 92 skipped, 3 deselected, 0 failed**, process exit
+`139` — the usual post-clean Windows/Qt teardown SIGSEGV, CI-green-equivalent under
+`Max(exit1, exit2)`). **The +85 breakdown:** +27 `tests/provenance/test_dag.py`, +48
+`tests/provenance/test_recipe.py` (incl. +8 in review-fix `a3bed35` — the non-linear-log-set
+guards + `RecipeStep.from_dict` hardening), +3 `tests/analysis/test_explanation.py`, +3
+`tests/services/test_analysis_orchestrator_service.py` (timestamp ×2 + `get_all_logs`), +1
+`tests/ui/controllers/test_pipeline_controller.py` (the B2 regression test), +3 structural from
+`test_import_layering` over the 3 new `uadas_core/provenance/*.py` modules (same mechanism as
+1.1/1.2/1.6). Any *other* delta would be a regression. `screenshot_app_state.py` byte-identical
+(16,294 bytes) — provenance adds no visible UI. `mypy` CI list (+ `uadas_core/provenance`) →
+**Success** (150 → **153** source files). `bandit -r uadas_core/provenance -q --skip
+B101,B107,B608` → exit 0 (pure transform, no SQL / no filesystem — no directed
+`security-reviewer` pass required, unlike 1.6). `lint-imports` → **2 kept / 0 broken** (the new
+machine-checked `provenance-is-a-leaf` contract: `core`/`analysis`/`services`/`persistence`/`jobs`
+must not import `uadas_core.provenance`). No `test_module_size` delta.
+
 ---
 
 ## Environment

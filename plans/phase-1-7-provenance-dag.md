@@ -382,3 +382,76 @@ persistence** (Phase 3 — see Multi-file touchpoints). Rejected in review if pr
   replay time.
 - **`outputs`-dropping round-trip is a documented behaviour choice** inside an otherwise
   additive step (pre-flight Part E item 11) — name it in the end-of-range review.
+
+---
+
+## §as-built (2026-09-10)
+
+**Commits:** implementer Tasks 1–7 `8d7d63e`,`7458266`,`728db2e`,`3283d64`,`1bfcd53`,`5208d2a`
+(worktree, off `3e53456`) → merge `c1a989a` → end-of-range review fixes `a3bed35`. Design/plan
+commits: `e887136` (RESOURCE_ORCHESTRATION §1.7–1.8), `68bdecc` (this doc's two folds +
+`phase-1-7-plan.md` + `phase-1-diagnosis.md`).
+
+**Built:** `uadas_core/provenance/{__init__,dag,recipe}.py`; `Explanation.from_dict` +
+round-trip proof; `AnalysisLogEntry.from_dict` ISO-8601 timestamp validation (CHANGE 5);
+`AnalysisOrchestratorService.get_all_logs()`. `uadas_core/provenance` added to the CI mypy
+clean list (150 → 153 files). `docs/ARCHITECTURE.md` gained a "Provenance DAG & Recipe"
+subsection.
+
+**End-of-range review** over `3e53456..5208d2a` (all non-author):
+
+| Reviewer | Verdict | Actioned |
+|---|---|---|
+| `code-reviewer` (haiku) | APPROVE | — |
+| `ecc:architect` (opus) | FIX-FIRST | B1, B2, item 5 + 5 tweaks — all in `a3bed35` |
+| `ecc:silent-failure-hunter` | ISSUES-FOUND | 1 MED (= B1) + LOW hardening — the actionable ones in `a3bed35` |
+
+**`a3bed35` — what the review changed:**
+
+- **B1 (silent branch loss).** `_creation_order` silently kept only the *last* `new_dataset_id`
+  when one log had >1 dataset-producing entry (a clean stage re-run with different params — a
+  *reachable* fan-out the single-root guard missed), dropping the other branch's log from the
+  Recipe with no error. Now raises `ServiceError` on any fan-out, and on
+  `len(ordered) != len(logs)` after the walk (a disconnected / cyclic set). The spec §5 "linear
+  chains only" fence is now actually enforced. +3 tests.
+- **B2 (open-project regression).** 1.7's `AnalysisLogEntry.from_dict` timestamp raise reached
+  the *unguarded* `PipelineController.restore_logs_for_project` restore loop
+  (`project_controller.open_project_at_path`'s `try` covers only `open_project`), so a
+  hand-edited / pre-1.7 project file with a non-ISO timestamp crashed the open instead of
+  loading. Now the loop catches `ServiceError`, logs a warning, and skips that one log —
+  matching the workspace model's "an orphaned reference is expected state, not corruption to
+  guard against". +1 regression test.
+- **CHANGE-5 gap.** `recipe_to_analysis_logs` builds `AnalysisLogEntry` *directly* from
+  `RecipeStep`s (not via `AnalysisLogEntry.from_dict`), so a bad timestamp in a Recipe payload
+  rode in unchecked. `RecipeStep.from_dict` now applies the same `fromisoformat` guard;
+  `produces_dataset` is a required key. +2 tests.
+- **Item 5.** `analysis_logs_to_recipe` built a whole throwaway `Dag` with `datasets={}` just to
+  read `roots()[0].meta` — always `partial=True` all-`None`, so §2's populated `source_dataset`
+  was unreachable, and `roots()[0]` was an unguarded index. Now takes an optional
+  `datasets: Mapping[str, DatasetMeta] | None`, reads the root meta directly, and drops the DAG
+  build. `source_dataset` carries a `partial` flag. +2 tests.
+- **Tweaks:** `recipe_to_analysis_logs` wraps `PipelineStage(step.stage)` → `ServiceError` (was
+  a bare `ValueError`); `_is_clean_entry` typed `AnalysisLogEntry`, not `Any`; a machine-checked
+  `.importlinter` `provenance-is-a-leaf` `forbidden` contract (`core`/`analysis`/`services`/
+  `persistence`/`jobs` → `uadas_core.provenance`) — `lint-imports` **2 kept, 0 broken**; `dag.py`
+  docstring corrected: the three cycle-checkers are *deferred debt*, and
+  `_reject_dataset_id_cycles(links: Mapping[str, str | None])` *is* the intended shared
+  signature (`workspace_service` / `persistence_service` build that map inline).
+
+**Verification:** full suite **1438 → 1523 / 92 / 0** (inv-2 exit `139` = post-clean Qt SIGSEGV,
+CI-green-equivalent). Screenshot byte-identical (16,294 B). mypy CI list → Success (153 files).
+`bandit uadas_core/provenance` exit 0. Branch CI: _pending push_.
+
+**Deferred (recorded, not scheduled):**
+
+- **Recipe disk persistence → Phase 3.** A Recipe is a pure function of the `AnalysisLog`s 1.6
+  already persists; a second stored copy is a stale-state hazard. 1.7 ships the in-memory
+  converters + `to_dict`/`from_dict` + the `json.dumps` round-trip only.
+- **Unify the three cycle-checkers** into `uadas_core/core/validation.py` — the architect's
+  post-1.6 deferral still stands; `links`-map form is the shared signature. Touches `services/` +
+  `persistence/`, so it belongs in Phase 2's deletion/consolidation work, not an additive step.
+- **`docs/ARCHITECTURE.md` "Module layout" diagram** still shows pre-1.1 `src/` paths and omits
+  `persistence` / `jobs` / `results` / `provenance` (it lagged from 1.3–1.6 already) — a Phase-1
+  DoD docs task, tracked in `plans/phase-1-diagnosis.md`.
+- **`Recipe.from_dict` version/`steps` strictness** and **`fromisoformat` accepting naive /
+  date-only** strings — LOW, revisit when Phase 3 adds Recipe versioning + disk persistence.
