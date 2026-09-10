@@ -4,7 +4,7 @@
 This module exists so that :mod:`uadas_core.theme.tokens` is not a set of colors
 somebody eyeballed. Every foreground/background pairing the application
 actually renders is listed in
-:data:`~src.ui.a11y.contrast_manifest.CONTRAST_REQUIREMENTS` and asserted
+:data:`~uadas_core.a11y.contrast_manifest.CONTRAST_REQUIREMENTS` and asserted
 against these functions by a test, for every theme, so a token edit that
 quietly breaks legibility fails the suite instead of shipping.
 

@@ -23,7 +23,7 @@ does not itself perform.
 
 **Contrast is delegated, not reimplemented.** :func:`~src.ui.a11y.rules.
 contrast_findings` reuses :mod:`uadas_core.theme.contrast`'s WCAG math and
-:data:`~src.ui.a11y.contrast_manifest.CONTRAST_REQUIREMENTS` -- the same
+:data:`~uadas_core.a11y.contrast_manifest.CONTRAST_REQUIREMENTS` -- the same
 pairing list ``tests/ui/theme/test_contrast.py`` already asserts against
 every theme. Reinventing that math here would risk the two silently
 disagreeing about what "passes" means.

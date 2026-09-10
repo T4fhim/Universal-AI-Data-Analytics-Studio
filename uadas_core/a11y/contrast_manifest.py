@@ -1,4 +1,4 @@
-# File: src/ui/a11y/contrast_manifest.py
+# File: uadas_core/a11y/contrast_manifest.py
 """Every foreground/background pairing the UI renders, with its WCAG floor.
 
 This is the list that makes :mod:`uadas_core.theme.tokens` trustworthy. Each

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.ui.a11y.contrast_manifest import CONTRAST_REQUIREMENTS
+from uadas_core.a11y.contrast_manifest import CONTRAST_REQUIREMENTS
 from uadas_core.theme.contrast import (
     AA_NON_TEXT,
     contrast_ratio,

@@ -5,7 +5,7 @@ Each rule is a small, independently testable function of "the widgets found
 under some root" (or, for :func:`contrast_findings`, "the currently applied
 theme's tokens") to a list of :class:`A11yFinding`. Kept in a separate module
 from :mod:`src.ui.a11y.audit` (rather than as private functions there) for
-the same reason :mod:`src.ui.a11y.contrast_manifest` is separate from
+the same reason :mod:`uadas_core.a11y.contrast_manifest` is separate from
 :mod:`uadas_core.theme.contrast`: the *math*/walking machinery and the *list of
 things actually checked* change for different reasons and at different
 rates, and a new rule should be addable by reading and extending this file
@@ -53,7 +53,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.ui.a11y.contrast_manifest import CONTRAST_REQUIREMENTS
+from uadas_core.a11y.contrast_manifest import CONTRAST_REQUIREMENTS
 from uadas_core.theme.contrast import contrast_ratio
 from uadas_core.theme.tokens import ThemeTokens
 
@@ -574,7 +574,7 @@ DEFAULT_RULES: tuple[A11yRule, ...] = (
 
 
 def contrast_findings(tokens: ThemeTokens) -> list[A11yFinding]:
-    """Check every :data:`~src.ui.a11y.contrast_manifest.CONTRAST_REQUIREMENTS` pairing against ``tokens``.
+    """Check every :data:`~uadas_core.a11y.contrast_manifest.CONTRAST_REQUIREMENTS` pairing against ``tokens``.
 
     Not part of :data:`DEFAULT_RULES` -- every rule above is a function of a
     walked widget tree, while this is a function of a *theme*, entirely
