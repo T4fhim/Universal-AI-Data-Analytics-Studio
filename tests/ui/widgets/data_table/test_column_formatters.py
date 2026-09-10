@@ -6,7 +6,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from src.ui.widgets.data_table.column_formatters import (
+from uadas_core.data_table.column_formatters import (
     MISSING_DISPLAY,
     format_value,
     is_missing,

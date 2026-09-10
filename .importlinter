@@ -35,6 +35,7 @@ source_modules =
     uadas_core.analysis
     uadas_core.cleaning
     uadas_core.core
+    uadas_core.data_table
     uadas_core.database
     uadas_core.forecasting
     uadas_core.help

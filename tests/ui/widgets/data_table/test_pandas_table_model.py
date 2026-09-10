@@ -14,8 +14,8 @@ import pandas as pd
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
-from src.ui.widgets.data_table.column_formatters import MISSING_ACCESSIBLE_TEXT
 from src.ui.widgets.data_table.pandas_table_model import PandasTableModel
+from uadas_core.data_table.column_formatters import MISSING_ACCESSIBLE_TEXT
 
 
 def _small_frame() -> pd.DataFrame:

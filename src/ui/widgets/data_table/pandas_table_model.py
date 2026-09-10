@@ -41,7 +41,7 @@ from PySide6.QtCore import (
     Qt,
 )
 
-from src.ui.widgets.data_table.column_formatters import (
+from uadas_core.data_table.column_formatters import (
     MISSING_ACCESSIBLE_TEXT,
     format_value,
     is_missing,

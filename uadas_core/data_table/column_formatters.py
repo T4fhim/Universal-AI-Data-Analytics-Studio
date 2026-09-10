@@ -1,4 +1,4 @@
-# File: src/ui/widgets/data_table/column_formatters.py
+# File: uadas_core/data_table/column_formatters.py
 """Cell-value formatting for :class:`~src.ui.widgets.data_table.pandas_table_model.PandasTableModel`.
 
 Kept as plain functions in their own module (rather than inlined into the
