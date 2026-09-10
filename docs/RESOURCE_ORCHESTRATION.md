@@ -183,20 +183,31 @@ is real. Phase 1's detail lives in `plans/phase-1-resource-plan.md`.
 
 ---
 
-## §6 — Phase 1 (active)
+## §6 — Phase 2 (next; planning drafted, execution gated on user go-ahead)
 
-- **Execution loop + per-step gates:** `plans/phase-1-execution-playbook.md`
-- **Per-sub-step resource matrix + corrected facts:** `plans/phase-1-resource-plan.md`
-- **De-risking controls (A1–A10, B-1…B-5, C-1…C-6, DoD):** `plans/phase-1-derisking-and-readiness.md`
-- **Rolling baseline:** `plans/phase-1-baseline.md` — currently **1413 / 92 / 0**
-- **State ledger:** `.superpowers/sdd/phase-1/progress.md`
+**Phase 1 is DONE** — merged to `main` 2026-09-10 as merge commit `4d61b93` (PR #3, 71 commits,
+merge-not-squash). Final rolling baseline **1542 / 92 / 0**. `DCO_ENFORCING=1` since this merge.
+Phase 1 detail is retained in `plans/phase-1-*` for reference; the whole-branch diagnosis's
+deferred items (D1–D15) are dispositioned in `plans/phase-1-diagnosis.md` §findings — Phase 2
+owns D1 / D2 / D4 / D5 / D6.
 
-Remaining sub-steps and their assignments: 1.3 de-globalize registries (inline impl, `architect`
-+ `code-reviewer`, frozen, 6 serial commits) → 1.4 typed generic `resolve()` only (inline impl,
-`ecc:type-design-analyzer` + `architect`, frozen; `Session` scope deferred to Phase 3) → 1.6
-persistence (`implementer` + worktree, `security-reviewer` ×2 + `code-reviewer`, additive) → 1.7
-provenance DAG (`implementer` + worktree, `ecc:architect` + `silent-failure-hunter`, additive,
-abortable) → Definition of Done → one PR `phase-1/extract-uadas-core → main`.
+- **De-risking controls (A1–A11, R2.1–R2.6, per-risk A–D, DoD):** `plans/phase-2-derisking-and-readiness.md`
+- **Execution loop + per-step gates:** `plans/phase-2-execution-playbook.md`
+- **Per-sub-step resource matrix + corrected facts:** `plans/phase-2-resource-plan.md`
+- **Pre-Phase-2 baseline:** captured 2026-09-10 on `main` @ `4d61b93` — **1542 / 92 / 0**;
+  `plans/phase-2-baseline.md` to be written at branch cut.
+- **State ledger:** `.superpowers/sdd/phase-2/progress.md` (created at branch cut).
+
+Phase 2 = **retire the desktop UI**: 2.0 scope lock (`ecc:code-explorer` inventory +
+`ecc:architect` structural rulings + CI-transformation design) → 2.1 lift the 8 Qt-free
+stranded modules (D5) → 2.2 extract `uadas_core/models/` (D1, cuts the `services↔ai` cycle) →
+2.3 top-level `bootstrap.py` + `layers` contract (D2) → 2.4 mine remaining assets to committed
+data files → 2.5 `git rm` `src/ui/` + `tests/ui/` + Qt entry paths + Qt deps → 2.6 CI
+transformation (Linux single-invocation `test` job; delete `run_tests_and_exit_cleanly.py`) →
+2.7 D4 persistence-atomicity follow-up (optional) → 2.8 doc + `.claude/` tooling sync → one PR
+`phase-2/retire-desktop-ui → main`. `ecc:refactor-cleaner` / `ecc:code-simplifier` are
+**in-scope** now (deletion work). Screenshot parity retires at 2.5 (no runnable app until
+Phase 4 — deliberate, A11).
 
 ---
 
