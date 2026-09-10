@@ -20,3 +20,20 @@ forbidden_modules =
     PyQt6
     django
 allow_indirect_imports = False
+
+# Phase 1.7: uadas_core.provenance is a read-only *view* over the orchestrator's
+# AnalysisLog set (it imports uadas_core.services / .analysis / .core). Those
+# layers, and the peer subsystems, must never import it back -- keep the
+# dependency one-directional so the reshape layer stays swappable.
+[importlinter:contract:provenance-is-a-leaf]
+name = uadas_core core/analysis/services/persistence/jobs must not import uadas_core.provenance
+type = forbidden
+source_modules =
+    uadas_core.core
+    uadas_core.analysis
+    uadas_core.services
+    uadas_core.persistence
+    uadas_core.jobs
+forbidden_modules =
+    uadas_core.provenance
+allow_indirect_imports = False

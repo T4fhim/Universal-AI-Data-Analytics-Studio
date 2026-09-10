@@ -24,16 +24,18 @@ Three elements (spec §1 + §R0.4 CHANGE 3):
 ``"new_dataset_id" in entry.outputs`` — never the ``stage``. An ANALYZE stage
 that happened to drop duplicates is still an edge; an EXPLAIN stage never is.
 
-:func:`_reject_dataset_id_cycles` is a deliberate sibling of
+:func:`_reject_dataset_id_cycles` is a sibling of
 :func:`uadas_core.services.workspace_service._reject_parent_cycles` and
 :func:`uadas_core.persistence.persistence_service._reject_parent_dataset_id_cycles`:
 same per-start visited-set walk, same "dangling parent is a clean stop, a
 revisited id is a :class:`~uadas_core.core.exceptions.ServiceError`" rule. The
-three are kept separate rather than shared because each guards a different
-data structure at a different boundary (a ``Dataset`` list on workspace
-restore, a ``Dataset`` map on project load, a ``{child: parent}`` link map
-built from *both* metadata and edges here) — cross-importing would couple
-three layers to force one signature to fit all of them.
+three are **not yet** unified — deferred debt (the architect flagged a merge
+into a shared ``uadas_core/core/validation.py`` after 1.6, once the pattern had
+proven stable). This copy's ``Mapping[str, str | None]`` link-map parameter is
+the intended common signature: ``workspace_service`` and
+``persistence_service`` each build exactly that map inline before their own
+walk. Unifying now would touch ``services/`` and ``persistence/`` — out of
+scope for this additive step.
 """
 
 from __future__ import annotations
@@ -43,7 +45,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from uadas_core.core.exceptions import ServiceError
-from uadas_core.services.analysis_orchestrator_service import AnalysisLog
+from uadas_core.services.analysis_orchestrator_service import (
+    AnalysisLog,
+    AnalysisLogEntry,
+)
 
 
 @dataclass(frozen=True)
@@ -140,7 +145,7 @@ class Dag:
         ]
 
 
-def _is_clean_entry(entry: Any) -> bool:
+def _is_clean_entry(entry: AnalysisLogEntry) -> bool:
     """``True`` iff this entry produced a derived dataset — the one edge predicate.
 
     Keyed on ``"new_dataset_id" in entry.outputs``, never on ``entry.stage``:

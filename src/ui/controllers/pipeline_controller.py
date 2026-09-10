@@ -363,12 +363,31 @@ class PipelineController:
         project is reopened in a fresh session.
         """
         recorded = self._project_service.get_recorded_analysis_logs(project)
+        restored = 0
         for dataset_id, log_dict in recorded.items():
-            self._orchestrator_service.load_log(AnalysisLog.from_dict(log_dict))
-        if recorded:
+            # Web-transition 1.7 made AnalysisLogEntry.from_dict reject a
+            # non-ISO-8601 timestamp with ServiceError. A hand-edited or
+            # partially-corrupt project file must still open (the rest of its
+            # state is fine) -- drop the unreadable log with a warning rather
+            # than aborting the whole open, matching the workspace model's
+            # "an orphaned reference is expected state, not corruption to guard
+            # against" stance.
+            try:
+                self._orchestrator_service.load_log(AnalysisLog.from_dict(log_dict))
+            except ServiceError as exc:
+                _logger.warning(
+                    "Skipped an unreadable analysis log for dataset %s in "
+                    "project '%s': %s",
+                    dataset_id,
+                    project.name,
+                    exc,
+                )
+                continue
+            restored += 1
+        if restored:
             _logger.info(
                 "Restored %d analysis log(s) from project '%s'.",
-                len(recorded),
+                restored,
                 project.name,
             )
         if self._on_changed is not None:

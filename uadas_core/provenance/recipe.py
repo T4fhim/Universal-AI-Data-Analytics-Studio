@@ -18,20 +18,31 @@ chain on replay, re-minting the dataset ids the ``outputs`` used to carry.
 ``RecipeStep.timestamp`` is provenance-of-origin — *when the original step
 ran* — not a replay clock; nothing in replay reads it.
 
-Scope for 1.7 (spec §5): linear chains only (a forest raises), deterministic
-tools only, no partial replay, and ``source_dataset.schema`` is left ``{}``
-(it needs a live DataFrame — Phase 3). Recipe *disk* persistence is also
-Phase 3; 1.7 ships the in-memory converters plus ``to_dict`` / ``from_dict``.
+Scope for 1.7 (spec §5): **linear chains only** — :func:`_creation_order` raises
+if the log set is a forest (>1 root), fans out (a log with >1 dataset-producing
+entry, e.g. a clean stage re-run with different params), or is disconnected /
+cyclic (fewer logs reachable from the root than exist). Deterministic tools
+only, no partial replay, and ``source_dataset.schema`` is left ``{}`` (it needs
+a live DataFrame — Phase 3). Recipe *disk* persistence is also Phase 3; 1.7
+ships the in-memory converters plus ``to_dict`` / ``from_dict``.
+
+Note: which dataset each entry *ran against* is **not** preserved through a
+Recipe round-trip — :func:`recipe_to_analysis_logs` normalizes the chain,
+re-partitioning entries into per-dataset logs at each producing step. The C-2
+contract (spec §3.3) compares the flattened creation-order entry *sequence*,
+not the log grouping.
 """
 
 from __future__ import annotations
 
+import datetime
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
 from uadas_core.core.exceptions import ServiceError
-from uadas_core.provenance.dag import analysis_logs_to_dag
+from uadas_core.provenance.dag import DatasetMeta
 from uadas_core.services.analysis_orchestrator_service import (
     AnalysisLog,
     AnalysisLogEntry,
@@ -87,15 +98,32 @@ class RecipeStep:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> RecipeStep:
+        """Rebuild a step, validating the timestamp the same way :class:`AnalysisLogEntry` does.
+
+        ``recipe_to_analysis_logs`` constructs :class:`AnalysisLogEntry` objects
+        *directly* from these steps (not via ``AnalysisLogEntry.from_dict``), so
+        a malformed ``timestamp`` in a Recipe payload would otherwise ride
+        straight into the rebuilt log chain — the exact silent path the 1.7
+        timestamp validation exists to close. ``produces_dataset`` is a required
+        key (``to_dict`` always writes it); a missing one would silently collapse
+        a derived-dataset boundary on replay.
+        """
+        timestamp = data["timestamp"]
+        try:
+            datetime.datetime.fromisoformat(timestamp)
+        except (TypeError, ValueError) as exc:
+            raise ServiceError(
+                f"RecipeStep.timestamp is not an ISO-8601 string: {timestamp!r}"
+            ) from exc
         return cls(
             id=data["id"],
             label=data.get("label", ""),
             stage=data["stage"],
             tool_name=data.get("tool_name"),
             inputs=dict(data.get("inputs", {})),
-            produces_dataset=bool(data.get("produces_dataset", False)),
+            produces_dataset=bool(data["produces_dataset"]),
             explanation=data.get("explanation"),
-            timestamp=data["timestamp"],
+            timestamp=timestamp,
         )
 
 
@@ -130,13 +158,23 @@ class Recipe:
 
 
 def _creation_order(logs: list[AnalysisLog]) -> list[AnalysisLog]:
-    """Root-first linear chain of logs, following each CLEAN's ``new_dataset_id``.
+    """Root-first linear chain of logs, following each producing entry's ``new_dataset_id``.
 
     The root is the one log whose ``dataset_id`` is never another entry's
-    ``new_dataset_id``. More than one root → a forest, which is out of scope
-    for 1.7 (spec §5) → :class:`ServiceError`. A ``new_dataset_id`` with no
-    matching log (the derived dataset was never worked on) is a clean stop,
-    mirroring the DAG's dangling-reference tolerance.
+    ``new_dataset_id``. A ``new_dataset_id`` with no matching log (the derived
+    dataset was never worked on) is a clean stop, mirroring the DAG's
+    dangling-reference tolerance.
+
+    1.7 handles **linear chains only** (spec §5); every non-linear shape raises
+    :class:`ServiceError`:
+
+    * ``!= 1`` root → an empty set or a forest.
+    * any log with ``> 1`` dataset-producing entry → a fan-out (a clean stage
+      re-run with different params branches the lineage). The single-root check
+      misses this — the log is still the sole root.
+    * ``len(ordered) != len(logs)`` after the walk → a disconnected log
+      (unreachable from the root) or a cycle among log ids (the walk stops early
+      on the visited-set guard).
     """
     produced = {
         e.outputs["new_dataset_id"]
@@ -150,6 +188,16 @@ def _creation_order(logs: list[AnalysisLog]) -> list[AnalysisLog]:
             f"analysis_logs_to_recipe expects a single root log, found {len(roots)} "
             "(recipe branching is out of scope for Phase 1.7)"
         )
+    fan_out = [
+        log.dataset_id
+        for log in logs
+        if sum("new_dataset_id" in e.outputs for e in log.entries) > 1
+    ]
+    if fan_out:
+        raise ServiceError(
+            f"log(s) {fan_out} each produced more than one dataset — recipe "
+            "branching is out of scope for Phase 1.7 (linear chains only)"
+        )
     by_id = {log.dataset_id: log for log in logs}
     ordered: list[AnalysisLog] = []
     current: AnalysisLog | None = roots[0]
@@ -162,32 +210,42 @@ def _creation_order(logs: list[AnalysisLog]) -> list[AnalysisLog]:
             if "new_dataset_id" in e.outputs:
                 nxt = by_id.get(e.outputs["new_dataset_id"])
         current = nxt
+    if len(ordered) != len(logs):
+        raise ServiceError(
+            f"analysis log set is not a single linear chain "
+            f"({len(ordered)} of {len(logs)} logs reachable from the root) — "
+            "a disconnected or cyclic log set is out of scope for Phase 1.7"
+        )
     return ordered
 
 
 def analysis_logs_to_recipe(
-    logs: list[AnalysisLog], *, name: str = "", description: str = ""
+    logs: list[AnalysisLog],
+    datasets: Mapping[str, DatasetMeta] | None = None,
+    *,
+    name: str = "",
+    description: str = "",
 ) -> Recipe:
     """Flatten a root→derived :class:`AnalysisLog` chain into a :class:`Recipe`.
 
     One :class:`RecipeStep` per log entry, in creation order;
     ``produces_dataset`` is ``"new_dataset_id" in entry.outputs`` (the same
-    single predicate the DAG uses). ``source_dataset`` carries the root
-    dataset's shape from the DAG's root node — ``schema`` stays ``{}`` (it
-    needs a live DataFrame, out of scope for 1.7).
+    single predicate the DAG uses).
+
+    :param datasets: Optional :class:`DatasetMeta` by id. When it holds the
+        root's id, ``source_dataset`` carries that dataset's real shape;
+        otherwise ``source_dataset`` is ``partial`` with ``None`` fields — the
+        converter has no DataFrame of its own to measure. ``schema`` is always
+        ``{}`` (it needs a live DataFrame — Phase 3).
     """
     ordered = _creation_order(list(logs))
-    # Build the DAG purely to reuse its root-node resolution — Recipe *is*
-    # "the DAG minus data", so the source-dataset facts come from the same
-    # place. datasets={} → the root meta is ``partial`` (all None) until a
-    # live dataset is available; that is honest, not a gap to paper over.
-    dag = analysis_logs_to_dag(ordered, {})
-    root_meta = dag.roots()[0].meta
+    root_meta = (datasets or {}).get(ordered[0].dataset_id)
     source_dataset: dict[str, Any] = {
-        "name": root_meta.name,
-        "row_count": root_meta.row_count,
-        "column_count": root_meta.column_count,
-        "source_format": root_meta.source_format,
+        "name": root_meta.name if root_meta else None,
+        "row_count": root_meta.row_count if root_meta else None,
+        "column_count": root_meta.column_count if root_meta else None,
+        "source_format": root_meta.source_format if root_meta else None,
+        "partial": root_meta.partial if root_meta else True,
         "schema": {},
     }
 
@@ -232,6 +290,12 @@ def recipe_to_analysis_logs(
     logs: list[AnalysisLog] = [root]
     current = root
     for step in recipe.steps:
+        try:
+            stage = PipelineStage(step.stage)
+        except ValueError as exc:
+            raise ServiceError(
+                f"Recipe step {step.id!r} has an unknown pipeline stage: {step.stage!r}"
+            ) from exc
         outputs: dict[str, Any] = {}
         minted: str | None = None
         if step.produces_dataset:
@@ -239,7 +303,7 @@ def recipe_to_analysis_logs(
             outputs = {"new_dataset_id": minted}
         current.entries.append(
             AnalysisLogEntry(
-                stage=PipelineStage(step.stage),
+                stage=stage,
                 tool_name=step.tool_name,
                 inputs=dict(step.inputs),
                 outputs=outputs,

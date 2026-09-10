@@ -215,6 +215,59 @@ def test_restore_logs_for_project_installs_logs_into_the_orchestrator(
     assert restored_log.entries[0].stage == PipelineStage.UNDERSTAND
 
 
+def test_restore_logs_skips_an_unreadable_log_and_still_opens_the_project(
+    qapp: QApplication,
+) -> None:
+    # Web-transition 1.7 gave AnalysisLogEntry.from_dict a hard ISO-8601 timestamp
+    # check. A pre-1.7 or hand-edited project file with a bad timestamp must still
+    # open -- the bad log is dropped with a warning, the good logs restore.
+    controller, workspace_service, orchestrator_service, project_service = (
+        _make_controller(qapp)
+    )
+    good = _make_dataset()
+    workspace_service.add_dataset(good)
+    orchestrator_service.run_stage(
+        good.dataset_id, PipelineStage.UNDERSTAND, tool_name="profile_dataset"
+    )
+    project = project_service.new_project("Test Project")
+    controller.persist_all_logs(project)
+    project_service.record_analysis_log(
+        project,
+        "corrupt-dataset",
+        {
+            "dataset_id": "corrupt-dataset",
+            "entries": [
+                {
+                    "stage": "understand",
+                    "tool_name": "profile_dataset",
+                    "inputs": {},
+                    "outputs": {},
+                    "explanation": None,
+                    "timestamp": "not-a-real-timestamp",
+                }
+            ],
+        },
+    )
+
+    fresh_orchestrator = AnalysisOrchestratorService(workspace_service)
+    fresh_controller = PipelineController(
+        controller._parent,
+        workspace_service,
+        fresh_orchestrator,
+        project_service,
+        controller._dock_manager,
+        controller._status_bar,
+        controller._state_bus,
+        controller._worker_runner,
+        controller._command_stack,
+    )
+
+    fresh_controller.restore_logs_for_project(project)  # must NOT raise
+
+    assert len(fresh_orchestrator.get_log(good.dataset_id).entries) == 1
+    assert fresh_orchestrator.get_log("corrupt-dataset").entries == []
+
+
 def test_round_trip_through_a_real_project_file_preserves_the_analysis_log(
     qapp: QApplication, tmp_path
 ) -> None:
