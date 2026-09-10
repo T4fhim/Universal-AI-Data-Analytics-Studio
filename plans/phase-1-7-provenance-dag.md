@@ -3,9 +3,18 @@
 **Status:** R0.4 design doc · produced 2026-09-07 (repo `architect`) · **R0.4 sign-off 2026-09-08
 by `ecc:architect` (opus, NOT the author — the prior "architect APPROVE" was self-review, an A3
 violation): APPROVE-WITH-CHANGES.** The core shape (dataset-node / transform-edge / Recipe =
-DAG-minus-data) is right and serves F2/F3. **Six changes below, two blocking, must land in this
-doc before the C-2 prototype is written.** 1.7 is last in Part D order, so this does not block
-1.3/1.4/1.6.
+DAG-minus-data) is right and serves F2/F3. **Six changes below, two blocking.** 1.7 is last in
+Part D order, so this did not block 1.3/1.4/1.6.
+
+**2026-09-10 — the six §R0.4 changes folded into the body, then a second fold after the
+`ecc:architect` (opus) re-check** (verdict: *shape sound, no model rework*; 5 local fixes):
+the CHANGE 4 rationale + citations were wrong (`_summarize_result` normalizes `Dataset`/`Figure`
+returns; the unsound path is `analysis_orchestrator_service.py:434`, not `tool_registry.py`);
+§3.1's `null_counts` was still fabricated (real `profile_dataset` output has no such key); §4's
+F10 row contradicted CHANGE 4; the §3.3 test can't sort by id after id-minting; edge/artifact
+must key on one predicate (`"new_dataset_id" in outputs`), not on `stage`. All applied below.
+The §R0.4 section is kept verbatim as the audit trail. **Implementation-ready** — proceed to the
+C-2 prototype.
 
 ---
 
@@ -96,44 +105,94 @@ Canonical: `AnalysisLogEntry` `@dataclass` `uadas_core/services/analysis_orchest
 (`to_dict`:214, `from_dict`:221); `Explanation` `@dataclass` `uadas_core/analysis/explanation.py:29`
 (`to_dict`:76, **no `from_dict`**).
 
-**Purpose.** Reshape the flat per-dataset `AnalysisLog` into a lineage DAG, and define a
-portable **Recipe** (the DAG minus the data) that can be replayed on a fresh dataset. This is
-the substrate Phase 5's transparency features (F1–F3, F10) build on. Additive: a layer
-*alongside* `AnalysisOrchestratorService`, changing nothing for existing callers.
+**Purpose.** Reshape the *set* of flat per-dataset `AnalysisLog`s into one lineage DAG, and
+define a portable **Recipe** (the DAG minus the data) that replays on a fresh dataset. This is
+the substrate Phase 5's transparency features (F1–F3, F10) build on. Additive: a new
+`uadas_core/provenance/` package *alongside* `AnalysisOrchestratorService`, changing nothing for
+existing callers.
 
-Field sources: `AnalysisLogEntry` `src/services/analysis_orchestrator_service.py:157-162`;
-`AnalysisLog.to_dict()` / `from_dict()` around lines 170-214; `Explanation`
-`src/analysis/explanation.py:76-93`.
+Canonical field sources (current tree, verified 2026-09-10):
+`AnalysisLogEntry` `@dataclass` `uadas_core/services/analysis_orchestrator_service.py:138`
+(`to_dict` `:168`, `from_dict` `:179` — keeps `explanation` as a plain dict);
+`AnalysisLog` `:190` (`to_dict` `:214`, `from_dict` `:221`);
+`AnalysisOrchestratorService._logs: dict[str, AnalysisLog]` `:246`;
+`Explanation` `@dataclass` `uadas_core/analysis/explanation.py:29` (`to_dict` `:76`,
+**no `from_dict`** — class body ends `:93`; 1.7 adds it).
 
 ---
 
-## 1. DAG node / edge model
+## 1. DAG model — three elements
 
-- **Node = a dataset** (`dataset_id`). Carries `name`, `row_count`, `column_count`,
-  `source_format`, and `parent_dataset_id` (root node has none).
-- **Edge = a transformation** that produced one dataset from another. Carries `from_dataset_id`,
-  `to_dataset_id`, `tool_name`, `inputs` (the tool kwargs), `stage` (`PipelineStage`),
-  `explanation` (optional), `timestamp`.
+```python
+def analysis_logs_to_dag(
+    logs: Iterable[AnalysisLog],
+    datasets: Mapping[str, DatasetMeta],
+) -> Dag: ...
+```
 
-### Reshaping from `AnalysisLogEntry`
+**The source is a set of per-dataset logs, not one** (BLOCKING 1). `_logs: dict[str,
+AnalysisLog]` (`analysis_orchestrator_service.py:246`) holds one log per dataset. A CLEAN entry
+lands in the **parent** dataset's log with `outputs["new_dataset_id"]` set (`:418-421`); every
+non-CLEAN entry, and all work on a derived dataset, lands in *that* dataset's log.
+`reproduce()` switches `current_dataset_id` after each CLEAN (`:488-489`). Persistence agrees:
+`project.contents["analysis_logs"]` is `{dataset_id: log_dict}` (`project_service.py`). So an
+edge's `from_dataset_id` is the **enclosing log's** `dataset_id` — *not* recoverable from the
+entry alone — and `to_dataset_id` is `entry.outputs["new_dataset_id"]`.
 
-The DAG is a *view* of the log, not a parallel source of truth. Rule:
+The DAG is a *view* over the logs, not a parallel source of truth.
 
-| Log entry | Becomes |
-|---|---|
-| entry whose `outputs` contains `new_dataset_id` (CLEAN-type) | an **edge** `parent → new_dataset_id` |
-| entry with no `new_dataset_id` (UNDERSTAND / ANALYZE / VISUALIZE — statistics only) | an **annotation** on the current node, not an edge |
+| Element | Identity | Carries | Built from |
+|---|---|---|---|
+| **dataset node** | `dataset_id` | `name`, `row_count`, `column_count`, `source_format`, `parent_dataset_id` (root: `None`) | the `datasets` mapping — one `DatasetMeta` per id any log references |
+| **transform edge** | `(from_dataset_id, to_dataset_id)` | `from_dataset_id` (enclosing log id), `to_dataset_id`, `tool_name`, `inputs` (tool kwargs), `stage` (`PipelineStage`), `explanation` (opt), `timestamp`, **`outputs` verbatim** | an entry with `"new_dataset_id" in entry.outputs` |
+| **artifact node** | `(dataset_id, entry_index)` (positional — §5) | `stage`, `tool_name`, `timestamp`; `visualization_id = entry.outputs.get("visualization_id")` | an entry **without** `new_dataset_id` in `outputs` — hangs off its dataset node, no edge |
 
-`AnalysisLogEntry.outputs` is a JSON-friendly summary (line 160, `dict[str, Any]`); for CLEAN
-stages it carries `new_dataset_id` + `derivation_description` (matches
-`Dataset.derivation_description`).
+**One predicate, per entry** (opus fix): `"new_dataset_id" in entry.outputs` → transform edge;
+else → artifact node. Keyed on `outputs`, **never on `stage`** — `run_stage` does not constrain
+the stage↔tool pairing (the work is "entirely determined by `tool_name`"), so an ANALYZE entry
+that ran a cleaning tool still yields an edge, and a CLEAN entry that ran `profile_dataset` is an
+artifact. `_summarize_result` (`analysis_orchestrator_service.py:416-421`) is what puts
+`new_dataset_id` there.
+
+**Why the artifact node** (CHANGE 3): F1 wants "every dataset, transform, **test, chart and
+forecast** … an inspectable node; click any node"; F9 wants comment-on-a-step. Without it a
+t-test or a chart has no identity. ~15 lines, zero Recipe impact (the Recipe's `steps[]` already
+enumerate non-edge operations).
+
+**`outputs` retained in the DAG** (CHANGE 4, opus-corrected): `AnalysisLogEntry.outputs` is
+already a JSON-friendly *summary* — `_summarize_result` (`analysis_orchestrator_service.py:404-434`)
+normalizes a `Dataset` return to `{new_dataset_id, derivation_description}` (`:416-421`) and a
+`go.Figure` to `{visualization_id}` (`:422-431`); a dict handler passes through (`:432-433`). The
+**DAG is a client-side assembly** that keeps each edge's `outputs` verbatim, so a viewer can
+inspect the transform's own result summary. The **Recipe** drops `outputs` (§2) — they are a
+function of the data and `reproduce()` regenerates them on replay. Note: "see the data as it
+was" (F1) comes from the **retained intermediate `Dataset`** (the non-mutating-Dataset rule, F3),
+not from `outputs`.
+
+**DAG vs Recipe on the server** (F10): the server stores the **Recipe** and the DAG
+**topology** — nodes + edges *without* `outputs`; DataFrames and result payloads never leave the
+browser. An unqualified "DAG with `outputs`" is a client-only object.
+
+**Dangling reference** (mirrors `WorkspaceService.get_lineage` `:403-405` / the 1.6 cycle
+checks): an edge `to`/`from` id, or a `parent_dataset_id`, absent from `datasets` → synthesize
+the node `name=None`, `partial=True`; never raise. A cycle in the assembled
+`{child: parent_dataset_id}` map **or** the edge `{to: from}` map → `ServiceError`
+(loader-boundary only, same rule as 1.6). **When `DatasetMeta.parent_dataset_id` disagrees with
+an edge's `from_dataset_id` for the same child, the edge wins** — `parent_dataset_id` is
+metadata; the transform edge is the observed lineage.
 
 ---
 
 ## 2. Recipe format (DAG minus data)
 
-Portable JSON: structure + operations + params, **no DataFrames**, so it replays on a new
-dataset with a compatible schema.
+Portable JSON: structure + operations + params, **no DataFrames and no `outputs`**, so it
+replays on a new dataset with a compatible schema. The DAG keeps `outputs` (§1); the Recipe is
+the only place they are dropped — `AnalysisOrchestratorService.reproduce()` regenerates them on
+replay, and F10 keeps result payloads + data client-side.
+
+`steps[].id` is **positional** (`"s1"`, `"s2"`) in 1.7. Content-derived ids (stable across
+re-export, needed once Phase 3 stores step-anchored F9 comments server-side) are out of scope —
+see §5.
 
 ```json
 {
@@ -169,50 +228,86 @@ dataset with a compatible schema.
 
 ## 3. Worked round-trip (the C-2 test — must pass on *every* real `AnalysisLog` fixture)
 
-### 3.1 Real `AnalysisLog.to_dict()` payload (UNDERSTAND → CLEAN → ANALYZE)
+### 3.1 Real payload — a **two-log** set (BLOCKING 2)
+
+`run_stage` writes the post-clean `profile_dataset` into the *derived* dataset's log, never the
+parent's. So a realistic `_logs` snapshot after "profile → drop nulls → profile again" is two
+logs, `[understand, clean]` on the root and `[analyze]` on the derived dataset:
+
+`profile_dataset`'s real return (via `_summarize_result`'s dict passthrough) is
+`{row_count, column_count, duplicate_row_count, ambiguous_type_columns, columns: [...]}` — **no
+`null_counts` key** (an earlier draft invented one). A `drop_missing_values` CLEAN entry returns
+a `Dataset`, which `_summarize_result` normalizes to `{new_dataset_id, derivation_description}`.
 
 ```json
 {
-  "dataset_id": "550e8400-e29b-41d4-a716-446655440000",
-  "entries": [
-    { "stage": "understand", "tool_name": "profile_dataset", "inputs": {},
-      "outputs": { "row_count": 5, "column_count": 2, "null_counts": {"region": 1, "revenue": 1} },
-      "explanation": null, "timestamp": "2026-09-07T14:32:15Z" },
-    { "stage": "clean", "tool_name": "drop_missing_values", "inputs": {},
-      "outputs": { "new_dataset_id": "d3a8f2c1-9e4b-4a7c-b1c2-3f5e7a9b2d1c",
-                   "derivation_description": "Removed 2 rows with any null values" },
-      "explanation": null, "timestamp": "2026-09-07T14:32:20Z" },
-    { "stage": "analyze", "tool_name": "profile_dataset", "inputs": {},
-      "outputs": { "row_count": 3, "column_count": 2, "null_counts": {} },
-      "explanation": null, "timestamp": "2026-09-07T14:32:25Z" }
-  ]
+  "550e8400-e29b-41d4-a716-446655440000": {
+    "dataset_id": "550e8400-e29b-41d4-a716-446655440000",
+    "entries": [
+      { "stage": "understand", "tool_name": "profile_dataset", "inputs": {},
+        "outputs": { "row_count": 5, "column_count": 2, "duplicate_row_count": 0,
+                     "ambiguous_type_columns": [], "columns": ["region", "revenue"] },
+        "explanation": null, "timestamp": "2026-09-07T14:32:15Z" },
+      { "stage": "clean", "tool_name": "drop_missing_values", "inputs": {},
+        "outputs": { "new_dataset_id": "d3a8f2c1-9e4b-4a7c-b1c2-3f5e7a9b2d1c",
+                     "derivation_description": "Removed 2 rows with any null values" },
+        "explanation": null, "timestamp": "2026-09-07T14:32:20Z" }
+    ]
+  },
+  "d3a8f2c1-9e4b-4a7c-b1c2-3f5e7a9b2d1c": {
+    "dataset_id": "d3a8f2c1-9e4b-4a7c-b1c2-3f5e7a9b2d1c",
+    "entries": [
+      { "stage": "analyze", "tool_name": "profile_dataset", "inputs": {},
+        "outputs": { "row_count": 3, "column_count": 2, "duplicate_row_count": 0,
+                     "ambiguous_type_columns": [], "columns": ["region", "revenue"] },
+        "explanation": null, "timestamp": "2026-09-07T14:32:25Z" }
+    ]
+  }
 }
 ```
 
+`analysis_logs_to_dag` is fed **both** logs (plus a `datasets` mapping with a `DatasetMeta` for
+each id). C-2 must include ≥1 multi-log fixture — a single-log input never exercises the
+cross-log edge, which is the case that actually occurs. **The C-2 catalog builds these payloads
+with real tool-output shapes, not hand-invented keys** (living-truth).
+
 ### 3.2 → DAG
 
-- nodes: `550e8400…` (5×2, root) ; `d3a8f2c1…` (3×2, parent = `550e8400…`)
-- edges: `550e8400… → d3a8f2c1…` (`drop_missing_values`, stage `clean`, ts `…20Z`)
-- the two `profile_dataset` entries → annotations on their respective nodes (no edge)
+- **dataset nodes:** `550e8400…` (5×2, root) ; `d3a8f2c1…` (3×2, `parent_dataset_id=550e8400…`)
+- **transform edge:** `550e8400… → d3a8f2c1…` — `drop_missing_values`, stage `clean`, ts `…20Z`,
+  `outputs={new_dataset_id, derivation_description}` retained verbatim
+- **artifact nodes:** `(550e8400…, 0)` UNDERSTAND `profile_dataset` ; `(d3a8f2c1…, 0)` ANALYZE
+  `profile_dataset` — one per entry without `new_dataset_id` in `outputs`, no edge
 
 ### 3.3 → Recipe → back to `AnalysisLog`
 
+Compare in **creation order** (root chain first, then each derived log in the order its CLEAN
+step produced it) — *not* an id sort: `recipe_to_analysis_logs` mints fresh derived ids, so the
+ids differ by construction. Assert list lengths explicitly before zipping — a bare `zip`
+silently truncates on a count mismatch.
+
 ```python
 def test_every_analysis_log_fixture_round_trips_through_recipe():
-    for log in ALL_ANALYSIS_LOG_FIXTURES:                 # every fixture in the suite
-        recipe = analysis_log_to_recipe(log)
-        log2   = recipe_to_analysis_log(recipe.to_dict(), new_root_dataset_id="new-root")
+    for logs in ALL_ANALYSIS_LOG_FIXTURES:               # each fixture = a set of logs (§R0.4 B1)
+        recipe = analysis_logs_to_recipe(logs)
+        logs2  = recipe_to_analysis_logs(recipe.to_dict(), new_root_dataset_id="new-root")
 
-        e1, e2 = log.to_dict()["entries"], log2.to_dict()["entries"]
-        assert len(e1) == len(e2)
+        e1 = [e for log in _creation_order(logs)  for e in log.entries]
+        e2 = [e for log in _creation_order(logs2) for e in log.entries]
+        assert len(e1) == len(e2)                          # never rely on zip() to catch this
         for a, b in zip(e1, e2):
-            assert b["stage"]       == a["stage"]
-            assert b["tool_name"]   == a["tool_name"]
-            assert b["inputs"]      == a["inputs"]
-            assert b["explanation"] == a["explanation"]   # round-trips via JSON
-            assert b["timestamp"]   == a["timestamp"]
+            assert b.stage       == a.stage
+            assert b.tool_name   == a.tool_name
+            assert b.inputs      == a.inputs
+            assert b.explanation == a.explanation          # plain dict, round-trips via JSON
+            assert b.timestamp   == a.timestamp            # provenance-of-origin, not a replay clock
             # outputs (incl. new_dataset_id) are RE-DERIVED on replay — not compared
+        assert json.dumps([log.to_dict() for log in logs2])   # CHANGE 5 — outputs JSON-serializable
 ```
+
+`_creation_order(logs)` = the root log (its `dataset_id` never appears as a `new_dataset_id`),
+then follow each CLEAN entry's `new_dataset_id` to the next log. For the empty fixture it is the
+single empty log; for a forest (>1 root) it raises — out of 1.7 scope (§5).
 
 **If any real fixture fails this, the Recipe shape is wrong — stop and return to R0.4.**
 `outputs` is deliberately not preserved in the Recipe (it is a function of the data);
@@ -227,7 +322,7 @@ def test_every_analysis_log_fixture_round_trips_through_recipe():
 | **F1 Provenance graph** | DAG nodes/edges — click a node for its data/metadata, an edge for the transform |
 | **F2 Replayable recipes** | Recipe (structure + ops, no data) → re-point at a new dataset → `reproduce()` |
 | **F3 Time-travel & fork** | DAG + the non-mutating-Dataset rule — every intermediate dataset still exists, so a what-if can branch from any node |
-| **F10 Local-first privacy** | server stores only Recipe/DAG; the data never leaves the browser (DuckDB-WASM + Pyodide execute the Recipe client-side) |
+| **F10 Local-first privacy** | server stores the **Recipe + DAG topology** (nodes + edges, *no* `outputs`, no data); DataFrames and result payloads stay in the browser (DuckDB-WASM + Pyodide execute the Recipe client-side) |
 
 ---
 
@@ -236,7 +331,10 @@ def test_every_analysis_log_fixture_round_trips_through_recipe():
 DAG UI rendering (Phase 4/5) · branch / merge of recipes (linear only here) ·
 non-deterministic tools (a recipe assumes `tool(df, **inputs)` is deterministic; RNG seed must
 be *in* `inputs`) · partial replay / "from step N" · tool-version pinning · result caching on
-replay · streaming outputs. Rejected in review if present.
+replay · streaming outputs · **content-derived ids** — `steps[].id` (`"s1"`/`"s2"`) *and*
+`ArtifactNode` identity (`(dataset_id, entry_index)`) are positional in 1.7; stable-across-
+re-export ids for F9 server-side comment anchoring land with Phase 3 · **Recipe disk
+persistence** (Phase 3 — see Multi-file touchpoints). Rejected in review if present.
 
 ---
 
@@ -247,8 +345,13 @@ replay · streaming outputs. Rejected in review if present.
   one and prove `Explanation(**e.to_dict()) == e`. Not covered by the current suite.
 - `AnalysisLogEntry.timestamp` is written as `datetime.now(UTC).isoformat()` (~line 351) but
   not validated on `from_dict`; a non-ISO string would pass silently. 1.7 should validate.
-- All tool `outputs` are JSON-serializable — true for current tools (`_summarize_result` wraps
-  non-dicts), not formally enforced.
+- All entry `outputs` are JSON-serializable — `_summarize_result`
+  (`analysis_orchestrator_service.py:404-434`) normalizes a `Dataset` return to
+  `{new_dataset_id, derivation_description}` and a `go.Figure` to `{visualization_id}`; a dict
+  handler passes through. The one unsound path is the `return {"result": result}` fallback at
+  **`analysis_orchestrator_service.py:434`** — reached only if a future tool returns a value that
+  is not a dict, a `Dataset`, or a `Figure`. C-2's `json.dumps(...)` assertion (§3.3) makes that
+  trip the test instead of failing silently on Recipe export.
 - `str(df[col].dtype)` for the schema map works for standard dtypes; pandas extension dtypes
   (`StringDtype`, `CategoricalDtype`) untested — implementation must degrade gracefully.
 - Recipe `version` is fixed at `"1.0"`; no migration path defined (Phase 3 adds one).
@@ -257,8 +360,25 @@ replay · streaming outputs. Rejected in review if present.
 
 ## Multi-file touchpoints
 
-`uadas_core/services/analysis_orchestrator_service.py` (add converter entry points, no
-dataclass change) · `uadas_core/analysis/explanation.py` (add `from_dict()`) · **new**
-`uadas_core/provenance/dag.py` + `uadas_core/provenance/recipe.py` ·
-`tests/provenance/test_recipe.py` (C-2, every fixture) · `project_service` persists recipes
-beside logs (1.6 owns AnalysisLog persistence; 1.7 adds Recipe export/import).
+- **new** `uadas_core/provenance/__init__.py` · `uadas_core/provenance/dag.py` (`Dag`,
+  `DatasetMeta`, `analysis_logs_to_dag`) · `uadas_core/provenance/recipe.py` (`Recipe`,
+  `analysis_logs_to_recipe`, `recipe_to_analysis_logs`).
+- `uadas_core/analysis/explanation.py` — add `Explanation.from_dict()` + prove
+  `Explanation(**e.to_dict()) == e`; validate a non-ISO `timestamp` is rejected on
+  `AnalysisLogEntry.from_dict` (currently silent — §Unverified).
+- `uadas_core/services/analysis_orchestrator_service.py` — no dataclass change. Adds
+  `get_all_logs() -> list[AnalysisLog]` (**needed**, not optional): the converter already
+  type-hints `AnalysisLog`, so `provenance/ → services/` is an unavoidable edge; `get_all_logs`
+  returns no DAG type so it adds no *reverse* edge, and it beats callers reaching into `_logs`.
+  Relocating the log dataclasses out of `services/` is the real dependency fix — out of 1.7.
+- `tests/provenance/test_recipe.py` — C-2, every `AnalysisLog` shape in the suite (§C-2
+  inventory), incl. ≥1 multi-log fixture and the `json.dumps` assertion.
+- **Recipe disk persistence → deferred to Phase 3** (opus re-check). 1.7 ships
+  `Recipe.to_dict()` / `from_dict()` + the `json.dumps` round-trip (C-2 §3.3 needs them). **No
+  `project_service` change** — a Recipe is a pure function of the `AnalysisLog`s that 1.6
+  already persists; a second stored copy is a stale-state hazard for zero gain.
+- `steps[].timestamp` (and `TransformEdge.timestamp`) is **provenance-of-origin**, not an
+  execution clock — a Recipe-reconstructed log handed to `reproduce()` must not read it as a
+  replay time.
+- **`outputs`-dropping round-trip is a documented behaviour choice** inside an otherwise
+  additive step (pre-flight Part E item 11) — name it in the end-of-range review.
