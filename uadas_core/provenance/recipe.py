@@ -26,12 +26,17 @@ Phase 3; 1.7 ships the in-memory converters plus ``to_dict`` / ``from_dict``.
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.provenance.dag import analysis_logs_to_dag
-from uadas_core.services.analysis_orchestrator_service import AnalysisLog
+from uadas_core.services.analysis_orchestrator_service import (
+    AnalysisLog,
+    AnalysisLogEntry,
+    PipelineStage,
+)
 
 _STEP_LABELS: dict[tuple[str, str | None], str] = {
     ("understand", "profile_dataset"): "Profile the dataset",
@@ -205,3 +210,44 @@ def analysis_logs_to_recipe(
     return Recipe(
         name=name, description=description, source_dataset=source_dataset, steps=steps
     )
+
+
+def recipe_to_analysis_logs(
+    data: dict[str, Any], *, new_root_dataset_id: str
+) -> list[AnalysisLog]:
+    """Replay a :meth:`Recipe.to_dict` payload into an equivalent AnalysisLog chain.
+
+    Walk ``steps`` in order against a fresh root log for
+    ``new_root_dataset_id``. A ``produces_dataset`` step's entry lands in the
+    *current* log with ``outputs = {"new_dataset_id": <fresh uuid4>}`` and
+    opens a new derived log; every other step's entry gets ``outputs = {}``.
+    ``outputs`` is intentionally re-minted rather than carried: it is a
+    function of the data the Recipe deliberately dropped, and
+    :meth:`~uadas_core.services.analysis_orchestrator_service.AnalysisOrchestratorService.reproduce`
+    regenerates the real values when the chain is actually re-executed. An
+    empty ``steps`` list yields a single empty log for the root id.
+    """
+    recipe = Recipe.from_dict(data)
+    root = AnalysisLog(dataset_id=new_root_dataset_id)
+    logs: list[AnalysisLog] = [root]
+    current = root
+    for step in recipe.steps:
+        outputs: dict[str, Any] = {}
+        minted: str | None = None
+        if step.produces_dataset:
+            minted = str(uuid.uuid4())
+            outputs = {"new_dataset_id": minted}
+        current.entries.append(
+            AnalysisLogEntry(
+                stage=PipelineStage(step.stage),
+                tool_name=step.tool_name,
+                inputs=dict(step.inputs),
+                outputs=outputs,
+                explanation=step.explanation,
+                timestamp=step.timestamp,
+            )
+        )
+        if minted is not None:
+            current = AnalysisLog(dataset_id=minted)
+            logs.append(current)
+    return logs

@@ -28,6 +28,7 @@ from uadas_core.provenance.recipe import (
     Recipe,
     RecipeStep,
     analysis_logs_to_recipe,
+    recipe_to_analysis_logs,
 )
 
 __all__ = [
@@ -40,4 +41,5 @@ __all__ = [
     "TransformEdge",
     "analysis_logs_to_dag",
     "analysis_logs_to_recipe",
+    "recipe_to_analysis_logs",
 ]

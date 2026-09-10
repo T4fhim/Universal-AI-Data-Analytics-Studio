@@ -10,7 +10,15 @@ the Task 6 C-2 acceptance gate (`recipe_to_analysis_logs`).
 
 from __future__ import annotations
 
-from uadas_core.provenance.recipe import Recipe, RecipeStep, analysis_logs_to_recipe
+import json
+
+from tests.provenance.conftest import _creation_order
+from uadas_core.provenance.recipe import (
+    Recipe,
+    RecipeStep,
+    analysis_logs_to_recipe,
+    recipe_to_analysis_logs,
+)
 
 
 def test_step_count_equals_total_entries(analysis_log_set):
@@ -41,3 +49,23 @@ def test_clean_steps_marked_produces_dataset(analysis_log_set):
         if "new_dataset_id" in e.outputs
     )
     assert sum(1 for s in r.steps if s.produces_dataset) == n
+
+
+def test_every_analysis_log_fixture_round_trips_through_recipe(analysis_log_set):
+    # The C-2 acceptance gate: every AnalysisLog shape the suite builds must
+    # survive analysis_logs_to_recipe -> recipe_to_analysis_logs. outputs
+    # (incl. new_dataset_id) are re-derived on replay and deliberately not
+    # compared; everything else must match, in creation order.
+    recipe = analysis_logs_to_recipe(analysis_log_set)
+    logs2 = recipe_to_analysis_logs(recipe.to_dict(), new_root_dataset_id="new-root")
+
+    e1 = [e for log in _creation_order(analysis_log_set) for e in log.entries]
+    e2 = [e for log in _creation_order(logs2) for e in log.entries]
+    assert len(e1) == len(e2)  # never rely on zip() to catch a length mismatch
+    for a, b in zip(e1, e2):
+        assert b.stage == a.stage
+        assert b.tool_name == a.tool_name
+        assert b.inputs == a.inputs
+        assert b.explanation == a.explanation  # plain dict, round-trips via JSON
+        assert b.timestamp == a.timestamp
+    assert json.dumps([log.to_dict() for log in logs2])  # outputs JSON-serializable
