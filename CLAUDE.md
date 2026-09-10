@@ -164,7 +164,7 @@ same shape: **stateless, classmethod-only** (never instantiated — mirrors how 
 as classes held in a registry, not objects), with inputs validated before real work happens:
 
 - `uadas_core/readers/base_reader.py` → `BaseReader.can_read()` / `list_tables()` / `read()`. New format readers
-  register in `uadas_core/readers/reader_registry.py`'s `_REGISTERED_READERS` tuple — that's the one place to
+  register in `uadas_core/readers/reader_registry.py`'s `_BUILTIN_READERS` tuple — that's the one place to
   touch when adding a reader.
 - `uadas_core/cleaning/base_operation.py` → `BaseOperation.apply(dataset, **kwargs) -> Dataset`. **Cleaning
   operations never mutate a `Dataset` in place** — always return a new `Dataset` with `parent_dataset_id`
@@ -192,6 +192,13 @@ visualization) are normal, expected state that dependent lookups handle graceful
 guard against. Preserve this non-cascading behavior when extending `WorkspaceService`'s methods. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#workspace-model) for the full `Dataset`/`Visualization`/
 `Dashboard` model.
+
+One deliberate exception at the persistence boundary (web-transition 1.6): `PersistenceService.
+save_workspace` does **not** persist a visualization whose dataset has been closed — it is reported
+in `SaveReport.skipped_visualization_ids` and its Parquet frame is GC'd. So that particular
+orphaned-reference state (visualization outliving its dataset) does not survive a save/load
+round-trip, even though it is legal in a live session. This is a save-side scope choice, not a
+break of the non-cascading rule.
 
 ### Configuration
 
@@ -238,7 +245,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#pyside6qt-layer-specifics) for m
 
 ### Multi-file touchpoints that do not auto-sync
 
-Adding a reader requires updating both `reader_registry.py`'s `_REGISTERED_READERS` tuple *and* the
+Adding a reader requires updating both `reader_registry.py`'s `_BUILTIN_READERS` tuple *and* the
 hardcoded `_DATASET_FILE_FILTER` string in `src/ui/main_window.py` — the second does not derive from the
 first automatically. Watch for the same class of gap (a registry plus a separately-hardcoded consumer)
 when extending charts, cleaning operations, or plugin categories.

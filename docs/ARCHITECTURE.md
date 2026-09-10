@@ -222,7 +222,7 @@ All fixed paths (`config/`, `logs/`, `projects/`) are anchored to the project ro
   everything before it, not a stub — see the Roadmap document for the milestone sequence this
   codebase has actually followed.
 - **Multi-file touchpoints that do not auto-sync**: adding a reader requires updating both
-  `reader_registry.py`'s `_REGISTERED_READERS` tuple *and* the hardcoded `_DATASET_FILE_FILTER`
+  `reader_registry.py`'s `_BUILTIN_READERS` tuple *and* the hardcoded `_DATASET_FILE_FILTER`
   string in `src/ui/main_window.py` — the second does not derive from the first automatically.
 - **A real test suite and enforced tooling exist and are CI-gated.** `tests/` mirrors `src/`'s
   package layout; `black`, `isort`, `mypy` (scoped to a curated clean-module list — see
