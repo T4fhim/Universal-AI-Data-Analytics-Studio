@@ -1,4 +1,4 @@
-# File: src/ui/theme/tokens.py
+# File: uadas_core/theme/tokens.py
 """The single source of truth for every color, space, and radius the UI uses.
 
 Qt Style Sheets have no variable mechanism — there is no QSS equivalent of a

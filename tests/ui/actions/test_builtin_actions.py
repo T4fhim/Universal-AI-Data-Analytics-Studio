@@ -12,7 +12,7 @@ from __future__ import annotations
 import src.ui.actions.builtin_actions  # noqa: F401 -- import-time registration
 from src.ui.actions.action_registry import Requirement, list_actions
 from src.ui.theme.icon_provider import IconProvider
-from src.ui.theme.tokens import DARK_TOKENS
+from uadas_core.theme.tokens import DARK_TOKENS
 
 
 def test_every_icon_name_exists_on_disk() -> None:

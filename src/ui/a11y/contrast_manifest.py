@@ -1,7 +1,7 @@
 # File: src/ui/a11y/contrast_manifest.py
 """Every foreground/background pairing the UI renders, with its WCAG floor.
 
-This is the list that makes :mod:`src.ui.theme.tokens` trustworthy. Each
+This is the list that makes :mod:`uadas_core.theme.tokens` trustworthy. Each
 entry names two token fields and the ratio they must reach;
 ``tests/ui/theme/test_contrast.py`` asserts all of them against every theme,
 so editing a colour cannot quietly break legibility.
@@ -23,7 +23,7 @@ rather than in what was convenient:
 
 from __future__ import annotations
 
-from src.ui.theme.contrast import (
+from uadas_core.theme.contrast import (
     AA_BODY_TEXT,
     AA_NON_TEXT,
     ContrastRequirement,

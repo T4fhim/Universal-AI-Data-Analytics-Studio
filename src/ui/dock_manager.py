@@ -55,12 +55,12 @@ from PySide6.QtWidgets import (
 )
 
 from src.ui.dataset_close_menu import DatasetCloseMenu
-from src.ui.theme.tokens import DARK_TOKENS
 from src.ui.widgets.chart_view import ChartView
 from src.ui.widgets.chat_panel import ChatPanel
 from src.ui.widgets.data_table.data_table_view import DataTableView
 from src.ui.widgets.dataset_explorer_view import DatasetExplorerView
 from uadas_core.core.logger import get_logger
+from uadas_core.theme.tokens import DARK_TOKENS
 
 if TYPE_CHECKING:
     # A previous edit's ruff auto-fix pass stripped this import as

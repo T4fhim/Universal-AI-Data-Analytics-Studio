@@ -1,5 +1,5 @@
 # File: src/ui/theme/qss_compiler.py
-"""Turns a :class:`~src.ui.theme.tokens.ThemeTokens` into a finished stylesheet.
+"""Turns a :class:`~uadas_core.theme.tokens.ThemeTokens` into a finished stylesheet.
 
 Qt Style Sheets have no variable mechanism, so the token layer has to be
 resolved before Qt ever sees the text. This module is that resolution step:
@@ -26,10 +26,10 @@ from __future__ import annotations
 from pathlib import Path
 from string import Template
 
-from src.ui.theme.tokens import ThemeTokens
 from uadas_core.core.constants import PROJECT_ROOT
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.core.logger import get_logger
+from uadas_core.theme.tokens import ThemeTokens
 
 _logger = get_logger(__name__)
 

@@ -1,4 +1,4 @@
-# File: src/ui/theme/plotly_theme.py
+# File: uadas_core/theme/plotly_theme.py
 """Translates design tokens into a Plotly layout template.
 
 Charts render inside a ``QWebEngineView`` (see
@@ -8,7 +8,7 @@ default white canvas and its default ten-colour qualitative palette, so
 switching the application to the dark theme leaves a glaring white rectangle
 in the middle of the window -- and the series colours are whatever Plotly
 picked, not the colourblind-safe ramp
-:mod:`src.ui.theme.tokens` validated.
+:mod:`uadas_core.theme.tokens` validated.
 
 Returns a plain ``dict`` rather than a ``plotly.graph_objects.layout.Template``
 so that this module has no Plotly import. The dict is applied by the chart
@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.ui.theme.tokens import ThemeTokens
+from uadas_core.theme.tokens import ThemeTokens
 
 
 def plotly_layout(tokens: ThemeTokens) -> dict[str, Any]:

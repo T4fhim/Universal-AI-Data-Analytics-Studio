@@ -6,7 +6,7 @@ previous hand-maintained QSS files were never checked against anything, and
 running these assertions against them for the first time found two genuine
 failures: the dark theme's focus ring scored 2.83 against a 3:1 floor
 (1.4.11), and the standard Okabe-Ito palette's blue scored 2.87 on the dark
-chart ground. Both are fixed in :mod:`src.ui.theme.tokens`, and both would
+chart ground. Both are fixed in :mod:`uadas_core.theme.tokens`, and both would
 have shipped without this file.
 
 Needs no ``QApplication`` -- contrast is a property of two colours, not of a
@@ -18,13 +18,13 @@ from __future__ import annotations
 import pytest
 
 from src.ui.a11y.contrast_manifest import CONTRAST_REQUIREMENTS
-from src.ui.theme.contrast import (
+from uadas_core.theme.contrast import (
     AA_NON_TEXT,
     contrast_ratio,
     parse_hex,
     relative_luminance,
 )
-from src.ui.theme.tokens import TOKENS_BY_NAME, ThemeTokens
+from uadas_core.theme.tokens import TOKENS_BY_NAME, ThemeTokens
 
 _THEMES = list(TOKENS_BY_NAME.values())
 _THEME_IDS = list(TOKENS_BY_NAME)

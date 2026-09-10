@@ -335,9 +335,9 @@ def test_changing_expertise_level_updates_theme_density(
     """Milestone 26 acceptance criterion 4: ThemeManager.set_density() (built in milestone
     15, unused until now) is actually driven by a live ExpertiseLevel change.
     """
-    from src.ui.theme.tokens import Density
     from src.ui.theme_manager import ThemeManager
     from tests.ui.qt_helpers import process_events
+    from uadas_core.theme.tokens import Density
 
     theme_manager = ThemeManager(qapp)
     theme_manager.apply_theme("dark")

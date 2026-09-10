@@ -22,7 +22,7 @@ NVDA walkthrough this module's existence makes it possible to schedule, but
 does not itself perform.
 
 **Contrast is delegated, not reimplemented.** :func:`~src.ui.a11y.rules.
-contrast_findings` reuses :mod:`src.ui.theme.contrast`'s WCAG math and
+contrast_findings` reuses :mod:`uadas_core.theme.contrast`'s WCAG math and
 :data:`~src.ui.a11y.contrast_manifest.CONTRAST_REQUIREMENTS` -- the same
 pairing list ``tests/ui/theme/test_contrast.py`` already asserts against
 every theme. Reinventing that math here would risk the two silently
@@ -40,8 +40,8 @@ from PySide6.QtWidgets import QDialog, QWidget
 
 from src.ui.a11y import rules
 from src.ui.a11y.rules import A11yFinding, Severity
-from src.ui.theme.tokens import ThemeTokens
 from uadas_core.core.logger import get_logger
+from uadas_core.theme.tokens import ThemeTokens
 
 # The path to src/ui/, derived from this file's own location rather than by
 # `import src.ui` -- this package is one of the "leaf" foundation layers

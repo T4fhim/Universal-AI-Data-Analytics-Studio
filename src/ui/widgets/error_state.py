@@ -27,8 +27,8 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 from src.ui.a11y.accessible import describe
-from src.ui.theme.tokens import DARK_TOKENS
 from src.ui.widgets.empty_state import render_illustration
+from uadas_core.theme.tokens import DARK_TOKENS
 
 
 class ErrorState(QWidget):

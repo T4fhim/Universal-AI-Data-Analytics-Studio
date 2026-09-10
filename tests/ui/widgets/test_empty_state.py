@@ -5,8 +5,8 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QApplication
 
-from src.ui.theme.tokens import DARK_TOKENS
 from src.ui.widgets.empty_state import EmptyState, render_illustration
+from uadas_core.theme.tokens import DARK_TOKENS
 
 
 def test_heading_and_message_are_shown(qapp: QApplication) -> None:

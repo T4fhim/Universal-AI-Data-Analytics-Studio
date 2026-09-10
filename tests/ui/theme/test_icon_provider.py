@@ -13,7 +13,7 @@ import pytest
 from PySide6.QtWidgets import QApplication
 
 from src.ui.theme.icon_provider import IconProvider
-from src.ui.theme.tokens import DARK_TOKENS, LIGHT_TOKENS
+from uadas_core.theme.tokens import DARK_TOKENS, LIGHT_TOKENS
 
 
 @pytest.fixture()

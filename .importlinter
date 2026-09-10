@@ -43,6 +43,7 @@ source_modules =
     uadas_core.reports
     uadas_core.results
     uadas_core.services
+    uadas_core.theme
     uadas_core.visualization
 forbidden_modules =
     uadas_core.provenance

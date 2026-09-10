@@ -38,7 +38,7 @@ from src.ui.a11y.rules import (
     _check_illustration_descriptions,
     contrast_findings,
 )
-from src.ui.theme.tokens import DARK_TOKENS
+from uadas_core.theme.tokens import DARK_TOKENS
 
 
 def _tree(*widgets: QWidget) -> tuple[QWidget, list[QWidget]]:

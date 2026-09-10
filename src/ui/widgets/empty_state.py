@@ -14,7 +14,7 @@ substitution trick this module reuses directly, since ``IconProvider`` itself on
 a bold heading, an explanatory message, and an optional action button.
 
 **No live theme wiring, by design.** Unlike :class:`~src.ui.theme.icon_provider.IconProvider`,
-this module does not hold a live :class:`~src.ui.theme.tokens.ThemeTokens` reference that
+this module does not hold a live :class:`~uadas_core.theme.tokens.ThemeTokens` reference that
 updates on every theme change -- plumbing a theme-aware provider into every current call site
 (``DockManager``, ``ApplicationMenuBar``, ``SettingsDialog``, every ``StagePage`` subclass)
 would be a wider change than this milestone's actual acceptance criteria ask for, and the
@@ -47,9 +47,9 @@ from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 from src.ui.a11y.accessible import describe
-from src.ui.theme.tokens import DARK_TOKENS
 from uadas_core.core.constants import PROJECT_ROOT
 from uadas_core.core.logger import get_logger
+from uadas_core.theme.tokens import DARK_TOKENS
 
 _logger = get_logger(__name__)
 

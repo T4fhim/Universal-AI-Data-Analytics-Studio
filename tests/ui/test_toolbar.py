@@ -12,8 +12,8 @@ from PySide6.QtWidgets import QApplication, QMainWindow
 import src.ui.actions.builtin_actions  # noqa: F401 -- populates the real registry
 from src.ui.actions.action_binder import ActionBinder
 from src.ui.theme.icon_provider import IconProvider
-from src.ui.theme.tokens import DARK_TOKENS
 from src.ui.toolbar import ApplicationToolBar
+from uadas_core.theme.tokens import DARK_TOKENS
 
 
 def test_toolbar_actions_have_real_icons_when_binder_has_a_provider(

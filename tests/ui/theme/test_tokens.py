@@ -10,15 +10,15 @@ from __future__ import annotations
 
 import pytest
 
-from src.ui.theme.tokens import (
+from uadas_core.core.constants import AVAILABLE_THEMES
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.theme.tokens import (
     DARK_TOKENS,
     DENSITY_BY_EXPERTISE_LEVEL,
     LIGHT_TOKENS,
     TOKENS_BY_NAME,
     Density,
 )
-from uadas_core.core.constants import AVAILABLE_THEMES
-from uadas_core.core.expertise_level import ExpertiseLevel
 
 
 def test_available_themes_matches_tokens() -> None:

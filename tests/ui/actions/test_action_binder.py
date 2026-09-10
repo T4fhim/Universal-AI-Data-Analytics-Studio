@@ -21,8 +21,8 @@ from src.ui.actions.action_registry import (
     register_action,
 )
 from src.ui.theme.icon_provider import IconProvider
-from src.ui.theme.tokens import DARK_TOKENS, LIGHT_TOKENS
 from uadas_core.core.exceptions import ServiceError
+from uadas_core.theme.tokens import DARK_TOKENS, LIGHT_TOKENS
 
 
 @dataclass

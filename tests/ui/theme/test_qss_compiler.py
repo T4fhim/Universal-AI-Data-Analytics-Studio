@@ -13,8 +13,8 @@ import pytest
 
 from src.ui.theme import qss_compiler
 from src.ui.theme.qss_compiler import TEMPLATE_PATH, compile_qss
-from src.ui.theme.tokens import DARK_TOKENS, LIGHT_TOKENS, TOKENS_BY_NAME
 from uadas_core.core.exceptions import ServiceError
+from uadas_core.theme.tokens import DARK_TOKENS, LIGHT_TOKENS, TOKENS_BY_NAME
 
 
 @pytest.fixture(autouse=True)

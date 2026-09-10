@@ -77,7 +77,7 @@ DEFAULT_WINDOW_HEIGHT: int = 900
 
 DEFAULT_THEME: str = "dark"
 
-# Must stay in step with src.ui.theme.tokens.TOKENS_BY_NAME. It is duplicated
+# Must stay in step with uadas_core.theme.tokens.TOKENS_BY_NAME. It is duplicated
 # rather than derived because uadas_core/core/ may not import from src/ui/ -- the
 # one-way dependency direction documented in docs/ARCHITECTURE.md -- and
 # config validation (which lives in core) needs the list. The two are pinned

@@ -4,9 +4,9 @@
 :class:`ThemeManager` no longer reads a per-theme ``.qss`` file. Milestone 15
 replaced ``resources/styles/dark.qss`` and ``light.qss`` -- two independently
 hand-maintained files with no shared colour vocabulary -- with a single
-``base.qss.template`` plus the token sets in :mod:`src.ui.theme.tokens`. This
+``base.qss.template`` plus the token sets in :mod:`uadas_core.theme.tokens`. This
 class is the seam between the two: it resolves a theme name to a
-:class:`~src.ui.theme.tokens.ThemeTokens`, hands it to
+:class:`~uadas_core.theme.tokens.ThemeTokens`, hands it to
 :func:`~src.ui.theme.qss_compiler.compile_qss`, and applies the result with
 ``QApplication.setStyleSheet`` so every widget -- including ones constructed
 later -- inherits it without any per-widget styling logic.
@@ -15,7 +15,7 @@ later -- inherits it without any per-widget styling logic.
 adequate while QSS was the only thing a theme affected. It no longer is: the
 icons rendered by :class:`~src.ui.theme.icon_provider.IconProvider` are
 recoloured from ``text_primary``, and Plotly figures are themed from
-``chart_categorical`` (see :mod:`src.ui.theme.plotly_theme`). Neither is
+``chart_categorical`` (see :mod:`uadas_core.theme.plotly_theme`). Neither is
 reachable through a stylesheet, so both must be told when the theme changes.
 :attr:`theme_changed` is that notification. A plain observer-callback list
 would have worked too, and was rejected because every consumer here is
@@ -38,10 +38,10 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QApplication
 
 from src.ui.theme.qss_compiler import compile_qss
-from src.ui.theme.tokens import TOKENS_BY_NAME, Density, ThemeTokens
 from uadas_core.core.constants import AVAILABLE_THEMES
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.core.logger import get_logger
+from uadas_core.theme.tokens import TOKENS_BY_NAME, Density, ThemeTokens
 
 _logger = get_logger(__name__)
 
@@ -136,7 +136,7 @@ class ThemeManager(QObject):
 
         Args:
             base_font_size: Passed straight to
-                :meth:`~src.ui.theme.tokens.ThemeTokens.with_base_font_size`
+                :meth:`~uadas_core.theme.tokens.ThemeTokens.with_base_font_size`
                 -- see that method for how the small/large sizes are
                 derived from it.
 
@@ -181,7 +181,7 @@ class ThemeManager(QObject):
         """Return the applied theme's tokens, or ``None`` before the first apply.
 
         This is what :class:`~src.ui.theme.icon_provider.IconProvider` and
-        :mod:`src.ui.theme.plotly_theme` read from a
+        :mod:`uadas_core.theme.plotly_theme` read from a
         :attr:`theme_changed` slot -- they need the colour values, not the
         name.
         """
@@ -205,7 +205,7 @@ class ThemeManager(QObject):
         if tokens is None:
             raise ServiceError(
                 f"Theme '{theme_name}' is listed in AVAILABLE_THEMES but has "
-                f"no token set in src.ui.theme.tokens.TOKENS_BY_NAME."
+                f"no token set in uadas_core.theme.tokens.TOKENS_BY_NAME."
             )
         tokens = tokens.with_density(self._density)
         if self._base_font_size is not None:

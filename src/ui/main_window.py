@@ -62,7 +62,6 @@ from src.ui.dock_manager import DockManager
 from src.ui.menu_bar import ApplicationMenuBar
 from src.ui.status_bar import ApplicationStatusBar
 from src.ui.theme.icon_provider import IconProvider
-from src.ui.theme.tokens import DARK_TOKENS
 from src.ui.theme_manager import ThemeManager
 from src.ui.toolbar import ApplicationToolBar
 from src.ui.ui_state_bus import UiStateBus
@@ -94,6 +93,7 @@ from uadas_core.services.project_service import ProjectService
 from uadas_core.services.report_service import ReportService
 from uadas_core.services.settings_service import SettingsService
 from uadas_core.services.workspace_service import WorkspaceService
+from uadas_core.theme.tokens import DARK_TOKENS
 
 _logger = get_logger(__name__)
 

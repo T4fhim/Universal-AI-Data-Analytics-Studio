@@ -31,9 +31,9 @@ from PySide6.QtCore import QObject, QSize, Qt, Signal
 from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
-from src.ui.theme.tokens import ThemeTokens
 from uadas_core.core.constants import PROJECT_ROOT
 from uadas_core.core.logger import get_logger
+from uadas_core.theme.tokens import ThemeTokens
 
 _logger = get_logger(__name__)
 

@@ -24,9 +24,9 @@ import plotly.graph_objects as go
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from src.ui.theme.tokens import DARK_TOKENS, LIGHT_TOKENS
 from src.ui.web import web_assets
 from src.ui.widgets.chart_view import ChartView, _flatten_layout, _merge_layout
+from uadas_core.theme.tokens import DARK_TOKENS, LIGHT_TOKENS
 
 # -- Pure-function tier: no QApplication required --------------------------
 

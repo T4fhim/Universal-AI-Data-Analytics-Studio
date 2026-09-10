@@ -1,7 +1,7 @@
-# File: src/ui/theme/contrast.py
+# File: uadas_core/theme/contrast.py
 """WCAG 2.2 contrast math, used to *prove* the design tokens are accessible.
 
-This module exists so that :mod:`src.ui.theme.tokens` is not a set of colors
+This module exists so that :mod:`uadas_core.theme.tokens` is not a set of colors
 somebody eyeballed. Every foreground/background pairing the application
 actually renders is listed in
 :data:`~src.ui.a11y.contrast_manifest.CONTRAST_REQUIREMENTS` and asserted
@@ -34,7 +34,7 @@ def parse_hex(color: str) -> tuple[int, int, int]:
     Raises:
         ValueError: If ``color`` is not a 6-digit ``#rrggbb`` string. Short
             form (``#abc``) and named colors are deliberately rejected rather
-            than supported: every token in :mod:`src.ui.theme.tokens` is
+            than supported: every token in :mod:`uadas_core.theme.tokens` is
             authored as full 6-digit hex, so accepting other spellings would
             only create a second way to write the same value.
     """
@@ -87,8 +87,8 @@ class ContrastRequirement:
     """One pairing that every theme must satisfy.
 
     Attributes:
-        foreground: Field name on :class:`~src.ui.theme.tokens.ThemeTokens`.
-        background: Field name on :class:`~src.ui.theme.tokens.ThemeTokens`.
+        foreground: Field name on :class:`~uadas_core.theme.tokens.ThemeTokens`.
+        background: Field name on :class:`~uadas_core.theme.tokens.ThemeTokens`.
         minimum: Required ratio — one of :data:`AA_BODY_TEXT`,
             :data:`AA_LARGE_TEXT`, or :data:`AA_NON_TEXT`.
         rationale: Where this pairing appears on screen, so a test failure

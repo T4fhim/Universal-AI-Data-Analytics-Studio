@@ -18,7 +18,7 @@ have no consumer yet -- milestone 24 uses them to filter a paired
 contract now, even though nothing reads it yet, means
 ``resources/web/chart_bridge.js`` and ``chart_host.html`` do not need to
 change again when M24 lands, matching how milestone 15 built
-:mod:`src.ui.theme.plotly_theme` unused until this very milestone wired it
+:mod:`uadas_core.theme.plotly_theme` unused until this very milestone wired it
 into chart rendering.
 """
 

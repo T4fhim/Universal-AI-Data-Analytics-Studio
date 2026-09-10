@@ -6,7 +6,7 @@ under some root" (or, for :func:`contrast_findings`, "the currently applied
 theme's tokens") to a list of :class:`A11yFinding`. Kept in a separate module
 from :mod:`src.ui.a11y.audit` (rather than as private functions there) for
 the same reason :mod:`src.ui.a11y.contrast_manifest` is separate from
-:mod:`src.ui.theme.contrast`: the *math*/walking machinery and the *list of
+:mod:`uadas_core.theme.contrast`: the *math*/walking machinery and the *list of
 things actually checked* change for different reasons and at different
 rates, and a new rule should be addable by reading and extending this file
 alone.
@@ -54,8 +54,8 @@ from PySide6.QtWidgets import (
 )
 
 from src.ui.a11y.contrast_manifest import CONTRAST_REQUIREMENTS
-from src.ui.theme.contrast import contrast_ratio
-from src.ui.theme.tokens import ThemeTokens
+from uadas_core.theme.contrast import contrast_ratio
+from uadas_core.theme.tokens import ThemeTokens
 
 
 class Severity(StrEnum):
@@ -63,7 +63,7 @@ class Severity(StrEnum):
 
     A :class:`~enum.StrEnum` for the same reason
     :class:`~uadas_core.core.expertise_level.ExpertiseLevel` and
-    :class:`~src.ui.theme.tokens.Density` do -- it prints and compares
+    :class:`~uadas_core.theme.tokens.Density` do -- it prints and compares
     cleanly in test failure output and log lines with no extra conversion.
 
     ``ERROR`` is a real WCAG 2.2 AA failure: something an assistive
@@ -583,7 +583,7 @@ def contrast_findings(tokens: ThemeTokens) -> list[A11yFinding]:
     ``tokens``, so an audit against a live, themed application still reports
     contrast failures alongside structural ones in one combined list.
 
-    Reuses :func:`~src.ui.theme.contrast.contrast_ratio` and the exact
+    Reuses :func:`~uadas_core.theme.contrast.contrast_ratio` and the exact
     requirement list ``tests/ui/theme/test_contrast.py`` already asserts
     against every theme (see that module and :mod:`src.ui.a11y.
     contrast_manifest`) -- this function exists so the same guarantee is

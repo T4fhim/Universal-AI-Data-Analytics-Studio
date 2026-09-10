@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.ui.theme.plotly_theme import plotly_config, plotly_layout
-from src.ui.theme.tokens import DARK_TOKENS, LIGHT_TOKENS, TOKENS_BY_NAME
+from uadas_core.theme.plotly_theme import plotly_config, plotly_layout
+from uadas_core.theme.tokens import DARK_TOKENS, LIGHT_TOKENS, TOKENS_BY_NAME
 
 
 @pytest.mark.parametrize(
