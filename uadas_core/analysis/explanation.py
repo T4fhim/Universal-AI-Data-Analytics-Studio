@@ -91,3 +91,25 @@ class Explanation:
             "limitations": list(self.limitations),
             "alternative_approaches": list(self.alternative_approaches),
         }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Explanation:
+        """Rebuild an :class:`Explanation` from its :meth:`to_dict` form.
+
+        Inverse of :meth:`to_dict`. Missing keys fall back to the field
+        default (every field is independently optional — see the class
+        docstring); list fields are copied defensively; unknown keys are
+        ignored so a payload from a newer version still loads. Added in
+        web-transition 1.7 (:mod:`uadas_core.provenance`) so a serialized
+        ``Explanation`` inside an ``AnalysisLogEntry`` or a Recipe step
+        reconstructs, rather than being carried as an opaque dict.
+        """
+        return cls(
+            what=data.get("what", ""),
+            why_it_matters=data.get("why_it_matters", ""),
+            how_calculated=data.get("how_calculated", ""),
+            confidence_or_uncertainty=data.get("confidence_or_uncertainty", ""),
+            assumptions=list(data.get("assumptions", [])),
+            limitations=list(data.get("limitations", [])),
+            alternative_approaches=list(data.get("alternative_approaches", [])),
+        )
