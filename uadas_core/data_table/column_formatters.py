@@ -4,7 +4,7 @@
 Kept as plain functions in their own module (rather than inlined into the
 model's ``data()`` method) so they are unit-testable with zero Qt and zero
 ``QAbstractTableModel`` machinery -- exactly the same reasoning
-``src/ui/theme/contrast.py`` documents for staying Qt-free.
+``uadas_core/theme/contrast.py`` documents for staying Qt-free.
 """
 
 from __future__ import annotations

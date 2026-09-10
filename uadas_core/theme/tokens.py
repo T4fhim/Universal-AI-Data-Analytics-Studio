@@ -72,9 +72,9 @@ class Density(StrEnum):
 
 
 # Milestone 26: the mapping Density's own docstring anticipated since milestone 15.
-# Lives here (src.ui.theme), not in uadas_core.core.expertise_level, because Density is a
-# UI-theming concept -- uadas_core.core must never import from src.ui (see this repo's layered
-# architecture), so the mapping has to live on the UI side of that boundary, importing
+# Lives in uadas_core.theme, not in uadas_core.core.expertise_level, because Density is a
+# UI-theming concept -- uadas_core.core must not depend on theme/UI vocabulary (see this repo's
+# layered architecture), so the mapping lives on the theme side of that boundary, importing
 # ExpertiseLevel (the core-side vocabulary) rather than the other way around.
 #
 # BEGINNER/STUDENT get COMFORTABLE (larger targets, more generous spacing -- a new user
