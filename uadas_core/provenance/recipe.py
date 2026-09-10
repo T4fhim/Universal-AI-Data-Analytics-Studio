@@ -102,9 +102,11 @@ class RecipeStep:
 
         ``recipe_to_analysis_logs`` constructs :class:`AnalysisLogEntry` objects
         *directly* from these steps (not via ``AnalysisLogEntry.from_dict``), so
-        a malformed ``timestamp`` in a Recipe payload would otherwise ride
-        straight into the rebuilt log chain — the exact silent path the 1.7
-        timestamp validation exists to close. ``produces_dataset`` is a required
+        a malformed ``timestamp`` / ``stage`` in a Recipe payload would otherwise
+        ride straight into the rebuilt log chain — the exact silent path the 1.7
+        validation exists to close. Validated here (parse time), not only in
+        ``recipe_to_analysis_logs`` (replay time), matching
+        :meth:`AnalysisLogEntry.from_dict`. ``produces_dataset`` is a required
         key (``to_dict`` always writes it); a missing one would silently collapse
         a derived-dataset boundary on replay.
         """
@@ -115,10 +117,17 @@ class RecipeStep:
             raise ServiceError(
                 f"RecipeStep.timestamp is not an ISO-8601 string: {timestamp!r}"
             ) from exc
+        stage = data["stage"]
+        try:
+            PipelineStage(stage)
+        except ValueError as exc:
+            raise ServiceError(
+                f"RecipeStep.stage is not a known pipeline stage: {stage!r}"
+            ) from exc
         return cls(
             id=data["id"],
             label=data.get("label", ""),
-            stage=data["stage"],
+            stage=stage,
             tool_name=data.get("tool_name"),
             inputs=dict(data.get("inputs", {})),
             produces_dataset=bool(data["produces_dataset"]),

@@ -152,12 +152,34 @@ def test_recipe_step_from_dict_requires_produces_dataset():
         RecipeStep.from_dict(good)
 
 
+def test_recipe_step_from_dict_rejects_an_unknown_stage():
+    # type-design review: from_dict validated timestamp but not stage, deferring
+    # the failure to replay -- now caught at parse time, uniform with
+    # AnalysisLogEntry.from_dict.
+    good = RecipeStep(
+        "s1",
+        "Profile",
+        "understand",
+        "profile_dataset",
+        {},
+        False,
+        None,
+        "2026-09-07T14:32:15Z",
+    ).to_dict()
+    with pytest.raises(ServiceError, match="stage"):
+        RecipeStep.from_dict({**good, "stage": "not-a-stage"})
+
+
 def test_recipe_to_analysis_logs_rejects_an_unknown_stage():
+    # An unknown stage in a recipe payload -> ServiceError, never a bare crash.
+    # Since the type-design fix it is rejected at Recipe.from_dict parse time
+    # (RecipeStep.from_dict) rather than at replay -- fail-fast, still a
+    # ServiceError about the stage.
     step = RecipeStep(
         "s1", "x", "not-a-stage", None, {}, False, None, "2026-09-07T14:32:15Z"
     )
     recipe = Recipe(steps=[step])
-    with pytest.raises(ServiceError, match="unknown pipeline stage"):
+    with pytest.raises(ServiceError, match="stage"):
         recipe_to_analysis_logs(recipe.to_dict(), new_root_dataset_id="new-root")
 
 

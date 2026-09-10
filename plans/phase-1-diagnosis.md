@@ -122,5 +122,24 @@ surrounding graceful-degradation path promises to handle.
 | D11 | LOW | `caa5d0b` "caching regression" test is single-threaded — doesn't pin the race it was filed for; the `base_worker` sync-`run()`-raise guard is "verified by inspection". | add threaded tests — **Phase 2 / opportunistic** |
 | D12 | LOW | `get_all_logs()` / `get_log()` return live `AnalysisLog` refs (a caller could mutate orchestrator state). No current mutator; consistent with `get_log`. | note; revisit if a mutating consumer appears |
 
+### §findings — Wave 2 (`ecc:type-design-analyzer`, verdict MINOR-NITS)
+
+`resolve()` overloads (1.4) rated 4/3/4/3 — **no action** (the unsoundness is already documented
+with a deferral plan). One nit fixed, three deferred.
+
+**Fixed — commit `_(RecipeStep stage-validation commit)_`:**
+
+| # | Where | What |
+|---|---|---|
+| F16 | `RecipeStep.from_dict` | validated `timestamp` + `produces_dataset` but not `stage` — a bad stage rode into the payload and only failed later in `recipe_to_analysis_logs`. Now `PipelineStage(stage)` at parse time → `ServiceError`, uniform with `AnalysisLogEntry.from_dict`. + test. |
+
+**Deferred (low, no consumers yet):**
+
+| # | Sev | Item | Owner |
+|---|---|---|---|
+| D13 | LOW | `TransformEdge.stage` / `ArtifactNode.stage` are `str`, downgraded from the `PipelineStage` in hand at construction, with no serialization boundary at this layer to justify it. Type them `PipelineStage` (a `StrEnum`, so `== "clean"` still works) and drop the `.value` at the two build sites. | **Phase 5** (when the DAG gets its first consumer / `to_dict`) |
+| D14 | LOW | `DatasetMeta.partial` is a stored bool on a separate axis from the 5 `\| None` fields — `partial=True` with full data, or the `False` default on an all-`None` record, are both representable. Make it a derived `@property` (all four descriptive fields `None`), or `__post_init__`-assert consistency. | **Phase 5** (with D13) |
+| D15 | LOW | `DatasetNode.dataset_id` duplicates `meta.dataset_id` (representable disagreement). Drop the field, expose a `@property`. | **Phase 5** (with D13) |
+
 **Verification after `7def88b`:** targeted suites 202 passed; `lint-imports` 2 kept / 0 broken;
 `mypy` clean; full suite — _see `plans/phase-1-baseline.md` Post-diagnosis entry_.
