@@ -1,5 +1,5 @@
 # File: src/ui/widgets/guidance_panel.py
-"""Renders :class:`~src.services.guidance_service.GuidanceService`'s ranked suggestions.
+"""Renders :class:`~uadas_core.services.guidance_service.GuidanceService`'s ranked suggestions.
 
 Embedded once per :class:`~src.ui.workbench.stage_page.StagePage` (see that class's own
 docstring for where, in its guidance-card zone) rather than as a single dock shared across
@@ -11,7 +11,7 @@ see that method's own docstring.
 
 **A real, stateless display widget, not a service consumer.** Like every other widget this
 overhaul built (``StageRail``, ``ResultCard``), :class:`GuidancePanel` holds no
-:class:`~src.services.guidance_service.GuidanceService` reference of its own --
+:class:`~uadas_core.services.guidance_service.GuidanceService` reference of its own --
 :meth:`set_suggestions` is called from outside with an already-computed
 ``list[Suggestion]``, and activating a suggestion only ever emits
 :attr:`suggestion_activated` with the suggestion's plain ``action_id`` string.
@@ -31,8 +31,8 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QListWidget, QListWidgetItem, QVBoxLayout, QWidget
 
-from src.services.guidance_service import Suggestion
 from src.ui.a11y.accessible import describe
+from uadas_core.services.guidance_service import Suggestion
 
 _ACTION_ID_ROLE = Qt.ItemDataRole.UserRole
 
@@ -47,7 +47,7 @@ _EMPTY_PLACEHOLDER_TEXT = "No suggestions right now."
 
 
 class GuidancePanel(QWidget):
-    """A ranked, activatable list of :class:`~src.services.guidance_service.Suggestion`.
+    """A ranked, activatable list of :class:`~uadas_core.services.guidance_service.Suggestion`.
 
     Signals:
         suggestion_activated: Emitted with the activated suggestion's ``action_id`` (a plain

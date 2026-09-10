@@ -6,7 +6,7 @@ anchors:
 
 # Excel Reader
 
-`src.readers.excel_reader.ExcelReader` -- `.xlsx`, `.xls`.
+`uadas_core.readers.excel_reader.ExcelReader` -- `.xlsx`, `.xls`.
 
 Multi-table: an Excel workbook can contain more than one worksheet, each a candidate table --
 you are asked which sheet to load if there is more than one.

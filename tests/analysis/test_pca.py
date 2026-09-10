@@ -1,5 +1,5 @@
 # File: tests/analysis/test_pca.py
-"""Tests for src.analysis.pca."""
+"""Tests for uadas_core.analysis.pca."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.analysis.pca import compute_pca
-from src.core.exceptions import ServiceError
+from uadas_core.analysis.pca import compute_pca
+from uadas_core.core.exceptions import ServiceError
 
 
 def _correlated_dataframe() -> pd.DataFrame:

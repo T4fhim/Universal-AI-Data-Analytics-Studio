@@ -1,5 +1,5 @@
 # File: tests/forecasting/test_arima_forecast.py
-"""Tests for src.forecasting.arima_forecast."""
+"""Tests for uadas_core.forecasting.arima_forecast."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.core.exceptions import ServiceError
-from src.forecasting.arima_forecast import forecast_arima
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.forecasting.arima_forecast import forecast_arima
 
 
 def _trending_series(n: int = 30) -> pd.DataFrame:

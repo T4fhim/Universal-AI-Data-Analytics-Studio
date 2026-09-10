@@ -23,8 +23,8 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QMainWindow, QToolBar
 
-from src.core.logger import get_logger
 from src.ui.actions.action_binder import ActionBinder
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 

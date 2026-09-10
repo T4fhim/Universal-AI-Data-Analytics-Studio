@@ -7,7 +7,7 @@ anchors:
 # Forecast
 
 The result of running a single forecaster from the [Predict](../pipeline/predict.md) stage
-(`src.forecasting.exponential_smoothing.ForecastResult`, the shared result type every one of
+(`uadas_core.forecasting.exponential_smoothing.ForecastResult`, the shared result type every one of
 the five forecasters returns).
 
 ## Result

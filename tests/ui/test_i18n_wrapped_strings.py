@@ -34,7 +34,7 @@ from pathlib import Path
 
 import pytest
 
-from src.core.constants import PROJECT_ROOT
+from uadas_core.core.constants import PROJECT_ROOT
 
 # Call names this test inspects arguments of. A bare method/function name, not a dotted path --
 # Qt call sites read as `widget.setText(...)`/`QLabel(...)`/`self.setWindowTitle(...)`, and this

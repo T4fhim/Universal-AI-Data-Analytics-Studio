@@ -6,7 +6,7 @@ anchors:
 
 # Exponential Smoothing
 
-`src.forecasting.exponential_smoothing.forecast_exponential_smoothing` -- Holt-Winters, via
+`uadas_core.forecasting.exponential_smoothing.forecast_exponential_smoothing` -- Holt-Winters, via
 `statsmodels`.
 
 Fast, and works well on short series; handles trend and, optionally, seasonality (additive or

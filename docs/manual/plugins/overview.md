@@ -8,8 +8,8 @@ anchors:
 
 Third-party extensions are discovered from configured search paths and registered into the
 same registries the application's own built-in readers, cleaning operations, and chart types
-use (`src.readers.reader_registry`, `src.cleaning.operation_registry`,
-`src.visualization.chart_registry`) -- a plugin-provided reader is used exactly the same way a
+use (`uadas_core.readers.reader_registry`, `uadas_core.cleaning.operation_registry`,
+`uadas_core.visualization.chart_registry`) -- a plugin-provided reader is used exactly the same way a
 built-in one is, from [Open Dataset](../data/open-dataset.md) onward.
 
 ## What a plugin can provide

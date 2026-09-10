@@ -3,26 +3,26 @@
 
 Milestone 22's primary acceptance-criterion page: "Running a t-test from the Analyze page
 renders a ``ResultCard`` with statistic, p-value, and an ``AssumptionsSection`` -- with no API
-key configured." This page calls straight into :mod:`src.analysis` (the same functions
-:mod:`src.ai.tool_registry`'s handlers wrap) rather than through the AI layer or
-:meth:`~src.services.analysis_orchestrator_service.AnalysisOrchestratorService.run_stage` --
-deliberately, not as a shortcut: ``run_stage`` returns an :class:`~src.services.
+key configured." This page calls straight into :mod:`uadas_core.analysis` (the same functions
+:mod:`uadas_core.ai.tool_registry`'s handlers wrap) rather than through the AI layer or
+:meth:`~uadas_core.services.analysis_orchestrator_service.AnalysisOrchestratorService.run_stage` --
+deliberately, not as a shortcut: ``run_stage`` returns an :class:`~uadas_core.services.
 analysis_orchestrator_service.AnalysisLogEntry` whose ``outputs`` is a JSON-friendly ``dict``
-(see that class's own docstring), because :mod:`src.ai.tool_registry` handlers convert every
+(see that class's own docstring), because :mod:`uadas_core.ai.tool_registry` handlers convert every
 analysis dataclass to a plain dict before returning it. Handing a ``dict`` to :class:`~src.ui.
-results.result_card.ResultCard` would defeat :mod:`~src.ui.results.result_renderer_registry`'s
-entire type-based dispatch (every renderer in :mod:`~src.ui.results.renderers` is keyed on the
+results.result_card.ResultCard` would defeat :mod:`~uadas_core.results.result_renderer_registry`'s
+entire type-based dispatch (every renderer in :mod:`~uadas_core.results.renderers` is keyed on the
 *real* result dataclass -- ``TTestResult``, not ``dict``) -- it would resolve to
-:class:`~src.ui.results.renderers.generic.GenericResultRenderer`'s dict branch every time,
-regardless of which test ran. Calling :mod:`src.analysis` directly keeps the typed result object
-intact end to end. Recording these runs into the pipeline's own :class:`~src.services.
+:class:`~uadas_core.results.renderers.generic.GenericResultRenderer`'s dict branch every time,
+regardless of which test ran. Calling :mod:`uadas_core.analysis` directly keeps the typed result object
+intact end to end. Recording these runs into the pipeline's own :class:`~uadas_core.services.
 analysis_orchestrator_service.AnalysisLog` (so they show up in Reproducible Analysis /
 lineage) is a real integration gap this milestone does not close -- see this milestone's own
 scope note in the plan document.
 
 Like :class:`~src.ui.workbench.pages.understand_page.UnderstandPage`, this page holds no
 *service* reference (see ``src/ui/workbench/__init__.py``'s "display-only" rule) -- but it does
-hold a plain :class:`~src.services.workspace_service.Dataset` handed to it via :meth:`set_dataset`,
+hold a plain :class:`~uadas_core.services.workspace_service.Dataset` handed to it via :meth:`set_dataset`,
 the same way :class:`~src.ui.widgets.data_table.data_table_view.DataTableView.load_dataset`
 takes a ``Dataset`` directly without needing a ``WorkspaceService`` reference of its own. A
 future milestone wiring ``main_window.py``'s ``_refresh_workbench`` to call
@@ -38,23 +38,23 @@ from typing import ClassVar
 
 from PySide6.QtWidgets import QComboBox, QMessageBox, QPushButton, QVBoxLayout
 
-from src.ai.tool_registry import get_tool_by_name
-from src.analysis.anova import one_way_anova
-from src.analysis.chi_square import chi_square_test
-from src.analysis.clustering import k_means_clustering
-from src.analysis.normality import check_normality
-from src.analysis.pca import compute_pca
-from src.analysis.regression import linear_regression
-from src.analysis.t_test import independent_t_test, paired_t_test
-from src.core.exceptions import ApplicationError
-from src.core.expertise_level import ExpertiseLevel
-from src.core.logger import get_logger
-from src.services.analysis_orchestrator_service import PipelineStage
-from src.services.workspace_service import Dataset
 from src.ui.a11y.accessible import describe
 from src.ui.dialogs.analysis_parameter_dialog import AnalysisParameterDialog
 from src.ui.results.result_card import ResultCard
 from src.ui.workbench.stage_page import StagePage
+from uadas_core.ai.tool_registry import get_tool_by_name
+from uadas_core.analysis.anova import one_way_anova
+from uadas_core.analysis.chi_square import chi_square_test
+from uadas_core.analysis.clustering import k_means_clustering
+from uadas_core.analysis.normality import check_normality
+from uadas_core.analysis.pca import compute_pca
+from uadas_core.analysis.regression import linear_regression
+from uadas_core.analysis.t_test import independent_t_test, paired_t_test
+from uadas_core.core.exceptions import ApplicationError
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.core.logger import get_logger
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
+from uadas_core.services.workspace_service import Dataset
 
 _logger = get_logger(__name__)
 
@@ -64,7 +64,7 @@ _DEFAULT_GUIDANCE = (
 )
 
 # Tool name -> callable(dataframe, **params) -> result dataclass. Deliberately calls
-# src.analysis functions directly rather than the src.ai.tool_registry handlers wrapping them --
+# uadas_core.analysis functions directly rather than the uadas_core.ai.tool_registry handlers wrapping them --
 # see this module's own docstring for why (the handlers discard the typed dataclass in favor of
 # a JSON dict, which is exactly what this page must not lose).
 _ANALYZE_DISPATCH: dict[str, Callable[..., object]] = {
@@ -123,7 +123,7 @@ class AnalyzePage(StagePage):
         self._dataset = dataset
 
     def set_expertise_level(self, level: ExpertiseLevel) -> None:
-        """Set which :class:`~src.core.expertise_level.ExpertiseLevel` ``run_analysis`` renders for."""
+        """Set which :class:`~uadas_core.core.expertise_level.ExpertiseLevel` ``run_analysis`` renders for."""
         self._expertise_level = level
 
     def _on_run_clicked(self) -> None:

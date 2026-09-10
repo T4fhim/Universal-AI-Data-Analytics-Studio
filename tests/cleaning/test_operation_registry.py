@@ -1,19 +1,19 @@
 # File: tests/cleaning/test_operation_registry.py
-"""Tests for src.cleaning.operation_registry."""
+"""Tests for uadas_core.cleaning.operation_registry."""
 
 from __future__ import annotations
 
 import pytest
 
-from src.cleaning.duplicates import DropDuplicates
-from src.cleaning.missing_values import DropMissingValues
-from src.cleaning.operation_registry import (
+from uadas_core.cleaning.duplicates import DropDuplicates
+from uadas_core.cleaning.missing_values import DropMissingValues
+from uadas_core.cleaning.operation_registry import (
     get_operation,
     list_operations,
     register_operation,
     unregister_operation,
 )
-from src.core.exceptions import ServiceError
+from uadas_core.core.exceptions import ServiceError
 
 
 def test_builtin_operations_are_registered() -> None:

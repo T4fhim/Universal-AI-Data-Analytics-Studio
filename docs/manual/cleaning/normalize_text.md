@@ -6,7 +6,7 @@ anchors:
 
 # Normalize Text
 
-`src.cleaning.text_normalization.NormalizeText`.
+`uadas_core.cleaning.text_normalization.NormalizeText`.
 
 Trims leading/trailing whitespace (on by default) and optionally normalizes casing (`lower`,
 `upper`, or `title` -- each word capitalized; unchanged by default) in the columns you specify.

@@ -12,9 +12,9 @@ from __future__ import annotations
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from src.core.exceptions import ServiceError
 from src.ui.theme.tokens import Density
 from src.ui.theme_manager import ThemeManager
+from uadas_core.core.exceptions import ServiceError
 
 
 @pytest.fixture()

@@ -7,7 +7,7 @@ anchors:
 
 # K-Means Clustering
 
-`src.analysis.clustering.k_means_clustering` -- via scikit-learn. Groups rows into `k` clusters
+`uadas_core.analysis.clustering.k_means_clustering` -- via scikit-learn. Groups rows into `k` clusters
 based on a set of numeric columns, using the same standardization
 (zero mean, unit variance) [PCA](pca.md) applies, and the same reasoning: unscaled columns with
 larger numeric ranges would otherwise dominate the distance metric k-means clusters on purely

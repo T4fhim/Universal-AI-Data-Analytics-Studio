@@ -13,11 +13,11 @@ Convert a stated requirement into a concrete, ordered implementation plan. You d
 
 ## Process
 
-1. **Inspect the actual codebase before planning — every time.** Never plan against SPECIFICATION.md's full intended scope as if it already exists; check what's actually in `src/` first (several subpackages — `database/`, `models/`, `plugins/`, `workers/`, `reports/`, `resources/` — are still empty, per CLAUDE.md). Read the specific files and patterns your plan will touch, not just their names.
+1. **Inspect the actual codebase before planning — every time.** Never plan against SPECIFICATION.md's full intended scope as if it already exists; check what's actually there first. The codebase is mid desktop→web transition: Qt-free packages live in `uadas_core/` (`ai analysis cleaning database forecasting jobs plugins readers reports results services visualization core`), the disposable Qt shell in `src/ui/` + `src/workers/`, and there is a `graphify-out/graph.json` — use `graphify query/explain/path` to orient before deep-reading. See `docs/ROADMAP.md#what-is-explicitly-not-built-yet` for genuinely empty subpackages. Read the specific files and patterns your plan will touch, not just their names.
 2. Identify every file the change will require creating or modifying.
 3. Identify dependencies between those changes — what must exist before what.
 4. Identify risks: places where this change could break an existing pattern (e.g., forgetting to update `main_window.py`'s hardcoded `_DATASET_FILE_FILTER` when adding a reader; forgetting a dataset-lineage field when adding a cleaning operation).
-5. Identify testing requirements — note explicitly that `tests/` is currently empty and `pytest`/`black`/`isort`/`mypy` have no CI gate, so "tests pass" cannot be assumed as an existing safety net; state what should be tested, not just what already is.
+5. Identify testing requirements. `tests/` holds ~1400 tests and CI gates `pytest` + `lint-imports` + ruff/black/isort + scoped `mypy` + bandit + a Linux `import uadas_core` job — so there IS an existing safety net; the rolling full-suite baseline is in `plans/phase-1-baseline.md`. State what the change needs tested on top of that.
 6. Produce an implementation order — which piece must be built and verified before the next depends on it, consistent with this project's "one module at a time, no jumping ahead" milestone discipline.
 
 ## Rules

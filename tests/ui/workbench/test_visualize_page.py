@@ -19,10 +19,10 @@ from __future__ import annotations
 import pandas as pd
 from PySide6.QtWidgets import QApplication
 
-from src.services.workspace_service import Dataset
 from src.ui.widgets.column_multi_select import ColumnMultiSelect
 from src.ui.workbench.pages.visualize_page import VisualizePage
-from src.visualization.chart_recommender import recommend_charts
+from uadas_core.services.workspace_service import Dataset
+from uadas_core.visualization.chart_recommender import recommend_charts
 
 
 def _make_dataset() -> Dataset:

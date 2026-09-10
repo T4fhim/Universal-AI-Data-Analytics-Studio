@@ -2,14 +2,14 @@
 """Tests for PredictPage -- milestone 25's four acceptance criteria, end to end.
 
 1. All 5 forecasters plus compare_forecast_models are reachable from a real page (first non-AI
-   UI path to any of src.forecasting).
+   UI path to any of uadas_core.forecasting).
 2. compare_forecast_models renders as a ranked table with the winner highlighted, plus an
    overlay chart of every candidate.
 3. validate_time_series failures surface as a pre-flight warning in the page, not a stack trace.
 4. Progress reporting is visible in the status bar during a comparison run -- the first real
    consumer of WorkerSignals.progress.
 
-Nothing mocked: a real Dataset, real src.forecasting functions, a real WorkerRunner over the
+Nothing mocked: a real Dataset, real uadas_core.forecasting functions, a real WorkerRunner over the
 real QThreadPool for the progress test, and a real ApplicationStatusBar -- matching this
 project's "real Qt widgets/services" test convention (see tests/ui/workbench/test_clean_page.py's
 own docstring for the same rule applied to its milestone).
@@ -20,12 +20,12 @@ from __future__ import annotations
 import pandas as pd
 from PySide6.QtWidgets import QApplication, QMainWindow, QTableWidget
 
-from src.core.expertise_level import ExpertiseLevel
-from src.services.workspace_service import Dataset
 from src.ui.status_bar import ApplicationStatusBar
 from src.ui.workbench.pages.predict_page import PredictPage
 from src.ui.worker_runner import WorkerRunner
 from tests.ui.qt_helpers import wait_for_signal
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.services.workspace_service import Dataset
 
 
 def _make_dataset(n: int = 20) -> Dataset:

@@ -1,5 +1,5 @@
 # File: tests/services/test_report_service.py
-"""Tests for src.services.report_service.ReportService.
+"""Tests for uadas_core.services.report_service.ReportService.
 
 Covers build_report_content()'s log-to-ReportContent replay (the
 milestone's "replay the log and render it" framing — see that module's
@@ -16,15 +16,15 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from src.analysis.explanation import Explanation
-from src.core.exceptions import ServiceError
-from src.core.expertise_level import ExpertiseLevel
-from src.services.analysis_orchestrator_service import (
+from uadas_core.analysis.explanation import Explanation
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.services.analysis_orchestrator_service import (
     AnalysisOrchestratorService,
     PipelineStage,
 )
-from src.services.report_service import ReportService, available_formats
-from src.services.workspace_service import Dataset, WorkspaceService
+from uadas_core.services.report_service import ReportService, available_formats
+from uadas_core.services.workspace_service import Dataset, WorkspaceService
 
 
 def _make_dataset() -> Dataset:

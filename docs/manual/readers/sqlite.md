@@ -6,7 +6,7 @@ anchors:
 
 # SQLite Reader
 
-`src.readers.sqlite_reader.SqliteReader` -- `.db`, `.sqlite`, `.sqlite3`.
+`uadas_core.readers.sqlite_reader.SqliteReader` -- `.db`, `.sqlite`, `.sqlite3`.
 
 Multi-table: a SQLite database file can contain any number of tables, each a candidate -- you
 are asked which one to load if there is more than one.

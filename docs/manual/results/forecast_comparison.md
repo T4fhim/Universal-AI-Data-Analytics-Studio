@@ -6,7 +6,7 @@ anchors:
 
 # Automatic Model Competition
 
-The result of `src.forecasting.model_comparison.compare_forecast_models`
+The result of `uadas_core.forecasting.model_comparison.compare_forecast_models`
 (`ModelComparisonResult`), run from the [Predict](../pipeline/predict.md) stage when you choose
 "Automatic Model Competition" instead of a single forecaster.
 

@@ -10,7 +10,7 @@ to nothing, found by the audit behind this whole overhaul.
 
 This package fixes that by splitting "what actions exist" from "what a
 window does when one fires" into three pieces, mirroring
-:mod:`src.visualization.chart_registry`'s registration shape:
+:mod:`uadas_core.visualization.chart_registry`'s registration shape:
 
 - :mod:`~src.ui.actions.action_registry` -- Qt-free, import-time-populated
   data (:class:`~src.ui.actions.action_registry.ActionSpec`). No handler and
@@ -29,7 +29,7 @@ window does when one fires" into three pieces, mirroring
 
 Alongside the registry: :mod:`src.ui.actions.builtin_actions` registers
 every action that predates this milestone (constructing this list at
-import time, matching how :mod:`~src.visualization.chart_registry` seeds
+import time, matching how :mod:`~uadas_core.visualization.chart_registry` seeds
 its own built-ins).
 """
 

@@ -4,9 +4,9 @@
 **Dismissible, and shown only once, by construction rather than by any state this dialog itself
 tracks.** This class has no notion of "have I been shown before" at all -- it does not read or
 write ``ui.first_run_completed``, and never will; deciding *whether* to construct and show it,
-and marking it seen afterward, is :func:`src.core.app.Application.run`'s job (the composition
-root, the one place :data:`~src.core.config.AppConfig.ui_first_run_completed` is read and
-:class:`~src.services.settings_service.SettingsService` is available before
+and marking it seen afterward, is :func:`src.app.Application.run`'s job (the composition
+root, the one place :data:`~uadas_core.core.config.AppConfig.ui_first_run_completed` is read and
+:class:`~uadas_core.services.settings_service.SettingsService` is available before
 :class:`~src.ui.main_window.MainWindow` is fully constructed). Any way of closing this dialog --
 the Close button, the window's own close control, Escape -- counts as "dismissed"; there is no
 separate "don't show again" checkbox to miss, since showing it at all already means the answer
@@ -22,9 +22,9 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog, QLabel, QPushButton, QVBoxLayout, QWidget
 
-from src.core.constants import APP_NAME
-from src.core.logger import get_logger
 from src.ui.a11y.accessible import describe
+from uadas_core.core.constants import APP_NAME
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 

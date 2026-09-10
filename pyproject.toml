@@ -30,7 +30,7 @@ dependencies = { file = ["requirements.txt"] }
 # a src-layout container, so point find() at the repo root and take
 # everything under `src`.
 where = ["."]
-include = ["src*"]
+include = ["src*", "uadas_core*"]
 
 [tool.black]
 line-length = 88
@@ -39,7 +39,7 @@ target-version = ["py313"]
 [tool.isort]
 profile = "black"
 line_length = 88
-known_first_party = ["src"]
+known_first_party = ["src", "uadas_core"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

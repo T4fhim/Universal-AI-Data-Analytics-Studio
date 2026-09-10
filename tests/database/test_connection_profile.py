@@ -1,8 +1,8 @@
 # File: tests/database/test_connection_profile.py
-"""Tests for src.database.connection_profile.ConnectionProfile/DatabaseType.
+"""Tests for uadas_core.database.connection_profile.ConnectionProfile/DatabaseType.
 
 Covers the to_dict()/from_dict() round trip that
-src.services.database_connection_service.DatabaseConnectionService
+uadas_core.services.database_connection_service.DatabaseConnectionService
 relies on to persist profiles through config.yaml, and confirms no
 password field exists anywhere on the dataclass (see that class's own
 docstring for why this is a deliberate security property, not an
@@ -15,7 +15,7 @@ import dataclasses
 
 import pytest
 
-from src.database.connection_profile import (
+from uadas_core.database.connection_profile import (
     DEFAULT_PORTS,
     ConnectionProfile,
     DatabaseType,

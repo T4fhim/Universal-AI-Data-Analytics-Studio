@@ -29,9 +29,13 @@ from pathlib import Path
 
 import pytest
 
-from src.core.constants import PROJECT_ROOT
+from uadas_core.core.constants import PROJECT_ROOT
 
 _SRC_ROOT = PROJECT_ROOT / "src"
+# web-transition Phase 1.1: the Qt-free packages moved to uadas_core/. Rule 1
+# ("nothing outside src/ui imports src.ui") must still be enforced against every
+# one of them, so _all_src_modules() spans both trees.
+_CORE_ROOT = PROJECT_ROOT / "uadas_core"
 
 # Packages/modules within src/ui/ that must import nothing from src.ui
 # EXCEPT each other -- the foundation layer. Paths are relative to src/ui/.
@@ -53,11 +57,11 @@ _SRC_ROOT = PROJECT_ROOT / "src"
 # live QApplication/parent window this foundation layer has no business depending on.
 _LEAF_PACKAGES = ("theme", "a11y", "actions", "help")
 
-# src/core/app.py is the application's composition root -- the one place
+# src/app.py is the application's composition root -- the one place
 # documented in docs/ARCHITECTURE.md that constructs QApplication, MainWindow,
 # and ThemeManager and wires them together. It importing src.ui is the whole
 # point of it, not a layering violation.
-_COMPOSITION_ROOTS = ("src/core/app.py",)
+_COMPOSITION_ROOTS = ("src/app.py",)
 
 
 def _module_dotted_name(path: Path) -> str:
@@ -91,7 +95,7 @@ def _imported_modules(path: Path) -> set[str]:
 
 
 def _all_src_modules() -> list[Path]:
-    return sorted(_SRC_ROOT.rglob("*.py"))
+    return sorted([*_SRC_ROOT.rglob("*.py"), *_CORE_ROOT.rglob("*.py")])
 
 
 def _all_ui_modules() -> list[Path]:

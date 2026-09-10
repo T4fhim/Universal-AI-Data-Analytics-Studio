@@ -35,10 +35,10 @@ from collections.abc import Callable
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMainWindow, QMenuBar, QWidgetAction
 
-from src.core.logger import get_logger
 from src.ui.actions.action_binder import ActionBinder
 from src.ui.ui_state_bus import UiStateBus
 from src.ui.widgets.empty_state import EmptyState
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 
@@ -148,7 +148,7 @@ class ApplicationMenuBar(QMenuBar):
 
         Args:
             recent_paths: Paths as returned by
-                :meth:`~src.services.project_service.ProjectService.get_recent_projects`,
+                :meth:`~uadas_core.services.project_service.ProjectService.get_recent_projects`,
                 most recent first.
             on_open: Called with the clicked path when a recent-project
                 entry is selected. Wiring happens *here*, in the same
@@ -162,7 +162,7 @@ class ApplicationMenuBar(QMenuBar):
         This clears and rebuilds the submenu each time rather than
         diffing against the previous contents, since the list is small
         (capped at 10 by
-        :class:`~src.services.project_service.ProjectService`) and
+        :class:`~uadas_core.services.project_service.ProjectService`) and
         rebuilding is simpler and less error-prone than maintaining
         incremental menu state.
         """

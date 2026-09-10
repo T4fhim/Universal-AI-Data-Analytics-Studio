@@ -15,9 +15,9 @@ Backs milestone 20's acceptance criteria:
    for the pure-service-layer version; this file additionally covers the controller-level
    persist/restore wiring with real services).
 
-Uses real :class:`~src.services.workspace_service.WorkspaceService`,
-:class:`~src.services.analysis_orchestrator_service.AnalysisOrchestratorService`, and
-:class:`~src.services.project_service.ProjectService` instances (not mocks) -- the same
+Uses real :class:`~uadas_core.services.workspace_service.WorkspaceService`,
+:class:`~uadas_core.services.analysis_orchestrator_service.AnalysisOrchestratorService`, and
+:class:`~uadas_core.services.project_service.ProjectService` instances (not mocks) -- the same
 "duck-typed fakes only for Qt-adjacent collaborators, real services for the actual business
 logic under test" split ``tests/ui/controllers/test_project_controller.py`` established.
 """
@@ -27,12 +27,6 @@ from __future__ import annotations
 import pandas as pd
 from PySide6.QtWidgets import QApplication, QMainWindow
 
-from src.services.analysis_orchestrator_service import (
-    AnalysisOrchestratorService,
-    PipelineStage,
-)
-from src.services.project_service import ProjectService
-from src.services.workspace_service import Dataset, WorkspaceService
 from src.ui.command_stack import CommandStack
 from src.ui.controllers.pipeline_controller import PipelineController
 from src.ui.dock_manager import DockManager
@@ -40,6 +34,12 @@ from src.ui.status_bar import ApplicationStatusBar
 from src.ui.ui_state_bus import UiStateBus
 from src.ui.worker_runner import WorkerRunner
 from tests.ui.qt_helpers import wait_for_signal
+from uadas_core.services.analysis_orchestrator_service import (
+    AnalysisOrchestratorService,
+    PipelineStage,
+)
+from uadas_core.services.project_service import ProjectService
+from uadas_core.services.workspace_service import Dataset, WorkspaceService
 
 
 def _make_dataset() -> Dataset:
@@ -213,6 +213,59 @@ def test_restore_logs_for_project_installs_logs_into_the_orchestrator(
     restored_log = fresh_orchestrator.get_log(dataset.dataset_id)
     assert len(restored_log.entries) == 1
     assert restored_log.entries[0].stage == PipelineStage.UNDERSTAND
+
+
+def test_restore_logs_skips_an_unreadable_log_and_still_opens_the_project(
+    qapp: QApplication,
+) -> None:
+    # Web-transition 1.7 gave AnalysisLogEntry.from_dict a hard ISO-8601 timestamp
+    # check. A pre-1.7 or hand-edited project file with a bad timestamp must still
+    # open -- the bad log is dropped with a warning, the good logs restore.
+    controller, workspace_service, orchestrator_service, project_service = (
+        _make_controller(qapp)
+    )
+    good = _make_dataset()
+    workspace_service.add_dataset(good)
+    orchestrator_service.run_stage(
+        good.dataset_id, PipelineStage.UNDERSTAND, tool_name="profile_dataset"
+    )
+    project = project_service.new_project("Test Project")
+    controller.persist_all_logs(project)
+    project_service.record_analysis_log(
+        project,
+        "corrupt-dataset",
+        {
+            "dataset_id": "corrupt-dataset",
+            "entries": [
+                {
+                    "stage": "understand",
+                    "tool_name": "profile_dataset",
+                    "inputs": {},
+                    "outputs": {},
+                    "explanation": None,
+                    "timestamp": "not-a-real-timestamp",
+                }
+            ],
+        },
+    )
+
+    fresh_orchestrator = AnalysisOrchestratorService(workspace_service)
+    fresh_controller = PipelineController(
+        controller._parent,
+        workspace_service,
+        fresh_orchestrator,
+        project_service,
+        controller._dock_manager,
+        controller._status_bar,
+        controller._state_bus,
+        controller._worker_runner,
+        controller._command_stack,
+    )
+
+    fresh_controller.restore_logs_for_project(project)  # must NOT raise
+
+    assert len(fresh_orchestrator.get_log(good.dataset_id).entries) == 1
+    assert fresh_orchestrator.get_log("corrupt-dataset").entries == []
 
 
 def test_round_trip_through_a_real_project_file_preserves_the_analysis_log(

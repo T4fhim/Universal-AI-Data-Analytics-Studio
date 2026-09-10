@@ -1,5 +1,5 @@
 # File: tests/cleaning/test_duplicates.py
-"""Tests for src.cleaning.duplicates.DropDuplicates.
+"""Tests for uadas_core.cleaning.duplicates.DropDuplicates.
 
 Covers the standard, zero-duplicate, and all-duplicate boundary cases,
 the ServiceError for an unknown column, and the never-mutate-in-place
@@ -12,9 +12,9 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from src.cleaning.duplicates import DropDuplicates
-from src.core.exceptions import ServiceError
-from src.services.workspace_service import Dataset
+from uadas_core.cleaning.duplicates import DropDuplicates
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.services.workspace_service import Dataset
 
 
 def _make_dataset(data: dict[str, list]) -> Dataset:

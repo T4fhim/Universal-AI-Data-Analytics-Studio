@@ -10,7 +10,7 @@ anchors:
 dataset.
 
 Builds a Plotly figure from the active dataset and a handful of column choices, via
-`src.visualization.chart_registry` -- every chart type is a stateless `BaseChart` subclass
+`uadas_core.visualization.chart_registry` -- every chart type is a stateless `BaseChart` subclass
 whose `build(dataframe, **kwargs)` returns a `go.Figure` directly embedded in the workspace.
 
 ## The twelve chart types
@@ -33,7 +33,7 @@ whose `build(dataframe, **kwargs)` returns a `go.Figure` directly embedded in th
 ## Getting a recommendation
 
 The Visualize stage page can rank candidate chart types for the columns you've picked, with a
-stated reason for each suggestion (`src.visualization.chart_recommender.recommend_charts`) --
+stated reason for each suggestion (`uadas_core.visualization.chart_recommender.recommend_charts`) --
 a rule-based recommender, not a trained model, so every suggestion is inspectable rather than a
 black-box guess. A numeric-vs-numeric pair suggests a scatter; a date column plus a numeric
 column suggests a line; a low-cardinality categorical column plus a numeric column suggests a

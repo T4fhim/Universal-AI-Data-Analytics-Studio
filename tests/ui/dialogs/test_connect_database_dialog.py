@@ -3,7 +3,7 @@
 
 "delete_profile is reachable from UI -- test that triggering the UI action actually calls
 through to the DatabaseConnectionService method with the right id." Uses a real
-:class:`~src.services.database_connection_service.DatabaseConnectionService` backed by a real
+:class:`~uadas_core.services.database_connection_service.DatabaseConnectionService` backed by a real
 ``tmp_path`` config file (the same construction pattern
 ``tests/services/test_database_connection_service.py`` already established), not a mock -- so
 this proves the button reaches real persistence, not just a stub method.
@@ -16,11 +16,11 @@ from pathlib import Path
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from src.core.config import AppConfig, load_config
-from src.database.connection_profile import ConnectionProfile, DatabaseType
-from src.services.database_connection_service import DatabaseConnectionService
-from src.services.settings_service import SettingsService
 from src.ui.dialogs.connect_database_dialog import ConnectDatabaseDialog
+from uadas_core.core.config import AppConfig, load_config
+from uadas_core.database.connection_profile import ConnectionProfile, DatabaseType
+from uadas_core.services.database_connection_service import DatabaseConnectionService
+from uadas_core.services.settings_service import SettingsService
 
 
 @pytest.fixture()

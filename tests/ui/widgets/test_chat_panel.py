@@ -12,9 +12,9 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QLabel, QListWidget
 
-from src.core.expertise_level import ExpertiseLevel
 from src.ui.results.result_card import ResultCard
 from src.ui.widgets.chat_panel import ChatPanel
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 # -- Criterion 2: messages are focusable, screen-reader-readable, and copyable ------------------
 
@@ -116,7 +116,7 @@ def test_append_tool_result_constructs_the_real_result_card_class(
 ) -> None:
     """Milestone 22's ResultCard, not a chat-specific reimplementation.
 
-    A plain dict is exactly the shape src.ai.tool_registry's own handlers return (see
+    A plain dict is exactly the shape uadas_core.ai.tool_registry's own handlers return (see
     result_renderer_registry's GenericResultRenderer docstring naming this as its "defensive
     path for a JSON-friendly dict"); ResultCard.display() resolves it via
     result_renderer_registry.get_renderer internally -- this test asserts the widget appended is

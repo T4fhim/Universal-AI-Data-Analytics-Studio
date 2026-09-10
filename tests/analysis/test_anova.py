@@ -1,5 +1,5 @@
 # File: tests/analysis/test_anova.py
-"""Tests for src.analysis.anova."""
+"""Tests for uadas_core.analysis.anova."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.analysis.anova import one_way_anova
-from src.core.exceptions import ServiceError
+from uadas_core.analysis.anova import one_way_anova
+from uadas_core.core.exceptions import ServiceError
 
 
 def _three_group_dataframe() -> pd.DataFrame:

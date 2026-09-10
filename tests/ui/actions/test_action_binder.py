@@ -13,7 +13,6 @@ from dataclasses import dataclass
 import pytest
 from PySide6.QtWidgets import QApplication, QMenu, QWidget
 
-from src.core.exceptions import ServiceError
 from src.ui.actions.action_binder import ActionBinder
 from src.ui.actions.action_registry import (
     ActionCategory,
@@ -23,6 +22,7 @@ from src.ui.actions.action_registry import (
 )
 from src.ui.theme.icon_provider import IconProvider
 from src.ui.theme.tokens import DARK_TOKENS, LIGHT_TOKENS
+from uadas_core.core.exceptions import ServiceError
 
 
 @dataclass

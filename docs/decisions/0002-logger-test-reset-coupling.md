@@ -8,12 +8,12 @@ Accepted.
 
 Phase 5's architect review flagged (MEDIUM) that `tests/conftest.py`'s
 `reset_logging_state` fixture directly sets
-`src.core.logger._configured = False` and manually strips root-logger
+`uadas_core.core.logger._configured = False` and manually strips root-logger
 handlers, and that `tests/core/test_logger.py` asserts on
 `logger_module._configured` directly. Both reach into a private,
 underscore-prefixed module attribute rather than a public API.
 
-`src/core/logger.py` was re-read in full before deciding.
+`uadas_core/core/logger.py` was re-read in full before deciding.
 `configure_logging()`'s own docstring documents the "configure exactly
 once per process" guard as deliberate: "This should be called exactly
 once, early in application startup... Calling it again after the
@@ -32,7 +32,7 @@ Two options were considered:
 ## Decision
 
 Leave the existing fixture-level coupling in place. No change to
-`src/core/logger.py`, `tests/conftest.py`, or
+`uadas_core/core/logger.py`, `tests/conftest.py`, or
 `tests/core/test_logger.py`.
 
 Option 1 was rejected specifically because it adds production API

@@ -1,5 +1,5 @@
 # File: tests/forecasting/test_linear_regression_forecast.py
-"""Tests for src.forecasting.linear_regression_forecast."""
+"""Tests for uadas_core.forecasting.linear_regression_forecast."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.core.exceptions import ServiceError
-from src.forecasting.linear_regression_forecast import forecast_linear_regression
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.forecasting.linear_regression_forecast import forecast_linear_regression
 
 
 def _linear_series(n: int = 20) -> pd.DataFrame:

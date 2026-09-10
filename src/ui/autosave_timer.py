@@ -9,15 +9,15 @@ confirmed directly against the pre-milestone-29 source (no code anywhere constru
 :class:`~src.ui.worker_runner.WorkerRunner`.** The manual "Save Project"/"Save Project As"
 actions (:meth:`~src.ui.controllers.project_controller.ProjectController.save_project`) already
 do exactly this -- a project file is metadata only (dataset names and *source paths*, never the
-dataframes themselves; see :class:`~src.services.project_service.Project`'s own JSON shape), so
+dataframes themselves; see :class:`~uadas_core.services.project_service.Project`'s own JSON shape), so
 the write is small and fast, not the kind of "must not block the UI thread" operation this
 project's own convention (report generation, dataset re-reads) reserves ``WorkerRunner`` for.
 Mirroring the manual save path's own synchronous behavior here avoids introducing a new,
 previously-nonexistent risk this milestone's own safety bar specifically calls out avoiding:
-mutating a plain (not documented or verified thread-safe) :class:`~src.services.project_service.
+mutating a plain (not documented or verified thread-safe) :class:`~uadas_core.services.project_service.
 Project` object from a worker thread while the UI thread might read it concurrently.
 
-**Re-reads ``enabled``/``interval_minutes`` from :class:`~src.services.settings_service.
+**Re-reads ``enabled``/``interval_minutes`` from :class:`~uadas_core.services.settings_service.
 SettingsService` on every :meth:`AutosaveTimer.tick`, rather than requiring an explicit
 "please reconfigure me" call from whoever owns the Settings dialog.** This is what lets a
 change made through Settings take effect on the very next natural timer firing with zero
@@ -41,11 +41,11 @@ from __future__ import annotations
 
 from PySide6.QtCore import QObject, QTimer
 
-from src.core.exceptions import ApplicationError
-from src.core.logger import get_logger
-from src.services.project_service import ProjectService
-from src.services.settings_service import SettingsService
-from src.services.workspace_service import WorkspaceService
+from uadas_core.core.exceptions import ApplicationError
+from uadas_core.core.logger import get_logger
+from uadas_core.services.project_service import ProjectService
+from uadas_core.services.settings_service import SettingsService
+from uadas_core.services.workspace_service import WorkspaceService
 
 _logger = get_logger(__name__)
 
@@ -58,7 +58,7 @@ class AutosaveTimer(QObject):
     Args:
         project_service: The active project (if any) is read and saved here.
         workspace_service: Supplies the current dataset list to
-            :meth:`~src.services.project_service.ProjectService.record_datasets` before saving,
+            :meth:`~uadas_core.services.project_service.ProjectService.record_datasets` before saving,
             so an autosave reflects datasets added/closed since the last save, the same as a
             manual save does.
         settings_service: Read fresh on every :meth:`tick` for ``autosave.enabled``/

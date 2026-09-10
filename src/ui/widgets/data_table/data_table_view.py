@@ -25,16 +25,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.core.logger import get_logger
 from src.ui.a11y.accessible import describe
 from src.ui.widgets.data_table.filter_bar import FilterBar
 from src.ui.widgets.data_table.pandas_table_model import PandasTableModel
 from src.workers import BaseWorker
+from uadas_core.core.logger import get_logger
 
 if TYPE_CHECKING:
     import pandas as pd
 
-    from src.services.workspace_service import Dataset
+    from uadas_core.services.workspace_service import Dataset
 
 _logger = get_logger(__name__)
 

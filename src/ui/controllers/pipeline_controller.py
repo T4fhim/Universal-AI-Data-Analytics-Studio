@@ -2,7 +2,7 @@
 """Owns the guided-pipeline workbench's business logic: propose, run, reproduce, persist.
 
 New in milestone 20 -- see :mod:`src.ui.controllers`'s own docstring for why controllers exist
-at all. Before this milestone, :class:`~src.services.analysis_orchestrator_service.
+at all. Before this milestone, :class:`~uadas_core.services.analysis_orchestrator_service.
 AnalysisOrchestratorService` was orphaned except ``get_log()`` (confirmed by grep against
 ``src/ui/`` at the time this overhaul's audit was written): ``propose_next_stage``,
 ``run_stage``, and ``reproduce`` were never called from anywhere a user could reach.
@@ -27,17 +27,6 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QMessageBox, QWidget
 
-from src.core.exceptions import ServiceError
-from src.core.logger import get_logger
-from src.services.analysis_orchestrator_service import (
-    AnalysisLog,
-    AnalysisLogEntry,
-    AnalysisOrchestratorService,
-    PipelineStage,
-    StageProposal,
-)
-from src.services.project_service import ProjectService
-from src.services.workspace_service import Dataset, WorkspaceService
 from src.ui.command_stack import CommandStack, DatasetPointerCommand
 from src.ui.dock_manager import DockManager
 from src.ui.status_bar import ApplicationStatusBar
@@ -47,9 +36,20 @@ from src.ui.workbench.pages.reproduce_page import ReproducePage
 from src.ui.workbench.pages.understand_page import UnderstandPage
 from src.ui.workbench.workbench import Workbench
 from src.ui.worker_runner import WorkerRunner
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.core.logger import get_logger
+from uadas_core.services.analysis_orchestrator_service import (
+    AnalysisLog,
+    AnalysisLogEntry,
+    AnalysisOrchestratorService,
+    PipelineStage,
+    StageProposal,
+)
+from uadas_core.services.project_service import ProjectService
+from uadas_core.services.workspace_service import Dataset, WorkspaceService
 
 if TYPE_CHECKING:
-    from src.services.project_service import Project
+    from uadas_core.services.project_service import Project
 
 _logger = get_logger(__name__)
 
@@ -175,7 +175,7 @@ class PipelineController:
         """Run the UNDERSTAND stage (``profile_dataset``) against the active dataset.
 
         The first UI-driven call to
-        :meth:`~src.services.analysis_orchestrator_service.AnalysisOrchestratorService.run_stage`
+        :meth:`~uadas_core.services.analysis_orchestrator_service.AnalysisOrchestratorService.run_stage`
         -- see this module's own docstring.
         """
         dataset = self._workspace_service.get_active_dataset()
@@ -230,7 +230,7 @@ class PipelineController:
 
         Connected to :attr:`~src.ui.workbench.pages.clean_page.CleanPage.operation_applied` in
         ``main_window.py``. ``derived`` has already been produced by
-        :meth:`~src.cleaning.base_operation.BaseOperation.apply` by the time this runs (see
+        :meth:`~uadas_core.cleaning.base_operation.BaseOperation.apply` by the time this runs (see
         ``CleanPage``'s own docstring for why the page computes it, not this controller) --
         this method's only job is bookkeeping: add it to the workspace, make it active, and
         push a :class:`~src.ui.command_stack.DatasetPointerCommand` so :meth:`undo` can move
@@ -342,7 +342,7 @@ class PipelineController:
         """Record every currently loaded dataset's analysis log into ``project``.
 
         Called by :class:`~src.ui.controllers.project_controller.ProjectController` just
-        before it calls :meth:`~src.services.project_service.ProjectService.save_project`,
+        before it calls :meth:`~uadas_core.services.project_service.ProjectService.save_project`,
         via the ``on_before_save`` callback ``main_window.py`` wires -- see this module's own
         docstring for why the wiring is a callback rather than an import.
         """
@@ -363,13 +363,35 @@ class PipelineController:
         project is reopened in a fresh session.
         """
         recorded = self._project_service.get_recorded_analysis_logs(project)
+        restored = 0
+        skipped = 0
         for dataset_id, log_dict in recorded.items():
-            self._orchestrator_service.load_log(AnalysisLog.from_dict(log_dict))
-        if recorded:
+            # Web-transition 1.7 hardened AnalysisLog(Entry).from_dict to reject
+            # every malformed-payload case (non-ISO timestamp, unknown stage,
+            # missing key) with ServiceError. A hand-edited or partially-corrupt
+            # project file must still open (the rest of its state is fine) --
+            # drop the unreadable log with a warning rather than aborting the
+            # whole open, matching the workspace model's "an orphaned reference
+            # is expected state, not corruption to guard against" stance.
+            try:
+                self._orchestrator_service.load_log(AnalysisLog.from_dict(log_dict))
+            except ServiceError as exc:
+                _logger.warning(
+                    "Skipped an unreadable analysis log for dataset %s in "
+                    "project '%s': %s",
+                    dataset_id,
+                    project.name,
+                    exc,
+                )
+                skipped += 1
+                continue
+            restored += 1
+        if restored or skipped:
             _logger.info(
-                "Restored %d analysis log(s) from project '%s'.",
-                len(recorded),
+                "Restored %d analysis log(s) from project '%s' (%d skipped as unreadable).",
+                restored,
                 project.name,
+                skipped,
             )
         if self._on_changed is not None:
             self._on_changed()

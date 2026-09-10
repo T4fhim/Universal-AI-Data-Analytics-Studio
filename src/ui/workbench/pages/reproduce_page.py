@@ -1,7 +1,7 @@
 # File: src/ui/workbench/pages/reproduce_page.py
 """The REPRODUCE stage's page: a button that replays the active dataset's recorded log.
 
-Wraps :meth:`~src.services.analysis_orchestrator_service.AnalysisOrchestratorService.reproduce`
+Wraps :meth:`~uadas_core.services.analysis_orchestrator_service.AnalysisOrchestratorService.reproduce`
 -- see that method's own docstring for what "replay" means (re-running each logged tool call in
 order, following the chain of derived datasets a CLEAN-stage entry may have produced). This page
 only asks for it via :attr:`reproduce_requested`; the actual call is
@@ -15,9 +15,9 @@ from typing import ClassVar
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QPushButton, QVBoxLayout
 
-from src.services.analysis_orchestrator_service import AnalysisLog, PipelineStage
 from src.ui.a11y.accessible import describe
 from src.ui.workbench.stage_page import StagePage
+from uadas_core.services.analysis_orchestrator_service import AnalysisLog, PipelineStage
 
 _DEFAULT_GUIDANCE = (
     "Replay every stage recorded for this dataset, in order -- the Reproducible Analysis "

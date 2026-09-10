@@ -1,5 +1,5 @@
 # File: tests/visualization/test_chart_recommender.py
-"""Tests for src.visualization.chart_recommender."""
+"""Tests for uadas_core.visualization.chart_recommender."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ import itertools
 import pandas as pd
 import pytest
 
-from src.visualization.chart_recommender import recommend_charts
-from src.visualization.chart_registry import get_chart
+from uadas_core.visualization.chart_recommender import recommend_charts
+from uadas_core.visualization.chart_registry import get_chart
 
 
 def test_recommend_charts_suggests_line_for_date_plus_numeric() -> None:

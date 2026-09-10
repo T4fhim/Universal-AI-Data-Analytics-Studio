@@ -7,12 +7,12 @@ anchors:
 
 # Correlation
 
-`src.analysis.correlation.compute_correlation` -- Pearson, Spearman, or Kendall correlation
+`uadas_core.analysis.correlation.compute_correlation` -- Pearson, Spearman, or Kendall correlation
 over a dataset's genuinely numeric columns.
 
 ## How it works
 
-Columns are checked against `src.readers.type_inference.find_ambiguous_type_columns` first --
+Columns are checked against `uadas_core.readers.type_inference.find_ambiguous_type_columns` first --
 a column a reader already flagged as containing a mix of value types is excluded from the
 matrix (and named, with a reason) even if pandas' own dtype inference happens to look
 numeric-compatible. Including it would produce a coefficient over data the column's own profile

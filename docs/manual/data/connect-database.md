@@ -11,12 +11,12 @@ anchors:
 Opens a live connection to a database server (or a local DuckDB file) and imports one table or
 query result as a `Dataset` -- unlike every reader under
 [Open Dataset](open-dataset.md), the source here is not a file that gets fully read once, but
-a running connection `src.services.database_connection_service.DatabaseConnectionService`
+a running connection `uadas_core.services.database_connection_service.DatabaseConnectionService`
 tracks for the rest of the session.
 
 ## Supported databases
 
-`src.database.connection_registry` maps a database type to its connector class:
+`uadas_core.database.connection_registry` maps a database type to its connector class:
 
 - **PostgreSQL** (`postgres_connection.py`)
 - **MySQL** (`mysql_connection.py`)

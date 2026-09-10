@@ -1,5 +1,5 @@
 # File: tests/ui/results/test_forecasting_renderer.py
-"""Tests for src.ui.results.renderers.forecasting -- milestone 25's own two renderers.
+"""Tests for uadas_core.results.renderers.forecasting -- milestone 25's own two renderers.
 
 Pure Python, zero ``QApplication`` -- same "renderer tests require zero QApplication" convention
 tests/ui/results/test_renderers.py's own docstring establishes. Real ``ForecastResult``/
@@ -13,15 +13,15 @@ from __future__ import annotations
 import pandas as pd
 import plotly.graph_objects as go
 
-from src.core.expertise_level import ExpertiseLevel
-from src.forecasting.exponential_smoothing import forecast_exponential_smoothing
-from src.forecasting.model_comparison import compare_forecast_models
-from src.ui.results.base_result_renderer import (
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.forecasting.exponential_smoothing import forecast_exponential_smoothing
+from uadas_core.forecasting.model_comparison import compare_forecast_models
+from uadas_core.results.base_result_renderer import (
     FigureSection,
     KeyValueSection,
     TableSection,
 )
-from src.ui.results.renderers.forecasting import (
+from uadas_core.results.renderers.forecasting import (
     ForecastResultRenderer,
     ModelComparisonResultRenderer,
 )

@@ -1,18 +1,21 @@
 # File: tests/database/test_connection_registry.py
-"""Tests for src.database.connection_registry."""
+"""Tests for uadas_core.database.connection_registry."""
 
 from __future__ import annotations
 
 import pytest
 
-from src.core.exceptions import ServiceError
-from src.database.connection_profile import DatabaseType
-from src.database.connection_registry import get_connector_class, list_supported_types
-from src.database.duckdb_connection import DuckDbConnection
-from src.database.mysql_connection import MySqlConnection
-from src.database.oracle_connection import OracleConnection
-from src.database.postgres_connection import PostgresConnection
-from src.database.sqlserver_connection import SqlServerConnection
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.database.connection_profile import DatabaseType
+from uadas_core.database.connection_registry import (
+    get_connector_class,
+    list_supported_types,
+)
+from uadas_core.database.duckdb_connection import DuckDbConnection
+from uadas_core.database.mysql_connection import MySqlConnection
+from uadas_core.database.oracle_connection import OracleConnection
+from uadas_core.database.postgres_connection import PostgresConnection
+from uadas_core.database.sqlserver_connection import SqlServerConnection
 
 
 def test_list_supported_types_covers_all_five_engines() -> None:

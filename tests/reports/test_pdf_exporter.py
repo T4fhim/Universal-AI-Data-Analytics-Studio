@@ -1,5 +1,5 @@
 # File: tests/reports/test_pdf_exporter.py
-"""Tests for src.reports.pdf_exporter.PdfReportExporter.
+"""Tests for uadas_core.reports.pdf_exporter.PdfReportExporter.
 
 figure_to_png_bytes is monkeypatched to a tiny real PNG rather than
 calling kaleido — kaleido's headless-Chrome rendering takes several
@@ -17,8 +17,8 @@ from pathlib import Path
 import plotly.graph_objects as go
 import pytest
 
-from src.core.expertise_level import ExpertiseLevel
-from src.reports.report_content import ReportContent, ReportSection
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.reports.report_content import ReportContent, ReportSection
 
 # A genuine, minimal 1x1 PNG — real image bytes are required since
 # reportlab's Image flowable parses them (via Pillow) to determine
@@ -54,11 +54,12 @@ def test_export_writes_a_pdf_file(
     tmp_path: Path, report_content: ReportContent, monkeypatch
 ) -> None:
     monkeypatch.setattr(
-        "src.reports.pdf_exporter.figure_to_png_bytes", lambda *a, **k: _TINY_PNG_BYTES
+        "uadas_core.reports.pdf_exporter.figure_to_png_bytes",
+        lambda *a, **k: _TINY_PNG_BYTES,
     )
     output_path = tmp_path / "report.pdf"
 
-    from src.reports.pdf_exporter import PdfReportExporter
+    from uadas_core.reports.pdf_exporter import PdfReportExporter
 
     result = PdfReportExporter.export(report_content, output_path)
 
@@ -74,11 +75,11 @@ def test_export_succeeds_when_rasterization_fails(
     # abort the whole export — see rasterize.figure_to_png_bytes's own
     # docstring for why this is a swallow-and-continue, not a raise.
     monkeypatch.setattr(
-        "src.reports.pdf_exporter.figure_to_png_bytes", lambda *a, **k: None
+        "uadas_core.reports.pdf_exporter.figure_to_png_bytes", lambda *a, **k: None
     )
     output_path = tmp_path / "report.pdf"
 
-    from src.reports.pdf_exporter import PdfReportExporter
+    from uadas_core.reports.pdf_exporter import PdfReportExporter
 
     result = PdfReportExporter.export(report_content, output_path)
 

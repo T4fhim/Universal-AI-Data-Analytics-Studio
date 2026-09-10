@@ -1,20 +1,21 @@
 # File: tests/visualization/test_chart_registry.py
-"""Tests for src.visualization.chart_registry."""
+"""Tests for uadas_core.visualization.chart_registry."""
 
 from __future__ import annotations
 
 import pytest
 
-from src.core.exceptions import ServiceError
-from src.visualization.chart_registry import (
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.visualization.chart_registry import (
     ChartRegistration,
     display_name_for,
     get_chart,
     list_charts,
     list_dialog_charts,
     register_chart,
+    unregister_chart,
 )
-from src.visualization.distribution_charts import HistogramChart
+from uadas_core.visualization.distribution_charts import HistogramChart
 
 
 def test_builtin_charts_are_registered() -> None:
@@ -57,10 +58,17 @@ def test_register_chart_duplicate_name_raises() -> None:
 
 
 def test_register_chart_new_name_succeeds() -> None:
+    # _REGISTRY is process-global module state; unregister in a finally so this
+    # test does not leak "_test_only_chart_type" into every later test that reads
+    # list_charts()/list_dialog_charts() (e.g. VisualizePage's chart-type combo).
+    # Matches test_operation_registry.test_register_operation_new_name_succeeds.
     register_chart(
         "_test_only_chart_type", ChartRegistration(HistogramChart, ("column",))
     )
-    assert "_test_only_chart_type" in list_charts()
+    try:
+        assert "_test_only_chart_type" in list_charts()
+    finally:
+        unregister_chart("_test_only_chart_type")
 
 
 def test_display_name_for_formats_snake_case() -> None:

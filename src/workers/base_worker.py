@@ -1,5 +1,5 @@
 # File: src/workers/base_worker.py
-"""Generic background-task execution via ``QThreadPool``.
+"""``QThreadPool`` adapter over the Qt-free :class:`~uadas_core.jobs.job_runner.JobRunner`.
 
 Chosen over a raw ``QThread`` subclass per task: ``QRunnable`` +
 ``QThreadPool.globalInstance()`` reuses a pool of worker threads across
@@ -13,19 +13,67 @@ signals a ``QRunnable`` cannot own directly — :class:`BaseWorker`
 composes one rather than trying to multiply-inherit ``QRunnable`` and
 ``QObject``, which Qt does not support cleanly through PySide6's
 metaclass machinery.
+
+**Web-transition Phase 1.2:** the actual "run ``fn`` off the calling
+thread, report the outcome through callbacks" policy no longer lives in
+:meth:`BaseWorker.run` — it moved to :mod:`uadas_core.jobs`, which carries
+no GUI-toolkit dependency and can be re-implemented against an
+out-of-process task queue in Phase 3. ``BaseWorker`` is now a thin
+adapter: ``QThreadPool`` still calls :meth:`run` on a pool thread, but
+that method hands the work to the process-wide
+:class:`~uadas_core.jobs.job_runner.JobRunner` and re-emits its callbacks
+as Qt signals, so the ``QueuedConnection`` wiring in
+:mod:`src.ui.worker_runner` marshals them to the UI thread exactly as
+before. This whole ``src/workers/`` shell — ``BaseWorker`` included — is
+deleted in Phase 2; nothing new should be built on it.
 """
 
 from __future__ import annotations
 
-import traceback
+import threading
+import traceback  # used by run()'s synchronous-raise guard
 from collections.abc import Callable
 from typing import Any
 
 from PySide6.QtCore import QObject, QRunnable, Signal
 
-from src.core.logger import get_logger
+from uadas_core.core.logger import get_logger
+from uadas_core.jobs import get_default_job_runner
+from uadas_core.jobs.job_runner import JobRunner
+from uadas_core.jobs.thread_pool_executor_job_runner import ThreadPoolExecutorJobRunner
 
 _logger = get_logger(__name__)
+
+
+# Phase-1.2 fallback. In a real application session ``bootstrap()`` installs
+# the process-wide JobRunner (the same instance ``container.resolve(JobRunner)``
+# hands out — one pool), so :func:`_resolve_job_runner` returns that. This
+# lazily-built local pool covers the one context that never runs
+# ``bootstrap()``: ``tests/ui/test_worker_runner.py``, which the de-risking
+# plan's Control A10 forbids editing. Without it, ``get_default_job_runner()``
+# would raise on the ``QThreadPool`` worker thread, where Qt silently swallows
+# the exception and ``signals.finished`` would never fire. A second module
+# global in a shell that is deleted in Phase 2 — deliberately scoped, noted
+# for the 1.3 de-globalization pass alongside ``uadas_core.jobs``'s own bridge.
+_fallback_job_runner: JobRunner | None = None
+_fallback_lock = threading.Lock()
+
+
+def _resolve_job_runner() -> JobRunner:
+    """Return the bootstrap-installed :class:`JobRunner`, or a local fallback pool."""
+    global _fallback_job_runner
+    try:
+        return get_default_job_runner()
+    except RuntimeError:
+        # Double-checked lock: two QThreadPool worker threads that both hit
+        # this branch before either assigns would otherwise build two pools
+        # (max_workers=4 -> 8 threads). The fast path stays lock-free once
+        # the singleton exists.
+        if _fallback_job_runner is None:
+            with _fallback_lock:
+                if _fallback_job_runner is None:
+                    _fallback_job_runner = ThreadPoolExecutorJobRunner()
+        return _fallback_job_runner
 
 
 class WorkerSignals(QObject):
@@ -127,52 +175,79 @@ class BaseWorker(QRunnable):
         self.signals.progress.emit(percent, message)
 
     def run(self) -> None:
-        # Milestone-28 remediation: temporary bracketing INFO logs (not DEBUG --
-        # this app's default log level is INFO, and these need to actually appear
-        # in a real run's log without requiring a config change) around every
-        # emit() call, added while chasing a reported defect where a background
-        # dataset read logs its own success but the UI never reflects it, on a real
-        # windowed session this project's offscreen test harness cannot reproduce
-        # (every offscreen repro -- including through a real MainWindow/QThreadPool --
-        # delivered correctly). These logs exist to answer one question definitively
-        # from the next real occurrence's log file: does emit() ever get reached and
-        # return on the worker thread at all? If "about to emit result" appears with
-        # no matching entry in WorkerRunner._guarded's own log (src/ui/worker_runner.py),
-        # the break is in Qt's queued delivery to the UI thread, not in this class or
-        # the connected callback itself. Remove once that root cause is confirmed and
-        # fixed -- not meant to be permanent noise.
+        """Hand the work to the :class:`JobRunner` and re-emit its callbacks as signals.
+
+        Called by ``QThreadPool`` on a pool thread. The wrapped ``fn`` is
+        no longer invoked here directly — :func:`_resolve_job_runner`
+        returns the Qt-free
+        :class:`~uadas_core.jobs.job_runner.JobRunner`, and this method
+        wires its ``on_result`` / ``on_error`` / ``on_finished`` callbacks
+        to ``self.signals.*``. Qt's existing ``QueuedConnection`` (see
+        :mod:`src.ui.worker_runner`) still marshals those emissions to the
+        UI thread.
+
+        Why still catch every exception: an exception escaping ``run()``
+        on a ``QThreadPool`` worker thread is silently lost (Qt does not
+        propagate it back to the caller). That responsibility now lives in
+        the ``JobRunner`` — it turns any exception from ``fn`` into an
+        ``on_error(exc, traceback_str)`` call rather than letting it
+        vanish — but the reason it matters is unchanged, which is why
+        :mod:`src.ui.worker_runner`'s own guard still references this.
+
+        Why block on an :class:`threading.Event`: ``QThreadPool``'s
+        contract is that ``run()`` returns only once the task is done. The
+        ``JobRunner`` may complete the job on a *different* thread, so this
+        pool thread waits on ``done`` until the terminal callback has
+        fired. The two thread pools are independent, so this wait cannot
+        self-deadlock (asserted by ``tests/ui/test_worker_runner.py`` and
+        the full suite).
+        """
         self.signals.started.emit()
-        try:
-            value = self._fn(*self._args, **self._kwargs)
-        except Exception as exc:  # noqa: BLE001 — deliberately broad: this is the
-            # thread boundary. Any exception the wrapped callable raises must be
-            # caught here and re-surfaced through signals.error on the UI thread,
-            # since an exception escaping run() on a QThreadPool worker thread is
-            # silently lost (Qt does not propagate it back to the caller) rather
-            # than crashing the application or reaching any except block the
-            # caller wrote — swallowing it here and forwarding it explicitly is
-            # the only way the caller ever learns the task failed.
-            _logger.warning("Background task %r failed: %s", self._fn, exc)
-            _logger.info(
-                "[diag] BaseWorker.run(): about to emit error for %r", self._fn
-            )
-            self.signals.error.emit(exc, traceback.format_exc())
-            _logger.info(
-                "[diag] BaseWorker.run(): error emit() returned for %r", self._fn
-            )
-        else:
-            _logger.info(
-                "[diag] BaseWorker.run(): about to emit result for %r", self._fn
-            )
+
+        done = threading.Event()
+
+        def _on_result(value: object) -> None:
             self.signals.result.emit(value)
-            _logger.info(
-                "[diag] BaseWorker.run(): result emit() returned for %r", self._fn
+
+        def _on_error(exc: Exception, formatted_traceback: str) -> None:
+            _logger.warning("Background task %r failed: %s", self._fn, exc)
+            self.signals.error.emit(exc, formatted_traceback)
+
+        def _on_finished() -> None:
+            # Emitted before done.set() unblocks run(), so finished is
+            # posted while this worker (and self.signals) is still held
+            # alive by the run() frame on the stack -- see __init__'s
+            # setAutoDelete(False) comment for the race this closes.
+            # try/finally: a raising `finished` slot must never leave the
+            # pool thread stuck forever on done.wait().
+            try:
+                self.signals.finished.emit()
+            finally:
+                done.set()
+
+        # report_progress is intentionally NOT forwarded to the JobRunner:
+        # __init__ (unchanged) already injected self._emit_progress into
+        # self._kwargs under the "progress_callback" key when the caller
+        # asked for progress, so self._kwargs already carries everything fn
+        # needs. Passing report_progress here too would just make the
+        # runner overwrite that with an equivalent forwarder.
+        try:
+            _resolve_job_runner().run(
+                self._fn,
+                *self._args,
+                on_result=_on_result,
+                on_error=_on_error,
+                on_finished=_on_finished,
+                **self._kwargs,
             )
-        finally:
-            _logger.info(
-                "[diag] BaseWorker.run(): about to emit finished for %r", self._fn
-            )
-            self.signals.finished.emit()
-            _logger.info(
-                "[diag] BaseWorker.run(): finished emit() returned for %r", self._fn
-            )
+        except Exception as exc:  # noqa: BLE001
+            # runner.run() itself raised synchronously (e.g. its executor was
+            # shut down, or bad kwargs to submit). Without this the async
+            # callbacks never fire and done.wait() below hangs the pool
+            # thread. _on_finished()'s own finally still guarantees done.set().
+            try:
+                _on_error(exc, traceback.format_exc())
+            finally:
+                _on_finished()
+
+        done.wait()

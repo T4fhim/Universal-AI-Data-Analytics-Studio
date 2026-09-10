@@ -6,7 +6,7 @@ Same single-page ``QDialog`` form shape as
 CreateVisualizationDialog`/:class:`~src.ui.dialogs.
 generate_report_dialog.GenerateReportDialog`. "Test Connection" and
 "Connect" both call straight into
-:class:`~src.services.database_connection_service.
+:class:`~uadas_core.services.database_connection_service.
 DatabaseConnectionService` synchronously (with a wait-cursor for
 feedback), rather than through a :class:`~src.workers.BaseWorker`
 thread the way :mod:`src.ui.main_window`'s own slow operations
@@ -18,7 +18,7 @@ larger than this milestone's UI surface calls for. A hung connection
 attempt blocks this dialog, not the whole application.
 
 The **password field is never written to a saved profile** — see
-:class:`~src.database.connection_profile.ConnectionProfile`'s own
+:class:`~uadas_core.database.connection_profile.ConnectionProfile`'s own
 docstring for the full reasoning. "Save this profile" persists only
 the name/type/host/port/database/username fields; the password must be
 re-entered the next time this profile is used, in this session or a
@@ -41,17 +41,20 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.core.exceptions import ApplicationError
-from src.core.logger import get_logger
-from src.database.connection_profile import (
+from uadas_core.core.exceptions import ApplicationError
+from uadas_core.core.logger import get_logger
+from uadas_core.database.connection_profile import (
     DEFAULT_PORTS,
     ConnectionProfile,
     DatabaseType,
 )
-from src.database.connection_registry import get_connector_class, list_supported_types
-from src.database.database_reader import DatabaseReader
-from src.services.database_connection_service import DatabaseConnectionService
-from src.services.workspace_service import Dataset
+from uadas_core.database.connection_registry import (
+    get_connector_class,
+    list_supported_types,
+)
+from uadas_core.database.database_reader import DatabaseReader
+from uadas_core.services.database_connection_service import DatabaseConnectionService
+from uadas_core.services.workspace_service import Dataset
 
 _logger = get_logger(__name__)
 
@@ -196,7 +199,7 @@ class ConnectDatabaseDialog(QDialog):
 
     def _on_delete_profile(self) -> None:
         """Delete the currently selected saved profile -- real, reachable path to
-        :meth:`~src.services.database_connection_service.DatabaseConnectionService.
+        :meth:`~uadas_core.services.database_connection_service.DatabaseConnectionService.
         delete_profile` (milestone 23)."""
         profile: ConnectionProfile | None = self._saved_profile_combo.currentData()
         if profile is None:

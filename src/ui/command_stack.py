@@ -6,14 +6,14 @@ Milestone 17's ``builtin_actions.py``/``menu_bar.py`` removed the ``edit.undo``/
 them real semantics, per those modules' own docstrings ("Milestone 23 is where real undo/redo
 semantics land").
 
-**What this stack actually undoes.** Per :mod:`~src.cleaning.base_operation`, a cleaning operation
-*never* mutates a :class:`~src.services.workspace_service.Dataset` in place -- it always returns a
+**What this stack actually undoes.** Per :mod:`~uadas_core.cleaning.base_operation`, a cleaning operation
+*never* mutates a :class:`~uadas_core.services.workspace_service.Dataset` in place -- it always returns a
 new, derived ``Dataset`` whose ``parent_dataset_id`` points back at the source. That means "undo a
 cleaning operation" does not require replaying, inverting, or storing any copy of a dataframe at
 all: the derived dataset and its parent both already exist, side by side, in
-:class:`~src.services.workspace_service.WorkspaceService`'s dataset dict, for as long as neither is
+:class:`~uadas_core.services.workspace_service.WorkspaceService`'s dataset dict, for as long as neither is
 explicitly closed. Undo is therefore nothing more than moving
-:meth:`~src.services.workspace_service.WorkspaceService.set_active_dataset` back to the parent's
+:meth:`~uadas_core.services.workspace_service.WorkspaceService.set_active_dataset` back to the parent's
 id; redo moves it forward to the child's id again. Neither direction ever touches a
 ``Dataset.dataframe`` -- there is no dataframe-copying, no re-running the operation, and no way for
 either direction to silently produce a value different from what was already computed once. This
@@ -22,11 +22,11 @@ docstring: "mutating in place would... make undo impossible without a separate u
 "[a fresh, immutable result] sidesteps both problems by construction rather than by discipline") --
 :class:`CommandStack` is that sidestep made concrete.
 
-**Why this lives in ``src/ui/`` rather than ``src/services/``.** Every other session-wide service
+**Why this lives in ``src/ui/`` rather than ``uadas_core/services/``.** Every other session-wide service
 (``WorkspaceService``, ``ProjectService``, ...) is registered in
-:func:`~src.core.bootstrap.bootstrap` and resolved from the shared
-:class:`~src.core.dependency_container.DependencyContainer`, per this overhaul's cross-cutting rule
-2. ``bootstrap.py`` lives under ``src/core/``, and ``src/ui/`` is the *only* package allowed to
+:func:`~uadas_core.core.bootstrap.bootstrap` and resolved from the shared
+:class:`~uadas_core.core.dependency_container.DependencyContainer`, per this overhaul's cross-cutting rule
+2. ``bootstrap.py`` lives under ``uadas_core/core/``, and ``src/ui/`` is the *only* package allowed to
 import ``src.ui`` at all (``tests/ui/test_import_layering.py`` enforces this both ways) -- so a
 "service" registered there could never itself live under ``src/ui/`` without breaking that
 one-way dependency direction. This is not actually a session-wide *service* in the same sense
@@ -40,8 +40,8 @@ the same kind of object.
 
 **Qt-free by construction.** Nothing here imports PySide6. A :class:`CommandStack` is exercised
 end to end -- push, undo, redo, the "never re-mutates" guarantee -- against a real
-:class:`~src.services.workspace_service.WorkspaceService` with zero ``QApplication``, matching how
-:mod:`~src.ui.results.result_renderer_registry`'s own tests need no ``qapp`` fixture either (see
+:class:`~uadas_core.services.workspace_service.WorkspaceService` with zero ``QApplication``, matching how
+:mod:`~uadas_core.results.result_renderer_registry`'s own tests need no ``qapp`` fixture either (see
 that package's own test suite).
 """
 
@@ -49,9 +49,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.core.exceptions import ServiceError
-from src.core.logger import get_logger
-from src.services.workspace_service import WorkspaceService
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.core.logger import get_logger
+from uadas_core.services.workspace_service import WorkspaceService
 
 _logger = get_logger(__name__)
 
@@ -61,13 +61,13 @@ class DatasetPointerCommand:
     """One undoable "the active dataset pointer moved" event.
 
     Deliberately holds only two ids, never a ``Dataset`` or a dataframe -- undo/redo replay this
-    command by calling :meth:`~src.services.workspace_service.WorkspaceService.set_active_dataset`
+    command by calling :meth:`~uadas_core.services.workspace_service.WorkspaceService.set_active_dataset`
     with one id or the other, never by touching any dataset's data (see this module's own
     docstring for why that is sufficient).
 
     Attributes:
         description: Human-readable summary of what this command did -- typically the derived
-            dataset's own :attr:`~src.services.workspace_service.Dataset.derivation_description`,
+            dataset's own :attr:`~uadas_core.services.workspace_service.Dataset.derivation_description`,
             shown in a future status-bar/tooltip ("Undo: Dropped missing values in 'email'").
         dataset_id: The dataset that became active when this command was originally applied --
             what :meth:`CommandStack.redo` restores the active pointer to.
@@ -75,7 +75,7 @@ class DatasetPointerCommand:
             :meth:`CommandStack.undo` restores the active pointer to. ``None`` is a legal value
             (the very first dataset loaded into an empty workspace has no "previous active
             dataset" to undo back to), and undoing such a command clears the active dataset
-            entirely, matching :meth:`~src.services.workspace_service.WorkspaceService.
+            entirely, matching :meth:`~uadas_core.services.workspace_service.WorkspaceService.
             set_active_dataset`'s own ``None``-clears-it contract.
     """
 
@@ -85,7 +85,7 @@ class DatasetPointerCommand:
 
 
 class CommandStack:
-    """A linear undo/redo stack over :class:`~src.services.workspace_service.WorkspaceService`'s
+    """A linear undo/redo stack over :class:`~uadas_core.services.workspace_service.WorkspaceService`'s
     active-dataset pointer.
 
     Args:
@@ -137,7 +137,7 @@ class CommandStack:
     def undo(self) -> DatasetPointerCommand:
         """Move the active-dataset pointer back to the most recent command's parent.
 
-        Never touches any :class:`~src.services.workspace_service.Dataset` object or its
+        Never touches any :class:`~uadas_core.services.workspace_service.Dataset` object or its
         dataframe -- see this module's own docstring for why that is the entire point.
 
         Returns:
@@ -146,7 +146,7 @@ class CommandStack:
 
         Raises:
             ServiceError: If there is nothing to undo -- matching
-                :class:`~src.services.workspace_service.WorkspaceService`'s own convention of
+                :class:`~uadas_core.services.workspace_service.WorkspaceService`'s own convention of
                 raising rather than silently no-op'ing on an invalid caller request (a bound
                 ``edit.undo`` ``QAction`` is disabled whenever ``can_undo()`` is ``False``, per
                 its ``ActionSpec.predicate`` -- reaching this branch at all means a caller
@@ -168,7 +168,7 @@ class CommandStack:
     def redo(self) -> DatasetPointerCommand:
         """Move the active-dataset pointer forward to the most recently undone command's dataset.
 
-        Never touches any :class:`~src.services.workspace_service.Dataset` object or its
+        Never touches any :class:`~uadas_core.services.workspace_service.Dataset` object or its
         dataframe -- see :meth:`undo`'s own docstring; the identical guarantee applies in
         this direction.
 

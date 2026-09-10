@@ -7,9 +7,9 @@ anchors:
 
 # Chi-Square Test of Independence
 
-`src.analysis.chi_square.chi_square_test` -- via `scipy.stats`. Tests whether two categorical
+`uadas_core.analysis.chi_square.chi_square_test` -- via `scipy.stats`. Tests whether two categorical
 columns are independent of each other, over the same contingency table
-[cross-tabulation](../pipeline/explore.md) builds (`src.analysis.crosstab.cross_tabulate`) --
+[cross-tabulation](../pipeline/explore.md) builds (`uadas_core.analysis.crosstab.cross_tabulate`) --
 reused rather than re-derived, so the two features cannot silently disagree about what counts
 as a valid pair of columns.
 

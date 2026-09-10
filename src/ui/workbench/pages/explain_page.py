@@ -1,18 +1,18 @@
 # File: src/ui/workbench/pages/explain_page.py
-"""The EXPLAIN stage's page: shows an :class:`~src.analysis.explanation.Explanation`, when one exists.
+"""The EXPLAIN stage's page: shows an :class:`~uadas_core.analysis.explanation.Explanation`, when one exists.
 
 Per the plan's A5 section, :class:`~src.ui.results.explanation_panel.ExplanationPanel` is "a
 **sibling** of ``ResultCard``, not embedded" -- this page is the plainest possible demonstration
 of that split: it holds only an ``ExplanationPanel``, no ``ResultCard`` at all, and its guidance
 text says plainly what is and is not available without an AI provider configured.
 
-Populating a real ``Explanation`` requires an AI call (:mod:`src.ai.assistant_service` -- "the
-AI's role: interpret, not invent new numbers," per :data:`~src.services.
+Populating a real ``Explanation`` requires an AI call (:mod:`uadas_core.ai.assistant_service` -- "the
+AI's role: interpret, not invent new numbers," per :data:`~uadas_core.services.
 analysis_orchestrator_service._STAGE_RATIONALE`'s own EXPLAIN entry), which needs a configured
 LLM provider to be meaningful. Wiring that live call is explicitly out of scope for this
 milestone (see the plan's own M22 section, which lists only the rendering side); this page ships
 :meth:`show_explanation` as the real, tested rendering path a future milestone's AI wiring calls
-into, and defaults to an empty :class:`~src.analysis.explanation.Explanation` (every field blank)
+into, and defaults to an empty :class:`~uadas_core.analysis.explanation.Explanation` (every field blank)
 with guidance text saying so, rather than fabricating placeholder content that would look like a
 real interpretation.
 """
@@ -23,11 +23,11 @@ from typing import ClassVar
 
 from PySide6.QtWidgets import QVBoxLayout
 
-from src.analysis.explanation import Explanation
-from src.core.expertise_level import ExpertiseLevel
-from src.services.analysis_orchestrator_service import PipelineStage
 from src.ui.results.explanation_panel import ExplanationPanel
 from src.ui.workbench.stage_page import StagePage
+from uadas_core.analysis.explanation import Explanation
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
 
 _DEFAULT_GUIDANCE = (
     "Every prior stage's result should be interpreted in plain language before reporting. "
@@ -57,7 +57,7 @@ class ExplainPage(StagePage):
         self._expertise_level = level
 
     def show_explanation(self, explanation: Explanation, level: ExpertiseLevel) -> None:
-        """Render ``explanation`` -- called with a real :class:`~src.analysis.explanation.
+        """Render ``explanation`` -- called with a real :class:`~uadas_core.analysis.explanation.
         Explanation` once an AI provider is wired in, and with an empty one (this page's own
         constructor default) when none is available yet."""
         self.explanation_panel.display(explanation, level)

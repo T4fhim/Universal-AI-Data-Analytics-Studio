@@ -11,7 +11,7 @@ zero headroom to spare (the file sat at exactly 400 non-docstring lines as of mi
 This is the smallest, most self-contained group of existing handlers available to extract --
 none of the three methods here touch ``Workbench``, any other controller, or ``__init__``-only
 state, unlike ``MainWindow.attach_theme_manager`` (which stays on ``MainWindow`` itself: it is
-called externally by :mod:`src.core.app`, and mutates ``self._icon_provider``/
+called externally by :mod:`src.app`, and mutates ``self._icon_provider``/
 ``self._dock_manager`` state that only ``MainWindow`` holds).
 """
 
@@ -21,10 +21,10 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QWidget
 
-from src.plugins.plugin_manager import PluginManager
-from src.services.settings_service import SettingsService
 from src.ui.dialogs.about_dialog import AboutDialog
 from src.ui.dialogs.settings_dialog import SettingsDialog
+from uadas_core.plugins.plugin_manager import PluginManager
+from uadas_core.services.settings_service import SettingsService
 
 if TYPE_CHECKING:
     from src.ui.theme_manager import ThemeManager

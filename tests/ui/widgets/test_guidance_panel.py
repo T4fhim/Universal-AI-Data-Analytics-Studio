@@ -1,10 +1,10 @@
 # File: tests/ui/widgets/test_guidance_panel.py
 """Tests for GuidancePanel -- milestone 26.
 
-Uses real :class:`~src.services.guidance_service.Suggestion` instances (not a Qt-only stand-in)
+Uses real :class:`~uadas_core.services.guidance_service.Suggestion` instances (not a Qt-only stand-in)
 so these tests exercise the actual data shape :class:`~src.ui.main_window.MainWindow` feeds in
-via :class:`~src.services.guidance_service.GuidanceService`, while constructing no
-:class:`~src.services.guidance_service.GuidanceService` itself -- this is a pure display-widget
+via :class:`~uadas_core.services.guidance_service.GuidanceService`, while constructing no
+:class:`~uadas_core.services.guidance_service.GuidanceService` itself -- this is a pure display-widget
 test, per :class:`GuidancePanel`'s own "holds no service reference" docstring.
 """
 
@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QApplication
 
-from src.services.analysis_orchestrator_service import PipelineStage
-from src.services.guidance_service import Suggestion, SuggestionCategory
 from src.ui.widgets.guidance_panel import GuidancePanel
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
+from uadas_core.services.guidance_service import Suggestion, SuggestionCategory
 
 
 def _suggestion(

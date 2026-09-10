@@ -2,7 +2,7 @@
 """The REPORT stage's page: a read-only view of the recorded analysis log plus a Generate button.
 
 Report generation itself is already fully built (milestone 13's
-:class:`~src.services.report_service.ReportService`, wired through
+:class:`~uadas_core.services.report_service.ReportService`, wired through
 :class:`~src.ui.controllers.report_controller.ReportController` and its
 :class:`~src.ui.dialogs.generate_report_dialog.GenerateReportDialog`) -- this page does not
 duplicate that dialog or its options. It only surfaces "what has this dataset's pipeline
@@ -18,9 +18,9 @@ from typing import ClassVar
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QPushButton, QVBoxLayout
 
-from src.services.analysis_orchestrator_service import AnalysisLog, PipelineStage
 from src.ui.a11y.accessible import describe
 from src.ui.workbench.stage_page import StagePage
+from uadas_core.services.analysis_orchestrator_service import AnalysisLog, PipelineStage
 
 _DEFAULT_GUIDANCE = (
     "Every prior stage's result can be included in a report. Generate one once the stages "

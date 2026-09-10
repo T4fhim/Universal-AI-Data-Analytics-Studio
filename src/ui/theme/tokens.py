@@ -40,18 +40,18 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from src.core.expertise_level import ExpertiseLevel
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 
 class Density(StrEnum):
     """How tightly the UI packs content.
 
     Subclasses ``str`` for the same reason
-    :class:`~src.core.expertise_level.ExpertiseLevel` does — it round-trips
+    :class:`~uadas_core.core.expertise_level.ExpertiseLevel` does — it round-trips
     through ``config.yaml`` as a plain string with no conversion at the
     config boundary.
 
-    Milestone 26 maps :class:`~src.core.expertise_level.ExpertiseLevel` onto
+    Milestone 26 maps :class:`~uadas_core.core.expertise_level.ExpertiseLevel` onto
     these so a beginner gets large targets and generous spacing while an
     engineer gets compact rows -- see :data:`DENSITY_BY_EXPERTISE_LEVEL` and
     :meth:`~src.ui.theme_manager.ThemeManager.set_density` (built in
@@ -72,8 +72,8 @@ class Density(StrEnum):
 
 
 # Milestone 26: the mapping Density's own docstring anticipated since milestone 15.
-# Lives here (src.ui.theme), not in src.core.expertise_level, because Density is a
-# UI-theming concept -- src.core must never import from src.ui (see this repo's layered
+# Lives here (src.ui.theme), not in uadas_core.core.expertise_level, because Density is a
+# UI-theming concept -- uadas_core.core must never import from src.ui (see this repo's layered
 # architecture), so the mapping has to live on the UI side of that boundary, importing
 # ExpertiseLevel (the core-side vocabulary) rather than the other way around.
 #
@@ -248,11 +248,11 @@ class ThemeTokens:
         return mapping
 
 
-# Hue per :class:`~src.services.analysis_orchestrator_service.PipelineStage`,
+# Hue per :class:`~uadas_core.services.analysis_orchestrator_service.PipelineStage`,
 # in that enum's declaration order (UPLOAD, UNDERSTAND, CLEAN, EXPLORE,
 # ANALYZE, VISUALIZE, PREDICT, EXPLAIN, REPORT, REPRODUCE). Indexed by
 # position rather than keyed by the enum so this module stays free of any
-# import from src.services — tokens are consumed by the QSS compiler, which
+# import from uadas_core.services — tokens are consumed by the QSS compiler, which
 # must remain loadable with nothing else in the application constructed.
 _DARK_STAGE_HUES = (
     "#7AA2F7",

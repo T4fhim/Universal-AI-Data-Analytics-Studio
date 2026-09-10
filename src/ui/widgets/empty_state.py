@@ -46,10 +46,10 @@ from PySide6.QtGui import QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
-from src.core.constants import PROJECT_ROOT
-from src.core.logger import get_logger
 from src.ui.a11y.accessible import describe
 from src.ui.theme.tokens import DARK_TOKENS
+from uadas_core.core.constants import PROJECT_ROOT
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 

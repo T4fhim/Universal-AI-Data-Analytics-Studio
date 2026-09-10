@@ -1,8 +1,9 @@
 # Phase 1 — De-Risking & Readiness Plan
 
-**Status:** accepted 2026-09-07 · scope + order decisions locked (below) · execution NOT
-started — begins only on an explicit "get to work" from the user, after the Readiness Gate
-(Part B) passes.
+**Status:** accepted 2026-09-07 · scope + order decisions locked (below) · **Readiness Gate
+R0.1–R0.5 COMPLETE 2026-09-07** (artifacts committed; see Part B) · **R0.6 branch cut** ·
+execution of step 1.1+ NOT started — begins only on an explicit "get to work" from the user,
+after R0.3/R0.4 get their reviewer sign-off.
 
 **Decisions locked 2026-09-07 (user):**
 
@@ -65,7 +66,14 @@ These are not optional per-step choices; they are the operating rules for the wh
 Run in order. Each produces an artifact committed to the repo so the baseline is not "in
 someone's memory".
 
-### R0.1 — Capture the golden baseline
+### R0.1 — Capture the golden baseline — ✅ DONE 2026-09-07 → `plans/phase-1-baseline.md`
+
+Baseline at `main` = `1f06bdc`: **1381 passed · 103 skipped · 0 failed** (inv-1 `10 passed`;
+inv-2 `1371 passed, 103 skipped, 3 deselected`, exit `-1073741819` = the documented Qt-shutdown
+AV, CI-green-equivalent via `Max(0, negative)=0`). Collected: **1487 total / 1484 non-uia / 3
+uia**. `screenshot_app_state.py` → exit 0, `plans/baseline-app.png` (16 KB) committed. Wall
+~9.1 min. Full detail + the exact reproduce commands in `plans/phase-1-baseline.md` — that
+file is what Control A9 compares the post-1.1 suite against.
 
 ```powershell
 $env:QT_QPA_PLATFORM = "offscreen"
@@ -86,7 +94,17 @@ against.
 `main` = `6d4a07f`; GitHub Actions `test` / `lint` / `uia_integration` all `success`
 (verified 2026-09-06 via the API). Nothing to do — recorded here for completeness.
 
-### R0.3 — Confirm the carve-out package list (1.0)
+### R0.3 — Confirm the carve-out package list (1.0) — ✅ ANALYSIS DONE 2026-09-07 → `plans/phase-1-3-carveout-scope.md` (needs `code-reviewer`/`architect` sign-off before 1.1)
+
+**Corrections found** (full evidence in `plans/phase-1-3-carveout-scope.md`): (1) **`services`
+was missing** from the list below — added (7 headless modules incl. `analysis_orchestrator_service`,
+`workspace_service`; zero Qt). (2) **`engine` does not exist** — dropped. (3) **`workers`
+cannot move at 1.1** — its only module `base_worker.py` is a `QThread`; it stays in the shell,
+consumed only by `src/ui/*`, and step 1.2 replaces it. `core` splits as expected: `app.py`
+(the sole Qt file) stays, the other 9 modules move. `lint-imports` (R0.5) proves the corrected
+set has **no import path to Qt/Django**. Corrected 1.1 move set: `ai · analysis · cleaning ·
+database · forecasting · plugins · readers · reports · services · visualization` + `core/`
+minus `app.py`. Part D order unaffected.
 
 **The scope decision is made (header): Option A, carve-out.** `git mv` only the Qt-free
 packages (`core readers cleaning analysis forecasting visualization ai reports database
@@ -106,9 +124,14 @@ note reviewed by `code-reviewer`:
   moved.
 - **Any hard dependency-order error in Part D?** If none, Part D stands as written.
 
-### R0.4 — Design docs for the two new subsystems (1.6, 1.7)
+### R0.4 — Design docs for the two new subsystems (1.6, 1.7) — ✅ DRAFTED 2026-09-07 (architect) (needs reviewer + `security-reviewer` sign-off before 1.6/1.7 code)
 
-`architect` / `planner` produce, and a reviewer accepts, **before any 1.6 / 1.7 code**:
+Both docs written against the real code (every load-bearing claim spot-checked): the derived-
+dataset drop is confirmed at `src/services/project_service.py:288`; `Dataset` /
+`Visualization` / `DashboardTile` / `AnalysisLogEntry` fields verified. Files:
+`plans/phase-1-6-persistence-contract.md`, `plans/phase-1-7-provenance-dag.md`. Each carries a
+`## Scope fence` and a `## Unverified` section; the C-2 and C-3 acceptance tests are written
+out in full.
 
 - `plans/phase-1-6-persistence-contract.md` — the `Dataset` → Parquet + metadata-row schema;
   the `Visualization` → `{dataset_id, chart_type, chart_parameters}` record; the
@@ -118,18 +141,25 @@ note reviewed by `code-reviewer`:
   the portable **Recipe** format (DAG minus data); a worked example of reshaping a real
   `AnalysisLog.to_dict()` payload into the new shape and back. With an `## Unverified` section.
 
-### R0.5 — Author the import-linter contract, prove it locally
+### R0.5 — Author the import-linter contract, prove it locally — ✅ DONE 2026-09-07
+
+`import-linter==2.15` installed + pinned in `requirements.txt` (with `grimp==3.17`).
+`.importlinter` committed — one `forbidden` contract, `source_modules` = the corrected
+carve-out set (written against `src.*` for now; `core` listed as its 9 non-`app` submodules),
+`forbidden_modules = PySide6, PyQt5, PyQt6, django`, `allow_indirect_imports = False`. Local
+run:
 
 ```
-pip install import-linter==<pin>
-# .importlinter:  contract "uadas_core is Qt-free and framework-free"
-#   forbidden modules: PySide6, PyQt5, PyQt6, django
-lint-imports            # must exit 0 against the carved package boundary
+$ lint-imports
+Analyzed 264 files, 1389 dependencies.
+uadas_core (carve-out packages) must not import PySide6/PyQt/Django KEPT
+Contracts: 1 kept, 0 broken.          # exit 0
 ```
 
-**Deliverable:** `.importlinter` committed; `import-linter` pinned in `requirements.txt`;
-a `lint-imports` step added to the CI `lint` job (in the *same* commit as the `git mv`, so
-it never has a window of not running).
+**Still to do at 1.1:** the codemod rewrites `src.` → `uadas_core.` in `.importlinter` (and
+collapses the 9 `core` lines to `uadas_core.core` once `app.py` has left), and a `lint-imports`
+step is added to the CI `lint` job **in the same commit as the `git mv`** so it never has a
+window of not running.
 
 ### R0.6 — Branch
 
@@ -255,13 +285,22 @@ Merges to `main` only when, in a single CI run on `phase-1/extract-uadas-core`:
 
 ## Unverified (carried into execution as assumptions, not facts)
 
-- The R0.1 baseline suite counts are not yet captured — the "1371 passed" figure quoted in
-  older docs is from CI logs, never reproduced here. R0.1 establishes the real number.
-- Whether `scripts/screenshot_app_state.py` still boots cleanly after the carve-out is
-  assumed, not tested — R0.1 captures the "before", 1.1 verification ⑦ tests the "after".
-- The exact count of `from src.` references is not yet enumerated; Control A-3's grep does
-  that at execution time.
-- `import-linter`'s latest version and whether it needs `setup.cfg` vs `.importlinter` vs
-  `pyproject.toml` config on this toolchain — resolved at R0.5.
-- That the carve-out list of Qt-free packages is complete — the architect confirms against a
-  fresh `grep -rl PySide6 src` at R0.3.
+**Resolved by R0.1–R0.5 (2026-09-07):**
+
+- ~~R0.1 baseline counts~~ → captured: **1381 passed / 103 skipped / 0 failed**, 1487 collected
+  (`plans/phase-1-baseline.md`).
+- ~~`screenshot_app_state.py` boots on the pre-carve-out tree~~ → yes, exit 0
+  (`plans/baseline-app.png`).
+- ~~`import-linter` version / config format~~ → `import-linter==2.15`, `.importlinter` INI in
+  repo root, `lint-imports` exits 0.
+- ~~carve-out list complete~~ → confirmed + corrected (`plans/phase-1-3-carveout-scope.md`):
+  add `services`, drop `engine`, `workers` deferred to 1.2.
+
+**Still open (into execution):**
+
+- The exact count of `from src.` references is not yet enumerated per corrected package set;
+  Control A-3's grep does that at 1.1 execution time (rough total token count 2026-09-07:
+  ~1,267 `from src.`/`import src.` lines across `*.py` incl. `tests/` and the staying `src/ui/`).
+- The exact landing module for `core/app.py` in the shell — `architect` decides at 1.1.
+- `plans/phase-1-6-*` and `phase-1-7-*` each carry their own `## Unverified` sections — the
+  C-2 / C-3 acceptance tests are written but not yet run.

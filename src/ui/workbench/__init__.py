@@ -8,10 +8,10 @@ recorded in the plan document's Context section). :class:`~src.ui.workbench.work
 replaces it: a persistent ``QHBoxLayout`` of :class:`~src.ui.workbench.stage_rail.StageRail`
 (the pipeline's navigation spine) and a ``QStackedWidget`` holding one welcome page plus one
 :class:`~src.ui.workbench.stage_page.StagePage` per registered
-:class:`~src.services.analysis_orchestrator_service.PipelineStage`.
+:class:`~uadas_core.services.analysis_orchestrator_service.PipelineStage`.
 
 This package is display-only, matching :mod:`src.ui.dock_manager`'s own shape: it holds no
-service references and calls nothing in :mod:`src.services` or :mod:`src.ui.controllers`
+service references and calls nothing in :mod:`uadas_core.services` or :mod:`src.ui.controllers`
 directly (see ``tests/ui/test_import_layering.py``'s ``_WIDGET_LIKE_PACKAGES``, which this
 package joins in milestone 20). Business logic -- reading pipeline state, running a stage,
 reproducing a log -- lives in :class:`~src.ui.controllers.pipeline_controller.PipelineController`;

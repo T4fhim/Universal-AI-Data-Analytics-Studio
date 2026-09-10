@@ -6,7 +6,7 @@ anchors:
 
 # Aggregation
 
-`src.analysis.aggregation.aggregate`, run from the [Explore](../pipeline/explore.md) stage.
+`uadas_core.analysis.aggregation.aggregate`, run from the [Explore](../pipeline/explore.md) stage.
 
 Groups a dataset by one or more categorical columns and summarizes a numeric column within
 each group, using `sum`, `mean`, `median`, `min`, `max`, `count`, or `std`. Any function other

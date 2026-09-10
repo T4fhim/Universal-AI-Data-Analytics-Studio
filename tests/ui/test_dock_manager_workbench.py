@@ -43,7 +43,7 @@ def test_set_project_label_preserves_already_loaded_datasets(
 ) -> None:
     import pandas as pd
 
-    from src.services.workspace_service import Dataset
+    from uadas_core.services.workspace_service import Dataset
 
     window = QMainWindow()
     manager = DockManager(window)

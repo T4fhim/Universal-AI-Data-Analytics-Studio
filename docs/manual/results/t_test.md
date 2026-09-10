@@ -7,7 +7,7 @@ anchors:
 
 # Independent / Paired t-Test
 
-`src.analysis.t_test` -- via `scipy.stats`. Two separate entry points, not one function with a
+`uadas_core.analysis.t_test` -- via `scipy.stats`. Two separate entry points, not one function with a
 `paired` flag, since the two take genuinely different inputs: two independent columns/groups,
 versus two paired columns of equal length.
 

@@ -30,11 +30,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.core.logger import get_logger
 from src.ui.a11y.accessible import describe
 from src.ui.actions.action_binder import ActionBinder
 from src.ui.actions.action_registry import list_actions
 from src.ui.ui_state_bus import UiStateBus
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 

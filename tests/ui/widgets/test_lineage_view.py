@@ -3,10 +3,10 @@
 
 "A test constructs a lineage view against a real multi-generation dataset chain (dataset ->
 cleaned child -> cleaned grandchild) and asserts the tree structure reflects it." Uses a real
-:class:`~src.services.workspace_service.WorkspaceService` and a real
-:class:`~src.cleaning.duplicates.DropDuplicates` operation to build the chain -- not synthetic
-``Dataset`` stand-ins with a hand-set ``parent_dataset_id`` -- so :meth:`~src.services.
-workspace_service.WorkspaceService.get_lineage`/:meth:`~src.services.workspace_service.
+:class:`~uadas_core.services.workspace_service.WorkspaceService` and a real
+:class:`~uadas_core.cleaning.duplicates.DropDuplicates` operation to build the chain -- not synthetic
+``Dataset`` stand-ins with a hand-set ``parent_dataset_id`` -- so :meth:`~uadas_core.services.
+workspace_service.WorkspaceService.get_lineage`/:meth:`~uadas_core.services.workspace_service.
 WorkspaceService.get_children`'s real output is what drives the assertions.
 """
 
@@ -16,9 +16,9 @@ import pandas as pd
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
-from src.cleaning.duplicates import DropDuplicates
-from src.services.workspace_service import Dataset, WorkspaceService
 from src.ui.widgets.lineage_view import LineageView
+from uadas_core.cleaning.duplicates import DropDuplicates
+from uadas_core.services.workspace_service import Dataset, WorkspaceService
 
 
 def _make_chain() -> tuple[WorkspaceService, Dataset, Dataset, Dataset]:

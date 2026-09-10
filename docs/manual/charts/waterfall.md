@@ -6,7 +6,7 @@ anchors:
 
 # Waterfall Chart
 
-`src.visualization.advanced_charts.WaterfallChart`. **Required:** a category column (labels
+`uadas_core.visualization.advanced_charts.WaterfallChart`. **Required:** a category column (labels
 each step) and a numeric value column (each step's change, positive or negative).
 
 Shows the cumulative effect of a sequence of changes. Row order is treated as the intended

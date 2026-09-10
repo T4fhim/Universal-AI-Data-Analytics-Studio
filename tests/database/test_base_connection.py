@@ -1,5 +1,5 @@
 # File: tests/database/test_base_connection.py
-"""Tests for src.database.base_connection.BaseDatabaseConnection's shared logic.
+"""Tests for uadas_core.database.base_connection.BaseDatabaseConnection's shared logic.
 
 Exercised through DuckDbConnection specifically — the one connector in
 this package that needs no live server, so these tests run a genuine,
@@ -21,10 +21,10 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from src.core.exceptions import ServiceError
-from src.database.base_connection import _redact_credentials
-from src.database.connection_profile import ConnectionProfile, DatabaseType
-from src.database.duckdb_connection import DuckDbConnection
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.database.base_connection import _redact_credentials
+from uadas_core.database.connection_profile import ConnectionProfile, DatabaseType
+from uadas_core.database.duckdb_connection import DuckDbConnection
 
 
 @pytest.fixture()
@@ -45,6 +45,15 @@ def connection(seeded_db_path: Path) -> DuckDbConnection:
         name="test-duckdb", db_type=DatabaseType.DUCKDB, database=str(seeded_db_path)
     )
     return DuckDbConnection(profile)
+
+
+@pytest.fixture()
+def query_connection(seeded_db_path: Path) -> DuckDbConnection:
+    """A connection with the arbitrary-SQL capability granted (web-transition Phase 1.8)."""
+    profile = ConnectionProfile(
+        name="test-duckdb", db_type=DatabaseType.DUCKDB, database=str(seeded_db_path)
+    )
+    return DuckDbConnection(profile, allow_arbitrary_queries=True)
 
 
 def test_test_connection_succeeds_against_a_real_database(
@@ -73,14 +82,29 @@ def test_read_table_unknown_table_raises(connection: DuckDbConnection) -> None:
         connection.read_table("does_not_exist")
 
 
-def test_execute_query_runs_arbitrary_sql(connection: DuckDbConnection) -> None:
-    dataframe = connection.execute_query("SELECT SUM(revenue) AS total FROM sales")
+def test_execute_query_runs_arbitrary_sql(query_connection: DuckDbConnection) -> None:
+    dataframe = query_connection.execute_query(
+        "SELECT SUM(revenue) AS total FROM sales"
+    )
     assert dataframe["total"].iloc[0] == 600
 
 
-def test_execute_query_bad_sql_raises(connection: DuckDbConnection) -> None:
+def test_execute_query_bad_sql_raises(query_connection: DuckDbConnection) -> None:
     with pytest.raises(ServiceError):
-        connection.execute_query("SELECT this is not valid sql")
+        query_connection.execute_query("SELECT this is not valid sql")
+
+
+def test_execute_query_refused_without_the_capability(
+    connection: DuckDbConnection,
+) -> None:
+    """A connection opened for table browsing must reject arbitrary SQL (Phase 1.8).
+
+    Red before the fix: ``execute_query`` ran the SQL for any connection.
+    Green after: it raises ``ServiceError`` before the engine is touched
+    unless ``allow_arbitrary_queries=True`` was passed at construction.
+    """
+    with pytest.raises(ServiceError, match="not permitted to run arbitrary SQL"):
+        connection.execute_query("SELECT SUM(revenue) AS total FROM sales")
 
 
 def test_connect_missing_database_file_raises_on_use(tmp_path: Path) -> None:

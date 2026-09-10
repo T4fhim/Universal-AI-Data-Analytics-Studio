@@ -10,7 +10,7 @@ widget that already works with a screen reader.
 
 Holds no service references (see this package's own docstring on why) -- :meth:`update_state`
 is called externally, by :class:`~src.ui.workbench.workbench.Workbench`, with plain data already
-computed from :class:`~src.services.analysis_orchestrator_service.AnalysisLog`/``StageProposal``.
+computed from :class:`~uadas_core.services.analysis_orchestrator_service.AnalysisLog`/``StageProposal``.
 """
 
 from __future__ import annotations
@@ -18,8 +18,8 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QListWidget, QListWidgetItem, QWidget
 
-from src.services.analysis_orchestrator_service import PipelineStage
 from src.ui.a11y.accessible import describe
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
 
 _STAGE_ROLE = Qt.ItemDataRole.UserRole
 _STATUS_ROLE = Qt.ItemDataRole.UserRole + 1
@@ -59,11 +59,11 @@ def _stage_from_item_data(raw: object) -> PipelineStage:
 
 
 class StageRail(QListWidget):
-    """Lists every :class:`~src.services.analysis_orchestrator_service.PipelineStage` and its status.
+    """Lists every :class:`~uadas_core.services.analysis_orchestrator_service.PipelineStage` and its status.
 
     Signals:
         stage_selected: Emitted with the clicked item's
-            :class:`~src.services.analysis_orchestrator_service.PipelineStage` whenever the
+            :class:`~uadas_core.services.analysis_orchestrator_service.PipelineStage` whenever the
             user clicks or activates (Enter/Space) a rail entry.
     """
 
@@ -100,14 +100,14 @@ class StageRail(QListWidget):
 
         Args:
             completed: Stages considered done -- ordinarily
-                :meth:`~src.services.analysis_orchestrator_service.AnalysisLog.completed_stages`,
+                :meth:`~uadas_core.services.analysis_orchestrator_service.AnalysisLog.completed_stages`,
                 with ``PipelineStage.UPLOAD`` added by the caller when a dataset is active
                 (UPLOAD is never logged as a stage run -- see
-                :mod:`~src.services.analysis_orchestrator_service`'s own
+                :mod:`~uadas_core.services.analysis_orchestrator_service`'s own
                 ``_AUTO_PROPOSED_STAGES`` comment for why -- so "an active dataset exists" is
                 what "UPLOAD complete" actually means, and this class has no dataset
                 reference of its own to derive that from).
-            proposed: The stage :class:`~src.services.analysis_orchestrator_service.
+            proposed: The stage :class:`~uadas_core.services.analysis_orchestrator_service.
                 AnalysisOrchestratorService.propose_next_stage` currently recommends, or
                 ``None`` if nothing is proposed (no active dataset).
         """
@@ -170,7 +170,7 @@ class StageRail(QListWidget):
     def status_for(self, stage: PipelineStage) -> str | None:
         """Return the currently displayed status for ``stage`` -- ``"complete"``, ``"proposed"``,
         ``"pending"``, or ``None`` if ``stage`` is not in the rail (should not happen; every
-        :class:`~src.services.analysis_orchestrator_service.PipelineStage` value gets one item
+        :class:`~uadas_core.services.analysis_orchestrator_service.PipelineStage` value gets one item
         at construction).
 
         Exists mainly for tests to assert the rail's real state without parsing the display

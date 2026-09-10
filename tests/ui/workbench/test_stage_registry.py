@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.exceptions import ServiceError
-from src.services.analysis_orchestrator_service import PipelineStage
 from src.ui.workbench import stage_page, stage_registry
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
 
 
 def test_builtin_stages_are_registered() -> None:

@@ -11,16 +11,16 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QApplication
 
-from src.services.analysis_orchestrator_service import (
-    AnalysisLog,
-    AnalysisLogEntry,
-    PipelineStage,
-)
 from src.ui.workbench.pages.report_page import ReportPage
 from src.ui.workbench.pages.reproduce_page import ReproducePage
 from src.ui.workbench.pages.understand_page import UnderstandPage
 from src.ui.workbench.pages.welcome_page import WelcomePage
 from tests.ui.qt_helpers import click
+from uadas_core.services.analysis_orchestrator_service import (
+    AnalysisLog,
+    AnalysisLogEntry,
+    PipelineStage,
+)
 
 
 def test_understand_page_run_button_has_a_real_accessible_name(

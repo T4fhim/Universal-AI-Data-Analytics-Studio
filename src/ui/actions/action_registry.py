@@ -1,15 +1,15 @@
 # File: src/ui/actions/action_registry.py
 """Qt-free, import-time-populated registry of every application action.
 
-Mirrors :mod:`src.visualization.chart_registry`'s exact shape (a frozen
+Mirrors :mod:`uadas_core.visualization.chart_registry`'s exact shape (a frozen
 dataclass registration, a module-level ``_REGISTRY`` dict,
-``register_action`` raising :class:`~src.core.exceptions.ServiceError` on a
+``register_action`` raising :class:`~uadas_core.core.exceptions.ServiceError` on a
 duplicate id, plus ``get_action``/``list_actions``/``unregister_action``),
 per this overhaul's cross-cutting rule 3.
 
 **Deliberately holds no handler and no ``QIcon``.** ``chart_registry``
 works as pure data resolvable at import time because a
-:class:`~src.visualization.base_chart.BaseChart` subclass needs no
+:class:`~uadas_core.visualization.base_chart.BaseChart` subclass needs no
 ``QApplication`` to exist. An action's handler is a bound method of a
 ``MainWindow`` that is not constructed until well after this module is
 imported, and constructing a ``QIcon`` before ``QApplication`` exists is
@@ -26,12 +26,12 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
-from src.core.exceptions import ServiceError
-from src.core.logger import get_logger
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.core.logger import get_logger
 
 if TYPE_CHECKING:
-    from src.services.analysis_orchestrator_service import PipelineStage
     from src.ui.actions.action_context import ActionContext
+    from uadas_core.services.analysis_orchestrator_service import PipelineStage
 
 _logger = get_logger(__name__)
 
@@ -50,7 +50,7 @@ class ActionCategory(Enum):
     # are pure workbench navigation (Workbench.show_stage) with no
     # service call of their own, and because ActionSpec.stage (set on
     # every action in this category) is what GuidanceService.get_suggestions
-    # maps a PIPELINE-source Suggestion onto without src.services.guidance_service
+    # maps a PIPELINE-source Suggestion onto without uadas_core.services.guidance_service
     # ever importing src.ui.
     PIPELINE = "pipeline"
 
@@ -104,7 +104,7 @@ class ActionSpec:
         palette_visible: Whether the command palette lists this action.
             ``False`` for things a fuzzy-search mis-click makes
             disproportionately risky (quitting the application).
-        stage: Which :class:`~src.services.analysis_orchestrator_service.
+        stage: Which :class:`~uadas_core.services.analysis_orchestrator_service.
             PipelineStage` this action belongs to, if any -- read by
             milestone 26's ``GuidanceService`` to map a suggestion onto a
             concrete action id. ``None`` for actions with no stage
@@ -134,7 +134,7 @@ def register_action(spec: ActionSpec) -> None:
     Raises:
         ServiceError: If ``spec.action_id`` is already registered -- this
             project has no "last registration wins" convention anywhere
-            else (compare :func:`~src.visualization.chart_registry.
+            else (compare :func:`~uadas_core.visualization.chart_registry.
             register_chart`), so a colliding id surfaces immediately
             rather than silently shadowing whichever action registered
             first.

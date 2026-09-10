@@ -6,7 +6,7 @@ anchors:
 
 # Prophet
 
-`src.forecasting.prophet_forecast.forecast_prophet` -- via Meta's `prophet` library.
+`uadas_core.forecasting.prophet_forecast.forecast_prophet` -- via Meta's `prophet` library.
 
 Better than [Exponential Smoothing](exponential_smoothing.md) for longer series with multiple
 seasonal patterns (e.g. both weekly and yearly cycles) and series with missing dates or

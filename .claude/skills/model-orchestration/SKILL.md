@@ -10,6 +10,18 @@ individual subagent behaves internally. Per-agent model tiers are already fixed 
 agent's frontmatter (`model: haiku|sonnet` in `.claude/agents/*.md`) and are not decided here;
 this skill is about *which* agent/skill/model to reach for and when to change tier mid-task.
 
+**Project-arc routing** — which resources come online in which of the 7 desktop→web phases, the
+standing delegation rules, and the hook-awareness list — lives in
+[`docs/RESOURCE_ORCHESTRATION.md`](../../../docs/RESOURCE_ORCHESTRATION.md). Read it alongside
+`CLAUDE.md`. Its hard budget rule, verbatim: *inside a per-commit cycle the only subagent is the
+single per-commit `code-reviewer`; heavier specialists run at sub-step boundaries — this is what
+stops rate-limit exhaustion from stranding a half-done branch.*
+
+Note: the codebase mid-transition splits into a Qt-free `uadas_core/` (readers, analysis,
+cleaning, database, forecasting, plugins, reports, results, services, visualization, ai, jobs,
+core) and a disposable `src/ui/` + `src/workers/` shell. Paths below that still say
+`src/analysis`, `src/ai/`, etc. mean `uadas_core/...` post-Phase-1.1.
+
 ## Current agent tiers (already configured — reference, don't duplicate)
 
 Read-only, single-pass agents run on `haiku`: `architect`, `code-reviewer`,
@@ -43,10 +55,14 @@ tool call) rather than to edit the agent's frontmatter.
   milestone changed test/tooling/build state (not just application features), also run
   `milestone-doc-sync` immediately after — see that skill for why this is a separate step.
 - **Review after non-trivial change**: `code-reviewer` (quality), `security-reviewer` (only for
-  `src/ai/`, `src/readers/`, `src/database/`, credential/network/filesystem code), `a11y-reviewer`
-  (widget/dock/dialog/chart/QSS changes in `src/ui/`), and/or `performance-analyzer`
-  (DataFrame-processing, forecasting, or chart-rendering code with a data-volume dimension) —
-  select the one(s) relevant to what changed, not all four by default.
+  `uadas_core/ai/`, `uadas_core/readers/`, `uadas_core/database/`, `uadas_core/persistence/`,
+  credential/network/filesystem code — and note CI's `bandit` runs `--skip B608`, so a new
+  SQL-building module has *no* automated injection gate), `a11y-reviewer` (widget/dock/dialog/
+  chart/QSS changes in `src/ui/`), and/or `performance-analyzer` (DataFrame-processing,
+  forecasting, or chart-rendering code with a data-volume dimension) — select the one(s)
+  relevant to what changed, not all four by default. For deeper Python-idiom review use
+  `ecc:python-reviewer`; for type/invariant design `ecc:type-design-analyzer`; for swallowed
+  errors / bad fallbacks `ecc:silent-failure-hunter`.
 
 ## Confidence gate before writing code
 

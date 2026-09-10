@@ -9,7 +9,7 @@ anchors:
 **File > Save Project**, or **Ctrl+S**. Enabled only when a project is open.
 
 Writes the active project's current state to its existing file path
-(`src.services.project_service.ProjectService.save_project`): every loaded dataset's name and
+(`uadas_core.services.project_service.ProjectService.save_project`): every loaded dataset's name and
 source path (see [New Project](new.md) for what is and is not stored), and each dataset's
 recorded analysis log, so a later [Open Project](open.md) restores exactly what had already
 run against it.

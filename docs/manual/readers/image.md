@@ -6,7 +6,7 @@ anchors:
 
 # Image (OCR) Reader
 
-`src.readers.image_reader.ImageReader` -- `.png`, `.jpg`, `.jpeg`, `.bmp`, `.tiff`, `.tif`.
+`uadas_core.readers.image_reader.ImageReader` -- `.png`, `.jpg`, `.jpeg`, `.bmp`, `.tiff`, `.tif`.
 
 Fundamentally different from every other reader: **OCR output is not verifiable against ground
 truth the way every other reader's output is.** A CSV reader's correctness can be checked

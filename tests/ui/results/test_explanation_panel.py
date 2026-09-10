@@ -8,9 +8,9 @@ from __future__ import annotations
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from src.analysis.explanation import Explanation
-from src.core.expertise_level import ExpertiseLevel
 from src.ui.results.explanation_panel import ExplanationPanel
+from uadas_core.analysis.explanation import Explanation
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 _ALL_FIELDS = (
     "what",

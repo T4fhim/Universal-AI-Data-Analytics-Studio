@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Working method:** read [docs/RESOURCE_ORCHESTRATION.md](docs/RESOURCE_ORCHESTRATION.md) each
+session alongside this file — it is the standing doctrine for phase→resource routing (which
+agent / skill / model tier / MCP for which kind of work), the delegation rules, the hooks that
+already run automatically, and the living-truth discipline for this repo's lagging plan docs.
+
 ## What this is
 
 Universal AI Data Analytics & Visualization Studio — a PySide6 desktop app for importing, cleaning,
@@ -158,16 +163,16 @@ Several packages define an abstract base class that concrete implementations plu
 same shape: **stateless, classmethod-only** (never instantiated — mirrors how they're actually consumed,
 as classes held in a registry, not objects), with inputs validated before real work happens:
 
-- `src/readers/base_reader.py` → `BaseReader.can_read()` / `list_tables()` / `read()`. New format readers
-  register in `src/readers/reader_registry.py`'s `_REGISTERED_READERS` tuple — that's the one place to
+- `uadas_core/readers/base_reader.py` → `BaseReader.can_read()` / `list_tables()` / `read()`. New format readers
+  register in `uadas_core/readers/reader_registry.py`'s `_BUILTIN_READERS` tuple — that's the one place to
   touch when adding a reader.
-- `src/cleaning/base_operation.py` → `BaseOperation.apply(dataset, **kwargs) -> Dataset`. **Cleaning
+- `uadas_core/cleaning/base_operation.py` → `BaseOperation.apply(dataset, **kwargs) -> Dataset`. **Cleaning
   operations never mutate a `Dataset` in place** — always return a new `Dataset` with `parent_dataset_id`
   set to the source's `dataset_id` and `derivation_description` explaining the change. This is what makes
   undo and dataset lineage possible; don't special-case an in-place variant.
-- `src/visualization/base_chart.py` → `BaseChart.build(dataframe, **kwargs) -> go.Figure`. Charts return
+- `uadas_core/visualization/base_chart.py` → `BaseChart.build(dataframe, **kwargs) -> go.Figure`. Charts return
   Plotly `Figure` objects directly (no custom wrapper).
-- `src/ai/llm_provider.py` → `BaseLLMProvider` is the exception to "stateless classmethod-only" (it holds
+- `uadas_core/ai/llm_provider.py` → `BaseLLMProvider` is the exception to "stateless classmethod-only" (it holds
   a real SDK client and conversation history). Each provider (`AnthropicProvider`, `GeminiProvider`,
   `GroqProvider`) translates its SDK's own message/tool-call wire format to/from the shared
   `LLMTurn`/`PendingToolCall` shape, so `AssistantService`'s tool-dispatch loop never branches on which
@@ -187,6 +192,13 @@ visualization) are normal, expected state that dependent lookups handle graceful
 guard against. Preserve this non-cascading behavior when extending `WorkspaceService`'s methods. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#workspace-model) for the full `Dataset`/`Visualization`/
 `Dashboard` model.
+
+One deliberate exception at the persistence boundary (web-transition 1.6): `PersistenceService.
+save_workspace` does **not** persist a visualization whose dataset has been closed — it is reported
+in `SaveReport.skipped_visualization_ids` and its Parquet frame is GC'd. So that particular
+orphaned-reference state (visualization outliving its dataset) does not survive a save/load
+round-trip, even though it is legal in a live session. This is a save-side scope choice, not a
+break of the non-cascading rule.
 
 ### Configuration
 
@@ -233,7 +245,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#pyside6qt-layer-specifics) for m
 
 ### Multi-file touchpoints that do not auto-sync
 
-Adding a reader requires updating both `reader_registry.py`'s `_REGISTERED_READERS` tuple *and* the
+Adding a reader requires updating both `reader_registry.py`'s `_BUILTIN_READERS` tuple *and* the
 hardcoded `_DATASET_FILE_FILTER` string in `src/ui/main_window.py` — the second does not derive from the
 first automatically. Watch for the same class of gap (a registry plus a separately-hardcoded consumer)
 when extending charts, cleaning operations, or plugin categories.

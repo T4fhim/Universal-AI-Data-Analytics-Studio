@@ -17,7 +17,7 @@ in the plan's A3 dock-disposition table as this overhaul's only user-visible doc
 The Logging panel is the one dock with genuine behavior already: it
 attaches a ``logging.Handler`` to the root logger so that every log
 message the application emits (through
-:func:`~src.core.logger.get_logger`, used throughout this codebase)
+:func:`~uadas_core.core.logger.get_logger`, used throughout this codebase)
 appears in this panel live, not just in the rotating file and console
 output logger.py already provides.
 
@@ -27,7 +27,7 @@ milestone 1b-ii, and readers already logged from worker threads before this mile
 is simply the first call path that reliably crashed under test, and a crash found while adding
 UI is a crash worth fixing on the same milestone that found it, not deferred). A ``logging.Handler``
 whose ``emit()`` runs on whatever thread the logging call itself happens on -- and
-:meth:`~src.services.analysis_orchestrator_service.AnalysisOrchestratorService.run_stage`, called
+:meth:`~uadas_core.services.analysis_orchestrator_service.AnalysisOrchestratorService.run_stage`, called
 from :class:`~src.ui.controllers.pipeline_controller.PipelineController` via
 :class:`~src.ui.worker_runner.WorkerRunner`, logs from a ``QThreadPool`` worker thread -- was
 calling ``QPlainTextEdit.appendPlainText`` directly from that non-GUI thread, which is undefined
@@ -54,13 +54,13 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem,
 )
 
-from src.core.logger import get_logger
 from src.ui.dataset_close_menu import DatasetCloseMenu
 from src.ui.theme.tokens import DARK_TOKENS
 from src.ui.widgets.chart_view import ChartView
 from src.ui.widgets.chat_panel import ChatPanel
 from src.ui.widgets.data_table.data_table_view import DataTableView
 from src.ui.widgets.dataset_explorer_view import DatasetExplorerView
+from uadas_core.core.logger import get_logger
 
 if TYPE_CHECKING:
     # A previous edit's ruff auto-fix pass stripped this import as
@@ -142,7 +142,7 @@ class DockManager:
     def __init__(self, parent_window: QMainWindow) -> None:
         self._parent_window = parent_window
         # Set by attach_theme_manager() -- constructed after this class, by
-        # src/core/app.py, the same reason main_window.py's own theme
+        # src/app.py, the same reason main_window.py's own theme
         # manager reference is attached post-construction rather than
         # passed into __init__ (see MainWindow.attach_theme_manager's
         # docstring). None means "no theme applied yet"; display_chart()
@@ -262,10 +262,10 @@ class DockManager:
         Args:
             datasets: The datasets to display, typically the return
                 value of
-                :meth:`~src.services.workspace_service.WorkspaceService.list_datasets`.
+                :meth:`~uadas_core.services.workspace_service.WorkspaceService.list_datasets`.
                 Typed as a plain ``list`` rather than
                 ``list[Dataset]`` to avoid this module importing
-                ``src.services.workspace_service`` for a type hint
+                ``uadas_core.services.workspace_service`` for a type hint
                 alone — ``DockManager`` has no other reason to depend
                 on the services layer, and a ``TYPE_CHECKING``-only
                 import for one parameter's annotation was judged not
@@ -455,10 +455,10 @@ class DockManager:
         """Open (or bring to front) a :class:`DataTableView` tab for ``dataset``.
 
         Args:
-            dataset: A :class:`~src.services.workspace_service.Dataset`.
+            dataset: A :class:`~uadas_core.services.workspace_service.Dataset`.
                 Untyped here for the same reason ``refresh_dataset_list``'s
                 ``datasets`` parameter is a plain ``list`` -- avoiding an
-                import of ``src.services.workspace_service`` for one
+                import of ``uadas_core.services.workspace_service`` for one
                 parameter's annotation alone.
 
         A dataset already open in its own tab is raised rather than
@@ -508,11 +508,11 @@ class DockManager:
                 it for a more useful tab label.
             closable_ref: Milestone 23. ``(kind, id)`` -- ``("visualization",
                 visualization_id)`` or ``("dashboard", dashboard_id)`` -- identifying which
-                :class:`~src.services.workspace_service.WorkspaceService`-tracked object this
+                :class:`~uadas_core.services.workspace_service.WorkspaceService`-tracked object this
                 tab represents, so :meth:`connect_chart_closed`'s handler can actually close
                 it when the tab closes. ``None`` (the default) for a tab with nothing tracked
                 to close (an AI-built chart -- milestone 9's ``build_chart`` tool -- is never
-                added as a :class:`~src.services.workspace_service.Visualization`), matching
+                added as a :class:`~uadas_core.services.workspace_service.Visualization`), matching
                 every call site written before this milestone, which keeps working unchanged.
         """
         chart_view = ChartView(self._chart_tabs)
@@ -535,7 +535,7 @@ class DockManager:
 
         Called once by :mod:`src.ui.main_window` from its own
         ``attach_theme_manager`` (mirroring how that method itself is
-        called once by :mod:`src.core.app` after the ``QApplication``
+        called once by :mod:`src.app` after the ``QApplication``
         exists), so that a theme toggle recolours every chart tab already
         open at the time via ``Plotly.relayout`` -- no page reload, no
         flicker -- rather than only affecting charts opened after the

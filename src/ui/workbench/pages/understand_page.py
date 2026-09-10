@@ -3,7 +3,7 @@
 
 This is the page acceptance-tested by milestone 20 -- clicking :attr:`run_button` is meant to
 be the very first UI-driven call to
-:meth:`~src.services.analysis_orchestrator_service.AnalysisOrchestratorService.run_stage` this
+:meth:`~uadas_core.services.analysis_orchestrator_service.AnalysisOrchestratorService.run_stage` this
 application has ever made (see that service's own module docstring: before this milestone, the
 whole class was orphaned except ``get_log()``). This page itself makes no such call -- it only
 emits :attr:`run_requested`, which :mod:`src.ui.main_window` connects to
@@ -18,9 +18,9 @@ from typing import Any, ClassVar
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QPushButton, QVBoxLayout
 
-from src.services.analysis_orchestrator_service import PipelineStage
 from src.ui.a11y.accessible import describe
 from src.ui.workbench.stage_page import StagePage
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
 
 _DEFAULT_GUIDANCE = (
     "Profile the dataset first -- row/column counts, missing values, and types -- before "
@@ -62,14 +62,14 @@ class UnderstandPage(StagePage):
 
     def show_profile_summary(self, outputs: dict[str, Any]) -> None:
         """Render a `profile_dataset` tool's ``outputs`` dict (see
-        :meth:`~src.services.analysis_orchestrator_service.AnalysisOrchestratorService.
+        :meth:`~uadas_core.services.analysis_orchestrator_service.AnalysisOrchestratorService.
         _summarize_result`) as the result area's text.
 
         Args:
             outputs: The exact dict recorded on the resulting
-                :class:`~src.services.analysis_orchestrator_service.AnalysisLogEntry.outputs`
+                :class:`~uadas_core.services.analysis_orchestrator_service.AnalysisLogEntry.outputs`
                 -- this method does not reshape it, only formats the specific keys
-                ``_profile_dataset`` (:mod:`src.ai.tool_registry`) always includes.
+                ``_profile_dataset`` (:mod:`uadas_core.ai.tool_registry`) always includes.
         """
         row_count = outputs.get("row_count")
         column_count = outputs.get("column_count")

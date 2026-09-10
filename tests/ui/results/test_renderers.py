@@ -4,9 +4,9 @@ anywhere in this file, per milestone 22's acceptance criterion "Renderer tests r
 QApplication -- sections() returns comparable dataclasses."
 
 Each test builds a real result dataclass with plausible numbers (no mocking of
-:mod:`src.analysis` itself -- these are the exact dataclasses those functions return) and asserts
+:mod:`uadas_core.analysis` itself -- these are the exact dataclasses those functions return) and asserts
 against ``sections()``'s output using plain ``==``/``isinstance``, proving
-:class:`~src.ui.results.base_result_renderer.ResultSection` values really are comparable
+:class:`~uadas_core.results.base_result_renderer.ResultSection` values really are comparable
 dataclasses, not opaque objects that happen to be constructible.
 """
 
@@ -14,33 +14,33 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.analysis.anova import AnovaResult
-from src.analysis.chi_square import ChiSquareResult
-from src.analysis.clustering import ClusteringResult
-from src.analysis.column_profile import ColumnProfile
-from src.analysis.correlation import CorrelationResult
-from src.analysis.dataset_profile import DatasetProfile
-from src.analysis.normality import NormalityResult
-from src.analysis.pca import PcaResult
-from src.analysis.regression import RegressionResult
-from src.analysis.t_test import TTestResult
-from src.core.expertise_level import ExpertiseLevel
-from src.ui.results.base_result_renderer import (
+from uadas_core.analysis.anova import AnovaResult
+from uadas_core.analysis.chi_square import ChiSquareResult
+from uadas_core.analysis.clustering import ClusteringResult
+from uadas_core.analysis.column_profile import ColumnProfile
+from uadas_core.analysis.correlation import CorrelationResult
+from uadas_core.analysis.dataset_profile import DatasetProfile
+from uadas_core.analysis.normality import NormalityResult
+from uadas_core.analysis.pca import PcaResult
+from uadas_core.analysis.regression import RegressionResult
+from uadas_core.analysis.t_test import TTestResult
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.results.base_result_renderer import (
     AssumptionsSection,
     KeyValueSection,
     MetricSection,
     ProseSection,
     TableSection,
 )
-from src.ui.results.renderers.correlation import CorrelationResultRenderer
-from src.ui.results.renderers.generic import GenericResultRenderer
-from src.ui.results.renderers.multivariate import (
+from uadas_core.results.renderers.correlation import CorrelationResultRenderer
+from uadas_core.results.renderers.generic import GenericResultRenderer
+from uadas_core.results.renderers.multivariate import (
     ClusteringResultRenderer,
     PcaResultRenderer,
 )
-from src.ui.results.renderers.profiling import DatasetProfileRenderer
-from src.ui.results.renderers.regression import RegressionResultRenderer
-from src.ui.results.renderers.statistical_tests import (
+from uadas_core.results.renderers.profiling import DatasetProfileRenderer
+from uadas_core.results.renderers.regression import RegressionResultRenderer
+from uadas_core.results.renderers.statistical_tests import (
     AnovaResultRenderer,
     ChiSquareResultRenderer,
     NormalityResultRenderer,

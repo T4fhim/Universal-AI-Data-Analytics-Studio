@@ -1,12 +1,12 @@
 # File: src/ui/results/__init__.py
-"""Result rendering: turns ~2,000 orphaned :mod:`src.analysis` lines into product (milestone 22).
+"""Result rendering: turns ~2,000 orphaned :mod:`uadas_core.analysis` lines into product (milestone 22).
 
 Two layers, per the plan's A5 ("Result rendering"):
 
-1. :mod:`~src.ui.results.base_result_renderer` / :mod:`~src.ui.results.renderers` -- pure,
-   Qt-free functions. A :class:`~src.ui.results.base_result_renderer.BaseResultRenderer`
+1. :mod:`~uadas_core.results.base_result_renderer` / :mod:`~uadas_core.results.renderers` -- pure,
+   Qt-free functions. A :class:`~uadas_core.results.base_result_renderer.BaseResultRenderer`
    subclass converts one analysis-result dataclass (``TTestResult``, ``CorrelationResult``, ...)
-   into a list of :class:`~src.ui.results.base_result_renderer.ResultSection` dataclasses --
+   into a list of :class:`~uadas_core.results.base_result_renderer.ResultSection` dataclasses --
    plain data, testable with zero ``QApplication``.
 2. :class:`~src.ui.results.result_card.ResultCard` / :class:`~src.ui.results.explanation_panel.
    ExplanationPanel` -- the only place in this package that touches Qt, theming, or

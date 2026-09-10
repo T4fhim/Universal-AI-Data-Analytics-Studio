@@ -6,7 +6,7 @@ anchors:
 
 # Parquet Reader
 
-`src.readers.parquet_reader.ParquetReader` -- `.parquet`.
+`uadas_core.readers.parquet_reader.ParquetReader` -- `.parquet`.
 
 Single-table, and unusually simple: Parquet is a typed, columnar format with no
 encoding-detection or delimiter-sniffing concern like [the CSV reader](csv.md)'s, and no

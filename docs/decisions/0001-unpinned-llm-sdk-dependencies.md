@@ -27,7 +27,7 @@ Phase 5's code review flagged (MEDIUM) that `anthropic`, `openai`, and
 `google-genai` were added to `requirements.txt` with no version
 constraint, and that these three packages sit directly on the
 credential-handling path (`AnthropicProvider`, `GroqProvider`, and
-`GeminiProvider` in `src/ai/llm_provider.py` all take a raw API key at
+`GeminiProvider` in `uadas_core/ai/llm_provider.py` all take a raw API key at
 construction). The concern: an unpinned dependency can silently pull a
 compromised or breaking release on the next `pip install -r
 requirements.txt`.

@@ -7,10 +7,10 @@ log_dir, reset_logging_state fixtures) — it adds no new top-level
 pytest configuration of its own, only the AI-specific fixtures below.
 
 FakeLLMProvider below is the seam this whole test package leans on:
-:class:`~src.ai.llm_provider.BaseLLMProvider` is the documented,
+:class:`~uadas_core.ai.llm_provider.BaseLLMProvider` is the documented,
 already-abstract extension point AssistantService talks to (see
-src/ai/assistant_service.py's own docstring: "Delegates every
-provider-specific detail to src.ai.llm_provider so this class's own
+uadas_core/ai/assistant_service.py's own docstring: "Delegates every
+provider-specific detail to uadas_core.ai.llm_provider so this class's own
 logic is identical regardless of which provider is active"). Swapping
 in a hand-written subclass of that same abstract base — rather than
 patching individual methods on a real AnthropicProvider/GeminiProvider/
@@ -26,8 +26,8 @@ from typing import Any
 import pandas as pd
 import pytest
 
-from src.ai.llm_provider import BaseLLMProvider, LLMTurn, PendingToolCall
-from src.services.workspace_service import Dataset, WorkspaceService
+from uadas_core.ai.llm_provider import BaseLLMProvider, LLMTurn, PendingToolCall
+from uadas_core.services.workspace_service import Dataset, WorkspaceService
 
 
 class FakeLLMProvider(BaseLLMProvider):
@@ -111,10 +111,10 @@ def active_dataset(workspace: WorkspaceService) -> Dataset:
 def make_provider(
     monkeypatch: pytest.MonkeyPatch, turns: list[LLMTurn]
 ) -> FakeLLMProvider:
-    """Patch src.ai.provider_rotation.create_provider to hand back a scripted FakeLLMProvider.
+    """Patch uadas_core.ai.provider_rotation.create_provider to hand back a scripted FakeLLMProvider.
 
-    Patched at ``src.ai.provider_rotation`` (milestone 7), not
-    ``src.ai.assistant_service`` — since that milestone,
+    Patched at ``uadas_core.ai.provider_rotation`` (milestone 7), not
+    ``uadas_core.ai.assistant_service`` — since that milestone,
     ``AssistantService`` no longer calls ``create_provider`` directly;
     it goes through ``ProviderRotationService.current_provider()``,
     which is where the real ``create_provider(provider_name, api_key,
@@ -123,7 +123,7 @@ def make_provider(
     it resolves to — the same seam BaseLLMProvider always provided, just
     one module further down the call chain than before rotation existed.
     """
-    import src.ai.provider_rotation as provider_rotation_module
+    import uadas_core.ai.provider_rotation as provider_rotation_module
 
     fake = FakeLLMProvider(turns)
     monkeypatch.setattr(

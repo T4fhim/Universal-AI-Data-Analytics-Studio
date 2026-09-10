@@ -37,11 +37,11 @@ from __future__ import annotations
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QApplication
 
-from src.core.constants import AVAILABLE_THEMES
-from src.core.exceptions import ServiceError
-from src.core.logger import get_logger
 from src.ui.theme.qss_compiler import compile_qss
 from src.ui.theme.tokens import TOKENS_BY_NAME, Density, ThemeTokens
+from uadas_core.core.constants import AVAILABLE_THEMES
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 
@@ -52,11 +52,11 @@ class ThemeManager(QObject):
     Args:
         application: The ``QApplication`` themes are applied to. Stored by
             reference -- this class does not construct one, since exactly one
-            must exist per process and :mod:`src.core.app` owns that.
+            must exist per process and :mod:`src.app` owns that.
         parent: Optional ``QObject`` parent. Defaults to ``None`` so the
             manager's lifetime is controlled by whoever holds the reference,
-            matching how :mod:`src.core.app` keeps it alive for the duration
-            of :meth:`~src.core.app.Application.run`.
+            matching how :mod:`src.app` keeps it alive for the duration
+            of :meth:`~src.app.Application.run`.
 
     Signals:
         theme_changed: Emitted with the new theme name **after** the
@@ -89,7 +89,7 @@ class ThemeManager(QObject):
         # gets exactly the token set it always did rather than a
         # ThemeTokens.with_base_font_size(13) call that happens to be a
         # no-op today but would silently start doing something the moment
-        # the default in src/core/config.py ever changed.
+        # the default in uadas_core/core/config.py ever changed.
         self._base_font_size: int | None = None
         self._reduced_motion: bool = False
 
@@ -97,7 +97,7 @@ class ThemeManager(QObject):
         """Compile ``theme_name``'s tokens and apply the stylesheet.
 
         Args:
-            theme_name: One of :data:`~src.core.constants.AVAILABLE_THEMES`.
+            theme_name: One of :data:`~uadas_core.core.constants.AVAILABLE_THEMES`.
 
         Raises:
             ServiceError: If ``theme_name`` is unknown, or the template is
@@ -120,7 +120,7 @@ class ThemeManager(QObject):
 
         Separate from :meth:`apply_theme` because density and colour scheme
         are independent axes -- milestone 25 drives density from
-        :class:`~src.core.expertise_level.ExpertiseLevel` while leaving the
+        :class:`~uadas_core.core.expertise_level.ExpertiseLevel` while leaving the
         user's dark/light choice alone. A no-op when nothing changes, so
         callers may set it unconditionally without forcing a repolish of the
         entire widget tree.
@@ -192,7 +192,7 @@ class ThemeManager(QObject):
     def _resolve_tokens(self, theme_name: str) -> ThemeTokens:
         """Return the token set for ``theme_name`` at the current density.
 
-        Validates against :data:`~src.core.constants.AVAILABLE_THEMES` first
+        Validates against :data:`~uadas_core.core.constants.AVAILABLE_THEMES` first
         rather than just checking ``TOKENS_BY_NAME`` membership, so that a
         theme present in one and absent from the other produces a clear error
         naming the supported set instead of a bare ``KeyError``.

@@ -6,7 +6,7 @@ anchors:
 
 # Bar Chart
 
-`src.visualization.categorical_charts.BarChart`. **Required:** a category column. **Optional:**
+`uadas_core.visualization.categorical_charts.BarChart`. **Required:** a category column. **Optional:**
 a value column (aggregated per category; if omitted, bars show value counts).
 
 A categorical column with dozens or hundreds of distinct values produces an unreadable chart

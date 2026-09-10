@@ -9,7 +9,7 @@ anchors:
 **File > Save Project As...**, or **Ctrl+Shift+S**. Enabled only when a project is open.
 
 Prompts for a destination `*.uads.json` file and saves the active project there
-(`src.services.project_service.ProjectService.save_project` with an explicit path), the same
+(`uadas_core.services.project_service.ProjectService.save_project` with an explicit path), the same
 content [Save](save.md) writes. The chosen path becomes the project's path going forward --
 a subsequent plain **Save** writes to this new location, not the old one.
 

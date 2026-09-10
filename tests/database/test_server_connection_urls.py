@@ -12,11 +12,11 @@ correct, dialect-specific SQLAlchemy URL from a ConnectionProfile.
 
 from __future__ import annotations
 
-from src.database.connection_profile import ConnectionProfile, DatabaseType
-from src.database.mysql_connection import MySqlConnection
-from src.database.oracle_connection import OracleConnection
-from src.database.postgres_connection import PostgresConnection
-from src.database.sqlserver_connection import SqlServerConnection
+from uadas_core.database.connection_profile import ConnectionProfile, DatabaseType
+from uadas_core.database.mysql_connection import MySqlConnection
+from uadas_core.database.oracle_connection import OracleConnection
+from uadas_core.database.postgres_connection import PostgresConnection
+from uadas_core.database.sqlserver_connection import SqlServerConnection
 
 
 def _profile(db_type: DatabaseType, **overrides) -> ConnectionProfile:

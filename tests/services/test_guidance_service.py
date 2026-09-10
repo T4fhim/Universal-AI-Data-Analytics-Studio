@@ -1,5 +1,5 @@
 # File: tests/services/test_guidance_service.py
-"""Tests for src.services.guidance_service.GuidanceService.
+"""Tests for uadas_core.services.guidance_service.GuidanceService.
 
 Covers milestone 26's three service-level acceptance criteria:
 
@@ -26,13 +26,13 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from src.core.expertise_level import ExpertiseLevel
-from src.services.analysis_orchestrator_service import (
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.services.analysis_orchestrator_service import (
     AnalysisOrchestratorService,
     PipelineStage,
 )
-from src.services.guidance_service import GuidanceService, SuggestionCategory
-from src.services.workspace_service import Dataset, WorkspaceService
+from uadas_core.services.guidance_service import GuidanceService, SuggestionCategory
+from uadas_core.services.workspace_service import Dataset, WorkspaceService
 
 
 def _fresh_dataset() -> Dataset:

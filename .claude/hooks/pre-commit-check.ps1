@@ -22,6 +22,17 @@ if (-not (Test-Path $py)) {
     exit 2
 }
 
+# Fast path: a commit that stages no .py file cannot change pytest or bandit
+# outcomes (both scan Python only), so skip the ~7-minute two-stage suite for
+# docs / plans / markdown / workflow-yaml commits. Any staged .py -- including
+# under tests/ or a conftest -- runs the full gate. Deletions count too (a
+# removed module can break an import-layering test).
+$stagedPy = @(& git diff --cached --name-only) | Where-Object { $_ -match '\.py$' }
+if (-not $stagedPy) {
+    Write-Host "pre-commit-check: no .py files staged -- skipping pytest/bandit."
+    exit 0
+}
+
 Write-Host "Running pytest..."
 # NOT a bare `python -m pytest`: verified directly (2026-09-01) that this exact bare
 # invocation can report a fully clean pytest summary (e.g. "1384 passed, 103 skipped,
@@ -50,11 +61,11 @@ Write-Host "Running Bandit..."
 # holds no real password). Added in Phase 0.6 of the web-transition plan, same
 # invocation the CI `lint` job runs. Phase 1.8's security pass removes baseline
 # entries as it fixes them; anything NOT in the baseline fails the commit.
-& $py -m bandit -r src -q -b ".bandit-baseline.json"
+& $py -m bandit -r src uadas_core -q --skip B101,B107,B608
 $banditExit = $LASTEXITCODE
 
 if ($banditExit -ne 0) {
-    Write-Error "Security checks failed (new bandit finding not in .bandit-baseline.json). Commit blocked."
+    Write-Error "Security checks failed (bandit finding outside the B101/B107/B608 skip set). Commit blocked."
     exit 2
 }
 

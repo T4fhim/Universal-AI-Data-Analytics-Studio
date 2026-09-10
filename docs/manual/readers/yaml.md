@@ -6,7 +6,7 @@ anchors:
 
 # YAML Reader
 
-`src.readers.yaml_reader.YamlReader` -- `.yaml`, `.yml`.
+`uadas_core.readers.yaml_reader.YamlReader` -- `.yaml`, `.yml`.
 
 Single-table, and the same shape as [the JSON reader](json.md) for the same underlying reason:
 both formats can encode either a list of flat records (the common, directly tabular case) or a

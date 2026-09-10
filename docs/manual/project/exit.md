@@ -10,7 +10,7 @@ anchors:
 
 Closes the main window. Before doing so, the application detaches the logging panel's log
 handler and closes every live database connection opened this session
-(`src.services.database_connection_service.DatabaseConnectionService.close_all_connections`).
+(`uadas_core.services.database_connection_service.DatabaseConnectionService.close_all_connections`).
 
 This action does not prompt to save an open project with unsaved changes -- there is currently
 no "unsaved changes" tracking in the project model to prompt from. If autosave is enabled (see

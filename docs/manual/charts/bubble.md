@@ -6,7 +6,7 @@ anchors:
 
 # Bubble Chart
 
-`src.visualization.advanced_charts.BubbleChart`. **Required:** x, y, and size columns (all
+`uadas_core.visualization.advanced_charts.BubbleChart`. **Required:** x, y, and size columns (all
 numeric; size must be non-negative). **Optional:** a color column.
 
 A scatter plot with a third numeric dimension mapped to marker size. Marker size is scaled so

@@ -42,9 +42,9 @@ from pathlib import Path
 
 from PySide6.QtCore import QTemporaryDir, QUrl
 
-from src.core.constants import PROJECT_ROOT
-from src.core.exceptions import ServiceError
-from src.core.logger import get_logger
+from uadas_core.core.constants import PROJECT_ROOT
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 

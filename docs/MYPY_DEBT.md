@@ -15,43 +15,76 @@ folded into CI's scope even though they were kept clean).
 ## How to reproduce these numbers
 
 ```powershell
-python -m mypy src/ --ignore-missing-imports --follow-imports=silent
+# Post web-transition-1.1: the Qt-free packages moved to uadas_core/, so the
+# reproduce command must cover BOTH trees. `mypy src/` alone now misses ~113 files.
+python -m mypy src/ uadas_core/ --ignore-missing-imports --follow-imports=silent --no-incremental
 ```
 
-As of this document's commit: **72 errors in 19 files** (down from 79
-before this remediation pass fixed 7 genuine, narrowly-scoped bugs in
-`src/ui/controllers/pipeline_controller.py`,
-`src/ui/widgets/data_table/pandas_table_model.py`, and
-`src/ui/dialogs/create_visualization_dialog.py` -- see git history for the
-commit that introduced this document for the exact diffs).
+**Rolling count (web-transition Phase 1):**
+- Milestone-19-27 remediation-pass commit: 72 errors / 19 files (`mypy src/` only), down from 79.
+- **2026-09-08 (post web-transition 1.1/1.2/1.5/1.8, two-tree `--no-incremental`): 74 errors /
+  19 files** (checked 213 source files). `src/ui/main_window.py` = **31** of them — 29 the
+  single `DependencyContainer.resolve() -> object` root cause below, + 2 unrelated (a
+  `Callable[[], bool]` vs `Callable[[], None]` callback arg at `:292`, a `ThemeTokens | None`
+  at `:510`). The other 43 are unrelated pre-existing debt (`uadas_core/ai/llm_provider.py` 8,
+  `uadas_core/reports/word_exporter.py` 7, `uadas_core/visualization/advanced_charts.py` 6,
+  the `cleaning/*` + `visualization/*` chart modules, `plugin_loader.py` 3, …).
+- **2026-09-09 (post web-transition 1.4, two-tree `--no-incremental`): 44 errors / 18 files**
+  (checked 213). Phase 1.4 added a typed `resolve(key: type[T]) -> T` / `-> Any` `@overload`
+  pair to `DependencyContainer` — `-> Any` fallback deliberately, not `-> object` (which would
+  trip `overload-overlap` on `dependency_container.py`, itself in CI's mypy scope). Effect:
+  **`mypy src/ui/main_window.py` 31 → 2** (the 29 `resolve() -> object` errors gone; the 2
+  named above remain, genuinely separate root causes), and one further `resolve()`-derived
+  error elsewhere in the full-tree run cleared (74 → 44 overall, 19 → 18 files).
+  `src/ui/main_window.py` still carries 2 errors so it stays **off** CI's scope; instead
+  **`src/app.py` was added** to CI's mypy list — the generic let it drop 3 `cast()` calls, it
+  survives Phase 2, and it had silently lost coverage at the 1.1 carve-out (covered via
+  `src/core`, which then left the list). Folding
+  `uadas_core/core/dependency_container.py` in was a no-op — `uadas_core/core` is already
+  entry #1.
+- **2026-09-10 (post web-transition 1.6 + 1.7 + the whole-branch diagnosis sweep, two-tree
+  `--no-incremental`): 44 errors / 18 files** (checked **218** — the +5 vs the 1.4 run are the
+  new `uadas_core/persistence/*` and `uadas_core/provenance/*` modules). **No change to the
+  error count**: 1.6 (`persistence`) and 1.7 (`provenance`) are greenfield and mypy-clean, and
+  each was folded into CI's `mypy (clean packages)` list at its own sub-step. That CI list now
+  checks **153 source files → "Success"** (1.4 `+src/app.py` → 148; 1.6 `+uadas_core/persistence`
+  → 150; 1.7 `+uadas_core/provenance` → 153). The 44 remaining two-tree errors are entirely
+  pre-existing Phase-0 debt in packages that were never on the list
+  (`uadas_core/ai/llm_provider.py`, `uadas_core/reports/word_exporter.py`,
+  `uadas_core/visualization/advanced_charts.py`, the `cleaning/*` + `visualization/*` chart
+  modules, `plugin_loader.py`, `src/ui/main_window.py` ×2, …) — untouched by Phase 1, tracked
+  here, not a Phase-1 regression.
 
 ## Excluded packages, categorized
 
-### `src/ui/main_window.py` -- 29 errors, all one root cause
+### `src/ui/main_window.py` -- 2 errors (was 31; 29 fixed in web-transition 1.4)
 
-Every error here is `"object" has no attribute "..."` or `Argument N ...
-has incompatible type "object"; expected "<ServiceType>"`. This is
-`DependencyContainer.resolve()` returning `object` (see
-`docs/ARCHITECTURE.md`'s dependency-container section) -- every
+Until Phase 1.4 this was 31 errors, 29 of them one root cause:
+`DependencyContainer.resolve()` returned `object` (see
+`docs/ARCHITECTURE.md`'s dependency-container section), so every
 `resolve(...)` call site in `main_window.py`'s `_build_controllers`/
-`_build_services` wiring loses the concrete service type and mypy correctly
-flags every attribute access and constructor argument built from that
-result. This is an architecture-level typing gap, not a bug in
-`main_window.py` itself, and fixing it means adding a typed
-`resolve(self, key: type[T]) -> T` overload (or an equivalent generic
-registration API) to `DependencyContainer` itself -- real, but
-out-of-scope for a remediation pass whose brief was "narrowly-scoped
-fixes, not sweeping changes." Flagged here as a recommendation for
-whichever milestone next touches `DependencyContainer`.
+`_build_services` wiring lost the concrete service type and mypy flagged
+every attribute access and constructor argument built from that result.
+Phase 1.4 added the typed `resolve(self, key: type[T]) -> T` overload to
+`DependencyContainer` (see that module + `.github/workflows/ci.yml`'s
+mypy-scope comment), clearing all 29.
 
-### `src/ai/` -- 9 errors (`llm_provider.py`: 8, `tool_registry.py`: 1)
+The 2 that remain are unrelated pre-existing debt, not the resolve gap:
+`:292` passes a `Callable[[], bool]` where a `Callable[[], None]` is
+expected (a callback whose return value is ignored at the call site);
+`:510` passes `ThemeTokens | None` where `IconProvider.set_tokens` wants a
+non-optional `ThemeTokens` (a missing `None` guard). Both are small,
+independent fixes; `main_window.py` is Phase-2-doomed so neither is
+scheduled, and the file stays off CI's mypy list until they're gone.
+
+### `uadas_core/ai/` -- 9 errors (`llm_provider.py`: 8, `tool_registry.py`: 1)
 
 `llm_provider.py`'s errors are all third-party SDK typing mismatches
 (Anthropic's `Messages.create(tools=...)` overload set, `google-genai`'s
 `Content | None` union, OpenAI's `ChatCompletionMessageFunctionToolCall |
 ChatCompletionMessageCustomToolCall` union) -- each provider's own
 docstring already explains why it translates its SDK's wire format by
-hand (see `BaseLLMProvider`'s docstring in `src/ai/llm_provider.py`), and
+hand (see `BaseLLMProvider`'s docstring in `uadas_core/ai/llm_provider.py`), and
 the SDKs' own generated stubs are stricter than the code's actual runtime
 behavior (e.g. every call site already narrows the union before use, but
 mypy still flags the access on the wider type). Narrowly fixing this
@@ -65,7 +98,7 @@ fixed narrowly in `create_visualization_dialog.py` in this same pass (see
 git history) -- worth the same treatment, left out only because fixing it
 alone does not make the rest of the package clean enough to add to CI.
 
-### `src/reports/word_exporter.py` -- 7 errors
+### `uadas_core/reports/word_exporter.py` -- 7 errors
 
 `python-docx`'s `Document` class returns effectively-`Any` (`Document?` in
 mypy's own output) from its constructor and every method
@@ -77,7 +110,7 @@ this, but not attempted here since seven call-site ignores across one
 file reads closer to "sweeping" than the "reasonable, narrowly-scoped
 fixes" this pass was asked for.
 
-### `src/visualization/*.py` -- 13 errors, all `Signature of "build"
+### `uadas_core/visualization/*.py` -- 13 errors, all `Signature of "build"
 incompatible with supertype "BaseChart"` (`distribution_charts.py`,
 `continuous_charts.py`, `categorical_charts.py`, `forecast_charts.py`,
 `advanced_charts.py`)
@@ -94,7 +127,7 @@ an explicit `# type: ignore[override]` to all thirteen with a comment
 pointing at the same interface-design tradeoff -- an architecture
 decision, not a bug, and out of scope for this pass to make unilaterally.
 
-### `src/cleaning/*.py` -- 5 errors, same pattern as visualization
+### `uadas_core/cleaning/*.py` -- 5 errors, same pattern as visualization
 
 `type_conversion.py`, `text_normalization.py`, `missing_values.py` (x2),
 `duplicates.py`: `Signature of "apply" incompatible with supertype
@@ -104,7 +137,7 @@ Same reasoning, same recommendation: an interface-design call for
 whichever milestone next touches `BaseOperation`/`BaseChart`, not
 something to paper over with an ignore-comment sweep here.
 
-### `src/forecasting/exponential_smoothing.py` -- 2 errors
+### `uadas_core/forecasting/exponential_smoothing.py` -- 2 errors
 
 `Unsupported operand types for * ("int" and "None")` -- a real, narrow
 `Optional` handling gap (a config value typed as `int | None` reaches an
@@ -115,7 +148,7 @@ specific value or actually be treated as a caller error was judged
 outside a mypy-scoping remediation pass's remit -- flagged here as a
 straightforward follow-up.
 
-### `src/readers/*.py` -- 3 errors
+### `uadas_core/readers/*.py` -- 3 errors
 
 `word_reader.py` (a `Path` passed where `python-docx`'s `Document()` stub
 declares `str | IO[bytes] | None`), `csv_reader.py` (a `max(..., key=...)`
@@ -127,7 +160,7 @@ to the others -- left as one paragraph of debt rather than three
 one-line fixes rushed in without reader-specific test coverage to back
 them.
 
-### `src/plugins/plugin_loader.py` -- 3 errors
+### `uadas_core/plugins/plugin_loader.py` -- 3 errors
 
 `Argument 1 to "register_reader" has incompatible type "type[object]";
 expected "type[BaseReader]"` (and the same for `register_operation`/
@@ -145,7 +178,7 @@ patch bundled into a mypy-scoping remediation.
 ## What changed in this pass
 
 Newly added to CI's mypy scope (all now genuinely clean):
-`src/core`, `src/services`, `src/analysis`, `src/database`, `src/workers`,
+`uadas_core/core`, `uadas_core/services`, `uadas_core/analysis`, `uadas_core/database`, `src/workers`,
 and within `src/ui/`: `controllers`, `workbench`, `widgets`, `results`,
 `dialogs`, and every standalone top-level `src/ui/*.py` module except
 `main_window.py` (`command_stack.py`, `command_palette.py`,

@@ -4,8 +4,8 @@
 Acceptance criterion 2 of milestone 23: "Undo reverses the active-dataset pointer to the parent
 (never re-mutates data) -- a test asserts the parent's dataframe is byte-identical before and
 after an undo/redo cycle." Every test here uses a real
-:class:`~src.services.workspace_service.WorkspaceService`, a real
-:class:`~src.cleaning.duplicates.DropDuplicates` operation, and a real pandas ``DataFrame`` --
+:class:`~uadas_core.services.workspace_service.WorkspaceService`, a real
+:class:`~uadas_core.cleaning.duplicates.DropDuplicates` operation, and a real pandas ``DataFrame`` --
 nothing mocked, matching this project's "no service mocking" convention already established by
 ``tests/ui/results/`` (see M22's own report).
 """
@@ -16,10 +16,10 @@ import pandas as pd
 import pandas.testing as pdt
 import pytest
 
-from src.cleaning.duplicates import DropDuplicates
-from src.core.exceptions import ServiceError
-from src.services.workspace_service import Dataset, WorkspaceService
 from src.ui.command_stack import CommandStack, DatasetPointerCommand
+from uadas_core.cleaning.duplicates import DropDuplicates
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.services.workspace_service import Dataset, WorkspaceService
 
 
 def _make_parent_dataset() -> Dataset:

@@ -1,5 +1,5 @@
 # File: src/ui/results/explanation_panel.py
-"""``ExplanationPanel``: renders an :class:`~src.analysis.explanation.Explanation`'s 7 fields.
+"""``ExplanationPanel``: renders an :class:`~uadas_core.analysis.explanation.Explanation`'s 7 fields.
 
 A **sibling** of :class:`~src.ui.results.result_card.ResultCard`, not embedded inside it -- per
 the plan's A5 section, that separation is "the key to the API-key problem: results render
@@ -10,12 +10,12 @@ exists.
 
 Each field is a collapsible :class:`QGroupBox` (Qt's checkable-group-box idiom doubles as a
 disclosure triangle here: unchecked hides the body, checked shows it) defaulting open or closed
-per the active :class:`~src.core.expertise_level.ExpertiseLevel`, per A5's own spec: "BEGINNER
+per the active :class:`~uadas_core.core.expertise_level.ExpertiseLevel`, per A5's own spec: "BEGINNER
 opens *what* + *why_it_matters*, RESEARCHER opens *assumptions* + *limitations*, ENGINEER opens
 *how_calculated*." The three levels A5 does not name explicitly (STUDENT, ANALYST,
 DECISION_MAKER) still need a sensible default rather than an unspecified one falling through to
 "nothing open" -- :data:`EXPLANATION_DEFAULT_EXPANDED` picks one consistent with each level's own
-:data:`~src.core.expertise_level.EXPERTISE_LEVEL_GUIDANCE` phrasing (STUDENT additionally wants
+:data:`~uadas_core.core.expertise_level.EXPERTISE_LEVEL_GUIDANCE` phrasing (STUDENT additionally wants
 *how_calculated*, since that guidance text says this user "benefits from seeing how a conclusion
 was reached"; ANALYST wants *confidence_or_uncertainty* alongside *what*, matching its guidance's
 "caveats worth flagging"; DECISION_MAKER mirrors BEGINNER's *what* + *why_it_matters*, matching
@@ -26,9 +26,9 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QGroupBox, QLabel, QVBoxLayout, QWidget
 
-from src.analysis.explanation import Explanation
-from src.core.expertise_level import ExpertiseLevel
 from src.ui.a11y.accessible import describe
+from uadas_core.analysis.explanation import Explanation
+from uadas_core.core.expertise_level import ExpertiseLevel
 
 # Field name -> (display title, how to read the field's value as display text).
 _FIELDS: tuple[tuple[str, str], ...] = (
@@ -54,12 +54,12 @@ EXPLANATION_DEFAULT_EXPANDED: dict[ExpertiseLevel, tuple[str, ...]] = {
 
 
 class ExplanationPanel(QWidget):
-    """Renders an :class:`~src.analysis.explanation.Explanation`, one collapsible section per field.
+    """Renders an :class:`~uadas_core.analysis.explanation.Explanation`, one collapsible section per field.
 
     Holds no service references, matching :class:`~src.ui.results.result_card.ResultCard`'s own
-    shape -- a caller hands this a real :class:`~src.analysis.explanation.Explanation` and an
-    :class:`~src.core.expertise_level.ExpertiseLevel` via :meth:`display`; nothing here calls
-    :mod:`src.ai` to produce one.
+    shape -- a caller hands this a real :class:`~uadas_core.analysis.explanation.Explanation` and an
+    :class:`~uadas_core.core.expertise_level.ExpertiseLevel` via :meth:`display`; nothing here calls
+    :mod:`uadas_core.ai` to produce one.
     """
 
     def __init__(self, parent: QWidget | None = None) -> None:

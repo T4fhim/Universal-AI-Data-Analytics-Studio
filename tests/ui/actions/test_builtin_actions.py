@@ -114,9 +114,9 @@ def test_every_pipeline_stage_with_a_registered_workbench_page_has_a_go_to_actio
     src.ui.workbench.stage_registry actually registers a page for -- see
     builtin_actions.py's own _STAGE_NAV_ACTIONS comment on why UPLOAD is excluded.
     """
-    from src.services.analysis_orchestrator_service import PipelineStage
     from src.ui.actions.action_registry import Requirement
     from src.ui.workbench.stage_registry import list_registered_stages
+    from uadas_core.services.analysis_orchestrator_service import PipelineStage
 
     registered_stages = list_registered_stages()
     assert PipelineStage.UPLOAD not in registered_stages  # sanity: no page for it

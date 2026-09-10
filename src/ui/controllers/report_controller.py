@@ -11,18 +11,18 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QMessageBox, QWidget
 
-from src.core.logger import get_logger
-from src.services.analysis_orchestrator_service import (
-    AnalysisOrchestratorService,
-    PipelineStage,
-)
-from src.services.report_service import ReportService
-from src.services.settings_service import SettingsService
-from src.services.workspace_service import WorkspaceService
 from src.ui.dialogs.generate_report_dialog import GenerateReportDialog
 from src.ui.dock_manager import DockManager
 from src.ui.status_bar import ApplicationStatusBar
 from src.ui.worker_runner import WorkerRunner
+from uadas_core.core.logger import get_logger
+from uadas_core.services.analysis_orchestrator_service import (
+    AnalysisOrchestratorService,
+    PipelineStage,
+)
+from uadas_core.services.report_service import ReportService
+from uadas_core.services.settings_service import SettingsService
+from uadas_core.services.workspace_service import WorkspaceService
 
 _logger = get_logger(__name__)
 

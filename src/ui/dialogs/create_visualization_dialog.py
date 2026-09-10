@@ -2,7 +2,7 @@
 """Dialog for building a chart from the active dataset's columns.
 
 Maps a small, fixed registry of chart-type names to their
-:mod:`src.visualization` builder classes and the columns each one
+:mod:`uadas_core.visualization` builder classes and the columns each one
 needs — rather than a fully dynamic parameter form driven by
 inspecting each builder's signature, which would need real parameter
 introspection this project's chart classes were not built to support
@@ -15,13 +15,14 @@ types this registry now lists.
 **Milestone 24: rebuilt on the shared multi-select picker, unlocking Treemap/Radar.**
 Before this milestone, every field got one :class:`QComboBox`, which cannot represent a
 ``list[str]`` parameter (Treemap's ``path_columns``, Radar's ``value_columns``) — so
-:attr:`~src.visualization.chart_registry.ChartRegistration.dialog_compatible` excluded both
+:attr:`~uadas_core.visualization.chart_registry.ChartRegistration.dialog_compatible` excluded both
 chart types from this dialog entirely, even though their column requirements are otherwise
 exactly as expressible as any other chart's. Now a field named in
-:attr:`~src.visualization.chart_registry.ChartRegistration.list_fields` gets a
+:attr:`~uadas_core.visualization.chart_registry.ChartRegistration.list_fields` gets a
 :class:`~src.ui.widgets.column_multi_select.ColumnMultiSelect` instead, and
-``chart_registry._register_builtins`` flips both chart types' ``dialog_compatible`` back to
-``True`` (its default) now that this dialog can actually represent their fields.
+``chart_registry._register_builtins`` now registers treemap/radar with the default
+``dialog_compatible=True`` (milestone 12 had set them ``False``) now that this dialog can
+actually represent their fields.
 """
 
 from __future__ import annotations
@@ -37,15 +38,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.core.exceptions import ApplicationError
-from src.core.logger import get_logger
 from src.ui.widgets.column_multi_select import ColumnMultiSelect
-from src.visualization.base_chart import BaseChart
-from src.visualization.chart_registry import display_name_for, list_dialog_charts
+from uadas_core.core.exceptions import ApplicationError
+from uadas_core.core.logger import get_logger
+from uadas_core.visualization.base_chart import BaseChart
+from uadas_core.visualization.chart_registry import display_name_for, list_dialog_charts
 
 _logger = get_logger(__name__)
 
-# Milestone 12: sourced from src.visualization.chart_registry rather
+
+# Milestone 12: sourced from uadas_core.visualization.chart_registry rather
 # than a dict this dialog maintained independently — see that
 # module's own docstring for why. Each entry: (builder class,
 # required column-picker fields, optional column-picker fields,
@@ -55,17 +57,31 @@ _logger = get_logger(__name__)
 # list_dialog_charts()'s entries appear here — as of milestone 24
 # that is every registered chart type (see this module's own
 # docstring for why Treemap/Radar are no longer excluded).
-_CHART_REGISTRY: dict[
-    str, tuple[type[BaseChart], list[str], list[str], frozenset[str]]
-] = {
-    display_name_for(name): (
-        registration.chart_class,
-        list(registration.required_fields),
-        list(registration.optional_fields),
-        frozenset(registration.list_fields),
-    )
-    for name, registration in list_dialog_charts().items()
-}
+#
+# Web-transition 1.3: this was a module-level dict frozen at import. Because
+# chart_registry._register_builtins() now runs inside bootstrap() -- after this
+# module imports -- the frozen snapshot was empty. Recomputed per call so the
+# dialog always offers whatever chart types are registered now (built-ins plus
+# any plugin charts) -- the same live-read fix applied to tool_registry's
+# _chart_builders() in this commit.
+def _chart_registry() -> (
+    dict[str, tuple[type[BaseChart], list[str], list[str], frozenset[str]]]
+):
+    """Live display-name -> (builder, required, optional, list-typed) map.
+
+    Recomputed per call so the dialog reflects whatever ``list_dialog_charts()``
+    returns now -- see the module comment above for why this replaced a frozen
+    module-level dict in web-transition 1.3.
+    """
+    return {
+        display_name_for(name): (
+            registration.chart_class,
+            list(registration.required_fields),
+            list(registration.optional_fields),
+            frozenset(registration.list_fields),
+        )
+        for name, registration in list_dialog_charts().items()
+    }
 
 
 class CreateVisualizationDialog(QDialog):
@@ -95,7 +111,7 @@ class CreateVisualizationDialog(QDialog):
         layout.addRow("Title (optional):", self._title_field)
 
         self._chart_type_combo = QComboBox(self)
-        self._chart_type_combo.addItems(list(_CHART_REGISTRY.keys()))
+        self._chart_type_combo.addItems(list(_chart_registry().keys()))
         self._chart_type_combo.currentTextChanged.connect(self._rebuild_column_fields)
         layout.addRow("Chart type:", self._chart_type_combo)
 
@@ -134,9 +150,9 @@ class CreateVisualizationDialog(QDialog):
             self._column_field_layout.removeRow(0)
         self._column_fields.clear()
 
-        _builder_class, required_fields, optional_fields, list_fields = _CHART_REGISTRY[
-            chart_type_name
-        ]
+        _builder_class, required_fields, optional_fields, list_fields = (
+            _chart_registry()[chart_type_name]
+        )
 
         for field_name in required_fields:
             if field_name in list_fields:
@@ -171,7 +187,7 @@ class CreateVisualizationDialog(QDialog):
 
     def _on_accept(self) -> None:
         chart_type_name = self._chart_type_combo.currentText()
-        builder_class, required_fields, _optional, _list_fields = _CHART_REGISTRY[
+        builder_class, required_fields, _optional, _list_fields = _chart_registry()[
             chart_type_name
         ]
 
@@ -209,7 +225,7 @@ class CreateVisualizationDialog(QDialog):
             _logger.warning("Chart build failed: %s", exc)
             return
         except Exception as exc:  # noqa: BLE001 -- builder_class.build() is a
-            # BaseChart implementation (see src/visualization/base_chart.py), a plugin
+            # BaseChart implementation (see uadas_core/visualization/base_chart.py), a plugin
             # extension point that can raise anything; this dialog must surface any
             # failure as a QMessageBox rather than crash the whole application.
             QMessageBox.critical(

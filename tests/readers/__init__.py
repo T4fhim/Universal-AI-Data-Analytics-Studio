@@ -1,2 +1,2 @@
 # File: tests/readers/__init__.py
-"""Tests for src.readers: reader_registry dispatch."""
+"""Tests for uadas_core.readers: reader_registry dispatch."""

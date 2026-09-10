@@ -52,3 +52,9 @@ dist/
 
 # Playwright MCP session scratch (screenshots, snapshots, console logs)
 .playwright-mcp/
+
+# superpowers SDD ledger + review-package scratch
+.superpowers/
+
+# graphify knowledge-graph output (rebuilt on demand via `graphify update .`)
+graphify-out/

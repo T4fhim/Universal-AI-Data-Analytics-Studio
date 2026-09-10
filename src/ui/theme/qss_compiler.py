@@ -26,10 +26,10 @@ from __future__ import annotations
 from pathlib import Path
 from string import Template
 
-from src.core.constants import PROJECT_ROOT
-from src.core.exceptions import ServiceError
-from src.core.logger import get_logger
 from src.ui.theme.tokens import ThemeTokens
+from uadas_core.core.constants import PROJECT_ROOT
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 

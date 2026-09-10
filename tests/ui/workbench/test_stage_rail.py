@@ -5,8 +5,8 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QApplication
 
-from src.services.analysis_orchestrator_service import PipelineStage
 from src.ui.workbench.stage_rail import StageRail
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
 
 
 def test_rail_has_one_item_per_pipeline_stage(qapp: QApplication) -> None:

@@ -1,5 +1,5 @@
 # File: tests/analysis/test_t_test.py
-"""Tests for src.analysis.t_test."""
+"""Tests for uadas_core.analysis.t_test."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.analysis.t_test import independent_t_test, paired_t_test
-from src.core.exceptions import ServiceError
+from uadas_core.analysis.t_test import independent_t_test, paired_t_test
+from uadas_core.core.exceptions import ServiceError
 
 
 def _grouped_dataframe() -> pd.DataFrame:

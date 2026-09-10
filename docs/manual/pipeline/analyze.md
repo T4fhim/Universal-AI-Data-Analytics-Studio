@@ -12,7 +12,7 @@ the data has been explored and cleaned.
 Pick a statistical test, configure its parameters in a form built directly from that tool's own
 schema, and run it -- producing a real `ResultCard` with the statistic, p-value, and (where the
 method has one) an assumptions section, **with no AI provider configured**. Like
-[Explore](explore.md), this page calls `src.analysis` functions directly rather than through
+[Explore](explore.md), this page calls `uadas_core.analysis` functions directly rather than through
 the AI layer, so the typed result reaches the correct renderer.
 
 ## Available tests

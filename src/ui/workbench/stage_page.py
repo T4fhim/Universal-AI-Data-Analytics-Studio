@@ -22,18 +22,18 @@ from typing import ClassVar
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFrame, QLabel, QScrollArea, QVBoxLayout, QWidget
 
-from src.services.analysis_orchestrator_service import PipelineStage
-from src.services.guidance_service import Suggestion
 from src.ui.a11y.accessible import HELP_ANCHOR_PROPERTY, describe
 from src.ui.widgets.error_state import ErrorState
 from src.ui.widgets.guidance_panel import GuidancePanel
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
+from uadas_core.services.guidance_service import Suggestion
 
 
 class StagePage(QWidget):
     """Base class for one pipeline stage's workbench content.
 
     Class attributes:
-        stage: Which :class:`~src.services.analysis_orchestrator_service.PipelineStage`
+        stage: Which :class:`~uadas_core.services.analysis_orchestrator_service.PipelineStage`
             this page represents. A concrete subclass must set this.
         help_anchor: The manual anchor F1 should open when this page has focus -- read by
             :func:`~src.ui.a11y.accessible.describe` via the ``helpAnchor`` dynamic property
@@ -191,7 +191,7 @@ class StagePage(QWidget):
     def set_guidance(self, text: str) -> None:
         """Replace the guidance card's text -- called with a static default at
         construction time by most subclasses, and overwritten with the live
-        :class:`~src.services.analysis_orchestrator_service.StageProposal.rationale`
+        :class:`~uadas_core.services.analysis_orchestrator_service.StageProposal.rationale`
         by :class:`~src.ui.workbench.workbench.Workbench` whenever this stage is
         the one currently proposed.
         """

@@ -1,5 +1,5 @@
 # File: tests/plugins/test_plugin_loader.py
-"""Tests for src.plugins.plugin_loader.discover_plugins.
+"""Tests for uadas_core.plugins.plugin_loader.discover_plugins.
 
 Builds real plugin directories under pytest's tmp_path fixture (a
 manifest plus an importable Python package) rather than mocking
@@ -15,9 +15,9 @@ from pathlib import Path
 
 import pytest
 
-from src.cleaning.operation_registry import get_operation, unregister_operation
-from src.core.exceptions import ServiceError
-from src.plugins.plugin_loader import discover_plugins
+from uadas_core.cleaning.operation_registry import get_operation, unregister_operation
+from uadas_core.core.exceptions import ServiceError
+from uadas_core.plugins.plugin_loader import discover_plugins
 
 
 def _make_plugin(
@@ -47,7 +47,7 @@ def _make_plugin(
 
 _VALID_OPERATION_MODULE = """
 from __future__ import annotations
-from src.cleaning.base_operation import BaseOperation
+from uadas_core.cleaning.base_operation import BaseOperation
 
 class TestOperation(BaseOperation):
     @classmethod

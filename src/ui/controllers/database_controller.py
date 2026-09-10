@@ -11,9 +11,9 @@ from collections.abc import Callable
 
 from PySide6.QtWidgets import QWidget
 
-from src.services.database_connection_service import DatabaseConnectionService
-from src.services.workspace_service import Dataset
 from src.ui.dialogs.connect_database_dialog import ConnectDatabaseDialog
+from uadas_core.services.database_connection_service import DatabaseConnectionService
+from uadas_core.services.workspace_service import Dataset
 
 
 class DatabaseController:
@@ -23,7 +23,7 @@ class DatabaseController:
         parent: The window the dialog should be parented to.
         database_service: Manages saved profiles and live connections --
             resolved from the shared
-            :class:`~src.core.bootstrap.DependencyContainer`.
+            :class:`~uadas_core.core.bootstrap.DependencyContainer`.
         on_dataset_loaded: Called with the dataset the dialog read, if any
             -- typically
             :meth:`~src.ui.controllers.dataset_controller.DatasetController.load_dataset`,

@@ -1,11 +1,12 @@
 # File: tests/core/test_bootstrap.py
-"""Tests for src.core.bootstrap.bootstrap().
+"""Tests for uadas_core.core.bootstrap.bootstrap().
 
 Verifies the fixed startup sequence documented in bootstrap.py's own
 module docstring: config load, logging configuration, and registration
 of AppConfig, ApplicationState, SettingsService, ProjectService,
-WorkspaceService, and (milestone 9) AnalysisOrchestratorService into
-the returned BootstrapContext's container.
+WorkspaceService, (milestone 9) AnalysisOrchestratorService, and
+(web-transition Phase 1.2) JobRunner into the returned
+BootstrapContext's container.
 """
 
 from __future__ import annotations
@@ -14,15 +15,20 @@ from pathlib import Path
 
 import yaml
 
-from src.core.application_state import ApplicationState
-from src.core.bootstrap import BootstrapContext, bootstrap
-from src.core.config import AppConfig, load_config
-from src.plugins.plugin_manager import PluginManager
-from src.services.analysis_orchestrator_service import AnalysisOrchestratorService
-from src.services.project_service import ProjectService
-from src.services.report_service import ReportService
-from src.services.settings_service import SettingsService
-from src.services.workspace_service import WorkspaceService
+from uadas_core.core.application_state import ApplicationState
+from uadas_core.core.bootstrap import BootstrapContext, bootstrap
+from uadas_core.core.config import AppConfig, load_config
+from uadas_core.jobs import get_default_job_runner
+from uadas_core.jobs.job_runner import JobRunner
+from uadas_core.jobs.thread_pool_executor_job_runner import ThreadPoolExecutorJobRunner
+from uadas_core.plugins.plugin_manager import PluginManager
+from uadas_core.services.analysis_orchestrator_service import (
+    AnalysisOrchestratorService,
+)
+from uadas_core.services.project_service import ProjectService
+from uadas_core.services.report_service import ReportService
+from uadas_core.services.settings_service import SettingsService
+from uadas_core.services.workspace_service import WorkspaceService
 
 
 def test_bootstrap_returns_populated_context(
@@ -76,6 +82,30 @@ def test_bootstrap_registers_all_milestone_services(
     assert context.container.resolve(ReportService) is context.container.resolve(
         ReportService
     )
+
+
+def test_bootstrap_registers_job_runner_singleton_matching_the_default_bridge(
+    config_path: Path, log_dir: Path, reset_logging_state
+) -> None:
+    """Web-transition Phase 1.2: JobRunner is registered on both paths as one object.
+
+    ``bootstrap()`` does two things with the runner it builds:
+    ``container.register(JobRunner, ...)`` (the real DI path) and
+    ``set_default_job_runner(...)`` (the Control-A10 bridge for
+    ``BaseWorker``). This asserts both hand out the *same* singleton --
+    if they ever diverge, a background task launched through
+    ``BaseWorker`` would run on a different pool than one launched
+    through an explicitly-resolved ``JobRunner``.
+    """
+    context = bootstrap(config_path=config_path, log_dir=log_dir)
+
+    assert context.container.is_registered(JobRunner)
+    resolved = context.container.resolve(JobRunner)
+    assert isinstance(resolved, ThreadPoolExecutorJobRunner)
+    # Singleton: same instance on every resolution.
+    assert context.container.resolve(JobRunner) is resolved
+    # The bridge and the container agree on the identical object.
+    assert get_default_job_runner() is resolved
 
 
 def test_bootstrap_seeds_project_service_from_config_recent_projects(

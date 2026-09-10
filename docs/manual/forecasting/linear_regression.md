@@ -6,7 +6,7 @@ anchors:
 
 # Linear / Polynomial Regression Forecast
 
-`src.forecasting.linear_regression_forecast.forecast_linear_regression` -- via scikit-learn.
+`uadas_core.forecasting.linear_regression_forecast.forecast_linear_regression` -- via scikit-learn.
 
 The simplest of the five forecasters: fits a polynomial trend against elapsed time (days from
 the series' first date) and projects it forward, with **no seasonality component at all**.

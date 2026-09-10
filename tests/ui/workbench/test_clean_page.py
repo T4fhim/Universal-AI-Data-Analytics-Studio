@@ -3,8 +3,8 @@
 
 "All 5 operation_registry cleaning operations are reachable from the Clean page -- first
 non-AI path to any cleaning operation." Every test here calls the real
-:mod:`~src.cleaning.operation_registry` operation classes against a real pandas ``DataFrame`` --
-nothing mocked, matching :mod:`tests.ui.workbench.test_analyze_page`'s own "no src.ai import on
+:mod:`~uadas_core.cleaning.operation_registry` operation classes against a real pandas ``DataFrame`` --
+nothing mocked, matching :mod:`tests.ui.workbench.test_analyze_page`'s own "no uadas_core.ai import on
 this path" proof for its own acceptance criterion.
 """
 
@@ -13,9 +13,9 @@ from __future__ import annotations
 import pandas as pd
 from PySide6.QtWidgets import QApplication
 
-from src.cleaning.operation_registry import list_operations
-from src.services.workspace_service import Dataset
 from src.ui.workbench.pages.clean_page import CleanPage
+from uadas_core.cleaning.operation_registry import list_operations
+from uadas_core.services.workspace_service import Dataset
 
 
 def _make_dataset() -> Dataset:

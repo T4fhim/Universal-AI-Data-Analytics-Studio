@@ -4,7 +4,7 @@
 Every fixture here exists to satisfy one specific rule: tests must never
 read or write the project's real ``config/config.yaml`` or ``logs/``
 directory. ``Application.create()``'s own docstring (see
-:mod:`src.core.app`) states this separation is exactly why
+:mod:`src.app`) states this separation is exactly why
 ``bootstrap()`` accepts overridable ``config_path``/``log_dir``
 arguments — this module is what exercises that path.
 
@@ -22,7 +22,25 @@ from pathlib import Path
 
 import pytest
 
-import src.core.logger as logger_module
+import uadas_core.core.logger as logger_module
+from uadas_core.cleaning import operation_registry
+from uadas_core.results import result_renderer_registry
+from uadas_core.visualization import chart_registry
+
+# web-transition 1.3: the cleaning-operation, chart, and result-renderer registries
+# no longer populate their built-ins as a module-import side effect (see
+# plans/phase-1-3-startup-graph.md §9) -- bootstrap() does. The test suite needs
+# them seeded independently of bootstrap(): many tests read a registry without
+# booting, and tests/ui/help/test_manual_anti_rot.py builds a
+# @pytest.mark.parametrize id list from list_renderers() at *collection* time, so
+# a fixture (which runs only once collection is done) is too late. Doing it here,
+# at root-conftest import, runs before any test module is collected. Each
+# _register_builtins() is idempotent, so a test that calls bootstrap() is
+# unaffected. This is the test harness explicitly initialising state it needs --
+# it replaces the old registry-module import side effect, relocated here.
+operation_registry._register_builtins()
+chart_registry._register_builtins()
+result_renderer_registry._register_builtins()
 
 
 @pytest.fixture()
@@ -39,9 +57,9 @@ def log_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture()
 def reset_logging_state():
-    """Reset src.core.logger's one-time configuration guard around a test.
+    """Reset uadas_core.core.logger's one-time configuration guard around a test.
 
-    src.core.logger.configure_logging() is deliberately a no-op on any
+    uadas_core.core.logger.configure_logging() is deliberately a no-op on any
     call after the first (see that module's docstring: "Calling it
     again after the first call is a no-op — it will not attach
     duplicate handlers — but it also will not apply new settings").

@@ -6,7 +6,7 @@ anchors:
 
 # HTML Reader
 
-`src.readers.html_reader.HtmlReader` -- `.html`, `.htm`.
+`uadas_core.readers.html_reader.HtmlReader` -- `.html`, `.htm`.
 
 Multi-table, the same conceptual shape as [the Excel reader](excel.md), except the "tables"
 here are whichever `<table>` elements `pandas.read_html` finds in the document (backed by

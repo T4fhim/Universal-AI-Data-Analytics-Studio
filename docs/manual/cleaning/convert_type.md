@@ -6,7 +6,7 @@ anchors:
 
 # Convert Type
 
-`src.cleaning.type_conversion.ConvertType`.
+`uadas_core.cleaning.type_conversion.ConvertType`.
 
 Converts a column's data type -- the direct follow-up to any reader's ambiguous-type warning
 (see [Open Dataset](../data/open-dataset.md) and [Dataset Profile](../results/dataset_profile.md)):

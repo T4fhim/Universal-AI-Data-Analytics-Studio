@@ -6,7 +6,7 @@ anchors:
 
 # Per-Column Profile
 
-`src.analysis.column_profile.profile_column` -- the per-column building block of
+`uadas_core.analysis.column_profile.profile_column` -- the per-column building block of
 [Dataset Profile](../results/dataset_profile.md), run once per column during
 [Understand](../pipeline/understand.md).
 

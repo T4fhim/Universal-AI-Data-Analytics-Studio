@@ -1,8 +1,8 @@
 # File: src/ui/__init__.py
 """Presentation layer: main window, menus, docks, dialogs, and widgets.
 
-Like ``src.services``, this package depends on ``src.core`` and
-``src.services`` but nothing in ``src.core`` or ``src.services``
+Like ``uadas_core.services``, this package depends on ``uadas_core.core`` and
+``uadas_core.services`` but nothing in ``uadas_core.core`` or ``uadas_core.services``
 depends back on it — the presentation layer sits above both in this
 project's layered architecture (Application -> Service -> Business
 Logic -> Data -> Presentation -> Plugin), so it can freely import from

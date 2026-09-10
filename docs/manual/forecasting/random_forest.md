@@ -6,7 +6,7 @@ anchors:
 
 # Random Forest Forecast
 
-`src.forecasting.random_forest_forecast.forecast_random_forest` -- via scikit-learn.
+`uadas_core.forecasting.random_forest_forecast.forecast_random_forest` -- via scikit-learn.
 
 Unlike this application's other forecasters, a Random Forest has no native notion of "time" --
 it is a general regressor. This forecaster turns the series into a supervised-learning problem

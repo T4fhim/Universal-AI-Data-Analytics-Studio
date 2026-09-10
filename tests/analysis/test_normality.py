@@ -1,5 +1,5 @@
 # File: tests/analysis/test_normality.py
-"""Tests for src.analysis.normality."""
+"""Tests for uadas_core.analysis.normality."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.analysis.normality import check_normality
-from src.core.exceptions import ServiceError
+from uadas_core.analysis.normality import check_normality
+from uadas_core.core.exceptions import ServiceError
 
 
 def test_normality_shapiro_on_normal_data_appears_normal() -> None:

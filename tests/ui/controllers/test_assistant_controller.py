@@ -18,16 +18,16 @@ import pandas as pd
 import pytest
 from PySide6.QtWidgets import QApplication, QMainWindow
 
-from src.ai.llm_provider import LLMTurn, PendingToolCall
-from src.core.config import AppConfig, load_config
-from src.services.settings_service import SettingsService
-from src.services.workspace_service import Dataset, WorkspaceService
 from src.ui.controllers.assistant_controller import AssistantController
 from src.ui.dock_manager import DockManager
 from src.ui.results.result_card import ResultCard
 from src.ui.status_bar import ApplicationStatusBar
 from src.ui.worker_runner import WorkerRunner
 from tests.ai.conftest import make_provider
+from uadas_core.ai.llm_provider import LLMTurn, PendingToolCall
+from uadas_core.core.config import AppConfig, load_config
+from uadas_core.services.settings_service import SettingsService
+from uadas_core.services.workspace_service import Dataset, WorkspaceService
 
 _FAKE_PROVIDER_PROFILE = {
     "name": "test-anthropic",
@@ -333,10 +333,10 @@ def test_rest_of_the_app_stays_fully_usable_with_no_api_key_configured(
     """An unrelated part of the app -- running a real statistical test from the Analyze stage
     page, exactly like tests/ui/workbench/test_analyze_page.py's own milestone-22 acceptance
     test -- works fully in the same no-API-key session as the chat panel above. Constructing
-    AnalyzePage/running independent_t_test never imports src.ai, so this is unaffected by the
+    AnalyzePage/running independent_t_test never imports uadas_core.ai, so this is unaffected by the
     chat panel's own "not configured" state by construction, not merely by accident."""
-    from src.core.expertise_level import ExpertiseLevel
     from src.ui.workbench.pages.analyze_page import AnalyzePage
+    from uadas_core.core.expertise_level import ExpertiseLevel
 
     workspace = WorkspaceService()
     dataset = _make_dataset()

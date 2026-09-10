@@ -6,7 +6,7 @@ anchors:
 
 # Drop Missing Values
 
-`src.cleaning.missing_values.DropMissingValues`.
+`uadas_core.cleaning.missing_values.DropMissingValues`.
 
 Removes rows containing a missing value, in the columns you specify -- or in **any** column if
 none are specified, matching pandas' own `dropna()` default so the common "just clean up

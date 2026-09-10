@@ -3,11 +3,11 @@
 
 "Running a t-test from the Analyze page renders a ResultCard with statistic, p-value, and an
 AssumptionsSection -- with no API key configured." No test in this file imports, patches, or
-otherwise touches :mod:`src.ai.llm_provider`/``AssistantService`` -- proving the "no API key
+otherwise touches :mod:`uadas_core.ai.llm_provider`/``AssistantService`` -- proving the "no API key
 configured" half is not merely untested but structurally impossible to depend on here: nothing
 on this path ever constructs an LLM provider (see
 :mod:`src.ui.workbench.pages.analyze_page`'s own docstring for why it calls
-:mod:`src.analysis` functions directly).
+:mod:`uadas_core.analysis` functions directly).
 """
 
 from __future__ import annotations
@@ -15,9 +15,9 @@ from __future__ import annotations
 import pandas as pd
 from PySide6.QtWidgets import QApplication
 
-from src.core.expertise_level import ExpertiseLevel
-from src.services.workspace_service import Dataset
 from src.ui.workbench.pages.analyze_page import AnalyzePage
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.services.workspace_service import Dataset
 
 
 def _make_dataset() -> Dataset:

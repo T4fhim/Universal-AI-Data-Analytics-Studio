@@ -6,7 +6,7 @@ anchors:
 
 # Archive Reader
 
-`src.readers.archive_reader.ArchiveReader` -- `.zip`, `.gz`, `.gzip`.
+`uadas_core.readers.archive_reader.ArchiveReader` -- `.zip`, `.gz`, `.gzip`.
 
 Not a format in its own right the way every other reader is -- a ZIP or GZIP file's actual
 tabular content is whatever format is *inside* it. This reader's real job is decompressing to a

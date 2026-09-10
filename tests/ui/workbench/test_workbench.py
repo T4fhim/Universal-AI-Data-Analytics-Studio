@@ -12,12 +12,12 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QApplication
 
-from src.services.analysis_orchestrator_service import (
+from src.ui.workbench.workbench import Workbench
+from uadas_core.services.analysis_orchestrator_service import (
     AnalysisLog,
     PipelineStage,
     StageProposal,
 )
-from src.ui.workbench.workbench import Workbench
 
 
 def test_workbench_starts_on_the_welcome_page(qapp: QApplication) -> None:

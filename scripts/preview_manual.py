@@ -48,7 +48,8 @@ from src.ui.help.manual_renderer import ManualRenderer
 class PreviewManualError(Exception):
     """Raised for a failure specific to this script, distinct from a real ``ServiceError``
     an anchor lookup or render might legitimately raise (which is allowed to propagate as-is
-    -- this script's own job is orchestration, not re-wrapping every possible failure)."""
+    -- this script's own job is orchestration, not re-wrapping every possible failure).
+    """
 
 
 def _print_text_preview(anchor: str) -> None:

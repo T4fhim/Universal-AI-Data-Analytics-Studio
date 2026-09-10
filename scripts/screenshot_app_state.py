@@ -12,10 +12,10 @@ Why this exists: prior milestones were verified by informally launching
 ``python main.py`` and looking at it, or by trusting the test suite alone
 -- neither leaves an artifact a reviewer (or another agent, in a later
 session, with no memory of what the screen looked like) can actually look
-at. This script boots the *real* :class:`~src.core.app.Application`
-composition path -- the same :func:`~src.core.bootstrap.bootstrap`,
+at. This script boots the *real* :class:`~src.app.Application`
+composition path -- the same :func:`~uadas_core.core.bootstrap.bootstrap`,
 :class:`~src.ui.theme_manager.ThemeManager`, and
-:class:`~src.ui.main_window.MainWindow` construction ``src.core.app.
+:class:`~src.ui.main_window.MainWindow` construction ``src.app.
 Application.run`` uses -- rather than a hand-rolled stand-in, so a
 screenshot from this script is evidence about the real application, not
 about some simplified double of it. It never calls ``QApplication.exec()``
@@ -61,10 +61,10 @@ if str(_PROJECT_ROOT) not in sys.path:
 from PySide6.QtCore import QCoreApplication, Qt
 from PySide6.QtWidgets import QApplication, QFileDialog
 
-from src.core.bootstrap import bootstrap
-from src.core.logger import get_logger
 from src.ui.main_window import MainWindow
 from src.ui.theme_manager import ThemeManager
+from uadas_core.core.bootstrap import bootstrap
+from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)
 
@@ -180,7 +180,7 @@ def run(output_path: Path, open_dataset: Path | None, new_project: bool) -> None
     except Exception as exc:
         raise ScreenshotError(f"bootstrap() failed: {exc}") from exc
 
-    # Mirrors src.core.app.Application.run()'s own construction sequence
+    # Mirrors src.app.Application.run()'s own construction sequence
     # exactly (QApplication singleton, the same OpenGL attributes, theme
     # application, MainWindow construction/attach_theme_manager/show) --
     # see that method's docstring for why AA_UseSoftwareOpenGL/

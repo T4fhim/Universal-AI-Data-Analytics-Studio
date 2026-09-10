@@ -1,16 +1,16 @@
 # File: src/ui/results/result_card.py
 """``ResultCard``: the one place in :mod:`~src.ui.results` that touches Qt (milestone 22).
 
-Converts whatever list of :class:`~src.ui.results.base_result_renderer.ResultSection` values a
-:class:`~src.ui.results.base_result_renderer.BaseResultRenderer` returns into a widget tree.
+Converts whatever list of :class:`~uadas_core.results.base_result_renderer.ResultSection` values a
+:class:`~uadas_core.results.base_result_renderer.BaseResultRenderer` returns into a widget tree.
 Every renderer funnels through the same six ``isinstance`` branches here instead of each result
 type growing its own bespoke display panel -- the exact duplication A5's own section says this
 split exists to avoid ("all Qt, theming, and accessibility code lives in exactly one place
 instead of once per result type").
 
 ``ResultCard`` never imports a specific renderer or result dataclass -- it only knows
-:class:`~src.ui.results.base_result_renderer.ResultSection` and calls
-:func:`~src.ui.results.result_renderer_registry.get_renderer` to find out how to render whatever
+:class:`~uadas_core.results.base_result_renderer.ResultSection` and calls
+:func:`~uadas_core.results.result_renderer_registry.get_renderer` to find out how to render whatever
 :meth:`display` is handed. That keeps this widget usable from any stage page (Analyze, Explore,
 the future chat-panel tool-result rendering M21 depends on this milestone for) without a
 per-caller import list.
@@ -29,9 +29,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.core.expertise_level import ExpertiseLevel
 from src.ui.a11y.accessible import describe
-from src.ui.results.base_result_renderer import (
+from src.ui.widgets.chart_view import ChartView
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.results.base_result_renderer import (
     AssumptionsSection,
     FigureSection,
     KeyValueSection,
@@ -40,8 +41,7 @@ from src.ui.results.base_result_renderer import (
     ResultSection,
     TableSection,
 )
-from src.ui.results.result_renderer_registry import get_renderer
-from src.ui.widgets.chart_view import ChartView
+from uadas_core.results.result_renderer_registry import get_renderer
 
 # Object-name / accessible-name prefix stamped on every section widget this card builds, plus a
 # `resultSectionKind` dynamic property naming which ResultSection subclass produced it -- a test
@@ -95,10 +95,10 @@ class ResultCard(QWidget):
 
         Args:
             result: Any analysis result object -- resolved to a renderer via
-                :func:`~src.ui.results.result_renderer_registry.get_renderer`, which never
+                :func:`~uadas_core.results.result_renderer_registry.get_renderer`, which never
                 raises (see that function's own docstring), so this method cannot fail on an
                 unrecognized result type either.
-            level: Which :class:`~src.core.expertise_level.ExpertiseLevel` to render for.
+            level: Which :class:`~uadas_core.core.expertise_level.ExpertiseLevel` to render for.
         """
         renderer = get_renderer(type(result))
         title = renderer.title(result)

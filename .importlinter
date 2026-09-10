@@ -1,0 +1,49 @@
+# import-linter contract - the machine-checked half of the desktop->web transition.
+#
+# The Qt-free carve-out packages now live under uadas_core (Phase 1.1). No module in
+# uadas_core may import a GUI toolkit or a web framework. Run: lint-imports.
+# Enforced in CI's lint job (see .github/workflows/ci.yml).
+
+[importlinter]
+root_packages =
+    uadas_core
+include_external_packages = True
+
+[importlinter:contract:uadas-core-qt-and-framework-free]
+name = uadas_core must not import PySide6/PyQt/Django
+type = forbidden
+source_modules =
+    uadas_core
+forbidden_modules =
+    PySide6
+    PyQt5
+    PyQt6
+    django
+allow_indirect_imports = False
+
+# Phase 1.7: uadas_core.provenance is a read-only *view* over the orchestrator's
+# AnalysisLog set (it imports uadas_core.services / .analysis / .core). NOTHING
+# else in uadas_core may import it back -- keep the dependency one-directional so
+# the reshape layer stays swappable. Every non-provenance subpackage is listed
+# (a bare `uadas_core` source would flag provenance importing its own submodules).
+[importlinter:contract:provenance-is-a-leaf]
+name = no uadas_core subpackage except provenance itself may import uadas_core.provenance
+type = forbidden
+source_modules =
+    uadas_core.ai
+    uadas_core.analysis
+    uadas_core.cleaning
+    uadas_core.core
+    uadas_core.database
+    uadas_core.forecasting
+    uadas_core.jobs
+    uadas_core.persistence
+    uadas_core.plugins
+    uadas_core.readers
+    uadas_core.reports
+    uadas_core.results
+    uadas_core.services
+    uadas_core.visualization
+forbidden_modules =
+    uadas_core.provenance
+allow_indirect_imports = False

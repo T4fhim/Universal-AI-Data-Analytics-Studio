@@ -38,10 +38,10 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QDialog, QWidget
 
-from src.core.logger import get_logger
 from src.ui.a11y import rules
 from src.ui.a11y.rules import A11yFinding, Severity
 from src.ui.theme.tokens import ThemeTokens
+from uadas_core.core.logger import get_logger
 
 # The path to src/ui/, derived from this file's own location rather than by
 # `import src.ui` -- this package is one of the "leaf" foundation layers
@@ -159,7 +159,7 @@ def _discover_dialog_classes() -> tuple[type[QDialog], ...]:
     calls out) drifts the moment a dialog is added or renamed and nobody
     remembers to update the list -- this instead re-derives it from the
     actual module tree every time it is imported, the same "single source of
-    truth" reasoning behind :data:`~src.visualization.chart_registry`'s
+    truth" reasoning behind :data:`~uadas_core.visualization.chart_registry`'s
     registry pattern, just via introspection instead of an explicit
     ``register_x`` call (a ``QDialog`` subclass needs no registration
     decision the way a chart type does -- being a ``QDialog`` at all is
@@ -202,7 +202,7 @@ def _discover_dialog_classes() -> tuple[type[QDialog], ...]:
     return tuple(discovered)
 
 
-# Built at import time, matching how src.visualization.chart_registry's own
+# Built at import time, matching how uadas_core.visualization.chart_registry's own
 # built-in registrations are populated at import time -- a dialog class is
 # either defined somewhere under src/ui/ or it is not, and that does not
 # change over the life of a running process. Recomputing this from scratch

@@ -21,7 +21,7 @@ inline so results can be regenerated.
 rg "fitz|pymupdf|PyMuPDF" src/
 ```
 
-returns exactly **one file**: `src/readers/pdf_reader.py`. Reading it: the
+returns exactly **one file**: `uadas_core/readers/pdf_reader.py`. Reading it: the
 only occurrences are in the *module docstring's prose*, explaining why
 `camelot-py` was chosen **instead of** PyMuPDF ("Uses `camelot-py` rather
 than `PyMuPDF` … a deliberate deviation"). There is no `import fitz` or
@@ -37,7 +37,7 @@ paths.
 
 ### What the PDF reader actually needs, and what it uses instead
 
-`PdfReader` (`src/readers/pdf_reader.py`) extracts tables from PDFs using
+`PdfReader` (`uadas_core/readers/pdf_reader.py`) extracts tables from PDFs using
 `camelot-py` exclusively, in two passes: `flavor="lattice"` (grid-line
 based, precise, needs Ghostscript) first, falling back to
 `flavor="stream"` (whitespace-based, less precise, no Ghostscript
@@ -66,11 +66,11 @@ version does not.)
 unused by any `src/` code today. It depends on `pdfminer.six`, `Pillow`,
 and the same `pypdfium2` camelot uses.
 
-**No automated tests exist for `src/readers/pdf_reader.py`** — checked
+**No automated tests exist for `uadas_core/readers/pdf_reader.py`** — checked
 `tests/readers/test_new_format_readers.py`, `tests/readers/
 test_reader_registry.py`, and a repo-wide glob for `*pdf*`; the only
 PDF-named test file is `tests/reports/test_pdf_exporter.py`, which exercises
-`src/reports/pdf_exporter.py` (PDF *generation* for reports), an unrelated
+`uadas_core/reports/pdf_exporter.py` (PDF *generation* for reports), an unrelated
 module. This means step 4 of the spike brief ("run the EXISTING pdf reader
 tests against it") could not be performed as literally specified — there is
 nothing to run. This is reported honestly as a gap, not glossed over:
@@ -269,9 +269,9 @@ the venv-only kaleido result below as a container proof.
 
 ### C.2 — `MPLBACKEND=Agg` Qt-free claim
 
-Imported `src.core.bootstrap`, `src.ai.tool_registry`,
-`src.forecasting.model_comparison`, `src.readers.reader_registry`,
-`src.visualization.chart_registry`, `src.services.guidance_service` and
+Imported `uadas_core.core.bootstrap`, `uadas_core.ai.tool_registry`,
+`uadas_core.forecasting.model_comparison`, `uadas_core.readers.reader_registry`,
+`uadas_core.visualization.chart_registry`, `uadas_core.services.guidance_service` and
 checked `sys.modules`:
 
 | | `PySide6` in `sys.modules` | Any Qt-named module loaded |
@@ -301,9 +301,9 @@ modules specifically.
 ### C.3 — Headless kaleido PNG export
 
 Built a real chart via the project's own visualization code
-(`src.visualization.categorical_charts.BarChart.build()`, a 4-category bar
+(`uadas_core.visualization.categorical_charts.BarChart.build()`, a 4-category bar
 chart) and rasterized it through the actual, unmodified
-`src.reports.rasterize.figure_to_png_bytes()` — the same function every
+`uadas_core.reports.rasterize.figure_to_png_bytes()` — the same function every
 report exporter uses, including its documented behavior of *swallowing*
 exceptions and returning `None` on failure. The returned value was checked
 directly, not just "no exception raised":

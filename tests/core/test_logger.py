@@ -1,5 +1,5 @@
 # File: tests/core/test_logger.py
-"""Tests for src.core.logger: configure_logging, get_logger.
+"""Tests for uadas_core.core.logger: configure_logging, get_logger.
 
 configure_logging() is guarded by a module-level "configure once per
 process" flag (see logger.py's own docstring), so every test that
@@ -13,8 +13,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-import src.core.logger as logger_module
-from src.core.logger import configure_logging, get_logger
+import uadas_core.core.logger as logger_module
+from uadas_core.core.logger import configure_logging, get_logger
 
 
 def test_configure_logging_creates_log_dir_and_file(

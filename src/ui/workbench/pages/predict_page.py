@@ -1,21 +1,21 @@
 # File: src/ui/workbench/pages/predict_page.py
 """The PREDICT stage's page: forecast a time series with any of the 5 forecasters, or let
-:func:`~src.forecasting.model_comparison.compare_forecast_models` pick the best one automatically.
+:func:`~uadas_core.forecasting.model_comparison.compare_forecast_models` pick the best one automatically.
 
 Milestone 25's primary acceptance criterion: this is the first non-AI UI path to anything in
-:mod:`src.forecasting` at all -- before this milestone that package was reachable only by typing
-English at the AI chat (see this overhaul's own Context section, "src/analysis/,
-src/forecasting/, and src/cleaning/ are 100% orphaned -- no src/ui/ file imports any of them").
+:mod:`uadas_core.forecasting` at all -- before this milestone that package was reachable only by typing
+English at the AI chat (see this overhaul's own Context section, "uadas_core/analysis/,
+uadas_core/forecasting/, and uadas_core/cleaning/ are 100% orphaned -- no src/ui/ file imports any of them").
 :mod:`~src.ui.workbench.pages.clean_page`/:mod:`~src.ui.workbench.pages.analyze_page` already
 closed that gap for their own packages in milestones 23/22; this page closes it for forecasting.
 
 Like :class:`~src.ui.workbench.pages.analyze_page.AnalyzePage`, this page calls straight into
-:mod:`src.forecasting`'s own functions rather than through :mod:`src.ai.tool_registry`'s
+:mod:`uadas_core.forecasting`'s own functions rather than through :mod:`uadas_core.ai.tool_registry`'s
 handlers -- those handlers convert the typed ``ForecastResult``/``ModelComparisonResult`` into a
-plain JSON dict (see :func:`~src.ai.tool_registry._forecast_result_to_dict`), which would defeat
-:mod:`~src.ui.results.result_renderer_registry`'s type-based dispatch to
-:mod:`~src.ui.results.renderers.forecasting`'s two dedicated renderers. It does still reuse
-:class:`~src.ai.tool_registry.ToolDefinition`'s ``input_schema`` (via
+plain JSON dict (see :func:`~uadas_core.ai.tool_registry._forecast_result_to_dict`), which would defeat
+:mod:`~uadas_core.results.result_renderer_registry`'s type-based dispatch to
+:mod:`~uadas_core.results.renderers.forecasting`'s two dedicated renderers. It does still reuse
+:class:`~uadas_core.ai.tool_registry.ToolDefinition`'s ``input_schema`` (via
 :class:`~src.ui.dialogs.analysis_parameter_dialog.AnalysisParameterDialog`, the same generic
 parameter form ``AnalyzePage``/``ExplorePage`` already use) purely for the parameter *form* --
 the schema and the handler are two independent things on the same ``ToolDefinition``, and this
@@ -24,7 +24,7 @@ page only wants the former.
 **Why "Automatic Model Competition" runs on a background worker and a single forecaster does
 not.** A single ``forecast_*`` call fits one model once -- the same "fast enough to run
 synchronously on the UI thread" shape ``AnalyzePage``/``ExplorePage`` already rely on for every
-one of their tools. :func:`~src.forecasting.model_comparison.compare_forecast_models` fits up to
+one of their tools. :func:`~uadas_core.forecasting.model_comparison.compare_forecast_models` fits up to
 five models *twice each* (once against a holdout split, once against the full series) -- Prophet
 alone is the slowest of the five, so running all ten fits on the UI thread would freeze the
 window for a genuinely noticeable stretch. This page offloads only the comparison path through
@@ -36,9 +36,9 @@ status bar method's own docstring, which named this exact milestone as where it 
 
 **Why this page holds a direct ``WorkerRunner``/``ApplicationStatusBar`` reference, unlike its
 stage-page siblings.** :mod:`~src.ui.workbench`'s own docstring says a stage page "holds no
-service references and calls nothing in ``src.services`` or ``src.ui.controllers`` directly."
+service references and calls nothing in ``uadas_core.services`` or ``src.ui.controllers`` directly."
 Neither :class:`~src.ui.worker_runner.WorkerRunner` nor :class:`~src.ui.status_bar.
-ApplicationStatusBar` is a ``src.services`` service or a ``src.ui.controllers`` controller --
+ApplicationStatusBar` is a ``uadas_core.services`` service or a ``src.ui.controllers`` controller --
 both are plain UI infrastructure ``main_window.py`` already constructs directly (not resolved
 from the ``DependencyContainer``) and hands straight to every milestone-19 controller as
 constructor arguments. Routing a live, in-flight progress percentage through a signal all the way
@@ -51,14 +51,14 @@ way ``PipelineController`` itself already receives both as plain constructor arg
 future page to copy freely.** The question was whether to leave it as-is or introduce a
 ``PredictController`` purely to hold these two references and forward calls back into this page.
 Rejected: such a controller would own no business logic of its own -- ``run_forecast`` already
-calls straight into :mod:`src.forecasting` (see this docstring's own reasoning above for why,
+calls straight into :mod:`uadas_core.forecasting` (see this docstring's own reasoning above for why,
 matching :class:`~src.ui.workbench.pages.analyze_page.AnalyzePage`), so the controller's entire
 job would be relaying a constructor-injected ``WorkerRunner``/``ApplicationStatusBar`` back out to
 the one page that already has direct access to both via ``set_worker_collaborators`` -- a pass-
 through layer with no behavior of its own, the exact shape :class:`~src.ui.controllers` package's
 own docstring says a controller earns its existence by *not* being. The boundary that keeps this
 from being a precedent for scope creep: it is licensed **only** for plain UI infrastructure
-objects that are (a) not resolved from the ``DependencyContainer`` (i.e. not a ``src.services``
+objects that are (a) not resolved from the ``DependencyContainer`` (i.e. not a ``uadas_core.services``
 service) and (b) not a ``src.ui.controllers`` controller -- ``WorkerRunner`` and
 ``ApplicationStatusBar`` are the only two objects in the codebase that currently qualify. A future
 page reaching for a real service (``WorkspaceService``, ``ProjectService``, anything resolved from
@@ -74,25 +74,6 @@ from typing import ClassVar
 
 from PySide6.QtWidgets import QComboBox, QLabel, QMessageBox, QPushButton, QVBoxLayout
 
-from src.ai.tool_registry import get_tool_by_name
-from src.core.exceptions import ApplicationError, ServiceError
-from src.core.expertise_level import ExpertiseLevel
-from src.core.logger import get_logger
-from src.forecasting.arima_forecast import forecast_arima
-from src.forecasting.exponential_smoothing import (
-    ForecastResult,
-    forecast_exponential_smoothing,
-)
-from src.forecasting.forecast_input import validate_time_series
-from src.forecasting.linear_regression_forecast import forecast_linear_regression
-from src.forecasting.model_comparison import (
-    ModelComparisonResult,
-    compare_forecast_models,
-)
-from src.forecasting.prophet_forecast import forecast_prophet
-from src.forecasting.random_forest_forecast import forecast_random_forest
-from src.services.analysis_orchestrator_service import PipelineStage
-from src.services.workspace_service import Dataset
 from src.ui.a11y.accessible import describe
 from src.ui.dialogs.analysis_parameter_dialog import AnalysisParameterDialog
 from src.ui.results.result_card import ResultCard
@@ -100,6 +81,25 @@ from src.ui.status_bar import ApplicationStatusBar
 from src.ui.workbench.stage_page import StagePage
 from src.ui.worker_runner import WorkerRunner
 from src.workers.base_worker import BaseWorker
+from uadas_core.ai.tool_registry import get_tool_by_name
+from uadas_core.core.exceptions import ApplicationError, ServiceError
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.core.logger import get_logger
+from uadas_core.forecasting.arima_forecast import forecast_arima
+from uadas_core.forecasting.exponential_smoothing import (
+    ForecastResult,
+    forecast_exponential_smoothing,
+)
+from uadas_core.forecasting.forecast_input import validate_time_series
+from uadas_core.forecasting.linear_regression_forecast import forecast_linear_regression
+from uadas_core.forecasting.model_comparison import (
+    ModelComparisonResult,
+    compare_forecast_models,
+)
+from uadas_core.forecasting.prophet_forecast import forecast_prophet
+from uadas_core.forecasting.random_forest_forecast import forecast_random_forest
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
+from uadas_core.services.workspace_service import Dataset
 
 _logger = get_logger(__name__)
 
@@ -111,7 +111,7 @@ _DEFAULT_GUIDANCE = (
 
 # Tool name -> callable(dataframe, date_column, value_column, periods, **extra) -> ForecastResult.
 # Matches AnalyzePage._ANALYZE_DISPATCH's exact shape and its own reason for calling
-# src.forecasting directly rather than through src.ai.tool_registry's dict-returning handlers
+# uadas_core.forecasting directly rather than through uadas_core.ai.tool_registry's dict-returning handlers
 # (see this module's own docstring).
 _SINGLE_FORECAST_DISPATCH: dict[str, Callable[..., ForecastResult]] = {
     "forecast_exponential_smoothing": forecast_exponential_smoothing,
@@ -151,7 +151,7 @@ class PredictPage(StagePage):
         self._worker_runner: WorkerRunner | None = None
         self._status_bar: ApplicationStatusBar | None = None
         # Milestone 29: matches config.yaml's own "forecasting.default_horizon_periods"
-        # default (see src.core.config._default_config_dict) -- overwritten with the
+        # default (see uadas_core.core.config._default_config_dict) -- overwritten with the
         # configured value by set_default_horizon_periods before this page is ever shown a
         # real dataset, so this literal is only ever the value seen if that call is somehow
         # skipped (a defensive fallback, not the value real users see).
@@ -230,7 +230,7 @@ class PredictPage(StagePage):
 
         A plain ``int``, not a service reference -- this page still holds no
         ``SettingsService`` of its own (see this module's own docstring on why every stage
-        page holds no ``src.services`` reference); ``main_window.py`` reads
+        page holds no ``uadas_core.services`` reference); ``main_window.py`` reads
         ``forecasting.default_horizon_periods`` once and hands the resolved value straight
         through, the same "resolve outside, hand in a plain value" shape
         :meth:`set_worker_collaborators` already uses for ``WorkerRunner``/``ApplicationStatusBar``.

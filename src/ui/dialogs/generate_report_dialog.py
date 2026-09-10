@@ -35,14 +35,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.core.expertise_level import ExpertiseLevel
-from src.core.logger import get_logger
-from src.services.analysis_orchestrator_service import PipelineStage
-from src.services.report_service import available_formats
+from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.core.logger import get_logger
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
+from uadas_core.services.report_service import available_formats
 
 _logger = get_logger(__name__)
 
-# Matches src.services.report_service's _EXPORTERS keys — kept as its
+# Matches uadas_core.services.report_service's _EXPORTERS keys — kept as its
 # own small mapping here (format key -> (Qt file-dialog filter, default
 # extension)) since the file-picker filter string is a UI concern the
 # service layer has no reason to know about.
@@ -54,7 +54,7 @@ _FORMAT_FILE_FILTERS: dict[str, tuple[str, str]] = {
 }
 
 # Human-readable checklist labels, in pipeline order — mirrors
-# src.services.report_service's own _STAGE_DISPLAY_NAMES so a section
+# uadas_core.services.report_service's own _STAGE_DISPLAY_NAMES so a section
 # the user unchecks here matches the label they'll see (or not see) in
 # the generated report exactly.
 _STAGE_LABELS: dict[PipelineStage, str] = {
@@ -77,13 +77,13 @@ class GenerateReportDialog(QDialog):
             build the default report title and shown so the user
             confirms which dataset they're reporting on.
         available_stages: Which
-            :class:`~src.services.analysis_orchestrator_service.
+            :class:`~uadas_core.services.analysis_orchestrator_service.
             PipelineStage` values currently have at least one
-            :class:`~src.services.analysis_orchestrator_service.
+            :class:`~uadas_core.services.analysis_orchestrator_service.
             AnalysisLogEntry` for this dataset — only these appear as
             checkable section options, since a stage with no log entry
             has nothing to include (see
-            :meth:`~src.services.analysis_orchestrator_service.
+            :meth:`~uadas_core.services.analysis_orchestrator_service.
             AnalysisLog.completed_stages`).
         parent: Parent widget, typically the main window.
         default_format: Mirrors ``reports.default_export_format`` (milestone 29 -- described

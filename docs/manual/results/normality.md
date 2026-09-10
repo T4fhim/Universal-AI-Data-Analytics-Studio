@@ -7,7 +7,7 @@ anchors:
 
 # Normality Test
 
-`src.analysis.normality` -- Shapiro-Wilk or D'Agostino-Pearson, via `scipy.stats`, for a single
+`uadas_core.analysis.normality` -- Shapiro-Wilk or D'Agostino-Pearson, via `scipy.stats`, for a single
 numeric column. This is a precondition check to run *before* choosing a test, such as
 [t-test](t_test.md) or [ANOVA](anova.md), that assumes normally distributed data -- not a step
 inside either of those tests.
