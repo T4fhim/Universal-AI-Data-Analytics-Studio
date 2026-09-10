@@ -81,7 +81,7 @@ the Linux single-invocation job has no such teardown.
 
 ---
 
-## 2.1 — lift the 8 Qt-free stranded modules (D5) — behaviour-frozen
+## 2.1 — lift the 10 Qt-free modules (7 D5 + 3 actions/*) — behaviour-frozen
 
 | Slot | Resource |
 |---|---|
