@@ -102,15 +102,18 @@ def _is_safe_archive_member(name: str) -> bool:
     """Boolean form of :func:`_reject_unsafe_archive_member` for list comprehensions.
 
     Used by :meth:`ArchiveReader.list_tables` to drop unsafe entries the
-    same way it already drops entries no reader recognises — quietly,
-    since a hostile entry alongside real data does not make the whole
-    archive unreadable. :meth:`ArchiveReader.read` still calls the
-    raising form so an explicit ``table_name`` request for such an entry
-    gets a clear error rather than "no such entry".
+    same way it already drops entries no reader recognises — the archive
+    stays readable via its legitimate members. But a dropped entry is a
+    zip-slip / absolute-path / symlink member in a file the user chose to
+    open, so it is logged at WARNING (not silently) — a crafted archive
+    should leave a trace (whole-branch diagnosis). :meth:`ArchiveReader.read`
+    still calls the raising form so an explicit ``table_name`` request for
+    such an entry gets a clear error rather than "no such entry".
     """
     try:
         _reject_unsafe_archive_member(name)
-    except ReaderError:
+    except ReaderError as exc:
+        _logger.warning("Dropping unsafe archive member %r: %s", name, exc)
         return False
     return True
 

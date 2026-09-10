@@ -35,10 +35,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from uadas_core.core.logger import get_logger
+
 if TYPE_CHECKING:
     from uadas_core.jobs.job_runner import JobRunner
 
 __all__ = ["get_default_job_runner", "set_default_job_runner"]
+
+_logger = get_logger(__name__)
 
 # Not an ``AppConfig``/container-held value: the whole reason it lives here
 # is that BaseWorker cannot be handed one through its constructor without
@@ -57,7 +61,19 @@ def set_default_job_runner(runner: JobRunner) -> None:
     to swap in a synchronous fake.
     """
     global _default_job_runner
+    previous = _default_job_runner
     _default_job_runner = runner
+    if previous is not None and previous is not runner:
+        # Re-install (a second bootstrap() in one process, or a test swapping
+        # the runner): tear down the old pool so its idle worker threads don't
+        # leak for the life of the process (whole-branch diagnosis). A
+        # synchronous fake has no shutdown() -- skip it; failure is non-fatal.
+        _shutdown = getattr(previous, "shutdown", None)
+        if callable(_shutdown):
+            try:
+                _shutdown(wait=False)
+            except Exception:
+                _logger.exception("Tearing down the previous default JobRunner failed.")
 
 
 def get_default_job_runner() -> JobRunner:

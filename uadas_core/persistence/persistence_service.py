@@ -430,12 +430,20 @@ class PersistenceService:
                     f"is structurally inconsistent."
                 )
             source_path = record["source_path"]
+            try:
+                stored_warnings = list(json.loads(record["read_warnings"]))
+            except (TypeError, ValueError) as exc:
+                # Structural corruption (hand-edited .db) -> whole-load abort with
+                # the module-standard ServiceError, not a bare JSONDecodeError.
+                raise ServiceError(
+                    f"Dataset {dataset_id}: read_warnings is not a valid JSON list."
+                ) from exc
             datasets_by_id[dataset_id] = Dataset(
                 name=record["name"],
                 dataframe=frame,
                 source_format=record["source_format"],
                 source_path=Path(source_path) if source_path is not None else None,
-                read_warnings=list(json.loads(record["read_warnings"])),
+                read_warnings=stored_warnings,
                 dataset_id=dataset_id,
                 parent_dataset_id=record["parent_dataset_id"],
                 derivation_description=record["derivation_description"],
@@ -699,8 +707,17 @@ def _rebuild_visualization(
 
     try:
         figure = registration.chart_class.build(dataset.dataframe, **filtered)
-    except ServiceError as exc:
-        raise _RebuildFailed(f"build() failed: {exc}") from exc
+    except Exception as exc:
+        # Contract §2.2: a build() failure for ONE visualization is collected into
+        # WorkspaceSnapshot.rebuild_failures, never raised -- one stale chart must
+        # not stop the whole project opening. build() is chart_class code (a
+        # built-in or a *plugin* chart) and can raise anything: a KeyError on a
+        # renamed/dropped column, a ValueError from pandas/plotly, an
+        # AttributeError, or a plugin's own exception type. A narrow
+        # `except ServiceError` here silently reclassified every other exception
+        # as a whole-load abort (end-of-range review, HIGH). _RebuildFailed never
+        # leaves this module.
+        raise _RebuildFailed(f"build() failed: {exc!r}") from exc
 
     return Visualization(
         name=record["name"],

@@ -293,3 +293,31 @@ def test_get_all_logs_returns_every_dataset_log() -> None:
     svc.get_log("root")
     svc.get_log("derived")
     assert {log.dataset_id for log in svc.get_all_logs()} == {"root", "derived"}
+
+
+# Whole-branch diagnosis (2026-09-10): from_dict raised bare KeyError/ValueError
+# for a malformed payload, slipping past restore_logs_for_project's
+# `except ServiceError` warn-and-skip. Every corrupt-payload case is ServiceError.
+
+
+def test_entry_from_dict_rejects_an_unknown_stage() -> None:
+    bad = {
+        "stage": "not-a-stage",
+        "tool_name": "profile_dataset",
+        "inputs": {},
+        "outputs": {},
+        "explanation": None,
+        "timestamp": "2026-09-07T14:32:15Z",
+    }
+    with pytest.raises(ServiceError, match="stage"):
+        AnalysisLogEntry.from_dict(bad)
+
+
+def test_entry_from_dict_rejects_a_missing_required_key() -> None:
+    with pytest.raises(ServiceError, match="required key"):
+        AnalysisLogEntry.from_dict({"stage": "understand"})  # no timestamp
+
+
+def test_log_from_dict_rejects_a_missing_dataset_id() -> None:
+    with pytest.raises(ServiceError, match="dataset_id"):
+        AnalysisLog.from_dict({"entries": []})

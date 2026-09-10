@@ -142,14 +142,18 @@ class SqliteReader(BaseReader):
         try:
             connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
             try:
-                # table_name is validated against available_tables
-                # (itself sourced from sqlite_master, not user input)
-                # immediately above, so this f-string is safe from SQL
-                # injection despite not using a parameterized query —
-                # SQL parameterization applies to *values*, not table
-                # identifiers, and this project has no path by which
-                # an arbitrary, unvalidated string reaches this point.
-                dataframe = pd.read_sql_query(f"SELECT * FROM {table_name}", connection)
+                # table_name is validated against available_tables (itself
+                # sourced from sqlite_master, not user input) immediately above,
+                # so this is not injectable. It is still quoted as a SQLite
+                # identifier ("" escapes a literal quote) so the statement stays
+                # correct for a legitimate table whose name contains a space,
+                # a keyword, or punctuation, and stays defensible if a future
+                # refactor weakens the validation above (whole-branch diagnosis).
+                quoted_table = '"' + table_name.replace('"', '""') + '"'
+                dataframe = pd.read_sql_query(
+                    f"SELECT * FROM {quoted_table}",
+                    connection,
+                )
             finally:
                 connection.close()
         except (sqlite3.Error, pd.errors.DatabaseError) as exc:

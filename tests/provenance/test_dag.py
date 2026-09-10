@@ -100,3 +100,41 @@ def test_stage_is_never_the_edge_predicate():
     )
     dag = analysis_logs_to_dag([log], {})
     assert len(dag.edges) == 1 and not dag.artifacts
+
+
+# Whole-branch diagnosis (2026-09-10): Dag.roots() is a new public method with
+# no direct test -- it would pass as `return []` or `return self.nodes`.
+
+
+def _clean_entry(new_id: str) -> AnalysisLogEntry:
+    return AnalysisLogEntry(
+        PipelineStage.CLEAN,
+        "drop_missing_values",
+        {},
+        {"new_dataset_id": new_id, "derivation_description": "x"},
+        None,
+        "2026-09-07T14:32:20Z",
+    )
+
+
+def test_roots_is_the_single_chain_start_for_a_two_log_set(analysis_log_set):
+    dag = analysis_logs_to_dag(analysis_log_set, datasets_for(analysis_log_set))
+    root_ids = {n.dataset_id for n in dag.roots()}
+    edge_targets = {e.to_dataset_id for e in dag.edges}
+    # a root is a node that is never an edge target
+    assert root_ids == {n.dataset_id for n in dag.nodes} - edge_targets
+    # and a non-empty DAG always has a start
+    assert dag.nodes == [] or root_ids
+
+
+def test_roots_excludes_a_derived_node_even_when_its_meta_lost_parent_dataset_id():
+    # "child" is produced by an edge but its DatasetMeta has parent_dataset_id
+    # None (metadata drift). roots() must still classify it non-root via the
+    # edge-target check, not the parent pointer.
+    log = AnalysisLog("root", [_clean_entry("child")])
+    metas = {
+        "root": DatasetMeta("root", "root", 1, 1, "csv", parent_dataset_id=None),
+        "child": DatasetMeta("child", "child", 1, 1, "csv", parent_dataset_id=None),
+    }
+    dag = analysis_logs_to_dag([log], metas)
+    assert {n.dataset_id for n in dag.roots()} == {"root"}

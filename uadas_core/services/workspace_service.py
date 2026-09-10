@@ -279,11 +279,13 @@ class WorkspaceService:
         three lists as-is rather than re-running those referential-integrity
         checks. It still rejects a ``parent_dataset_id`` *cycle* (via
         :func:`_reject_parent_cycles`), which is only reachable through a
-        hand-edited persisted workspace. ``datasets`` must already be
-        topologically ordered (parents before children);
-        :class:`~uadas_core.persistence.persistence_service.PersistenceService`
-        guarantees that. Active dataset / visualization are cleared — a
-        restored snapshot does not persist the session's selection.
+        hand-edited persisted workspace. ``datasets`` order is *not* a
+        correctness precondition — the three lists become dicts keyed by id —
+        but ``self._datasets`` keeps ``datasets``' insertion order, so a caller
+        that wants parents-before-children in the Dataset Explorer should pass
+        them that way (:class:`~uadas_core.persistence.persistence_service.PersistenceService`
+        already topologically sorts on load). Active dataset / visualization are
+        cleared — a restored snapshot does not persist the session's selection.
         """
         _reject_parent_cycles(datasets)
         self._datasets = {d.dataset_id: d for d in datasets}

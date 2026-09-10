@@ -336,3 +336,109 @@ def test_row_count_checksum_mismatch_is_a_structural_load_error(
 
     with pytest.raises(ServiceError):
         service.load_workspace(base)
+
+
+# --------------------------------------------------------------------------
+# Whole-branch diagnosis follow-ups (2026-09-10): structural-failure paths and
+# _gc_orphan_parquet were imported-but-unasserted; the per-viz build() guard
+# only caught ServiceError.
+# --------------------------------------------------------------------------
+
+
+def test_gc_orphan_parquet_deletes_a_stray_frame_but_keeps_live_ones(
+    tmp_path: Path,
+) -> None:
+    base = tmp_path / "p.workspace"
+    workspace = WorkspaceService()
+    live = Dataset(
+        name="live", dataframe=pd.DataFrame({"x": [1, 2, 3]}), source_format="csv"
+    )
+    workspace.add_dataset(live)
+    service = PersistenceService()
+    service.save_workspace(workspace.list_datasets(), [], [], base)
+
+    live_frame = base / f"{live.dataset_id}.parquet"
+    stray = base / "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.parquet"
+    stray.write_bytes(live_frame.read_bytes())  # a valid-looking orphan frame
+    assert stray.exists() and live_frame.exists()
+
+    # A second save of the same (still-live) dataset must GC the orphan and
+    # leave every saved dataset's frame in place -- an over-delete here is
+    # silent data loss.
+    service.save_workspace(workspace.list_datasets(), [], [], base)
+    assert not stray.exists()
+    assert live_frame.exists()
+    snapshot = service.load_workspace(base)
+    assert [d.dataset_id for d in snapshot.datasets] == [live.dataset_id]
+
+
+def test_load_rejects_a_corrupt_workspace_db(tmp_path: Path) -> None:
+    base = tmp_path / "p.workspace"
+    workspace = WorkspaceService()
+    workspace.add_dataset(
+        Dataset(name="d", dataframe=pd.DataFrame({"x": [1]}), source_format="csv")
+    )
+    service = PersistenceService()
+    service.save_workspace(workspace.list_datasets(), [], [], base)
+
+    (base / "workspace.db").write_bytes(b"this is not a sqlite database")
+    with pytest.raises(ServiceError):
+        service.load_workspace(base)
+
+
+def test_load_rejects_a_bare_directory_with_no_workspace_db(tmp_path: Path) -> None:
+    empty = tmp_path / "empty.workspace"
+    empty.mkdir()
+    with pytest.raises(ServiceError):
+        PersistenceService().load_workspace(empty)
+
+
+def test_load_rejects_a_missing_parquet_frame(tmp_path: Path) -> None:
+    base = tmp_path / "p.workspace"
+    workspace = WorkspaceService()
+    dataset = Dataset(
+        name="d", dataframe=pd.DataFrame({"x": [1, 2, 3]}), source_format="csv"
+    )
+    workspace.add_dataset(dataset)
+    service = PersistenceService()
+    service.save_workspace(workspace.list_datasets(), [], [], base)
+
+    (base / f"{dataset.dataset_id}.parquet").unlink()
+    with pytest.raises(ServiceError):
+        service.load_workspace(base)
+
+
+def test_a_non_serviceerror_build_failure_is_a_rebuild_failure_not_a_load_abort(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    base = tmp_path / "p.workspace"
+    workspace = WorkspaceService()
+    frame = pd.DataFrame({"city": ["a", "b", "c", "a"], "sales": [1, 2, 3, 4]})
+    dataset = Dataset(name="d", dataframe=frame, source_format="csv")
+    workspace.add_dataset(dataset)
+    viz = Visualization(
+        name="chart",
+        dataset_id=dataset.dataset_id,
+        figure=_bar_figure(frame, "city"),
+        chart_type="bar",
+        chart_parameters={"category_column": "city"},
+    )
+    workspace.add_visualization(viz)
+    service = PersistenceService()
+    service.save_workspace(
+        workspace.list_datasets(), workspace.list_visualizations(), [], base
+    )
+
+    # A plugin/built-in build() can raise anything; before the diagnosis fix a
+    # non-ServiceError aborted the whole load instead of being collected.
+    bar_chart = chart_registry.get_chart("bar").chart_class
+
+    def _boom(*_args: object, **_kwargs: object) -> object:
+        raise RuntimeError("plugin chart blew up")
+
+    monkeypatch.setattr(bar_chart, "build", staticmethod(_boom))
+
+    snapshot = service.load_workspace(base)  # must NOT raise
+    assert snapshot.datasets  # the dataset still loaded
+    assert viz.visualization_id in snapshot.rebuild_failures
+    assert snapshot.visualizations == []

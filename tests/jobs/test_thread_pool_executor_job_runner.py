@@ -97,3 +97,29 @@ def test_ten_concurrent_jobs_each_get_their_own_callbacks() -> None:
         ]
         assert recorder.errors == []
         assert recorder.finished_count == 1
+
+
+def test_a_job_that_fails_with_no_on_error_callback_is_logged_not_silent(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Whole-branch diagnosis (2026-09-10): before the fix, a raising fn with
+    # on_error=None dropped the exception into the discarded Future with no
+    # trace anywhere.
+    import threading
+
+    runner = ThreadPoolExecutorJobRunner(max_workers=1)
+    done = threading.Event()
+
+    def _boom() -> None:
+        raise RuntimeError("boom")
+
+    try:
+        with caplog.at_level("ERROR"):
+            runner.run(_boom, on_finished=done.set)
+            assert done.wait(timeout=5)
+        assert any(
+            "no on_error callback" in r.message and r.levelname == "ERROR"
+            for r in caplog.records
+        )
+    finally:
+        runner.shutdown(wait=True)

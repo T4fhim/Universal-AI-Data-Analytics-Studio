@@ -40,9 +40,12 @@ from dataclasses import dataclass, field
 from typing import Any, TypeVar
 from uuid import uuid4
 
+from uadas_core.core.logger import get_logger
+
 T = TypeVar("T")
 
 _DEFAULT_MAX_WORKERS = 4
+_logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -89,23 +92,44 @@ class ThreadPoolExecutorJobRunner:
             # matching what BaseWorker.__init__ does today.
             kwargs["progress_callback"] = on_progress or (lambda *_: None)
 
+        def _run_callback(cb: Callable[..., None] | None, *cb_args: Any) -> None:
+            # A callback that itself raises must not escape into the discarded
+            # Future (where the executor swallows it) -- the job's own outcome is
+            # already decided; a broken listener is the listener's bug, logged
+            # here so it is not silent (whole-branch diagnosis, LOW).
+            if cb is None:
+                return
+            try:
+                cb(*cb_args)
+            except Exception:
+                _logger.exception(
+                    "A JobRunner callback (%s) raised; the job's outcome is unaffected.",
+                    getattr(cb, "__name__", cb),
+                )
+
         def _wrapped() -> None:
             try:
                 value = fn(*args, **kwargs)
-            except Exception as exc:  # noqa: BLE001 - this IS the boundary: any
+            except Exception as exc:
                 # exception from ``fn`` must be reported via ``on_error`` rather
                 # than allowed to escape the pool thread, where it would be
                 # swallowed by the executor and surface only as a dead job.
                 if on_error is not None:
-                    on_error(exc, traceback.format_exc())
+                    _run_callback(on_error, exc, traceback.format_exc())
+                else:
+                    # No on_error handler -- without this the failure vanishes
+                    # into the discarded Future with no trace anywhere
+                    # (whole-branch diagnosis, MED).
+                    _logger.exception(
+                        "Job %s failed and no on_error callback was supplied.",
+                        getattr(fn, "__name__", fn),
+                    )
             else:
-                if on_result is not None:
-                    on_result(value)
+                _run_callback(on_result, value)
             finally:
                 # Always, on both paths — the "job is over regardless of
                 # outcome" hook every caller can rely on.
-                if on_finished is not None:
-                    on_finished()
+                _run_callback(on_finished)
 
         # The Future is intentionally discarded — see the module docstring.
         self._executor.submit(_wrapped)

@@ -185,7 +185,25 @@ class AnalysisLogEntry:
         # rather than coerce: guessing at a malformed timestamp's intent is
         # worse than refusing the payload. ``fromisoformat`` on 3.11+ accepts
         # a trailing ``Z``, which is the form the write path can emit.
-        timestamp = data["timestamp"]
+        # Every malformed-payload case raises ServiceError, not a bare
+        # KeyError/ValueError -- the restore path
+        # (PipelineController.restore_logs_for_project) catches ServiceError to
+        # warn-and-skip a corrupt log so the project still opens; a bare
+        # exception would slip past that guard and abort the whole open. Same
+        # contract as RecipeStep.from_dict (whole-branch diagnosis, MED).
+        try:
+            raw_stage = data["stage"]
+            timestamp = data["timestamp"]
+        except KeyError as exc:
+            raise ServiceError(
+                f"AnalysisLogEntry is missing a required key: {exc}"
+            ) from exc
+        try:
+            stage = PipelineStage(raw_stage)
+        except ValueError as exc:
+            raise ServiceError(
+                f"AnalysisLogEntry.stage is not a known pipeline stage: {raw_stage!r}"
+            ) from exc
         try:
             datetime.datetime.fromisoformat(timestamp)
         except (TypeError, ValueError) as exc:
@@ -193,7 +211,7 @@ class AnalysisLogEntry:
                 f"AnalysisLogEntry.timestamp is not an ISO-8601 string: {timestamp!r}"
             ) from exc
         return cls(
-            stage=PipelineStage(data["stage"]),
+            stage=stage,
             tool_name=data.get("tool_name"),
             inputs=dict(data.get("inputs", {})),
             outputs=dict(data.get("outputs", {})),
@@ -234,8 +252,12 @@ class AnalysisLog:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AnalysisLog:
+        try:
+            dataset_id = data["dataset_id"]
+        except KeyError as exc:
+            raise ServiceError("AnalysisLog is missing 'dataset_id'.") from exc
         return cls(
-            dataset_id=data["dataset_id"],
+            dataset_id=dataset_id,
             entries=[AnalysisLogEntry.from_dict(e) for e in data.get("entries", [])],
         )
 

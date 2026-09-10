@@ -364,14 +364,15 @@ class PipelineController:
         """
         recorded = self._project_service.get_recorded_analysis_logs(project)
         restored = 0
+        skipped = 0
         for dataset_id, log_dict in recorded.items():
-            # Web-transition 1.7 made AnalysisLogEntry.from_dict reject a
-            # non-ISO-8601 timestamp with ServiceError. A hand-edited or
-            # partially-corrupt project file must still open (the rest of its
-            # state is fine) -- drop the unreadable log with a warning rather
-            # than aborting the whole open, matching the workspace model's
-            # "an orphaned reference is expected state, not corruption to guard
-            # against" stance.
+            # Web-transition 1.7 hardened AnalysisLog(Entry).from_dict to reject
+            # every malformed-payload case (non-ISO timestamp, unknown stage,
+            # missing key) with ServiceError. A hand-edited or partially-corrupt
+            # project file must still open (the rest of its state is fine) --
+            # drop the unreadable log with a warning rather than aborting the
+            # whole open, matching the workspace model's "an orphaned reference
+            # is expected state, not corruption to guard against" stance.
             try:
                 self._orchestrator_service.load_log(AnalysisLog.from_dict(log_dict))
             except ServiceError as exc:
@@ -382,13 +383,15 @@ class PipelineController:
                     project.name,
                     exc,
                 )
+                skipped += 1
                 continue
             restored += 1
-        if restored:
+        if restored or skipped:
             _logger.info(
-                "Restored %d analysis log(s) from project '%s'.",
+                "Restored %d analysis log(s) from project '%s' (%d skipped as unreadable).",
                 restored,
                 project.name,
+                skipped,
             )
         if self._on_changed is not None:
             self._on_changed()
