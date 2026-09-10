@@ -43,9 +43,8 @@ from PySide6.QtWidgets import QMainWindow
 # composition root for the UI's action-consuming side, so it is the
 # natural place for this import to live rather than a scattered import in
 # menu_bar.py/toolbar.py, which only *consume* the registry, not populate it.
-import src.ui.actions.builtin_actions  # noqa: F401
+import uadas_core.actions.builtin_actions  # noqa: F401
 from src.ui.actions.action_binder import ActionBinder
-from src.ui.actions.action_context import ActionContext
 from src.ui.command_palette import CommandPalette
 from src.ui.command_stack import CommandStack
 from src.ui.controllers.assistant_controller import AssistantController
@@ -74,6 +73,7 @@ from src.ui.workbench.pages.understand_page import UnderstandPage
 from src.ui.workbench.pages.visualize_page import VisualizePage
 from src.ui.workbench.workbench import Workbench
 from src.ui.worker_runner import WorkerRunner
+from uadas_core.actions.action_context import ActionContext
 from uadas_core.core.bootstrap import BootstrapContext
 from uadas_core.core.constants import (
     APP_NAME,
@@ -374,7 +374,7 @@ class MainWindow(QMainWindow):
     def _on_ui_state_changed(self) -> None:
         """Recompute and apply enablement -- the sole consumer of ``state_changed``.
 
-        Rebuilds a fresh :class:`~src.ui.actions.action_context.ActionContext`
+        Rebuilds a fresh :class:`~uadas_core.actions.action_context.ActionContext`
         from the live services on every call rather than tracking one
         incrementally, per that class's own docstring. ``is_busy`` is
         always ``False`` here: no current ``ActionSpec`` reads it, so wiring

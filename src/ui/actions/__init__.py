@@ -12,14 +12,14 @@ This package fixes that by splitting "what actions exist" from "what a
 window does when one fires" into three pieces, mirroring
 :mod:`uadas_core.visualization.chart_registry`'s registration shape:
 
-- :mod:`~src.ui.actions.action_registry` -- Qt-free, import-time-populated
-  data (:class:`~src.ui.actions.action_registry.ActionSpec`). No handler and
+- :mod:`~uadas_core.actions.action_registry` -- Qt-free, import-time-populated
+  data (:class:`~uadas_core.actions.action_registry.ActionSpec`). No handler and
   no ``QIcon`` live here: handlers are bound methods of a ``MainWindow``
   that does not exist at import time, and constructing a ``QIcon`` before
   ``QApplication`` exists is undefined behavior -- putting either in the
   registration would force per-window mutable state onto what should stay
   pure data.
-- :mod:`~src.ui.actions.action_context` -- :class:`ActionContext`, an
+- :mod:`~uadas_core.actions.action_context` -- :class:`ActionContext`, an
   immutable snapshot of "what can the user do right now," captured in
   O(columns), never O(rows).
 - :mod:`~src.ui.actions.action_binder` -- the per-window Qt side.
@@ -27,7 +27,7 @@ window does when one fires" into three pieces, mirroring
   "every registered action has a real handler" from a code-review hope into
   a startup-time hard failure.
 
-Alongside the registry: :mod:`src.ui.actions.builtin_actions` registers
+Alongside the registry: :mod:`uadas_core.actions.builtin_actions` registers
 every action that predates this milestone (constructing this list at
 import time, matching how :mod:`~uadas_core.visualization.chart_registry` seeds
 its own built-ins).

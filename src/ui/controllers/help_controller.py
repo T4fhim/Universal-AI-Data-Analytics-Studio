@@ -44,7 +44,7 @@ class HelpController:
         # plan's own wording and resolves to whatever a given platform's real "show help" key
         # is (F1 on Windows/Linux). A plain QShortcut, not a QAction/ActionSpec: F1 is a
         # window-wide keyboard shortcut with no menu/toolbar/palette presence of its own,
-        # unlike every registered action in src.ui.actions.action_registry.
+        # unlike every registered action in uadas_core.actions.action_registry.
         self._shortcut = QShortcut(
             QKeySequence(QKeySequence.StandardKey.HelpContents), parent
         )

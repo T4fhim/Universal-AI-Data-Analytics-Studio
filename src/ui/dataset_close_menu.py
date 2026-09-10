@@ -11,7 +11,7 @@ nothing else :class:`DockManager` itself holds.
 Milestone 23: closes the "data accumulates until exit" leak this overhaul's audit named --
 before this, nothing in ``src/ui/`` ever called
 :meth:`~uadas_core.services.workspace_service.WorkspaceService.close_dataset`. A context menu, not a
-registered :class:`~src.ui.actions.action_registry.ActionSpec` (unlike ``edit.undo``/
+registered :class:`~uadas_core.actions.action_registry.ActionSpec` (unlike ``edit.undo``/
 ``edit.redo``) -- closing *which* dataset is per-item data, the same reason "Open Recent" stays
 bespoke rather than becoming registry entries (see :mod:`~src.ui.menu_bar`'s own docstring).
 """

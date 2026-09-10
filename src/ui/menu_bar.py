@@ -6,7 +6,7 @@ constructed each ``QAction`` itself and exposed it as a named attribute
 (``self.action_new_project``), which ``main_window.py`` connected by hand --
 nothing enforced that every constructed action actually got a handler. Now
 each menu is a flat, declarative list of
-:class:`~src.ui.actions.action_registry.ActionSpec` ids, handed to
+:class:`~uadas_core.actions.action_registry.ActionSpec` ids, handed to
 :meth:`~src.ui.actions.action_binder.ActionBinder.build_menu`, which
 constructs (or reuses) the real ``QAction`` for each id -- the same
 ``QAction`` the toolbar and command palette also reference, so there is
@@ -23,7 +23,7 @@ now that ``edit.undo``/``edit.redo`` have real semantics -- see
 
 "Open Recent" stays bespoke rather than becoming registry entries: each
 item's target path is per-instance data no static
-:class:`~src.ui.actions.action_registry.ActionSpec` could represent (there
+:class:`~uadas_core.actions.action_registry.ActionSpec` could represent (there
 is no fixed set of "recent project" ids to register). See
 :meth:`update_recent_projects_menu`.
 """

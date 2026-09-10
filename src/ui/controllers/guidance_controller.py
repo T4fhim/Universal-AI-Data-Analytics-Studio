@@ -118,7 +118,7 @@ class GuidanceController:
 
         Milestone 26's own acceptance criterion -- every ``Suggestion.action_id``
         :class:`~uadas_core.services.guidance_service.GuidanceService` can ever produce resolves in
-        :mod:`~src.ui.actions.action_registry` -- is what makes ``action_for(action_id)``
+        :mod:`~uadas_core.actions.action_registry` -- is what makes ``action_for(action_id)``
         below safe to call unconditionally: an unknown id would raise
         :class:`~uadas_core.core.exceptions.ServiceError`, the correct "this should never happen"
         failure mode here, not a silently swallowed no-op.

@@ -6,7 +6,7 @@ Covers milestone 26's three service-level acceptance criteria:
 1. Every ``Suggestion.action_id`` this service can ever produce resolves in the real
    ``ActionRegistry`` -- a contract test that constructs every ``PipelineStage``, feeds
    ``propose_next_stage`` through every possible completed-stage combination it can reach,
-   and asserts against the actually-registered ids (via ``src.ui.actions.builtin_actions``),
+   and asserts against the actually-registered ids (via ``uadas_core.actions.builtin_actions``),
    not a hand-maintained duplicate list that could drift from the real registrations.
 2. Guidance is fully populated and useful with **no AI key configured** -- exercised by
    never constructing an ``AssistantService``/provider anywhere in this file at all, and
@@ -16,7 +16,7 @@ Covers milestone 26's three service-level acceptance criteria:
 
 No ``QApplication`` anywhere in this file -- this module never imports ``src.ui`` (see its
 own docstring), and the contract test's "resolves in the real registry" check imports
-``src.ui.actions.builtin_actions`` purely for its import-time registration side effect,
+``uadas_core.actions.builtin_actions`` purely for its import-time registration side effect,
 which itself requires no live Qt application (``ActionSpec`` construction is Qt-free -- see
 that module's own docstring).
 """
@@ -99,15 +99,15 @@ def guidance_service(orchestrator: AnalysisOrchestratorService) -> GuidanceServi
 def test_every_pipeline_stage_proposal_maps_to_a_registered_action_id() -> None:
     """Contract test: every stage propose_next_stage can ever return has a real registered action.
 
-    Imports src.ui.actions.builtin_actions purely for its import-time registration side
+    Imports uadas_core.actions.builtin_actions purely for its import-time registration side
     effect (matching how main_window.py itself relies on this same side effect -- see that
     module's own comment on the import), then asserts GuidanceService's own
     f"workbench.go_to_{stage.value}" formatting resolves for every stage
     AnalysisOrchestratorService.propose_next_stage can produce: every _AUTO_PROPOSED_STAGES
     member, plus its REPORT fallback.
     """
-    import src.ui.actions.builtin_actions  # noqa: F401
-    from src.ui.actions.action_registry import get_action
+    import uadas_core.actions.builtin_actions  # noqa: F401
+    from uadas_core.actions.action_registry import get_action
 
     possible_stages = (
         PipelineStage.UNDERSTAND,
@@ -136,8 +136,8 @@ def test_every_suggestion_action_id_is_registered(
     just the pipeline-source ones test_every_pipeline_stage_proposal_maps_to_a_registered_
     action_id above already checked in isolation.
     """
-    import src.ui.actions.builtin_actions  # noqa: F401
-    from src.ui.actions.action_registry import get_action
+    import uadas_core.actions.builtin_actions  # noqa: F401
+    from uadas_core.actions.action_registry import get_action
 
     dataset = _fresh_dataset()
     workspace.add_dataset(dataset)

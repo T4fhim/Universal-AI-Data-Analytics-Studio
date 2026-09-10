@@ -15,13 +15,17 @@ from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QApplication, QWidget
 
 from src.ui.actions.action_binder import ActionBinder
-from src.ui.actions.action_registry import ActionCategory, ActionSpec, register_action
 from src.ui.command_palette import CommandPalette
+from uadas_core.actions.action_registry import (
+    ActionCategory,
+    ActionSpec,
+    register_action,
+)
 
 
 @pytest.fixture(autouse=True)
 def _isolated_registry(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.ui.actions.action_registry as registry_module
+    import uadas_core.actions.action_registry as registry_module
 
     monkeypatch.setattr(registry_module, "_REGISTRY", {})
     register_action(

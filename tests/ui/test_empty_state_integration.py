@@ -20,7 +20,7 @@ from __future__ import annotations
 import pandas as pd
 from PySide6.QtWidgets import QApplication, QMainWindow, QWidgetAction
 
-import src.ui.actions.builtin_actions  # noqa: F401 -- populates the real registry
+import uadas_core.actions.builtin_actions  # noqa: F401 -- populates the real registry
 from src.ui.actions.action_binder import ActionBinder
 from src.ui.dock_manager import DockManager
 from src.ui.menu_bar import ApplicationMenuBar

@@ -1,7 +1,7 @@
 # File: src/ui/command_palette.py
 """A Ctrl+K searchable list of every ``palette_visible`` action.
 
-Lists every :class:`~src.ui.actions.action_registry.ActionSpec` with
+Lists every :class:`~uadas_core.actions.action_registry.ActionSpec` with
 ``palette_visible=True`` and, on selection, calls
 ``QAction.trigger()`` on the exact same ``QAction``
 :class:`~src.ui.actions.action_binder.ActionBinder` hands the menu bar and
@@ -32,8 +32,8 @@ from PySide6.QtWidgets import (
 
 from src.ui.a11y.accessible import describe
 from src.ui.actions.action_binder import ActionBinder
-from src.ui.actions.action_registry import list_actions
 from src.ui.ui_state_bus import UiStateBus
+from uadas_core.actions.action_registry import list_actions
 from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)

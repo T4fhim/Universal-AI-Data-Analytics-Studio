@@ -10,7 +10,7 @@ crash -- but it means a user can only discover an action is unavailable by
 clicking it.
 
 **Why a bus and not polling.** A ``QTimer`` re-running
-:meth:`~src.ui.actions.action_context.ActionContext.capture` on an interval
+:meth:`~uadas_core.actions.action_context.ActionContext.capture` on an interval
 would work, but it either recomputes uselessly most of the time (nothing
 changed) or lags behind a real change by up to the timer's interval. This
 class instead exposes :meth:`request_refresh`, called from the exact call
@@ -48,7 +48,7 @@ class UiStateBus(QObject):
         state_changed: Emitted with no arguments -- a listener (typically
             :meth:`~src.ui.actions.action_binder.ActionBinder.
             refresh_enablement`'s caller) re-captures a fresh
-            :class:`~src.ui.actions.action_context.ActionContext` itself
+            :class:`~uadas_core.actions.action_context.ActionContext` itself
             rather than this signal carrying one, since the bus has no
             reference to the services a context is built from (it is a
             pure Qt plumbing class, not a workspace-aware one) and

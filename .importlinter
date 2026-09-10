@@ -31,6 +31,7 @@ name = no uadas_core subpackage except provenance itself may import uadas_core.p
 type = forbidden
 source_modules =
     uadas_core.a11y
+    uadas_core.actions
     uadas_core.ai
     uadas_core.analysis
     uadas_core.cleaning

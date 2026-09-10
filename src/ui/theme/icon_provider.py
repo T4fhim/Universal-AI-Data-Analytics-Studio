@@ -141,7 +141,7 @@ class IconProvider(QObject):
         """Return every icon name on disk, sorted.
 
         Backs a test asserting that every ``icon_name`` referenced by an
-        :class:`~src.ui.actions.action_registry.ActionSpec` actually exists,
+        :class:`~uadas_core.actions.action_registry.ActionSpec` actually exists,
         so a typo surfaces in the suite rather than as a silently blank
         toolbar button.
         """

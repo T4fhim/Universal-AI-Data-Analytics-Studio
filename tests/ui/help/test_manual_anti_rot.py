@@ -20,9 +20,9 @@ from __future__ import annotations
 
 import pytest
 
-import src.ui.actions.builtin_actions  # noqa: F401 -- import-time registration side effect
-from src.ui.actions.action_registry import list_actions
+import uadas_core.actions.builtin_actions  # noqa: F401 -- import-time registration side effect
 from src.ui.workbench.stage_registry import get_stage_page_class, list_registered_stages
+from uadas_core.actions.action_registry import list_actions
 from uadas_core.help.manual_index import ManualIndex
 from uadas_core.results.result_renderer_registry import list_renderers
 

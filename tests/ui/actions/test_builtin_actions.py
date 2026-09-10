@@ -9,9 +9,9 @@ synthetic fixture.
 
 from __future__ import annotations
 
-import src.ui.actions.builtin_actions  # noqa: F401 -- import-time registration
-from src.ui.actions.action_registry import Requirement, list_actions
+import uadas_core.actions.builtin_actions  # noqa: F401 -- import-time registration
 from src.ui.theme.icon_provider import IconProvider
+from uadas_core.actions.action_registry import Requirement, list_actions
 from uadas_core.theme.tokens import DARK_TOKENS
 
 
@@ -114,8 +114,8 @@ def test_every_pipeline_stage_with_a_registered_workbench_page_has_a_go_to_actio
     src.ui.workbench.stage_registry actually registers a page for -- see
     builtin_actions.py's own _STAGE_NAV_ACTIONS comment on why UPLOAD is excluded.
     """
-    from src.ui.actions.action_registry import Requirement
     from src.ui.workbench.stage_registry import list_registered_stages
+    from uadas_core.actions.action_registry import Requirement
     from uadas_core.services.analysis_orchestrator_service import PipelineStage
 
     registered_stages = list_registered_stages()

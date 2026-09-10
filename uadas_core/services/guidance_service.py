@@ -2,12 +2,12 @@
 """Answers "what should I do next?" -- milestone 26's ``GuidanceService``.
 
 Merges four **deterministic** sources into one ranked list of :class:`Suggestion`, each
-carrying a real :class:`~src.ui.actions.action_registry.ActionSpec` id as a plain string:
+carrying a real :class:`~uadas_core.actions.action_registry.ActionSpec` id as a plain string:
 
 1. :meth:`~uadas_core.services.analysis_orchestrator_service.AnalysisOrchestratorService.
    propose_next_stage` -- one PIPELINE suggestion, mapped onto a
    ``"workbench.go_to_<stage>"`` action id (see
-   :mod:`src.ui.actions.builtin_actions`'s ``_STAGE_NAV_ACTIONS`` -- registered for every
+   :mod:`uadas_core.actions.builtin_actions`'s ``_STAGE_NAV_ACTIONS`` -- registered for every
    stage :func:`~uadas_core.services.analysis_orchestrator_service.AnalysisOrchestratorService.
    propose_next_stage` can ever return, so this mapping can never miss).
 2. :func:`~uadas_core.visualization.chart_recommender.recommend_charts` -- CHART suggestions,
@@ -26,7 +26,7 @@ carrying a real :class:`~src.ui.actions.action_registry.ActionSpec` id as a plai
    :func:`get_suggestions`'s final sort step, not a fifth source of new candidates.
 
 **Never imports anything from ``src.ui``.** ``Suggestion.action_id`` is a plain string a UI
-layer resolves against :func:`~src.ui.actions.action_registry.get_action` -- this is what lets
+layer resolves against :func:`~uadas_core.actions.action_registry.get_action` -- this is what lets
 ``tests/services/test_guidance_service.py`` exercise this whole module with zero ``QApplication``,
 and what keeps this service on the correct side of this repo's "ui/ imports downward only" rule
 (nothing outside ``src/ui`` may import ``src.ui`` -- see ``tests/ui/test_import_layering.py``).
@@ -96,7 +96,7 @@ class Suggestion:
 
     Attributes:
         action_id: A string id resolvable via
-            :func:`~src.ui.actions.action_registry.get_action` -- **never** a live
+            :func:`~uadas_core.actions.action_registry.get_action` -- **never** a live
             ``QAction`` or handler reference (see this module's own docstring on why
             ``src.ui`` is never imported here). The one hard invariant
             ``tests/services/test_guidance_service.py``'s contract test enforces: every

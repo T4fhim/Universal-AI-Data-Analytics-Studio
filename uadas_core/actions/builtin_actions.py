@@ -1,4 +1,4 @@
-# File: src/ui/actions/builtin_actions.py
+# File: uadas_core/actions/builtin_actions.py
 """Registers every action built before milestone 17.
 
 Populated once at import time (bottom of this module), the same convention
@@ -32,7 +32,7 @@ predicate rather than forcing a boolean ``Requirement`` to fit.
 
 from __future__ import annotations
 
-from src.ui.actions.action_registry import (
+from uadas_core.actions.action_registry import (
     ActionCategory,
     ActionSpec,
     Requirement,

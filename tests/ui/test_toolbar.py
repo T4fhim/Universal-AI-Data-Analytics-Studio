@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QApplication, QMainWindow
 
-import src.ui.actions.builtin_actions  # noqa: F401 -- populates the real registry
+import uadas_core.actions.builtin_actions  # noqa: F401 -- populates the real registry
 from src.ui.actions.action_binder import ActionBinder
 from src.ui.theme.icon_provider import IconProvider
 from src.ui.toolbar import ApplicationToolBar

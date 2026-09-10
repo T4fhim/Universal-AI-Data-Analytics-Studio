@@ -1,4 +1,4 @@
-# File: src/ui/actions/action_registry.py
+# File: uadas_core/actions/action_registry.py
 """Qt-free, import-time-populated registry of every application action.
 
 Mirrors :mod:`uadas_core.visualization.chart_registry`'s exact shape (a frozen
@@ -30,7 +30,7 @@ from uadas_core.core.exceptions import ServiceError
 from uadas_core.core.logger import get_logger
 
 if TYPE_CHECKING:
-    from src.ui.actions.action_context import ActionContext
+    from uadas_core.actions.action_context import ActionContext
     from uadas_core.services.analysis_orchestrator_service import PipelineStage
 
 _logger = get_logger(__name__)
@@ -58,7 +58,7 @@ class ActionCategory(Enum):
 class Requirement(Enum):
     """Named preconditions :meth:`~src.ui.actions.action_binder.ActionBinder.
     refresh_enablement` checks generically against an
-    :class:`~src.ui.actions.action_context.ActionContext`, so the common
+    :class:`~uadas_core.actions.action_context.ActionContext`, so the common
     "needs an open project" / "needs an active dataset" cases don't each
     need their own one-line predicate lambda repeated across every action
     that shares the same precondition. Anything more specific (e.g. "needs
@@ -77,7 +77,7 @@ class ActionSpec:
         action_id: A stable, dotted identifier -- ``"dataset.open"``,
             ``"project.save"``. Used as the registry key, the command
             palette's search target, and (via ``requires``) what
-            :class:`~src.ui.actions.action_context.ActionContext` gets
+            :class:`~uadas_core.actions.action_context.ActionContext` gets
             checked against.
         label: Display text, with a ``&`` mnemonic where one applies --
             passed straight to ``QAction(label, parent)``.

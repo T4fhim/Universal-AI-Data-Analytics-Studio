@@ -14,13 +14,13 @@ import pytest
 from PySide6.QtWidgets import QApplication, QMenu, QWidget
 
 from src.ui.actions.action_binder import ActionBinder
-from src.ui.actions.action_registry import (
+from src.ui.theme.icon_provider import IconProvider
+from uadas_core.actions.action_registry import (
     ActionCategory,
     ActionSpec,
     Requirement,
     register_action,
 )
-from src.ui.theme.icon_provider import IconProvider
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.theme.tokens import DARK_TOKENS, LIGHT_TOKENS
 
@@ -46,7 +46,7 @@ class _FakeContext:
 
 @pytest.fixture(autouse=True)
 def _isolated_registry(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.ui.actions.action_registry as registry_module
+    import uadas_core.actions.action_registry as registry_module
 
     monkeypatch.setattr(registry_module, "_REGISTRY", {})
     register_action(

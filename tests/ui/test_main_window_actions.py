@@ -15,8 +15,8 @@ from pathlib import Path
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from src.ui.actions.action_context import ActionContext
 from src.ui.main_window import MainWindow
+from uadas_core.actions.action_context import ActionContext
 from uadas_core.core.bootstrap import bootstrap
 
 

@@ -1,7 +1,7 @@
 # File: src/ui/actions/action_binder.py
 """The per-window Qt side of the action registry.
 
-:class:`ActionBinder` is where an :class:`~src.ui.actions.action_registry.
+:class:`ActionBinder` is where an :class:`~uadas_core.actions.action_registry.
 ActionSpec` finally becomes a real ``QAction`` -- constructed lazily, on
 first reference (from either :meth:`bind`, :meth:`build_menu`, or
 :meth:`action_for`), and cached so the menu bar, the toolbar, and the
@@ -22,13 +22,13 @@ from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QMenu, QWidget
 
 from src.ui.a11y.accessible import HELP_ANCHOR_PROPERTY
-from src.ui.actions.action_registry import get_action, list_actions
 from src.ui.theme.icon_provider import IconProvider
+from uadas_core.actions.action_registry import get_action, list_actions
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.core.logger import get_logger
 
 if TYPE_CHECKING:
-    from src.ui.actions.action_context import ActionContext
+    from uadas_core.actions.action_context import ActionContext
 
 _logger = get_logger(__name__)
 
@@ -161,7 +161,7 @@ class ActionBinder(QObject):
         clickable, connected-to-nothing menu items -- into a startup-time
         :class:`~uadas_core.core.exceptions.ServiceError` instead of something a
         code review has to remember to catch. Checked against
-        :func:`~src.ui.actions.action_registry.list_actions` (every
+        :func:`~uadas_core.actions.action_registry.list_actions` (every
         *registered* action), not just ``self._actions`` (every
         *constructed* one) -- an action that was registered but never
         referenced by :meth:`bind`/:meth:`build_menu`/:meth:`action_for` at

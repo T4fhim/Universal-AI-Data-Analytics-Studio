@@ -13,8 +13,8 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from src.ui.actions.action_context import ActionContext
-from src.ui.actions.action_registry import Requirement
+from uadas_core.actions.action_context import ActionContext
+from uadas_core.actions.action_registry import Requirement
 
 
 class _FakeProjectService:

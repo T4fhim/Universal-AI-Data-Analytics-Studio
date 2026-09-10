@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.ui.actions.action_registry import (
+from uadas_core.actions.action_registry import (
     ActionCategory,
     ActionSpec,
     Requirement,
@@ -34,7 +34,7 @@ def _isolated_registry(monkeypatch: pytest.MonkeyPatch) -> None:
     a fixture like this (it currently does not need one because nothing
     else mutates its registry in tests).
     """
-    import src.ui.actions.action_registry as registry_module
+    import uadas_core.actions.action_registry as registry_module
 
     monkeypatch.setattr(registry_module, "_REGISTRY", {})
 

@@ -12,7 +12,7 @@ accessible.describe` was called with a ``help_anchor`` keyword has the property 
 that class's own docstring for why the page container is stamped too, not just its buttons).
 But a menu item and a toolbar button do not carry their own identity the way an ordinary
 ``QWidget`` does: a ``QToolBar``'s buttons and a ``QMenu``'s items are views onto a ``QAction``,
-and it is the ``QAction`` (built once per :class:`~src.ui.actions.action_registry.ActionSpec`
+and it is the ``QAction`` (built once per :class:`~uadas_core.actions.action_registry.ActionSpec`
 by :class:`~src.ui.actions.action_binder.ActionBinder`) that actually carries the stamped
 property -- so this function checks the focused widget's associated ``QAction`` first, falling
 through to the widget's own property only if there is no such action.

@@ -126,12 +126,12 @@ class CommandStack:
 
     def can_undo(self) -> bool:
         """Whether :meth:`undo` has anything to do -- what
-        :attr:`~src.ui.actions.action_context.ActionContext.can_undo` reads."""
+        :attr:`~uadas_core.actions.action_context.ActionContext.can_undo` reads."""
         return bool(self._undo_stack)
 
     def can_redo(self) -> bool:
         """Whether :meth:`redo` has anything to do -- what
-        :attr:`~src.ui.actions.action_context.ActionContext.can_redo` reads."""
+        :attr:`~uadas_core.actions.action_context.ActionContext.can_redo` reads."""
         return bool(self._redo_stack)
 
     def undo(self) -> DatasetPointerCommand:
