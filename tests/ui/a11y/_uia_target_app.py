@@ -77,7 +77,7 @@ from PySide6.QtWidgets import (
 from src.ui.main_window import MainWindow
 from src.ui.theme_manager import ThemeManager
 from uadas_core.core.bootstrap import bootstrap
-from uadas_core.services.workspace_service import Dataset
+from uadas_core.models import Dataset
 
 # Mirrors src.ui.a11y.rules._BUTTON_LIKE / _FIELD_LIKE exactly (see that
 # module's own _path() docstring for why this project accepts this kind of

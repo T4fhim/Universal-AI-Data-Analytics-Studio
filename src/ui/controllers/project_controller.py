@@ -21,13 +21,14 @@ from src.ui.ui_state_bus import UiStateBus
 from src.ui.worker_runner import WorkerRunner
 from uadas_core.core.exceptions import ApplicationError
 from uadas_core.core.logger import get_logger
+from uadas_core.models import Project
 from uadas_core.persistence.persistence_service import (
     PersistenceService,
     SaveReport,
     WorkspaceSnapshot,
 )
 from uadas_core.readers.reader_registry import get_reader_for_path
-from uadas_core.services.project_service import Project, ProjectService
+from uadas_core.services.project_service import ProjectService
 from uadas_core.services.workspace_service import WorkspaceService
 
 if TYPE_CHECKING:
@@ -51,7 +52,7 @@ def _read_recorded_datasets(recorded: list[tuple[str, Path]]) -> tuple[list, lis
 
     Returns:
         A ``(datasets, failures)`` tuple: successfully read
-        :class:`~uadas_core.services.workspace_service.Dataset` objects, and
+        :class:`~uadas_core.models.Dataset` objects, and
         human-readable failure strings for recorded datasets that could not
         be reloaded (multi-table source, or a caught
         :class:`~uadas_core.core.exceptions.ApplicationError`) -- same

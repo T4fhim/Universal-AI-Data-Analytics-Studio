@@ -27,7 +27,8 @@ import pandas as pd
 import pytest
 
 from uadas_core.ai.llm_provider import BaseLLMProvider, LLMTurn, PendingToolCall
-from uadas_core.services.workspace_service import Dataset, WorkspaceService
+from uadas_core.models import Dataset
+from uadas_core.services.workspace_service import WorkspaceService
 
 
 class FakeLLMProvider(BaseLLMProvider):

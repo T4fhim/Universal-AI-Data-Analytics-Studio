@@ -26,13 +26,9 @@ import pandas as pd
 from PySide6.QtWidgets import QApplication, QMainWindow
 
 from src.ui.controllers.project_controller import ProjectController
+from uadas_core.models import Dataset, Project, Visualization
 from uadas_core.persistence.persistence_service import PersistenceService
-from uadas_core.services.project_service import Project
-from uadas_core.services.workspace_service import (
-    Dataset,
-    Visualization,
-    WorkspaceService,
-)
+from uadas_core.services.workspace_service import WorkspaceService
 from uadas_core.visualization import chart_registry
 
 

@@ -14,7 +14,7 @@ import pytest
 
 from uadas_core.cleaning.duplicates import DropDuplicates
 from uadas_core.core.exceptions import ServiceError
-from uadas_core.services.workspace_service import Dataset
+from uadas_core.models import Dataset
 
 
 def _make_dataset(data: dict[str, list]) -> Dataset:

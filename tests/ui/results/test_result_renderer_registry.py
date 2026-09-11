@@ -24,10 +24,10 @@ from uadas_core.analysis.pca import PcaResult, compute_pca
 from uadas_core.analysis.regression import RegressionResult, linear_regression
 from uadas_core.analysis.t_test import TTestResult, independent_t_test, paired_t_test
 from uadas_core.core.exceptions import ServiceError
+from uadas_core.models import Dataset
 from uadas_core.results import result_renderer_registry
 from uadas_core.results.renderers.generic import GenericResultRenderer
 from uadas_core.results.renderers.profiling import DatasetProfileRenderer
-from uadas_core.services.workspace_service import Dataset
 
 
 # The 12 orphaned uadas_core.analysis functions this milestone's acceptance criterion 2 names,

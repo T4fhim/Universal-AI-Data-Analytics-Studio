@@ -19,7 +19,8 @@ from src.ui.dock_manager import DockManager
 from src.ui.status_bar import ApplicationStatusBar
 from src.ui.ui_state_bus import UiStateBus
 from src.ui.worker_runner import WorkerRunner
-from uadas_core.services.workspace_service import Dataset, WorkspaceService
+from uadas_core.models import Dataset
+from uadas_core.services.workspace_service import WorkspaceService
 
 
 def _make_controller(qapp: QApplication) -> tuple[DatasetController, WorkspaceService]:

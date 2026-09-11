@@ -31,8 +31,8 @@ from uadas_core.analysis.crosstab import cross_tabulate
 from uadas_core.core.exceptions import ApplicationError
 from uadas_core.core.expertise_level import ExpertiseLevel
 from uadas_core.core.logger import get_logger
+from uadas_core.models import Dataset
 from uadas_core.services.analysis_orchestrator_service import PipelineStage
-from uadas_core.services.workspace_service import Dataset
 
 _logger = get_logger(__name__)
 

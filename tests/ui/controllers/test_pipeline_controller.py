@@ -34,12 +34,13 @@ from src.ui.status_bar import ApplicationStatusBar
 from src.ui.ui_state_bus import UiStateBus
 from src.ui.worker_runner import WorkerRunner
 from tests.ui.qt_helpers import wait_for_signal
+from uadas_core.models import Dataset
 from uadas_core.services.analysis_orchestrator_service import (
     AnalysisOrchestratorService,
     PipelineStage,
 )
 from uadas_core.services.project_service import ProjectService
-from uadas_core.services.workspace_service import Dataset, WorkspaceService
+from uadas_core.services.workspace_service import WorkspaceService
 
 
 def _make_dataset() -> Dataset:

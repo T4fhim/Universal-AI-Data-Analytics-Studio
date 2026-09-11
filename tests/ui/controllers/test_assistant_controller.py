@@ -26,8 +26,9 @@ from src.ui.worker_runner import WorkerRunner
 from tests.ai.conftest import make_provider
 from uadas_core.ai.llm_provider import LLMTurn, PendingToolCall
 from uadas_core.core.config import AppConfig, load_config
+from uadas_core.models import Dataset
 from uadas_core.services.settings_service import SettingsService
-from uadas_core.services.workspace_service import Dataset, WorkspaceService
+from uadas_core.services.workspace_service import WorkspaceService
 
 _FAKE_PROVIDER_PROFILE = {
     "name": "test-anthropic",

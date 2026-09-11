@@ -12,7 +12,7 @@ Why this lives in its own package rather than as methods on
   and only touches the singleton (via :meth:`WorkspaceService.load_snapshot`)
   back on the UI thread.
 * It imports :mod:`uadas_core.visualization.chart_registry` directly to
-  *re-derive* every :class:`~uadas_core.services.workspace_service.Visualization`
+  *re-derive* every :class:`~uadas_core.models.Visualization`
   figure on load. Figures are large and are a pure function of
   ``(dataframe, chart_parameters)``; storing them would only create
   stale-figure bugs when the underlying frame changes.
@@ -46,12 +46,7 @@ import pyarrow
 
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.core.logger import get_logger
-from uadas_core.services.workspace_service import (
-    Dashboard,
-    DashboardTile,
-    Dataset,
-    Visualization,
-)
+from uadas_core.models import Dashboard, DashboardTile, Dataset, Visualization
 from uadas_core.visualization import chart_registry
 
 _logger = get_logger(__name__)

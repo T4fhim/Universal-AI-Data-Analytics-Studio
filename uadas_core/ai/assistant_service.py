@@ -6,7 +6,7 @@ so this class's own logic is identical regardless of which provider is
 active.
 
 The one rule enforced here, not in the tool registry: a tool that
-returns a new :class:`~uadas_core.services.workspace_service.Dataset` (every
+returns a new :class:`~uadas_core.models.Dataset` (every
 cleaning tool) is added to
 :class:`~uadas_core.services.workspace_service.WorkspaceService` as a new
 dataset — it never silently replaces the active dataset.
@@ -30,11 +30,8 @@ from uadas_core.ai.tool_registry import get_anthropic_tool_schemas, get_tool_by_
 from uadas_core.core.exceptions import ApplicationError, ServiceError
 from uadas_core.core.expertise_level import EXPERTISE_LEVEL_GUIDANCE, ExpertiseLevel
 from uadas_core.core.logger import get_logger
-from uadas_core.services.workspace_service import (
-    Dataset,
-    Visualization,
-    WorkspaceService,
-)
+from uadas_core.models import Dataset, Visualization
+from uadas_core.services.workspace_service import WorkspaceService
 
 _logger = get_logger(__name__)
 

@@ -15,7 +15,7 @@ from PySide6.QtWidgets import QApplication
 
 from src.ui.workbench.pages.clean_page import CleanPage
 from uadas_core.cleaning.operation_registry import list_operations
-from uadas_core.services.workspace_service import Dataset
+from uadas_core.models import Dataset
 
 
 def _make_dataset() -> Dataset:

@@ -17,7 +17,7 @@ from PySide6.QtWidgets import QApplication
 
 from src.ui.workbench.pages.analyze_page import AnalyzePage
 from uadas_core.core.expertise_level import ExpertiseLevel
-from uadas_core.services.workspace_service import Dataset
+from uadas_core.models import Dataset
 
 
 def _make_dataset() -> Dataset:

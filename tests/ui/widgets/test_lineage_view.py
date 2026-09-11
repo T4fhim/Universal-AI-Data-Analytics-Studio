@@ -18,7 +18,8 @@ from PySide6.QtWidgets import QApplication
 
 from src.ui.widgets.lineage_view import LineageView
 from uadas_core.cleaning.duplicates import DropDuplicates
-from uadas_core.services.workspace_service import Dataset, WorkspaceService
+from uadas_core.models import Dataset
+from uadas_core.services.workspace_service import WorkspaceService
 
 
 def _make_chain() -> tuple[WorkspaceService, Dataset, Dataset, Dataset]:

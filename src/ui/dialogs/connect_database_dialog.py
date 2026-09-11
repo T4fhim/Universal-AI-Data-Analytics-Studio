@@ -53,8 +53,8 @@ from uadas_core.database.connection_registry import (
     list_supported_types,
 )
 from uadas_core.database.database_reader import DatabaseReader
+from uadas_core.models import Dataset
 from uadas_core.services.database_connection_service import DatabaseConnectionService
-from uadas_core.services.workspace_service import Dataset
 
 _logger = get_logger(__name__)
 

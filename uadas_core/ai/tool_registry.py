@@ -11,7 +11,7 @@ or the assistant calls them on a human's behalf — there is no
 assistant-specific bypass of any check built in earlier phases.
 
 Cleaning tools never mutate the active dataset. Each one returns a new
-:class:`~uadas_core.services.workspace_service.Dataset` with lineage set,
+:class:`~uadas_core.models.Dataset` with lineage set,
 exactly as :class:`~uadas_core.cleaning.base_operation.BaseOperation`
 requires when called directly — the assistant is not exempted from
 this rule.
@@ -47,7 +47,7 @@ from uadas_core.forecasting.linear_regression_forecast import forecast_linear_re
 from uadas_core.forecasting.model_comparison import compare_forecast_models
 from uadas_core.forecasting.prophet_forecast import forecast_prophet
 from uadas_core.forecasting.random_forest_forecast import forecast_random_forest
-from uadas_core.services.workspace_service import Dataset
+from uadas_core.models import Dataset
 from uadas_core.visualization.base_chart import BaseChart
 from uadas_core.visualization.chart_registry import list_charts
 

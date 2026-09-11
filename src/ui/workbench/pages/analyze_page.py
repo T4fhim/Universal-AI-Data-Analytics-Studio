@@ -22,7 +22,7 @@ scope note in the plan document.
 
 Like :class:`~src.ui.workbench.pages.understand_page.UnderstandPage`, this page holds no
 *service* reference (see ``src/ui/workbench/__init__.py``'s "display-only" rule) -- but it does
-hold a plain :class:`~uadas_core.services.workspace_service.Dataset` handed to it via :meth:`set_dataset`,
+hold a plain :class:`~uadas_core.models.Dataset` handed to it via :meth:`set_dataset`,
 the same way :class:`~src.ui.widgets.data_table.data_table_view.DataTableView.load_dataset`
 takes a ``Dataset`` directly without needing a ``WorkspaceService`` reference of its own. A
 future milestone wiring ``main_window.py``'s ``_refresh_workbench`` to call
@@ -53,8 +53,8 @@ from uadas_core.analysis.t_test import independent_t_test, paired_t_test
 from uadas_core.core.exceptions import ApplicationError
 from uadas_core.core.expertise_level import ExpertiseLevel
 from uadas_core.core.logger import get_logger
+from uadas_core.models import Dataset
 from uadas_core.services.analysis_orchestrator_service import PipelineStage
-from uadas_core.services.workspace_service import Dataset
 
 _logger = get_logger(__name__)
 

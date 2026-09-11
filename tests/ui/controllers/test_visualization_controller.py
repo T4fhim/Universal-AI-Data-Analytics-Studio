@@ -20,13 +20,8 @@ from src.ui.dock_manager import DockManager
 from src.ui.status_bar import ApplicationStatusBar
 from src.ui.ui_state_bus import UiStateBus
 from src.ui.worker_runner import WorkerRunner
-from uadas_core.services.workspace_service import (
-    Dashboard,
-    DashboardTile,
-    Dataset,
-    Visualization,
-    WorkspaceService,
-)
+from uadas_core.models import Dashboard, DashboardTile, Dataset, Visualization
+from uadas_core.services.workspace_service import WorkspaceService
 
 
 def _make_controller(

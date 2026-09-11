@@ -13,7 +13,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QMainWindow
 
 from src.ui.dock_manager import DockManager
-from uadas_core.services.workspace_service import Dataset
+from uadas_core.models import Dataset
 
 
 def _make_dataset(name: str = "test") -> Dataset:

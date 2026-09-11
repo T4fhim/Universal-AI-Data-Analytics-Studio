@@ -41,6 +41,7 @@ source_modules =
     uadas_core.forecasting
     uadas_core.help
     uadas_core.jobs
+    uadas_core.models
     uadas_core.persistence
     uadas_core.plugins
     uadas_core.readers

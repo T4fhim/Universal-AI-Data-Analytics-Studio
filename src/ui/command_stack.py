@@ -7,7 +7,7 @@ them real semantics, per those modules' own docstrings ("Milestone 23 is where r
 semantics land").
 
 **What this stack actually undoes.** Per :mod:`~uadas_core.cleaning.base_operation`, a cleaning operation
-*never* mutates a :class:`~uadas_core.services.workspace_service.Dataset` in place -- it always returns a
+*never* mutates a :class:`~uadas_core.models.Dataset` in place -- it always returns a
 new, derived ``Dataset`` whose ``parent_dataset_id`` points back at the source. That means "undo a
 cleaning operation" does not require replaying, inverting, or storing any copy of a dataframe at
 all: the derived dataset and its parent both already exist, side by side, in
@@ -67,7 +67,7 @@ class DatasetPointerCommand:
 
     Attributes:
         description: Human-readable summary of what this command did -- typically the derived
-            dataset's own :attr:`~uadas_core.services.workspace_service.Dataset.derivation_description`,
+            dataset's own :attr:`~uadas_core.models.Dataset.derivation_description`,
             shown in a future status-bar/tooltip ("Undo: Dropped missing values in 'email'").
         dataset_id: The dataset that became active when this command was originally applied --
             what :meth:`CommandStack.redo` restores the active pointer to.
@@ -137,7 +137,7 @@ class CommandStack:
     def undo(self) -> DatasetPointerCommand:
         """Move the active-dataset pointer back to the most recent command's parent.
 
-        Never touches any :class:`~uadas_core.services.workspace_service.Dataset` object or its
+        Never touches any :class:`~uadas_core.models.Dataset` object or its
         dataframe -- see this module's own docstring for why that is the entire point.
 
         Returns:
@@ -168,7 +168,7 @@ class CommandStack:
     def redo(self) -> DatasetPointerCommand:
         """Move the active-dataset pointer forward to the most recently undone command's dataset.
 
-        Never touches any :class:`~uadas_core.services.workspace_service.Dataset` object or its
+        Never touches any :class:`~uadas_core.models.Dataset` object or its
         dataframe -- see :meth:`undo`'s own docstring; the identical guarantee applies in
         this direction.
 

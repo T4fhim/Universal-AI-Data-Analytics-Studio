@@ -34,10 +34,10 @@ from src.ui.actions.action_binder import ActionBinder
 from src.ui.dock_manager import DockManager
 from src.ui.workbench.workbench import Workbench
 from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.models import Dataset
 from uadas_core.services.analysis_orchestrator_service import PipelineStage
 from uadas_core.services.guidance_service import GuidanceService
 from uadas_core.services.settings_service import SettingsService
-from uadas_core.services.workspace_service import Dataset
 from uadas_core.theme.tokens import DENSITY_BY_EXPERTISE_LEVEL, Density
 
 if TYPE_CHECKING:

@@ -34,7 +34,7 @@ from uadas_core.core.logger import get_logger
 if TYPE_CHECKING:
     import pandas as pd
 
-    from uadas_core.services.workspace_service import Dataset
+    from uadas_core.models import Dataset
 
 _logger = get_logger(__name__)
 

@@ -87,7 +87,7 @@ class ReportContent:
         dataset_summary: Plain key/value pairs describing the dataset
             itself (row/column counts, source format, column names) —
             deliberately a plain ``dict`` rather than a full
-            :class:`~uadas_core.services.workspace_service.Dataset` reference,
+            :class:`~uadas_core.models.Dataset` reference,
             since every exporter only ever needs to display these few
             facts, not the underlying dataframe.
         expertise_level: Which

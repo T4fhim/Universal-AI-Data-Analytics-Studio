@@ -49,7 +49,7 @@ from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem, QWidget
 from src.ui.a11y.accessible import describe
 
 if TYPE_CHECKING:
-    from uadas_core.services.workspace_service import Dataset
+    from uadas_core.models import Dataset
 
 # Mirrors DockManager._populate_dataset_items's own Qt.ItemDataRole.UserRole convention for
 # stashing a dataset_id on a tree item -- NOT DisplayRole (0), which would silently overwrite

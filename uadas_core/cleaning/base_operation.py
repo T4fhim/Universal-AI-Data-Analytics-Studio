@@ -4,10 +4,10 @@
 :class:`BaseOperation` enforces one architectural rule that matters
 more than any individual operation's logic: **cleaning operations
 never mutate a dataset in place.** Every operation takes a source
-:class:`~uadas_core.services.workspace_service.Dataset` and returns a new
-one, with :attr:`~uadas_core.services.workspace_service.Dataset.
+:class:`~uadas_core.models.Dataset` and returns a new
+one, with :attr:`~uadas_core.models.Dataset.
 parent_dataset_id` set to the source's ID and
-:attr:`~uadas_core.services.workspace_service.Dataset.derivation_description`
+:attr:`~uadas_core.models.Dataset.derivation_description`
 describing what changed — using milestone 3a's lineage fields for
 their first real purpose. This is not a style preference: mutating in
 place would silently invalidate any visualization or further-derived
@@ -27,7 +27,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from uadas_core.services.workspace_service import Dataset
+    from uadas_core.models import Dataset
 
 
 class BaseOperation(ABC):
@@ -52,7 +52,7 @@ class BaseOperation(ABC):
                 restrictive or too generic to be useful.
 
         Returns:
-            A new :class:`~uadas_core.services.workspace_service.Dataset`
+            A new :class:`~uadas_core.models.Dataset`
             with ``parent_dataset_id`` set to ``dataset.dataset_id``
             and ``derivation_description`` set to a human-readable
             summary of what this operation did.

@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.ui.autosave_timer import AutosaveTimer
-from uadas_core.services.project_service import Project
+from uadas_core.models import Project
 
 
 class _FakeProjectService:

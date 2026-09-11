@@ -455,7 +455,7 @@ class DockManager:
         """Open (or bring to front) a :class:`DataTableView` tab for ``dataset``.
 
         Args:
-            dataset: A :class:`~uadas_core.services.workspace_service.Dataset`.
+            dataset: A :class:`~uadas_core.models.Dataset`.
                 Untyped here for the same reason ``refresh_dataset_list``'s
                 ``datasets`` parameter is a plain ``list`` -- avoiding an
                 import of ``uadas_core.services.workspace_service`` for one
@@ -512,7 +512,7 @@ class DockManager:
                 tab represents, so :meth:`connect_chart_closed`'s handler can actually close
                 it when the tab closes. ``None`` (the default) for a tab with nothing tracked
                 to close (an AI-built chart -- milestone 9's ``build_chart`` tool -- is never
-                added as a :class:`~uadas_core.services.workspace_service.Visualization`), matching
+                added as a :class:`~uadas_core.models.Visualization`), matching
                 every call site written before this milestone, which keeps working unchanged.
         """
         chart_view = ChartView(self._chart_tabs)

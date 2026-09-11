@@ -29,87 +29,17 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.core.logger import get_logger
+from uadas_core.models import Project
 
 _logger = get_logger(__name__)
 
 PROJECT_FILE_EXTENSION = ".uads.json"
 _MAX_RECENT_PROJECTS = 10
-
-
-@dataclass
-class Project:
-    """A single working session, serializable to and from disk.
-
-    Attributes:
-        name: Display name for the project. Does not need to match
-            the filename.
-        path: Location of this project's file on disk. ``None`` for a
-            newly created, not-yet-saved project — see
-            :meth:`ProjectService.new_project`.
-        contents: Open-ended project data. This milestone does not
-            define what goes in here beyond the empty dict a new
-            project starts with; later milestones (dataset tracking,
-            visualization tracking) will read and write specific keys
-            of this dict rather than this class growing a typed field
-            per feature.
-        last_saved_at: Unix timestamp of the last successful save, or
-            ``None`` if never saved.
-    """
-
-    name: str
-    path: Path | None = None
-    contents: dict[str, Any] = field(default_factory=dict)
-    last_saved_at: float | None = None
-
-    def to_json_dict(self) -> dict[str, Any]:
-        """Return a JSON-serializable representation of this project.
-
-        ``path`` is intentionally excluded: a project's file location
-        is where it lives, not data it contains about itself, and
-        serializing it would let a copied or moved project file
-        silently disagree with its own actual location on disk.
-        """
-        return {
-            "name": self.name,
-            "contents": self.contents,
-            "last_saved_at": self.last_saved_at,
-        }
-
-    @classmethod
-    def from_json_dict(cls, data: dict[str, Any], path: Path) -> Project:
-        """Reconstruct a :class:`Project` from a loaded JSON dict.
-
-        Args:
-            data: The parsed JSON contents of a project file.
-            path: The file path this data was loaded from — supplied
-                by the caller (see :meth:`ProjectService.open_project`)
-                rather than read from ``data`` itself, since ``path``
-                is deliberately not part of the serialized form.
-
-        Raises:
-            ServiceError: If ``data`` is missing the required ``name``
-                key or has the wrong shape for any field.
-        """
-        if "name" not in data:
-            raise ServiceError(
-                f"Project file at {path} is missing the required 'name' field."
-            )
-        if not isinstance(data.get("contents", {}), dict):
-            raise ServiceError(
-                f"Project file at {path} has a 'contents' field that is not a mapping."
-            )
-        return cls(
-            name=data["name"],
-            path=path,
-            contents=data.get("contents", {}),
-            last_saved_at=data.get("last_saved_at"),
-        )
 
 
 class ProjectService:
@@ -138,7 +68,7 @@ class ProjectService:
         self._active_project: Project | None = None
 
     def new_project(self, name: str) -> Project:
-        """Create a new, unsaved :class:`Project`.
+        """Create a new, unsaved :class:`~uadas_core.models.Project`.
 
         The returned project has ``path=None`` — it does not exist on
         disk until :meth:`save_project` is called with a destination
@@ -200,7 +130,7 @@ class ProjectService:
                 available, or if writing to disk fails.
 
         Returns:
-            The same :class:`Project` instance, mutated in place with
+            The same :class:`~uadas_core.models.Project` instance, mutated in place with
             its resolved ``path`` and updated ``last_saved_at``
             timestamp — returned for convenience so callers can chain
             without needing to separately track that this call
@@ -248,7 +178,7 @@ class ProjectService:
 
         Writes into ``project.contents["datasets"]`` — a list of
         ``{"name": ..., "source_path": ...}`` records — rather than
-        adding a typed field to :class:`Project` itself, matching that
+        adding a typed field to :class:`~uadas_core.models.Project` itself, matching that
         class's existing "open-ended contents dict" design. Does not
         itself call :meth:`save_project`; callers (typically
         :mod:`src.ui.main_window`) call this to update

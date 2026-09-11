@@ -17,7 +17,7 @@ into a JSON dict, which would defeat :mod:`~uadas_core.results.result_renderer_r
 type-dispatch (see ``AnalyzePage``'s own docstring). Cleaning operations have no such problem --
 :mod:`uadas_core.ai.tool_registry`'s own cleaning handlers (``_drop_missing_values`` and its four
 siblings) are thin pass-throughs that already return the real, typed
-:class:`~uadas_core.services.workspace_service.Dataset` :meth:`~uadas_core.cleaning.base_operation.
+:class:`~uadas_core.models.Dataset` :meth:`~uadas_core.cleaning.base_operation.
 BaseOperation.apply` produced, nothing is lost by going through them. This page still bypasses
 ``tool_registry`` and calls :func:`~uadas_core.cleaning.operation_registry.get_operation` directly,
 though, for a different reason: ``tool_registry`` is the *AI* layer's own module (see its
@@ -43,7 +43,7 @@ called with (mirroring ``AnalyzePage.set_dataset``'s "display-only, no service r
 understand_page.UnderstandPage`'s ``run_requested``, this page holds no
 :class:`~uadas_core.services.workspace_service.WorkspaceService` reference and cannot add the derived
 dataset to the workspace, set it active, or push an undo command itself -- :attr:`operation_applied`
-carries the new :class:`~uadas_core.services.workspace_service.Dataset` out to whichever controller
+carries the new :class:`~uadas_core.models.Dataset` out to whichever controller
 method ``main_window.py`` connects it to
 (:meth:`~src.ui.controllers.pipeline_controller.PipelineController.register_clean_operation`),
 which does exactly that. This keeps the "never mutate a Dataset in place" contract's *consumer*
@@ -74,8 +74,8 @@ from uadas_core.ai.tool_registry import get_tool_by_name
 from uadas_core.cleaning.operation_registry import get_operation, list_operations
 from uadas_core.core.exceptions import ApplicationError
 from uadas_core.core.logger import get_logger
+from uadas_core.models import Dataset
 from uadas_core.services.analysis_orchestrator_service import PipelineStage
-from uadas_core.services.workspace_service import Dataset
 
 _logger = get_logger(__name__)
 
@@ -198,7 +198,7 @@ class CleanPage(StagePage):
         sequence.
 
         Returns:
-            The new, derived :class:`~uadas_core.services.workspace_service.Dataset` on success, or
+            The new, derived :class:`~uadas_core.models.Dataset` on success, or
             ``None`` if the operation name was unrecognized or it raised.
         """
         try:

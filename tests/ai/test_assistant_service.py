@@ -60,7 +60,8 @@ from uadas_core.ai.assistant_service import _MAX_TOOL_ITERATIONS, AssistantServi
 from uadas_core.ai.llm_provider import BaseLLMProvider, LLMTurn, PendingToolCall
 from uadas_core.ai.tool_registry import get_anthropic_tool_schemas
 from uadas_core.core.exceptions import ServiceError
-from uadas_core.services.workspace_service import Dataset, WorkspaceService
+from uadas_core.models import Dataset
+from uadas_core.services.workspace_service import WorkspaceService
 
 _FAKE_API_KEY = "sk-test-not-a-real-key"
 

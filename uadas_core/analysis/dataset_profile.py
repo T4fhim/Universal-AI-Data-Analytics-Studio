@@ -7,8 +7,8 @@ from dataclasses import dataclass, field
 
 from uadas_core.analysis.column_profile import ColumnProfile, profile_column
 from uadas_core.core.logger import get_logger
+from uadas_core.models import Dataset
 from uadas_core.readers.type_inference import find_ambiguous_type_columns
-from uadas_core.services.workspace_service import Dataset
 
 _logger = get_logger(__name__)
 

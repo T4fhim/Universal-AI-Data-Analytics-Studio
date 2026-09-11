@@ -46,11 +46,11 @@ from enum import StrEnum
 from uadas_core.analysis.dataset_profile import profile_dataset
 from uadas_core.core.expertise_level import ExpertiseLevel
 from uadas_core.core.logger import get_logger
+from uadas_core.models import Dataset
 from uadas_core.services.analysis_orchestrator_service import (
     AnalysisOrchestratorService,
     PipelineStage,
 )
-from uadas_core.services.workspace_service import Dataset
 from uadas_core.visualization.chart_recommender import recommend_charts
 from uadas_core.visualization.chart_registry import display_name_for
 

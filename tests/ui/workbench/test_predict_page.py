@@ -25,7 +25,7 @@ from src.ui.workbench.pages.predict_page import PredictPage
 from src.ui.worker_runner import WorkerRunner
 from tests.ui.qt_helpers import wait_for_signal
 from uadas_core.core.expertise_level import ExpertiseLevel
-from uadas_core.services.workspace_service import Dataset
+from uadas_core.models import Dataset
 
 
 def _make_dataset(n: int = 20) -> Dataset:

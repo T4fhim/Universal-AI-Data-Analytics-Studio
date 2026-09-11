@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QApplication
 
 from src.ui.workbench.pages.explore_page import ExplorePage
 from uadas_core.core.expertise_level import ExpertiseLevel
-from uadas_core.services.workspace_service import Dataset
+from uadas_core.models import Dataset
 
 
 def _make_dataset() -> Dataset:

@@ -59,8 +59,8 @@ from src.ui.widgets.data_table.data_table_view import DataTableView
 from src.ui.workbench.stage_page import StagePage
 from uadas_core.core.exceptions import ApplicationError
 from uadas_core.core.logger import get_logger
+from uadas_core.models import Dataset
 from uadas_core.services.analysis_orchestrator_service import PipelineStage
-from uadas_core.services.workspace_service import Dataset
 from uadas_core.visualization.chart_recommender import ChartSuggestion, recommend_charts
 from uadas_core.visualization.chart_registry import display_name_for, list_dialog_charts
 

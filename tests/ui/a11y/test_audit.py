@@ -22,7 +22,7 @@ from src.ui.a11y.audit import ALL_DIALOG_CLASSES, Severity, audit_widget_tree
 from src.ui.main_window import MainWindow
 from src.ui.theme_manager import ThemeManager
 from uadas_core.core.bootstrap import bootstrap
-from uadas_core.services.workspace_service import Dataset
+from uadas_core.models import Dataset
 from uadas_core.theme.tokens import TOKENS_BY_NAME
 
 

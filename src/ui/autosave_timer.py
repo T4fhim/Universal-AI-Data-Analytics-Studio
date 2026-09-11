@@ -9,7 +9,7 @@ confirmed directly against the pre-milestone-29 source (no code anywhere constru
 :class:`~src.ui.worker_runner.WorkerRunner`.** The manual "Save Project"/"Save Project As"
 actions (:meth:`~src.ui.controllers.project_controller.ProjectController.save_project`) already
 do exactly this -- a project file is metadata only (dataset names and *source paths*, never the
-dataframes themselves; see :class:`~uadas_core.services.project_service.Project`'s own JSON shape), so
+dataframes themselves; see :class:`~uadas_core.models.Project`'s own JSON shape), so
 the write is small and fast, not the kind of "must not block the UI thread" operation this
 project's own convention (report generation, dataset re-reads) reserves ``WorkerRunner`` for.
 Mirroring the manual save path's own synchronous behavior here avoids introducing a new,

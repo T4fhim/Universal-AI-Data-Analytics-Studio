@@ -98,8 +98,8 @@ from uadas_core.forecasting.model_comparison import (
 )
 from uadas_core.forecasting.prophet_forecast import forecast_prophet
 from uadas_core.forecasting.random_forest_forecast import forecast_random_forest
+from uadas_core.models import Dataset
 from uadas_core.services.analysis_orchestrator_service import PipelineStage
-from uadas_core.services.workspace_service import Dataset
 
 _logger = get_logger(__name__)
 

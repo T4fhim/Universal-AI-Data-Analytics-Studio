@@ -36,11 +36,8 @@ from uadas_core.ai.tool_registry import get_tool_by_name
 from uadas_core.analysis.explanation import Explanation
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.core.logger import get_logger
-from uadas_core.services.workspace_service import (
-    Dataset,
-    Visualization,
-    WorkspaceService,
-)
+from uadas_core.models import Dataset, Visualization
+from uadas_core.services.workspace_service import WorkspaceService
 
 _logger = get_logger(__name__)
 
@@ -225,14 +222,14 @@ class AnalysisLog:
     """Every stage run against one dataset, in order — the Reproducible Analysis record.
 
     Attributes:
-        dataset_id: The :class:`~uadas_core.services.workspace_service.Dataset`
+        dataset_id: The :class:`~uadas_core.models.Dataset`
             this log belongs to. A log tracks one dataset's pipeline
             history; a derived dataset produced mid-pipeline (a
             cleaning stage's output) gets its own log entry recorded
             under whichever ``dataset_id`` was active for that
             :meth:`AnalysisOrchestratorService.run_stage` call, not
             retroactively merged into its parent's log — this mirrors
-            how :class:`~uadas_core.services.workspace_service.Dataset`
+            how :class:`~uadas_core.models.Dataset`
             lineage itself works (a new dataset with
             ``parent_dataset_id`` set, not a mutation).
         entries: Every stage run, oldest first.

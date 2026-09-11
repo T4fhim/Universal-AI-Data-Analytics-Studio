@@ -16,12 +16,8 @@ from src.ui.ui_state_bus import UiStateBus
 from src.ui.worker_runner import WorkerRunner
 from uadas_core.core.exceptions import ApplicationError
 from uadas_core.core.logger import get_logger
-from uadas_core.services.workspace_service import (
-    Dashboard,
-    DashboardTile,
-    Visualization,
-    WorkspaceService,
-)
+from uadas_core.models import Dashboard, DashboardTile, Visualization
+from uadas_core.services.workspace_service import WorkspaceService
 from uadas_core.visualization.dashboard_renderer import render_dashboard
 
 _logger = get_logger(__name__)
@@ -95,7 +91,7 @@ class VisualizationController:
         inline (see that page's own docstring for why) rather than opening
         :class:`~src.ui.dialogs.create_visualization_dialog.CreateVisualizationDialog`, but
         the two paths otherwise need identical workspace bookkeeping -- create a
-        :class:`~uadas_core.services.workspace_service.Visualization`, add it, set it active, and
+        :class:`~uadas_core.models.Visualization`, add it, set it active, and
         refresh dependent UI. This method is that shared tail, called with the dialog-built
         tuple's exact ``(figure, chart_type, parameters)`` shape so :meth:`create_visualization`
         and this method never drift into two different bookkeeping sequences.
@@ -137,7 +133,7 @@ class VisualizationController:
         parameters: dict,
     ) -> Visualization:
         """Shared tail of :meth:`create_visualization`/:meth:`register_built_visualization`:
-        build the :class:`~uadas_core.services.workspace_service.Visualization`, add it, activate
+        build the :class:`~uadas_core.models.Visualization`, add it, activate
         it, and refresh dependent UI -- see :meth:`register_built_visualization`'s own
         docstring for why this exists as a separate method rather than being inlined into
         each caller."""
@@ -242,7 +238,7 @@ class VisualizationController:
         or ``"dashboard"`` (the only two kinds either call site ever passes), dispatched to the
         matching :class:`~uadas_core.services.workspace_service.WorkspaceService` close method. A tab
         opened with no ``closable_ref`` (an AI-built chart not tracked as a real
-        :class:`~uadas_core.services.workspace_service.Visualization` -- see
+        :class:`~uadas_core.models.Visualization` -- see
         :meth:`~src.ui.dock_manager.DockManager.display_chart`'s own docstring) never reaches
         this method at all; that gap is not this milestone's scope.
         """

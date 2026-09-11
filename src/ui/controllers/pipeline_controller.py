@@ -38,6 +38,7 @@ from src.ui.workbench.workbench import Workbench
 from src.ui.worker_runner import WorkerRunner
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.core.logger import get_logger
+from uadas_core.models import Dataset
 from uadas_core.services.analysis_orchestrator_service import (
     AnalysisLog,
     AnalysisLogEntry,
@@ -46,10 +47,10 @@ from uadas_core.services.analysis_orchestrator_service import (
     StageProposal,
 )
 from uadas_core.services.project_service import ProjectService
-from uadas_core.services.workspace_service import Dataset, WorkspaceService
+from uadas_core.services.workspace_service import WorkspaceService
 
 if TYPE_CHECKING:
-    from uadas_core.services.project_service import Project
+    from uadas_core.models import Project
 
 _logger = get_logger(__name__)
 

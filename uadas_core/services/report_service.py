@@ -6,8 +6,8 @@ plans/defining-features-what-stateless-zebra.md) is "replay the log
 and render it" — this service does not compute anything new. Every
 number in a generated report already exists, either as a
 :class:`~uadas_core.services.workspace_service.WorkspaceService`-tracked
-:class:`~uadas_core.services.workspace_service.Dataset`/
-:class:`~uadas_core.services.workspace_service.Visualization` or as an
+:class:`~uadas_core.models.Dataset`/
+:class:`~uadas_core.models.Visualization` or as an
 :class:`~uadas_core.services.analysis_orchestrator_service.
 AnalysisOrchestratorService`'s recorded
 :class:`~uadas_core.services.analysis_orchestrator_service.AnalysisLogEntry`

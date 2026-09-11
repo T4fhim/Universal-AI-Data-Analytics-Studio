@@ -12,8 +12,8 @@ from collections.abc import Callable
 from PySide6.QtWidgets import QWidget
 
 from src.ui.dialogs.connect_database_dialog import ConnectDatabaseDialog
+from uadas_core.models import Dataset
 from uadas_core.services.database_connection_service import DatabaseConnectionService
-from uadas_core.services.workspace_service import Dataset
 
 
 class DatabaseController:

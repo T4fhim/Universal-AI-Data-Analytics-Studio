@@ -117,7 +117,7 @@ def test_opening_a_dataset_transitions_the_workbench_off_the_welcome_page(
     import pandas as pd
 
     from tests.ui.qt_helpers import process_events
-    from uadas_core.services.workspace_service import Dataset
+    from uadas_core.models import Dataset
 
     dataset = Dataset(
         name="test", dataframe=pd.DataFrame({"a": [1, 2, 3]}), source_format="csv"
@@ -139,8 +139,8 @@ def test_opening_a_dataset_shows_upload_complete_and_understand_proposed_on_the_
     import pandas as pd
 
     from tests.ui.qt_helpers import process_events
+    from uadas_core.models import Dataset
     from uadas_core.services.analysis_orchestrator_service import PipelineStage
-    from uadas_core.services.workspace_service import Dataset
 
     dataset = Dataset(
         name="test", dataframe=pd.DataFrame({"a": [1, 2, 3]}), source_format="csv"
@@ -164,8 +164,8 @@ def test_clicking_run_on_understand_produces_a_real_log_entry_end_to_end(
     import pandas as pd
 
     from tests.ui.qt_helpers import process_events, wait_for_signal
+    from uadas_core.models import Dataset
     from uadas_core.services.analysis_orchestrator_service import PipelineStage
-    from uadas_core.services.workspace_service import Dataset
 
     dataset = Dataset(
         name="test", dataframe=pd.DataFrame({"a": [1, 2, 3]}), source_format="csv"
@@ -284,7 +284,7 @@ def test_opening_a_dataset_populates_every_stage_pages_guidance_panel(
     import pandas as pd
 
     from tests.ui.qt_helpers import process_events
-    from uadas_core.services.workspace_service import Dataset
+    from uadas_core.models import Dataset
 
     dataset = Dataset(
         name="test",
@@ -311,8 +311,8 @@ def test_activating_a_guidance_suggestion_navigates_the_workbench(
     import pandas as pd
 
     from tests.ui.qt_helpers import process_events
+    from uadas_core.models import Dataset
     from uadas_core.services.analysis_orchestrator_service import PipelineStage
-    from uadas_core.services.workspace_service import Dataset
 
     dataset = Dataset(
         name="test", dataframe=pd.DataFrame({"a": [1, 2, 3]}), source_format="csv"

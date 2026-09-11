@@ -27,12 +27,13 @@ import pandas as pd
 import pytest
 
 from uadas_core.core.expertise_level import ExpertiseLevel
+from uadas_core.models import Dataset
 from uadas_core.services.analysis_orchestrator_service import (
     AnalysisOrchestratorService,
     PipelineStage,
 )
 from uadas_core.services.guidance_service import GuidanceService, SuggestionCategory
-from uadas_core.services.workspace_service import Dataset, WorkspaceService
+from uadas_core.services.workspace_service import WorkspaceService
 
 
 def _fresh_dataset() -> Dataset:

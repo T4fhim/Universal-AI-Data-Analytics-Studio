@@ -21,7 +21,7 @@ from PySide6.QtWidgets import QApplication
 
 from src.ui.widgets.column_multi_select import ColumnMultiSelect
 from src.ui.workbench.pages.visualize_page import VisualizePage
-from uadas_core.services.workspace_service import Dataset
+from uadas_core.models import Dataset
 from uadas_core.visualization.chart_recommender import recommend_charts
 
 

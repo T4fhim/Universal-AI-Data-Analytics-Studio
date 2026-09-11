@@ -30,7 +30,7 @@ class DatasetCloseMenu:
 
     Args:
         tree: The Dataset Explorer's tree widget -- items must carry their
-            :attr:`~uadas_core.services.workspace_service.Dataset.dataset_id` in
+            :attr:`~uadas_core.models.Dataset.dataset_id` in
             ``Qt.ItemDataRole.UserRole`` (see
             :meth:`~src.ui.dock_manager.DockManager._populate_dataset_items`), the same
             convention :meth:`~src.ui.dock_manager.DockManager.connect_dataset_double_click`

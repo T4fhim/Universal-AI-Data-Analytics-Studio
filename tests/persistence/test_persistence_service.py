@@ -26,18 +26,13 @@ import pandas as pd
 import pytest
 
 from uadas_core.core.exceptions import ServiceError
+from uadas_core.models import Dashboard, DashboardTile, Dataset, Visualization
 from uadas_core.persistence.persistence_service import (
     PersistenceService,
     SaveReport,
     WorkspaceSnapshot,
 )
-from uadas_core.services.workspace_service import (
-    Dashboard,
-    DashboardTile,
-    Dataset,
-    Visualization,
-    WorkspaceService,
-)
+from uadas_core.services.workspace_service import WorkspaceService
 from uadas_core.visualization import chart_registry
 
 
