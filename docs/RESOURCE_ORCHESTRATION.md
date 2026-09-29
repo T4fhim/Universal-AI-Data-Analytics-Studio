@@ -183,7 +183,7 @@ is real. Phase 1's detail lives in `plans/phase-1-resource-plan.md`.
 
 ---
 
-## §6 — Phase 2 (next; planning drafted, execution gated on user go-ahead)
+## §6 — Phase 2 (ACTIVE — executing one sub-step at a time on `phase-2/retire-desktop-ui`)
 
 **Phase 1 is DONE** — merged to `main` 2026-09-10 as merge commit `4d61b93` (PR #3, 71 commits,
 merge-not-squash). Final rolling baseline **1542 / 92 / 0**. `DCO_ENFORCING=1` since this merge.
@@ -194,13 +194,19 @@ owns D1 / D2 / D4 / D5 / D6.
 - **De-risking controls (A1–A11, R2.1–R2.6, per-risk A–D, DoD):** `plans/phase-2-derisking-and-readiness.md`
 - **Execution loop + per-step gates:** `plans/phase-2-execution-playbook.md`
 - **Per-sub-step resource matrix + corrected facts:** `plans/phase-2-resource-plan.md`
-- **Pre-Phase-2 baseline:** captured 2026-09-10 on `main` @ `4d61b93` — **1542 / 92 / 0**;
-  `plans/phase-2-baseline.md` to be written at branch cut.
-- **State ledger:** `.superpowers/sdd/phase-2/progress.md` (created at branch cut).
+- **Pre-Phase-2 baseline:** captured 2026-09-10 on `main` @ `8ab95f6` — **1542 / 92 / 0**
+  (`plans/phase-2-baseline.md`). **Current baseline after 2.2: 1540 / 82 / 0** — the drift is the
+  three `src/ui/**`-glob meta-tests shedding moved modules (see A10's collected-count caveat in
+  `plans/phase-2-derisking-and-readiness.md`); gate = 0 failed + no *named* test lost, verified
+  per step with `pytest --collect-only` + `comm`.
+- **State ledger:** `.superpowers/sdd/phase-2/progress.md` (gitignored; the recovery map).
+- **Progress (2026-09-29):** 2.0 ✅ · 2.1 ✅ (10 modules) · 2.2 ✅ · **2.3 next** — JIT plans in
+  `plans/phase-2-1-plan.md` / `phase-2-2-plan.md`; the local commit gate is un-wired (see the
+  `pretooluse-git-commit-gate.ps1` note in `.claude/hooks/`), so run the suite by hand per commit.
 
 Phase 2 = **retire the desktop UI**: 2.0 scope lock (`ecc:code-explorer` inventory +
-`ecc:architect` structural rulings + CI-transformation design) → 2.1 lift the 8 Qt-free
-stranded modules (D5) → 2.2 extract `uadas_core/models/` (D1, cuts the `services↔ai` cycle) →
+`ecc:architect` structural rulings + CI-transformation design) → 2.1 lift the 10 Qt-free
+stranded modules (D5 + actions) → 2.2 extract `uadas_core/models/` (D1, cuts the `services↔ai` cycle) →
 2.3 top-level `bootstrap.py` + `layers` contract (D2) → 2.4 mine remaining assets to committed
 data files → 2.5 `git rm` `src/ui/` + `tests/ui/` + Qt entry paths + Qt deps → 2.6 CI
 transformation (Linux single-invocation `test` job; delete `run_tests_and_exit_cleanly.py`) →
