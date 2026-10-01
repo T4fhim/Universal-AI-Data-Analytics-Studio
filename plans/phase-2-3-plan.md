@@ -114,7 +114,7 @@ architect; a surviving dotted reference anywhere (esp. ci.yml); an unexplained c
 **architect** (opus, read-only, after the commit, verifier role): *"Confirm commit <sha> on
 `phase-2/retire-desktop-ui` (C:\Users\mdabu\OneDrive\Documents\Projects\Universal-AI-Data-Analytics-Studio)
 implements `plans/phase-2-3-plan.md` §1–§2. Read that plan and `plans/phase-2-structural-moves.md`
-Rulings 2–3. Judge specifically: (1) the 13-layer order — run `lint-imports` yourself; (2) the
+Rulings 2–3. Judge specifically: (1) the 12-tier order — run `lint-imports` yourself; (2) the
 SECOND `ignore_imports` (`core.application_state -> models`, annotation-only, caused by `Project`
 moving to `models` while `models.project` imports `core.exceptions`) — is option (a) the right
 call vs moving `ApplicationState` up or a `Protocol`?; (3) nothing from 2.4+ leaked in; (4)

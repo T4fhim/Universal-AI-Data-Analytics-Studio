@@ -173,7 +173,7 @@ Phase-4 note / already-safe / already-done), current path, target path. 2.5 may 
    bare constructor annotation; fix = **one documented `ignore_imports` line** in contract 3,
    plus a 2.7/Phase-3 follow-up to make it a `Protocol`. NOT a `TYPE_CHECKING` move (doesn't
    help — 2.15 counts them).
-3. **Corrected `layers` stanza** (13 layers, `provenance` at the TOP, the flat sibling tier
+3. **Corrected `layers` stanza** (12 tiers, `provenance` at the TOP, the flat sibling tier
    decomposed) — the exact text is in `plans/phase-2-structural-moves.md` Ruling 3.
 4. **2.1 AND 2.2 must also extend contract 2's (`provenance-is-a-leaf`) hand-enumerated
    `source_modules` list** — a missing entry there is a silent enforcement gap, not a CI
@@ -336,7 +336,7 @@ dependency error at R2.4; nothing else re-opens it):
    workspace_service` loop; the residual `assistant_service → WorkspaceService` edge is left for
    2.3's `ignore_imports`. Behaviour-frozen (A10).
 4. **2.3** move `bootstrap.py` → `uadas_core/bootstrap.py`, fix its `core/__init__.py:1` stale
-   header, add the corrected 13-layer `layers` contract (contract 3, with the one
+   header, add the corrected 12-tier `layers` contract (contract 3, with the one
    `ignore_imports` line) + extend contract 2's `source_modules` — all in the same commit (D2).
    Behaviour-frozen (A10). **Re-run `lint-imports` and adjust the stanza's `theme`/`help`/
    `actions` tier placement to whatever 2.1 actually created** — don't paste blindly. After
