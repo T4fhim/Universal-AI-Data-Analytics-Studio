@@ -55,8 +55,10 @@ tiering > `resource-router` defaults. The more specific and more recently verifi
    with *"report back caveman-compressed (`caveman` full/ultra): one line per finding —
    `file:line` · claim · fix. No prose, no preamble."* The compressed tool-result re-injected
    into the orchestrator is ~60% smaller, which is what keeps a long multi-stage run inside the
-   token budget. Use `cavecrew-investigator` / `cavecrew-reviewer` (return is caveman by
-   construction) for locate / diff-review delegations. **Never compress** code being written, a
+   token budget. (`cavecrew-investigator` / `-reviewer` would return caveman by construction, but
+   those agents ship only inside the upstream Caveman *plugin* and are **not installed on this
+   machine** — the `cavecrew` skill folder alone carries no agent files — so use the prompt
+   suffix above with an existing agent.) **Never compress** code being written, a
    commit message the user will read, or the final user-facing summary — compression is for
    agent→orchestrator hops only.
 8. **graphify-first for structure, grep for fields.** Once `graphify-out/graph.json` exists,
@@ -77,18 +79,28 @@ tiering > `resource-router` defaults. The more specific and more recently verifi
 - **`protect-files.ps1`** (PreToolUse Edit/Write): blocks `.env*`, `secrets.json`,
   `credentials.json`, `*.pem`, `*.key`. A block means route the change elsewhere (document the
   env var), not fight it.
-- **`pre-commit-check.ps1`** (PreToolUse commit): two-stage `pytest` + `bandit`, blocks on
-  failure. Matcher is `"Bash|PowerShell"`; it fast-exits when no `.py` file is staged. **A
-  hook-config change needs a session reload to take effect** (observation 0019) — until then,
-  run `scripts/run_tests_and_exit_cleanly.py` manually before a `.py` commit. Once live it *is*
-  the "one suite run per commit" evidence — don't also run pytest by hand right before the
-  commit.
+- **`pre-commit-check.ps1`** (PreToolUse commit, reached via `pretooluse-git-commit-gate.ps1`):
+  two-stage `pytest` + `bandit`, blocks on failure. Matcher is `"Bash|PowerShell"`; it fast-exits
+  when no `.py` file is staged. **History:** the old inline `-Command` wrapper single-quoted
+  `'$CLAUDE_PROJECT_DIR\…'`, which PowerShell never expands, so the gate silently never ran
+  through all of Phase 2.1/2.2 (every commit was suite-verified by hand). Re-wired to the
+  `-File …\pretooluse-git-commit-gate.ps1` form in `57bb810`; both script branches were exercised
+  directly, but the *positive* path (full suite on a staged `.py`) is **unverified until the
+  first `.py` commit after a window reload** — expect "Running pytest…" and an ~8-minute pause;
+  if the commit returns in seconds it is still not firing. **A hook-config change needs a
+  session reload to take effect** (observation 0019) — until verified, run
+  `scripts/run_tests_and_exit_cleanly.py` manually before a `.py` commit. Once proven live it
+  *is* the "one suite run per commit" evidence — don't also run pytest by hand right before it.
 - **ECC `gateguard-fact-force`** (PreToolUse Edit/Write): the fact-forcing gate — state
   callers / affected API / data shape / the verbatim user instruction before an edit. Keep it on
   for risky edits; relax per-session with
   `ECC_DISABLED_HOOKS=pre:edit-write:gateguard-fact-force` only for a genuinely mechanical batch
-  (observation 0015). It also blocks destructive `git` commands even with facts — route recovery
-  through scratchpad `subprocess` git calls.
+  (observation 0015). It also fact-forces the first Bash command and destructive `git`/`rm`
+  commands, and its per-file dedup is defeated by the `C:`/`c:` working-directory case flip
+  (observation 0025), so expect it to re-fire — present the fact block each time. When it loops on
+  a *destructive* command even with facts, the gate's own sanctioned escape is an inline
+  `ECC_GATEGUARD=off <command>` for that single command (used this way for the Phase 2.1 recovery
+  `git stash`); never set it session-wide.
 - **`graphify hook-guard`** (global, PreToolUse Bash/Grep/Read): advisory nudges, inert until
   `graphify-out/graph.json` exists; building the graph activates them (never blocking). Once the
   graph exists, answer codebase-structure questions with `graphify query / path / explain`
@@ -100,15 +112,27 @@ tiering > `resource-router` defaults. The more specific and more recently verifi
   checked (`gh run list --branch <b>`, `gh run view <id>`).
 - **`0xC0000005` note:** a non-zero exit from `scripts/run_tests_and_exit_cleanly.py` on the
   *second* invocation is the expected Windows Qt-shutdown access violation *after* a clean
-  `pytest` result — CI-green-equivalent. Any Bash-capable subagent must be told this or it
-  reports a passing suite as failed.
+  `pytest` result — CI-green-equivalent (it surfaces as exit **139** under git-bash). The
+  pytest **summary line is the truth**; never pipe the runner through `tail`/`head` (the pipe's
+  exit code masks the runner's — observation 0026). Any Bash-capable subagent must be told this
+  or it reports a passing suite as failed.
 - **CI** (`.github/workflows/ci.yml`): `test` (Windows, full pytest), `lint`
-  (ruff / black / isort / bandit / `lint-imports`), `dco` (advisory, `DCO_ENFORCING=0`),
-  `uia_integration` (separate), and the Linux `import uadas_core` runtime job. `bandit` runs
+  (ruff / black / isort / bandit / `lint-imports`), `dco` (**enforcing**, `DCO_ENFORCING=1` since
+  PR #4 — runs only on pull requests, so it shows *skipped* on a plain branch push until the
+  Phase 2 PR opens; every commit from Phase 2 on must be `git commit -s`), `uia_integration`
+  (separate; deleted at 2.6), and the Linux `import uadas_core` job (promoted to the sole `test`
+  job at 2.6). The `test` job also runs black / isort / mypy (the curated clean-packages list,
+  currently 161 files — add new clean packages there, not repo-wide). `bandit` runs
   `--skip B101,B107,B608` — **B608 (SQL-injection) detection is OFF**, so a new SQL-building
   module has *no automated* injection gate; a directed manual security review is the only one.
-- **MCP auth:** `context7` / `playwright` / `chrome-devtools` / `skillspector` need none;
-  `vercel` needs OAuth (Phase 6); the `github` MCP is not required — `gh` covers it.
+- **MCP servers (verified with `claude mcp list`, 2026-10-01):** connected — `context7`
+  (user-scope; kept deliberately because ecc's `docs-lookup` agent binds to the
+  `mcp__context7__*` names), `playwright` (user-scope, pinned `@playwright/mcp@0.0.80`, per the
+  global `CLAUDE.md`), `chrome-devtools` (ecc plugin), `skillspector`; none need auth. `vercel`
+  needs OAuth (Phase 6). The plugin-provided `context7` / `playwright` / `github` duplicates are
+  **disabled** (`claude plugin disable …`), and the user-scope `github` MCP was **removed** — it
+  held a plaintext PAT; `gh` (authed as `T4fhim`) covers GitHub, so there is deliberately no
+  github MCP. Never re-add one with an inline token; use an env-var reference.
 
 ---
 
@@ -119,7 +143,10 @@ Plans and design docs in this repo lag the tree. Before acting on any claim in a
 - **Re-verify `file:line` citations against the current tree** — the `plans/phase-1-6-*` and
   `phase-1-7-*` docs cite pre-1.1 `src/` paths throughout.
 - **Re-verify counts against reality, not a hard-coded number** — the golden baseline is a
-  *rolling* number (currently **1413 / 92 / 0**), tracked in `plans/phase-1-baseline.md`.
+  *rolling* number (currently **1540 / 82 / 0** after Phase 2.2; Phase 1 ended at 1542 / 92 / 0),
+  recorded in `plans/phase-2-baseline.md` and the SDD ledger. It legitimately *moves* during
+  Phase 2: three `tests/ui/` meta-tests glob `src/ui/**` (see A10's collected-count caveat), so
+  the gate is "0 failed + no *named* test lost", checked with `pytest --collect-only` + `comm`.
 - **Re-verify branch / merge state against `origin/*` after a fetch**, never local refs
   (observation 0014).
 - **Re-verify a "tool passes / is clean" claim by running the tool** — never inherit it from a
