@@ -99,10 +99,12 @@ visualization` and **not** `provenance` (verified) — so the two top-tier sibli
    -> `[uadas_core\bootstrap.py]` (1 lost + 1 gained, both passing). Anything else = abort.
 6. Screenshot byte-identical to `plans/baseline-app.png`; `graphify update .`.
 7. **Commit-gate observation:** this is the first `.py` commit since the gate was re-wired. Commit
-   *after* the fast gates (gate on): if it pauses ~8 min and prints "Running pytest…", the gate
-   is live — record that and skip a duplicate manual run. If it returns in seconds the gate is
+   *after* the fast gates (gate on). A PreToolUse hook's stdout is **not shown on success**, so
+   "Running pytest…" is invisible even when the gate works — the **~8-minute pause** is the only
+   evidence. Pause = gate live: record it and skip a duplicate manual run. Returns in seconds =
    still dead: run the 2-invocation suite by hand **before pushing** (the commit is local and
-   amendable). Either way, push only after a green suite.
+   amendable). Either way, push only after a green suite. (A *failing* gate does show: it blocks
+   the commit with exit 2 and a message.)
 
 **Abort:** `lint-imports` reports any break beyond the two documented ignores -> stop, back to the
 architect; a surviving dotted reference anywhere (esp. ci.yml); an unexplained collect-diff.

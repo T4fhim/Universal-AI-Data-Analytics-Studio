@@ -86,8 +86,9 @@ tiering > `resource-router` defaults. The more specific and more recently verifi
   through all of Phase 2.1/2.2 (every commit was suite-verified by hand). Re-wired to the
   `-File …\pretooluse-git-commit-gate.ps1` form in `57bb810`; both script branches were exercised
   directly, but the *positive* path (full suite on a staged `.py`) is **unverified until the
-  first `.py` commit after a window reload** — expect "Running pytest…" and an ~8-minute pause;
-  if the commit returns in seconds it is still not firing. **A hook-config change needs a
+  first `.py` commit after a window reload** — a PreToolUse hook's stdout is not shown on
+  success, so the only evidence is the **~8-minute pause**; a `.py` commit that returns in seconds
+  means it is still not firing (a *failing* gate does show: exit 2 + message). **A hook-config change needs a
   session reload to take effect** (observation 0019) — until verified, run
   `scripts/run_tests_and_exit_cleanly.py` manually before a `.py` commit. Once proven live it
   *is* the "one suite run per commit" evidence — don't also run pytest by hand right before it.
