@@ -13,7 +13,7 @@ Why this exists: prior milestones were verified by informally launching
 -- neither leaves an artifact a reviewer (or another agent, in a later
 session, with no memory of what the screen looked like) can actually look
 at. This script boots the *real* :class:`~src.app.Application`
-composition path -- the same :func:`~uadas_core.core.bootstrap.bootstrap`,
+composition path -- the same :func:`~uadas_core.bootstrap.bootstrap`,
 :class:`~src.ui.theme_manager.ThemeManager`, and
 :class:`~src.ui.main_window.MainWindow` construction ``src.app.
 Application.run`` uses -- rather than a hand-rolled stand-in, so a
@@ -63,7 +63,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog
 
 from src.ui.main_window import MainWindow
 from src.ui.theme_manager import ThemeManager
-from uadas_core.core.bootstrap import bootstrap
+from uadas_core.bootstrap import bootstrap
 from uadas_core.core.logger import get_logger
 
 _logger = get_logger(__name__)

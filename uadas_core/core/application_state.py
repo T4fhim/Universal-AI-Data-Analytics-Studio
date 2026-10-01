@@ -28,7 +28,7 @@ risk regardless of which direction they point.
 
 An instance of this class is intended to be registered into the
 :class:`~uadas_core.core.dependency_container.DependencyContainer` as a
-singleton (see :mod:`uadas_core.core.bootstrap`), rather than held as a
+singleton (see :mod:`uadas_core.bootstrap`), rather than held as a
 module-level global — this keeps session state explicit and
 resolvable through the same mechanism as every other service, and
 avoids a global mutable object that any module could import and

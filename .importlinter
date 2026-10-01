@@ -34,6 +34,7 @@ source_modules =
     uadas_core.actions
     uadas_core.ai
     uadas_core.analysis
+    uadas_core.bootstrap
     uadas_core.cleaning
     uadas_core.core
     uadas_core.data_table
@@ -53,3 +54,38 @@ source_modules =
 forbidden_modules =
     uadas_core.provenance
 allow_indirect_imports = False
+
+# Phase 2.3: the uadas_core dependency stack, top (imported by nobody) to
+# bottom (imports nothing else in uadas_core). A module may import any layer
+# below it, never one above. `|` marks independent siblings -- they may not
+# import each other either. Validated by dry run against the post-2.2 tree;
+# see plans/phase-2-3-plan.md for why the two ignores below are the only ones.
+[importlinter:contract:uadas-core-layers]
+name = uadas_core subpackages form a strict dependency stack
+type = layers
+layers =
+    uadas_core.bootstrap | uadas_core.provenance
+    uadas_core.persistence | uadas_core.actions
+    uadas_core.services
+    uadas_core.ai
+    uadas_core.plugins
+    uadas_core.results
+    uadas_core.visualization
+    uadas_core.analysis
+    uadas_core.cleaning | uadas_core.forecasting | uadas_core.database | uadas_core.reports | uadas_core.jobs
+    uadas_core.readers | uadas_core.a11y
+    uadas_core.models | uadas_core.theme | uadas_core.help | uadas_core.data_table
+    uadas_core.core
+ignore_imports =
+    # (1) The last strand of the old services<->ai cycle (Phase 1 diagnosis
+    # D1). AssistantService takes WorkspaceService purely as a constructor
+    # annotation (assistant_service.py:150,178) -- no runtime use -- but
+    # import-linter counts TYPE_CHECKING imports, so guarding it would not
+    # help. Remove when the annotation becomes a Protocol (2.7 / Phase 3).
+    uadas_core.ai.assistant_service -> uadas_core.services.workspace_service
+    # (2) The core<->models cycle Phase 2.2 left behind: application_state
+    # annotates with Dataset/Project/Visualization under TYPE_CHECKING while
+    # models.project raises core.exceptions.ServiceError. Annotation-only, so
+    # no runtime cycle exists. Remove if ApplicationState moves above core or
+    # the annotation becomes a Protocol.
+    uadas_core.core.application_state -> uadas_core.models

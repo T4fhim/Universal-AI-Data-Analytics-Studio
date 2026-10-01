@@ -55,7 +55,7 @@ def configure_logging(
     """Configure the root logger with a rotating file handler and console handler.
 
     This should be called exactly once, early in application startup
-    (see :mod:`uadas_core.core.bootstrap`), before any other module calls
+    (see :mod:`uadas_core.bootstrap`), before any other module calls
     :func:`get_logger` and emits its first message. Calling it again
     after the first call is a no-op — it will not attach duplicate
     handlers — but it also will not apply new settings; restart the

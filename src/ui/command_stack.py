@@ -24,9 +24,9 @@ docstring: "mutating in place would... make undo impossible without a separate u
 
 **Why this lives in ``src/ui/`` rather than ``uadas_core/services/``.** Every other session-wide service
 (``WorkspaceService``, ``ProjectService``, ...) is registered in
-:func:`~uadas_core.core.bootstrap.bootstrap` and resolved from the shared
+:func:`~uadas_core.bootstrap.bootstrap` and resolved from the shared
 :class:`~uadas_core.core.dependency_container.DependencyContainer`, per this overhaul's cross-cutting rule
-2. ``bootstrap.py`` lives under ``uadas_core/core/``, and ``src/ui/`` is the *only* package allowed to
+2. ``bootstrap.py`` lives under ``uadas_core/``, and ``src/ui/`` is the *only* package allowed to
 import ``src.ui`` at all (``tests/ui/test_import_layering.py`` enforces this both ways) -- so a
 "service" registered there could never itself live under ``src/ui/`` without breaking that
 one-way dependency direction. This is not actually a session-wide *service* in the same sense

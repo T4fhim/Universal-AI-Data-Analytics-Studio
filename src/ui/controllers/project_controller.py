@@ -85,7 +85,7 @@ class ProjectController:
         parent: The window dialogs (``QFileDialog``, ``QMessageBox``)
             should be parented to.
         project_service: Resolved from the shared
-            :class:`~uadas_core.core.bootstrap.DependencyContainer`.
+            :class:`~uadas_core.bootstrap.DependencyContainer`.
         workspace_service: Same -- datasets reloaded from a project are
             added here.
         dock_manager: For refreshing the Dataset Explorer and appending

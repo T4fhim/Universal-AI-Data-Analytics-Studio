@@ -190,12 +190,12 @@ class GuidanceService:
         orchestrator_service: Queried for :meth:`~uadas_core.services.
             analysis_orchestrator_service.AnalysisOrchestratorService.propose_next_stage`
             (source 1) -- the same session-scoped instance
-            :mod:`uadas_core.core.bootstrap` already registers, so this service's PIPELINE
+            :mod:`uadas_core.bootstrap` already registers, so this service's PIPELINE
             suggestion always reflects the same pipeline state the workbench's own
             :class:`~src.ui.workbench.stage_rail.StageRail` displays.
 
     Stateless beyond that one collaborator reference -- registered as a container singleton
-    in :mod:`uadas_core.core.bootstrap`, alongside ``AnalysisOrchestratorService``, per this repo's
+    in :mod:`uadas_core.bootstrap`, alongside ``AnalysisOrchestratorService``, per this repo's
     "new services register in bootstrap.py" convention, even though nothing here would break
     if a caller constructed a second instance (there is no session state of this service's
     own to fork).

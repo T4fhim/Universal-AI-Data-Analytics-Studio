@@ -23,7 +23,7 @@ class DatabaseController:
         parent: The window the dialog should be parented to.
         database_service: Manages saved profiles and live connections --
             resolved from the shared
-            :class:`~uadas_core.core.bootstrap.DependencyContainer`.
+            :class:`~uadas_core.bootstrap.DependencyContainer`.
         on_dataset_loaded: Called with the dataset the dialog read, if any
             -- typically
             :meth:`~src.ui.controllers.dataset_controller.DatasetController.load_dataset`,

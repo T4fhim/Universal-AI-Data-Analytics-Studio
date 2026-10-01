@@ -33,7 +33,7 @@ uadas_core/          # the Qt-free core (import-clean of any GUI toolkit / web f
 src/                 # the PySide6 desktop shell (deleted in Phase 2)
 ├── ui/              # main window, dialogs, widgets, dock/menu/toolbar/theme managers, controllers, workbench — depends on all of uadas_core/
 ├── workers/         # BaseWorker (QRunnable) + WorkerRunner — marshals uadas_core.jobs callbacks onto the Qt UI thread (milestone 6)
-└── app.py           # Application composition root — builds the container via uadas_core.core.bootstrap, constructs MainWindow
+└── app.py           # Application composition root — builds the container via uadas_core.bootstrap, constructs MainWindow
 ```
 
 > `src/models/`, `src/resources/`, and `src/utils/` were empty scaffold directories that no
@@ -50,7 +50,7 @@ Dependency direction is one-way down this list: `core` depends on nothing else i
 
 ## Application startup sequence
 
-`main.py` → `Application.create()` (`src/app.py`) → `bootstrap()` (`uadas_core/core/bootstrap.py`),
+`main.py` → `Application.create()` (`src/app.py`) → `bootstrap()` (`uadas_core/bootstrap.py`),
 in a fixed order:
 
 1. **`AppConfig.load()`** (`uadas_core/core/config.py`) — reads `config/config.yaml`; self-healing,

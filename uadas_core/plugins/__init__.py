@@ -6,7 +6,7 @@ format a plugin declares itself with; :mod:`~uadas_core.plugins.plugin_loader`
 scans configured search paths for plugins and validates each provided
 class against the relevant existing ``Base*`` ABC before it is usable;
 :mod:`~uadas_core.plugins.plugin_manager` is the session-wide service
-(registered in :mod:`~uadas_core.core.bootstrap`) that owns the discovered
+(registered in :mod:`~uadas_core.bootstrap`) that owns the discovered
 set and lets a "Plugins" settings panel enable/disable individual
 plugins without restarting the application.
 """

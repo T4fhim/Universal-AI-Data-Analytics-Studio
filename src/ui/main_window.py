@@ -74,7 +74,7 @@ from src.ui.workbench.pages.visualize_page import VisualizePage
 from src.ui.workbench.workbench import Workbench
 from src.ui.worker_runner import WorkerRunner
 from uadas_core.actions.action_context import ActionContext
-from uadas_core.core.bootstrap import BootstrapContext
+from uadas_core.bootstrap import BootstrapContext
 from uadas_core.core.constants import (
     APP_NAME,
     DEFAULT_WINDOW_HEIGHT,
@@ -103,7 +103,7 @@ class MainWindow(QMainWindow):
 
     Args:
         context: The result of a successful
-            :func:`~uadas_core.core.bootstrap.bootstrap` call. Services this
+            :func:`~uadas_core.bootstrap.bootstrap` call. Services this
             window needs are resolved from ``context.container`` during
             construction and handed to whichever controller owns them;
             ``ThemeManager`` is constructed fresh here (it wraps the live

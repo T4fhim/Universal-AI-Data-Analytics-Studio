@@ -11,7 +11,7 @@ returned on every subsequent request.
 This module intentionally does not know about any specific service
 (settings, project, workspace, etc.) — those are registered into a
 container instance by whatever milestone introduces them.
-:mod:`uadas_core.core.bootstrap` owns the one container instance the
+:mod:`uadas_core.bootstrap` owns the one container instance the
 application actually uses.
 """
 

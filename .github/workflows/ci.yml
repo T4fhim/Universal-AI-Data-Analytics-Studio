@@ -137,7 +137,7 @@ jobs:
         # they merely call into.
         run: python -m mypy uadas_core/core uadas_core/services uadas_core/analysis uadas_core/database uadas_core/results uadas_core/persistence
           uadas_core/jobs uadas_core/provenance uadas_core/theme uadas_core/a11y uadas_core/help
-          uadas_core/data_table uadas_core/actions uadas_core/models
+          uadas_core/data_table uadas_core/actions uadas_core/models uadas_core/bootstrap.py
           src/app.py
           src/workers src/ui/theme src/ui/a11y src/ui/web src/ui/actions
           src/ui/controllers src/ui/workbench src/ui/widgets src/ui/results
@@ -403,7 +403,7 @@ jobs:
 
       - name: import uadas_core with no PySide6
         run: |
-          python -c "import uadas_core; import uadas_core.core.bootstrap; import uadas_core.services.workspace_service; import uadas_core.ai.assistant_service; import uadas_core.visualization.chart_registry; import uadas_core.database.base_connection; print('uadas_core imports clean without PySide6')"
+          python -c "import uadas_core; import uadas_core.bootstrap; import uadas_core.services.workspace_service; import uadas_core.ai.assistant_service; import uadas_core.visualization.chart_registry; import uadas_core.database.base_connection; print('uadas_core imports clean without PySide6')"
 
       - name: pytest -- non-UI subset, PySide6-free
         env:

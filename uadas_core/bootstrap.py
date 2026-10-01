@@ -1,4 +1,4 @@
-# File: uadas_core/core/bootstrap.py
+# File: uadas_core/bootstrap.py
 """Application startup orchestration.
 
 :func:`bootstrap` runs the fixed sequence every application startup

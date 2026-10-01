@@ -77,7 +77,7 @@ class SettingsDialog(QDialog):
             instance — resolved from the dependency container by
             :mod:`src.ui.main_window`, not constructed here, since
             exactly one instance should exist per process (see
-            :mod:`uadas_core.core.bootstrap`'s reasoning for why these
+            :mod:`uadas_core.bootstrap`'s reasoning for why these
             services are container-registered).
         parent: Parent widget, typically the main window.
     """
@@ -276,7 +276,7 @@ class SettingsDialog(QDialog):
         """List discovered plugins with load status/errors, and let each be enabled/disabled.
 
         Reads from :attr:`_plugin_manager` (already loaded once during
-        :func:`~uadas_core.core.bootstrap.bootstrap`) rather than triggering a
+        :func:`~uadas_core.bootstrap.bootstrap`) rather than triggering a
         fresh scan itself — opening the Settings dialog should show
         what's actually running, not silently re-discover plugins as a
         side effect of the user looking at a settings panel.

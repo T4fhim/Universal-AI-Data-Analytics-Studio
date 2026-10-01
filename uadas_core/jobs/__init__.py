@@ -54,7 +54,7 @@ _default_job_runner: JobRunner | None = None
 def set_default_job_runner(runner: JobRunner) -> None:
     """Install the process-wide default :class:`JobRunner`.
 
-    Called once, by :func:`uadas_core.core.bootstrap.bootstrap`, right
+    Called once, by :func:`uadas_core.bootstrap.bootstrap`, right
     after it registers the same instance into the dependency container.
     Calling it again replaces the previous runner — harmless in
     production (bootstrap runs once) and convenient for tests that need
@@ -92,7 +92,7 @@ def get_default_job_runner() -> JobRunner:
     if _default_job_runner is None:
         raise RuntimeError(
             "No default JobRunner has been installed. "
-            "uadas_core.core.bootstrap.bootstrap() installs one via "
+            "uadas_core.bootstrap.bootstrap() installs one via "
             "set_default_job_runner(); this call happened before bootstrap ran "
             "(or outside an application session)."
         )

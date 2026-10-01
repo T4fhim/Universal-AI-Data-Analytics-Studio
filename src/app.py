@@ -1,7 +1,7 @@
 # File: src/app.py
 """Application entry class.
 
-:class:`Application` wraps a :class:`~uadas_core.core.bootstrap.BootstrapContext`
+:class:`Application` wraps a :class:`~uadas_core.bootstrap.BootstrapContext`
 and exposes a single :meth:`run` method as the application's actual
 behavior after startup. As of milestone 1b-ii, ``run`` constructs the
 ``QApplication``, applies the configured theme via
@@ -23,7 +23,7 @@ from src.ui.autosave_timer import AutosaveTimer
 from src.ui.dialogs.first_run_tour_dialog import FirstRunTourDialog
 from src.ui.main_window import MainWindow
 from src.ui.theme_manager import ThemeManager
-from uadas_core.core.bootstrap import BootstrapContext, bootstrap
+from uadas_core.bootstrap import BootstrapContext, bootstrap
 from uadas_core.core.constants import APP_NAME, APP_VERSION
 from uadas_core.core.logger import get_logger
 from uadas_core.services.project_service import ProjectService
@@ -38,7 +38,7 @@ class Application:
 
     Args:
         context: The result of a successful
-            :func:`~uadas_core.core.bootstrap.bootstrap` call. ``Application``
+            :func:`~uadas_core.bootstrap.bootstrap` call. ``Application``
             does not call ``bootstrap`` itself — see
             :meth:`create`, which is the convenience path most callers
             (including ``main.py``) should use instead of constructing
@@ -54,7 +54,7 @@ class Application:
 
         This is the entry point ``main.py`` calls. It exists as a
         separate constructor path (rather than folding
-        :func:`~uadas_core.core.bootstrap.bootstrap` into ``__init__``) so
+        :func:`~uadas_core.bootstrap.bootstrap` into ``__init__``) so
         that tests can construct an ``Application`` from a
         hand-built ``BootstrapContext`` — pointed at a temporary
         config file and log directory — without needing to run the

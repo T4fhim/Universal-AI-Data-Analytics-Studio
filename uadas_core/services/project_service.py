@@ -9,13 +9,13 @@ datasets were loaded, so they can be reloaded automatically on open.
 :class:`ProjectService` does not depend on
 :class:`~uadas_core.services.workspace_service.WorkspaceService` — the two
 remain independently registered container singletons, per
-:mod:`uadas_core.core.bootstrap`'s established pattern. Rather than either
+:mod:`uadas_core.bootstrap`'s established pattern. Rather than either
 service reaching into the other, :meth:`ProjectService.save_project`
 and :meth:`ProjectService.open_project` accept dataset references as
 explicit parameters; :mod:`src.ui.main_window` (which already holds
 references to both services) is responsible for passing the current
 dataset list through. This keeps each service's dependencies exactly
-as narrow as :mod:`uadas_core.core.bootstrap`'s original registration order
+as narrow as :mod:`uadas_core.bootstrap`'s original registration order
 already established.
 
 :class:`ProjectService` is the single place that knows how a project

@@ -2,7 +2,7 @@
 """Session-wide plugin state: what's discovered, what's enabled, and how to toggle it.
 
 :class:`PluginManager` is registered as a singleton in
-:mod:`~uadas_core.core.bootstrap`, the same way
+:mod:`~uadas_core.bootstrap`, the same way
 :class:`~uadas_core.services.workspace_service.WorkspaceService` and every
 other session-wide service is — see that module's own docstring for
 why services are constructed once and shared via the dependency

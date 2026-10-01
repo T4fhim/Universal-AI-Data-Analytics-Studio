@@ -271,7 +271,7 @@ class AnalysisOrchestratorService:
     Session-scoped, in-memory state (one :class:`AnalysisLog` per
     dataset ID seen), matching :class:`WorkspaceService`'s own
     lifetime — register as a container singleton in
-    :mod:`uadas_core.core.bootstrap` alongside it, per this repo's
+    :mod:`uadas_core.bootstrap` alongside it, per this repo's
     session-wide-service convention.
     """
 

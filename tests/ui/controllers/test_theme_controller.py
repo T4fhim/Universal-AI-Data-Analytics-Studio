@@ -16,7 +16,7 @@ from PySide6.QtWidgets import QApplication, QWidget
 
 from src.ui.controllers.theme_controller import ThemeController
 from src.ui.theme_manager import ThemeManager
-from uadas_core.core.bootstrap import bootstrap
+from uadas_core.bootstrap import bootstrap
 from uadas_core.plugins.plugin_manager import PluginManager
 from uadas_core.services.settings_service import SettingsService
 
