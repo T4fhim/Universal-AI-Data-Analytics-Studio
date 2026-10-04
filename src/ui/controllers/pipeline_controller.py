@@ -27,7 +27,6 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QMessageBox, QWidget
 
-from src.ui.command_stack import CommandStack, DatasetPointerCommand
 from src.ui.dock_manager import DockManager
 from src.ui.status_bar import ApplicationStatusBar
 from src.ui.ui_state_bus import UiStateBus
@@ -36,6 +35,7 @@ from src.ui.workbench.pages.reproduce_page import ReproducePage
 from src.ui.workbench.pages.understand_page import UnderstandPage
 from src.ui.workbench.workbench import Workbench
 from src.ui.worker_runner import WorkerRunner
+from uadas_core.command_stack import CommandStack, DatasetPointerCommand
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.core.logger import get_logger
 from uadas_core.models import Dataset
@@ -90,7 +90,7 @@ class PipelineController:
         command_stack: Milestone 23. Where :meth:`register_clean_operation` pushes a new
             undoable command and :meth:`undo`/:meth:`redo` replay one -- constructed once in
             ``main_window.py`` (not resolved from the ``DependencyContainer``; see
-            :mod:`~src.ui.command_stack`'s own docstring for why) and handed to this
+            :mod:`~uadas_core.command_stack`'s own docstring for why) and handed to this
             controller since ``PipelineController`` already owns every other pipeline-shaped
             mutation of the active dataset (``run_understand_stage``, ``reproduce_active_dataset``).
         on_changed: Called after anything that could have changed the active dataset's
@@ -234,7 +234,7 @@ class PipelineController:
         :meth:`~uadas_core.cleaning.base_operation.BaseOperation.apply` by the time this runs (see
         ``CleanPage``'s own docstring for why the page computes it, not this controller) --
         this method's only job is bookkeeping: add it to the workspace, make it active, and
-        push a :class:`~src.ui.command_stack.DatasetPointerCommand` so :meth:`undo` can move
+        push a :class:`~uadas_core.command_stack.DatasetPointerCommand` so :meth:`undo` can move
         the active pointer back.
         """
         self._workspace_service.add_dataset(derived)
@@ -261,7 +261,7 @@ class PipelineController:
         """Move the active-dataset pointer back to the parent of the most recent operation.
 
         Never mutates any dataset's dataframe -- see
-        :meth:`~src.ui.command_stack.CommandStack.undo`'s own docstring; this method is a thin
+        :meth:`~uadas_core.command_stack.CommandStack.undo`'s own docstring; this method is a thin
         UI-feedback wrapper around it (busy state is not needed here, unlike
         :meth:`run_understand_stage` -- moving a pointer is O(1), nothing to offload).
         """

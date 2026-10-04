@@ -36,6 +36,7 @@ source_modules =
     uadas_core.analysis
     uadas_core.bootstrap
     uadas_core.cleaning
+    uadas_core.command_stack
     uadas_core.core
     uadas_core.data_table
     uadas_core.database
@@ -64,7 +65,7 @@ allow_indirect_imports = False
 name = uadas_core subpackages form a strict dependency stack
 type = layers
 layers =
-    uadas_core.bootstrap | uadas_core.provenance
+    uadas_core.bootstrap | uadas_core.provenance | uadas_core.command_stack
     uadas_core.persistence | uadas_core.actions
     uadas_core.services
     uadas_core.ai

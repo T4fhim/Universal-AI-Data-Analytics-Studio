@@ -16,8 +16,8 @@ import pandas as pd
 import pandas.testing as pdt
 import pytest
 
-from src.ui.command_stack import CommandStack, DatasetPointerCommand
 from uadas_core.cleaning.duplicates import DropDuplicates
+from uadas_core.command_stack import CommandStack, DatasetPointerCommand
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.models import Dataset
 from uadas_core.services.workspace_service import WorkspaceService

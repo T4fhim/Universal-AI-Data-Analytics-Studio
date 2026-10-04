@@ -20,7 +20,7 @@ and shows "No Active Dataset" if it is ``None``, never touching
 ``ProjectService`` at all.
 
 ``edit.undo``/``edit.redo`` **are now registered** (milestone 23) -- see
-:mod:`~src.ui.command_stack`'s own docstring for the real semantics behind
+:mod:`~uadas_core.command_stack`'s own docstring for the real semantics behind
 them. Both use ``predicate`` rather than ``requires``: ``Requirement`` has no
 "can undo" member (a boolean precondition would be the wrong shape even if
 it did -- see ``ActionContext.can_undo``'s own docstring on why it is a

@@ -99,7 +99,7 @@ every milestone is separately git-tagged; this is reconstructed from in-code cit
 The milestone list above (1a–14) was the last state this document tracked. **Milestones 15–29
 also completed** — the design-token/QSS system, `ChartView` hardening, `ActionRegistry`/command
 palette, the dataframe viewer, `MainWindow` decomposition, the Workbench/StageRail shell, the AI
-chat overhaul, the result-rendering framework, real undo/redo (`src/ui/command_stack.py`,
+chat overhaul, the result-rendering framework, real undo/redo (`uadas_core/command_stack.py`,
 milestone 23), the Visualize/Predict stages, `GuidanceService`, empty/error states + i18n,
 accessibility enforcement (`src/ui/a11y/`), and the in-app manual / F1 help / onboarding pass.
 Their plan is `plans/ui-overhaul-pioneering-adaptive-workbench.md`; their detail lives in git

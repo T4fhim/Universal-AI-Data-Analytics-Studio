@@ -19,7 +19,7 @@ the time, exactly the dead-action defect this whole overhaul's audit
 flagged (the same "absence over inert placeholder" reasoning milestone 20
 applies to the Project Explorer dock). **It returns here in milestone 23**,
 now that ``edit.undo``/``edit.redo`` have real semantics -- see
-:mod:`~src.ui.command_stack`'s own docstring.
+:mod:`~uadas_core.command_stack`'s own docstring.
 
 "Open Recent" stays bespoke rather than becoming registry entries: each
 item's target path is per-instance data no static

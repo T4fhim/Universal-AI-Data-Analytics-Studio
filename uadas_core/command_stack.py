@@ -1,4 +1,4 @@
-# File: src/ui/command_stack.py
+# File: uadas_core/command_stack.py
 """Real Undo/Redo, built strictly on top of the never-mutate-in-place cleaning contract.
 
 Milestone 17's ``builtin_actions.py``/``menu_bar.py`` removed the ``edit.undo``/``edit.redo``

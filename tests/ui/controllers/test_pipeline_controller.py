@@ -27,13 +27,13 @@ from __future__ import annotations
 import pandas as pd
 from PySide6.QtWidgets import QApplication, QMainWindow
 
-from src.ui.command_stack import CommandStack
 from src.ui.controllers.pipeline_controller import PipelineController
 from src.ui.dock_manager import DockManager
 from src.ui.status_bar import ApplicationStatusBar
 from src.ui.ui_state_bus import UiStateBus
 from src.ui.worker_runner import WorkerRunner
 from tests.ui.qt_helpers import wait_for_signal
+from uadas_core.command_stack import CommandStack
 from uadas_core.models import Dataset
 from uadas_core.services.analysis_orchestrator_service import (
     AnalysisOrchestratorService,

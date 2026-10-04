@@ -23,7 +23,7 @@ def _menu_titles(menu_bar: ApplicationMenuBar) -> set[str]:
 def test_edit_menu_has_undo_and_redo(qapp: QApplication) -> None:
     """Milestone 23 reintroduces the Edit menu -- removed in milestone 17 because Undo/Redo
     were connected to nothing, restored now that they have real semantics (see
-    src/ui/command_stack.py's own docstring).
+    uadas_core/command_stack.py's own docstring).
     """
     window = QMainWindow()
     binder = ActionBinder(window)

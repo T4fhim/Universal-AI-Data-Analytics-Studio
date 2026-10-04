@@ -57,7 +57,7 @@ class ActionContext:
             connection attempt), unlike actually constructing an
             ``AssistantService``.
         is_busy: Whether a background worker is currently running.
-        can_undo: Whether :class:`~src.ui.command_stack.CommandStack.can_undo` currently
+        can_undo: Whether :class:`~uadas_core.command_stack.CommandStack.can_undo` currently
             returns ``True`` for the running session's command stack -- read by
             ``edit.undo``'s own ``ActionSpec.predicate`` (milestone 23; see
             ``builtin_actions.py``). Field existed since milestone 17, always ``False``, in
@@ -117,11 +117,11 @@ class ActionContext:
             is_busy: Passed through from whatever tracks worker activity
                 (``MainWindow`` in milestone 17 -- see its
                 ``_busy_worker_count``).
-            can_undo: Passed through from :meth:`~src.ui.command_stack.CommandStack.can_undo`
+            can_undo: Passed through from :meth:`~uadas_core.command_stack.CommandStack.can_undo`
                 (milestone 23) -- defaults to ``False`` for callers (mostly tests) that
                 construct a context with no live command stack in scope.
             can_redo: See ``can_undo`` -- from
-                :meth:`~src.ui.command_stack.CommandStack.can_redo`.
+                :meth:`~uadas_core.command_stack.CommandStack.can_redo`.
         """
         active_dataset = workspace_service.get_active_dataset()
         if active_dataset is not None:

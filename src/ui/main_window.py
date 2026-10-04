@@ -46,7 +46,6 @@ from PySide6.QtWidgets import QMainWindow
 import uadas_core.actions.builtin_actions  # noqa: F401
 from src.ui.actions.action_binder import ActionBinder
 from src.ui.command_palette import CommandPalette
-from src.ui.command_stack import CommandStack
 from src.ui.controllers.assistant_controller import AssistantController
 from src.ui.controllers.database_controller import DatabaseController
 from src.ui.controllers.dataset_controller import DatasetController
@@ -75,6 +74,7 @@ from src.ui.workbench.workbench import Workbench
 from src.ui.worker_runner import WorkerRunner
 from uadas_core.actions.action_context import ActionContext
 from uadas_core.bootstrap import BootstrapContext
+from uadas_core.command_stack import CommandStack
 from uadas_core.core.constants import (
     APP_NAME,
     DEFAULT_WINDOW_HEIGHT,
@@ -141,7 +141,7 @@ class MainWindow(QMainWindow):
         self._binder = ActionBinder(self, self._icon_provider)
         self._worker_runner = WorkerRunner(self)
         # Milestone 23: constructed directly here, not resolved from the
-        # DependencyContainer -- see src/ui/command_stack.py's own docstring for why it
+        # DependencyContainer -- see uadas_core/command_stack.py's own docstring for why it
         # follows UiStateBus/WorkerRunner's construction pattern rather than bootstrap.py's.
         self._command_stack = CommandStack(self._workspace_service)
 
