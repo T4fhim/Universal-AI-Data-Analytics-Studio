@@ -42,9 +42,7 @@ Write-Host "Running pytest..."
 # scripts/run_tests_and_exit_cleanly.py (os._exit() once pytest's real result is known)
 # is CI's actual fix for this and CLAUDE.md's documented command -- this hook had never
 # been updated to match, so it could spuriously block a commit with all tests passing.
-# Same two-invocation split as CI: tests/ui/test_worker_runner.py first (real-QThreadPool
-# tests proved flaky once event-loop backpressure builds up later in a long run).
-# Pass/fail is judged by Test-PytestPassed, not the bare exit code. Verified 2026-10-04: invocation 2
+# Pass/fail is judged by Test-PytestPassed, not the bare exit code. Verified 2026-10-04: the full-suite run
 # exits with the native access-violation code (-1073741819, 0xC0000005) AFTER pytest prints a clean
 # summary, on every run here -- so demanding exit 0 blocked every commit with all tests green.
 # os._exit() in the runner does not help: the crash lands inside pytest.main()'s own teardown. A crash
@@ -62,13 +60,14 @@ function Test-PytestPassed {
     return $true
 }
 
-& $py "scripts\run_tests_and_exit_cleanly.py" "tests\ui\test_worker_runner.py" -q 2>&1 | Tee-Object -Variable out1 | Out-Host
+# Phase 2.5: a single invocation. The two-invocation split existed only because the Qt tests under
+# tests/ui/ (test_worker_runner.py's real-QThreadPool tests) were flaky late in a long run; that
+# directory is gone, so the surviving suite is one plain run.
+& $py "scripts\run_tests_and_exit_cleanly.py" "tests" -q 2>&1 | Tee-Object -Variable out1 | Out-Host
 $testExit1 = $LASTEXITCODE
-& $py "scripts\run_tests_and_exit_cleanly.py" "tests" -q -m "not uia_integration" --ignore="tests\ui\test_worker_runner.py" 2>&1 | Tee-Object -Variable out2 | Out-Host
-$testExit2 = $LASTEXITCODE
 
-if (-not (Test-PytestPassed $testExit1 $out1) -or -not (Test-PytestPassed $testExit2 $out2)) {
-    Write-Error "Tests failed (exit $testExit1 / $testExit2). Commit blocked."
+if (-not (Test-PytestPassed $testExit1 $out1)) {
+    Write-Error "Tests failed (exit $testExit1). Commit blocked."
     exit 2
 }
 
