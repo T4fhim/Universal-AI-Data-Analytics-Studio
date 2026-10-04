@@ -45,6 +45,17 @@ testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-ra"
 
+# Ruff: inherit the repo-root configuration (rule selection, line length), and relax only
+# RUF012 ("mutable class attribute needs ClassVar") where Django's own API requires a
+# plain list on a class body: `Meta.indexes` / `Meta.constraints` on models, and
+# `dependencies` / `operations` on migrations. Scoped to apps/api; the core is unchanged.
+[tool.ruff]
+extend = "../../pyproject.toml"
+
+[tool.ruff.lint.per-file-ignores]
+"uadas_api/*/models.py" = ["RUF012"]
+"uadas_api/*/migrations/*.py" = ["RUF012"]
+
 [tool.mypy]
 # Run from apps/api (`cd apps/api && python -m mypy uadas_api`): mypy reads the config
 # in the current directory, and this table loads the django-stubs plugin, which the
@@ -55,6 +66,13 @@ check_untyped_defs = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 no_implicit_optional = true
+
+# The core is installed editable, which mypy cannot resolve, and it has its own curated
+# mypy run at the repo root (docs/MYPY_DEBT.md). Only tests/test_choices_parity.py imports
+# it; treating it as untyped keeps the core's debt out of this job.
+[[tool.mypy.overrides]]
+module = ["uadas_core", "uadas_core.*"]
+ignore_missing_imports = true
 
 [tool.django-stubs]
 django_settings_module = "uadas_api.settings.dev"

@@ -145,18 +145,21 @@ jobs:
         run: python -m mypy uadas_api tests
 
       - name: Collected-test count is not silently shrinking
-        # Same guard as the core job (observation 0022), with its own floor. 65 tests
-        # at the 3.1 skeleton; the floor is that minus 2, leaving room to prune a
-        # couple deliberately while failing on a real collapse (e.g. a conftest
-        # import error that silently drops a whole module). Raise it as the suite
-        # grows -- lowering it should be a conscious, reviewed change.
+        # Same guard as the core job (observation 0022), with its own floor. 484 tests
+        # at the 3.2 data model (65 at the 3.1 skeleton; most of the growth is the
+        # discovery-based tenant-isolation harness, which multiplies one check across
+        # every tenant model, so adding a model raises the count). The floor is that
+        # minus 2, leaving room to prune a couple deliberately while failing on a real
+        # collapse (e.g. a conftest import error that silently drops a whole module).
+        # Raise it as the suite grows -- lowering it should be a conscious, reviewed
+        # change.
         run: |
           out="$(python -m pytest apps/api/tests --collect-only -q -p no:cacheprovider)"
           echo "$out" | tail -n 3
           count="$(echo "$out" | grep -oE '^[0-9]+ tests? collected' | grep -oE '^[0-9]+')"
           test -n "$count" || { echo "::error::could not read a collected-test count"; exit 1; }
           echo "collected: $count"
-          test "$count" -ge 63 || { echo "::error::collected $count tests, expected at least 63"; exit 1; }
+          test "$count" -ge 482 || { echo "::error::collected $count tests, expected at least 482"; exit 1; }
 
       - name: pytest (apps/api)
         # DJANGO_SETTINGS_MODULE comes from apps/api/pyproject.toml, not the

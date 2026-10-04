@@ -16,6 +16,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
+import pytest
 from django.core.management import call_command
 
 API_ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +35,7 @@ def _manage(args: list[str], env: dict[str, str]) -> subprocess.CompletedProcess
     )
 
 
+@pytest.mark.django_db  # JSONField checks (3.2 models) consult the DB connection's features
 def test_check_passes_under_test_settings() -> None:
     call_command("check")
 

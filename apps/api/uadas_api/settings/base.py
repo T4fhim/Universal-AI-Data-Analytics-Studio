@@ -30,11 +30,11 @@ ALLOWED_HOSTS: list[str] = get_list("DJANGO_ALLOWED_HOSTS")
 CORS_ALLOWED_ORIGINS: list[str] = get_list("CORS_ALLOWED_ORIGINS")
 CSRF_TRUSTED_ORIGINS: list[str] = get_list("CSRF_TRUSTED_ORIGINS")
 
-# AUTH_USER_MODEL MUST be set in sub-step 3.2, BEFORE the first migration is
-# committed (to a custom user model in uadas_api.accounts). Django cannot swap the
-# user model once migrations that reference ``auth.User`` exist without a painful
-# manual rewrite, so 3.2 sets it in the same change that creates the first migration,
-# not after. Do not generate or commit any migration until that is done.
+# The custom user model (email login, UUID primary key). Django cannot swap the user
+# model once migrations that reference ``auth.User`` exist without a painful manual
+# rewrite, so this was set in the same change (3.2) that created the first migrations,
+# not after. Never remove or repoint it once those migrations are applied anywhere.
+AUTH_USER_MODEL: str = "accounts.User"
 
 INSTALLED_APPS: list[str] = [
     "django.contrib.contenttypes",
@@ -44,7 +44,7 @@ INSTALLED_APPS: list[str] = [
     # see api.py); harmless otherwise.
     "ninja",
     "corsheaders",
-    # Local apps (empty in 3.1; models arrive from 3.2).
+    # Local apps (models since 3.2; `ai` has none yet).
     "uadas_api.accounts",
     "uadas_api.workspaces",
     "uadas_api.pipeline",

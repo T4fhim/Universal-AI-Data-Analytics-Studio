@@ -5,11 +5,11 @@ The Django 6 + Django Ninja backend for the Universal AI Data Analytics Studio w
 It is a separate distribution from the framework-free core (`uadas_core`, repo root) and
 depends on it; the core never imports it (enforced by `.importlinter`).
 
-**Status: sub-step 3.1, the skeleton.** Five empty Django apps (`accounts`, `workspaces`,
-`pipeline`, `ai`, `exports`), split settings, and one endpoint, `GET /api/health`
-(`{"status": "ok"}`, liveness only, no database access). No models, migrations,
-authentication, storage or background tasks yet. `AUTH_USER_MODEL` must be set in 3.2
-before the first migration is committed (see the note in `uadas_api/settings/base.py`).
+**Status: sub-step 3.2, the data model and tenancy.** Five Django apps (`accounts`,
+`workspaces`, `pipeline`, `ai`, `exports`), split settings, one endpoint, `GET /api/health`
+(`{"status": "ok"}`, liveness only, no database access), and the models described under
+[Data model](#data-model). No authentication flow, storage, background tasks or API
+endpoints over the models yet (3.3 onwards). `AUTH_USER_MODEL = "accounts.User"`.
 
 ## Install
 
@@ -62,6 +62,41 @@ configure the probe to send one of the allowed host names in its `Host` header.
 
 The OpenAPI schema and docs routes (`/api/openapi.json`, `/api/docs`) exist only when
 `DEBUG` is on; the contract is generated offline with `api.get_openapi_schema()`.
+
+## Data model
+
+Full table, constraints and limitations: [plans/phase-3-2-data-model.md](../../plans/phase-3-2-data-model.md).
+
+| App | Models |
+|---|---|
+| `accounts` | `User` (email login, case-insensitive unique), `Organization` (the tenant), `Membership` (role per organization), `AuditEvent` (append-only) |
+| `workspaces` | `Project`, `DatasetRecord`, `ChartSpec`, `Dashboard` |
+| `pipeline` | `PipelineNode`, `PipelineEdge` (the provenance DAG), `Recipe` |
+| `exports` | `Report` |
+| `ai` | none yet |
+
+Every model except `User`/`Organization`/`Membership` inherits `TenantOwnedModel`
+(`uadas_api/tenancy.py`): a UUID primary key, a non-null `organization` foreign key
+(`PROTECT`), and a write-time rule that every foreign key to another tenant model must stay
+inside the same organization. Always list through `Model.objects.for_organization(org)`. The
+rule is application-level only (no composite foreign keys exist in Django); raw SQL
+bypasses it. `DatasetRecord.parent_dataset_id` is a plain UUID, not a foreign key, mirroring
+the core's non-cascading lineage. Value sets (source formats, chart types, report formats,
+graph kinds) are defined here and pinned to `uadas_core` by `tests/test_choices_parity.py`;
+the models never import the core.
+
+Also enforced: `organization` (and a membership's user/organization) cannot change once saved;
+`bulk_create(update_conflicts=True)` is refused on tenant models; the guards apply to
+`_base_manager`, so related-manager calls such as `project.datasets.add(row)` are covered;
+`storage_key` must sit under `"<organization_id>/"` with plain segments only. **Reader
+obligation:** JSON fields that carry ids (`ChartSpec.spec`, `Dashboard.layout`,
+`PipelineNode.payload`, `Recipe.definition`, `Report.config`) are not validated; resolve any id
+read from them through `for_organization`, never `objects.get(pk=...)`.
+
+Adding a tenant model: subclass `TenantOwnedModel` with `class Meta(TenantOwnedModel.Meta)`
+(a bare `class Meta:` drops the guarded base manager; the harness catches it), give it an index
+or unique constraint that leads with `organization`, register a factory in `tests/factories.py`
+(the isolation harness fails until you do), `makemigrations`, done.
 
 ## Test
 
