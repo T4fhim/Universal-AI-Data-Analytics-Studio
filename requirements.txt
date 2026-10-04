@@ -1,4 +1,9 @@
-pandas
+# Capped below 3 on purpose. Until Phase 2.5 the project resolved pandas 2.3.x only because
+# ydata-profiling / numba / dask (all since dropped) capped it; removing them let a fresh
+# install resolve pandas 3.0 (and numpy 2.5, scipy 1.18), a major version with breaking
+# changes (string dtype, copy-on-write) that nothing here has been validated against. Moving
+# to pandas 3 should be a deliberate migration with its own test pass, not a side effect.
+pandas<3
 numpy
 plotly
 # Real, unconditional runtime dependency of uadas_core/visualization/continuous_charts.py
