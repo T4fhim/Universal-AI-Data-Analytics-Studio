@@ -17,10 +17,9 @@ standing delegation rules, and the hook-awareness list — lives in
 single per-commit `code-reviewer`; heavier specialists run at sub-step boundaries — this is what
 stops rate-limit exhaustion from stranding a half-done branch.*
 
-Note: the codebase mid-transition splits into a Qt-free `uadas_core/` (readers, analysis,
-cleaning, database, forecasting, plugins, reports, results, services, visualization, ai, jobs,
-core) and a disposable `src/ui/` + `src/workers/` shell. Paths below that still say
-`src/analysis`, `src/ai/`, etc. mean `uadas_core/...` post-Phase-1.1.
+Note: all code now lives in the Qt-free `uadas_core/` (readers, analysis, cleaning, database,
+forecasting, plugins, reports, results, services, visualization, ai, jobs, persistence, core,
+...); the Qt shell was removed in Phase 2.5 and there is no UI until the Phase 4 web UI.
 
 ## Current agent tiers (already configured — reference, don't duplicate)
 
@@ -36,9 +35,9 @@ tool call) rather than to edit the agent's frontmatter.
 - **Discover/understand a milestone or bug**: read `SPECIFICATION.md` + `docs/ROADMAP.md`'s
   "not built yet" list before assuming a module exists — do this directly, not via a subagent,
   it's cheaper than a delegation round-trip for a few file reads.
-- **Plan new feature/milestone work**: `planner` agent (always inspects actual `src/`, not just
+- **Plan new feature/milestone work**: `planner` agent (always inspects actual `uadas_core/`, not just
   CLAUDE.md/SPECIFICATION.md, since spec scope outruns implementation).
-- **Architecture-boundary question** (new service vs. method, `src/analysis` vs `src/services`,
+- **Architecture-boundary question** (new service vs. method, `uadas_core/analysis` vs `uadas_core/services`,
   does a new reader/chart/op fit the existing `Base*` shape): `architect` agent — before
   implementing, not after.
 - **Implement approved work**: `implementer` agent, or inline if it's a single-file,
@@ -48,8 +47,7 @@ tool call) rather than to edit the agent's frontmatter.
   scaffold the file in the right shape, then check `project-architecture` skill for the
   integration points (registry, config 3-place rule, bootstrap registration) *before* declaring
   the change complete, then `test-engineer` for coverage.
-- **Chart/visualization work**: `dataviz-development` skill.
-- **Qt/PySide6 widget, threading, or lifecycle work**: `pyside6-development` skill.
+- **Chart/visualization work**: `uadas_core/visualization/` is plain Plotly figure-building — follow the `add-extension` skill. The `dataviz-development` skill is dormant until the Phase 4 web UI exists.
 - **Before claiming any milestone/feature/fix complete**: `milestone-verification` skill —
   non-negotiable per that skill's own scope; this skill does not restate its checklist. If the
   milestone changed test/tooling/build state (not just application features), also run
@@ -57,17 +55,17 @@ tool call) rather than to edit the agent's frontmatter.
 - **Review after non-trivial change**: `code-reviewer` (quality), `security-reviewer` (only for
   `uadas_core/ai/`, `uadas_core/readers/`, `uadas_core/database/`, `uadas_core/persistence/`,
   credential/network/filesystem code — and note CI's `bandit` runs `--skip B608`, so a new
-  SQL-building module has *no* automated injection gate), `a11y-reviewer` (widget/dock/dialog/
-  chart/QSS changes in `src/ui/`), and/or `performance-analyzer` (DataFrame-processing,
+  SQL-building module has *no* automated injection gate), `a11y-reviewer` (dormant until the
+  Phase 4 web UI exists), and/or `performance-analyzer` (DataFrame-processing,
   forecasting, or chart-rendering code with a data-volume dimension) — select the one(s)
-  relevant to what changed, not all four by default. For deeper Python-idiom review use
+  relevant to what changed, not all by default. For deeper Python-idiom review use
   `ecc:python-reviewer`; for type/invariant design `ecc:type-design-analyzer`; for swallowed
   errors / bad fallbacks `ecc:silent-failure-hunter`.
 
 ## Confidence gate before writing code
 
 Proceed only when reasonably confident (not just hopeful) that:
-- the relevant source file(s) actually exist as assumed (check `src/`, don't trust
+- the relevant source file(s) actually exist as assumed (check `uadas_core/`, don't trust
   `SPECIFICATION.md` as proof of existing functionality),
 - the integration points listed in `project-architecture` for this change type are known,
   and
@@ -82,7 +80,7 @@ license to over-investigate work that's already clear.
 
 Escalate a task from inline/haiku-tier reasoning to `sonnet`-tier (implementer/debugger/
 test-engineer, or unblocking the main session's own reasoning) when: the change touches
-more than one `src/` subpackage, an unexpected failure appears mid-implementation, or
+more than one `uadas_core/` subpackage, an unexpected failure appears mid-implementation, or
 requirements turn out ambiguous once the actual code is read. De-escalate back to direct,
 undelegated action once the ambiguous part is resolved and what remains is mechanical
 (e.g. registering an already-designed reader in `reader_registry.py`).

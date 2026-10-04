@@ -12,22 +12,22 @@ run that skill immediately after, before declaring the new extension complete.
 
 ## Scope boundary
 
-This skill does NOT provide the integration-point checklist (registry entry, UI filter update,
-config sync) — that's `project-architecture`. It does NOT provide milestone completion sign-off —
+This skill does NOT provide the integration-point checklist (registry entry, file-picker filter
+update, config sync) — that's `project-architecture`. It does NOT provide milestone completion sign-off —
 that's `milestone-verification`. It only generates a correctly-shaped starting file.
 
 ## Which Base* type, and where it lives
 
 | Extension point | Base class | Lives under | Registry it must be added to |
 |---|---|---|---|
-| File format reader | `BaseReader` (`src/readers/base_reader.py`) | `src/readers/` | `src/readers/reader_registry.py`'s `_REGISTERED_READERS` |
-| Cleaning operation | `BaseOperation` (`src/cleaning/base_operation.py`) | `src/cleaning/` | `src/cleaning/operation_registry.py` |
-| Chart type | `BaseChart` (`src/visualization/base_chart.py`) | `src/visualization/` | `src/visualization/chart_registry.py` |
-| LLM provider | `BaseLLMProvider` (`src/ai/llm_provider.py`) | `src/ai/` | wired into `create_provider()` in `src/ai/llm_provider.py` |
+| File format reader | `BaseReader` (`uadas_core/readers/base_reader.py`) | `uadas_core/readers/` | `uadas_core/readers/reader_registry.py`'s `_BUILTIN_READERS` |
+| Cleaning operation | `BaseOperation` (`uadas_core/cleaning/base_operation.py`) | `uadas_core/cleaning/` | `uadas_core/cleaning/operation_registry.py` |
+| Chart type | `BaseChart` (`uadas_core/visualization/base_chart.py`) | `uadas_core/visualization/` | `uadas_core/visualization/chart_registry.py` |
+| LLM provider | `BaseLLMProvider` (`uadas_core/ai/llm_provider.py`) | `uadas_core/ai/` | wired into `create_provider()` in `uadas_core/ai/llm_provider.py` |
 
-(This project also has registries for other extension families — `src/database/connection_registry.py`,
-`src/ai/tool_registry.py`, plus UI-side `action_registry.py`/`stage_registry.py`/
-`result_renderer_registry.py` — those follow the same "register it or it doesn't exist to the rest
+(This project also has registries for other extension families — `uadas_core/database/connection_registry.py`,
+`uadas_core/ai/tool_registry.py`, `uadas_core/actions/action_registry.py`,
+`uadas_core/results/result_renderer_registry.py` — those follow the same "register it or it doesn't exist to the rest
 of the app" principle but are outside this skill's four `Base*` types.)
 
 ## Shape to follow (stateless, classmethod-only)
@@ -40,20 +40,20 @@ conversation history) — see CLAUDE.md's `Base*` section before scaffolding a n
 ### Reader skeleton
 
 ```python
-# File: src/readers/<name>_reader.py
+# File: uadas_core/readers/<name>_reader.py
 """<Why this reader exists and what format it handles — not just what it does.>"""
 from __future__ import annotations
 
 from pathlib import Path
 
-from src.readers.base_reader import BaseReader
-from src.core.models import Dataset  # adjust to actual Dataset import path
+from uadas_core.readers.base_reader import BaseReader
+from uadas_core.models import Dataset
 
 
 class <Name>Reader(BaseReader):
     """:class:`BaseReader` implementation for <format>.
 
-    See :class:`src.readers.base_reader.BaseReader` for the contract this fulfils.
+    See :class:`uadas_core.readers.base_reader.BaseReader` for the contract this fulfils.
     """
 
     @classmethod
@@ -72,12 +72,12 @@ class <Name>Reader(BaseReader):
 ### Operation skeleton
 
 ```python
-# File: src/cleaning/<name>_operation.py
+# File: uadas_core/cleaning/<name>_operation.py
 """<Why this operation exists.>"""
 from __future__ import annotations
 
-from src.cleaning.base_operation import BaseOperation
-from src.core.models import Dataset
+from uadas_core.cleaning.base_operation import BaseOperation
+from uadas_core.models import Dataset
 
 
 class <Name>Operation(BaseOperation):
@@ -98,14 +98,14 @@ class <Name>Operation(BaseOperation):
 ### Chart skeleton
 
 ```python
-# File: src/visualization/<name>_chart.py
+# File: uadas_core/visualization/<name>_chart.py
 """<Why this chart exists.>"""
 from __future__ import annotations
 
 import pandas as pd
 import plotly.graph_objects as go
 
-from src.visualization.base_chart import BaseChart
+from uadas_core.visualization.base_chart import BaseChart
 
 
 class <Name>Chart(BaseChart):
@@ -118,7 +118,7 @@ class <Name>Chart(BaseChart):
 
 ### LLM provider skeleton
 
-Read `src/ai/llm_provider.py`'s existing providers (`AnthropicProvider`, `GeminiProvider`,
+Read `uadas_core/ai/llm_provider.py`'s existing providers (`AnthropicProvider`, `GeminiProvider`,
 `GroqProvider`) first — a new provider implements `send()` / `append_user_message()` /
 `append_assistant_turn()` / `append_tool_results()`, translating its SDK's own wire format to the
 shared `LLMTurn`/`PendingToolCall` shape, and is wired into `create_provider()`. This is the one
