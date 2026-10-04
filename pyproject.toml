@@ -7,8 +7,8 @@ build-backend = "setuptools.build_meta"
 # clone could not `pip install -e .`, and nothing downstream (the
 # Qt-free `uadas_core` extraction in Phase 1, an `apps/api` that depends
 # on it, an import-linter contract) can be packaged without this section
-# existing first. The importable package is still literally named `src`
-# here; Phase 1.1 renames it to `uadas_core`.
+# existing first. The importable package is `uadas_core` (Phase 1.1 renamed
+# it from `src`; Phase 2.5 deleted the Qt shell that still lived in `src`).
 [project]
 name = "universal-ai-data-analytics-studio"
 version = "0.0.0"
@@ -26,11 +26,10 @@ dynamic = ["dependencies"]
 dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools.packages.find]
-# `src` is a real package (src/__init__.py exists) at the repo root, not
-# a src-layout container, so point find() at the repo root and take
-# everything under `src`.
+# `uadas_core` is a real package at the repo root, not a src-layout
+# container, so point find() at the repo root and take everything under it.
 where = ["."]
-include = ["src*", "uadas_core*"]
+include = ["uadas_core*"]
 
 [tool.black]
 line-length = 88
@@ -39,7 +38,7 @@ target-version = ["py313"]
 [tool.isort]
 profile = "black"
 line_length = 88
-known_first_party = ["src", "uadas_core"]
+known_first_party = ["uadas_core"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
