@@ -6,8 +6,14 @@ name: CI
 # backend target -- so a Windows-only assumption in the core fails CI instead of
 # surviving until deployment.
 #
-# Jobs: `test` (imports, types, the suite), `lint` (ruff/import-linter/bandit/black/
-# isort), `dco` (PR sign-off).
+# Phase 3.1 adds the Django backend (`apps/api`, package `uadas_api`): its own
+# `api-test` job against a Postgres 17 service container, `apps/api` under the lint
+# job's ruff/black/isort, and a `django`-not-importable assertion in the core `test`
+# job (the core never installs the web framework). See plans/phase-3-readiness.md.
+#
+# Jobs: `test` (core imports, types, the suite), `api-test` (the Django backend's
+# suite, deployment check and bandit), `lint` (ruff/import-linter/bandit/black/isort),
+# `dco` (PR sign-off).
 
 on:
   push:
@@ -38,16 +44,18 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
-      - name: Assert no Qt binding is importable
+      - name: Assert no Qt binding or Django is importable
         # Now the primary runtime proof that the core is Qt-free, alongside the
         # lint job's `lint-imports`: if a dependency ever pulls a Qt binding back
-        # in, this fails before the suite can pass by accident.
+        # in, this fails before the suite can pass by accident. Phase 3.1 extends it
+        # to Django: the web backend (apps/api) is installed only by the `api-test`
+        # job, so the core's own dependency set must never bring the framework in.
         run: |
           python - <<'PY'
           import importlib.util, sys
-          present = [m for m in ("PySide6", "PyQt5", "PyQt6", "shiboken6")
+          present = [m for m in ("PySide6", "PyQt5", "PyQt6", "shiboken6", "django")
                      if importlib.util.find_spec(m) is not None]
-          print("importable Qt bindings:", present or "none")
+          print("importable Qt bindings / Django:", present or "none")
           sys.exit(1 if present else 0)
           PY
 
@@ -86,6 +94,91 @@ jobs:
       - name: pytest
         run: python -m pytest tests/ -q --tb=long -p no:cacheprovider
 
+  api-test:
+    # Phase 3.1: the Django 6 + Django Ninja backend (apps/api, package `uadas_api`).
+    # A separate job from `test` on purpose -- the core job must keep proving the core
+    # runs with no web framework installed. Postgres 17 is the production engine, so
+    # the suite runs against it here (`DATABASE_URL`; locally it falls back to in-memory
+    # SQLite). The service credentials are throwaway and only reachable on the runner.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: uadas
+          POSTGRES_PASSWORD: uadas
+          POSTGRES_DB: uadas
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U uadas -d uadas"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://uadas:uadas@localhost:5432/uadas
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            apps/api/pyproject.toml
+
+      - name: OS deps for pyodbc / python-magic
+        run: sudo apt-get update && sudo apt-get install -y unixodbc-dev libmagic1
+
+      - name: Install dependencies
+        # The root distribution (uadas_core) plus the API in editable mode, with its
+        # `dev` extra (pytest-django, pytest-cov, django-stubs).
+        run: python -m pip install -r requirements.txt -e . -e "apps/api[dev]"
+
+      - name: mypy (apps/api, django-stubs)
+        # Its own run, from apps/api, so mypy reads apps/api/pyproject.toml (which loads
+        # the django-stubs plugin) instead of the repo-root config (the core's curated,
+        # plugin-free run above). Verified clean with the pinned mypy==2.1.0 and
+        # django-stubs 6.1.1: the whole package and its tests, no exclusions.
+        working-directory: apps/api
+        run: python -m mypy uadas_api tests
+
+      - name: Collected-test count is not silently shrinking
+        # Same guard as the core job (observation 0022), with its own floor. 65 tests
+        # at the 3.1 skeleton; the floor is that minus 2, leaving room to prune a
+        # couple deliberately while failing on a real collapse (e.g. a conftest
+        # import error that silently drops a whole module). Raise it as the suite
+        # grows -- lowering it should be a conscious, reviewed change.
+        run: |
+          out="$(python -m pytest apps/api/tests --collect-only -q -p no:cacheprovider)"
+          echo "$out" | tail -n 3
+          count="$(echo "$out" | grep -oE '^[0-9]+ tests? collected' | grep -oE '^[0-9]+')"
+          test -n "$count" || { echo "::error::could not read a collected-test count"; exit 1; }
+          echo "collected: $count"
+          test "$count" -ge 63 || { echo "::error::collected $count tests, expected at least 63"; exit 1; }
+
+      - name: pytest (apps/api)
+        # DJANGO_SETTINGS_MODULE comes from apps/api/pyproject.toml, not the
+        # environment, so the core suite above never initialises Django.
+        run: python -m pytest apps/api/tests -q --tb=long -p no:cacheprovider
+
+      - name: manage.py check --deploy (prod settings)
+        # The deployment checklist must be clean with a valid production environment;
+        # any warning fails the build. The values are throwaway CI-only inputs.
+        working-directory: apps/api
+        env:
+          DJANGO_SETTINGS_MODULE: uadas_api.settings.prod
+          DJANGO_SECRET_KEY: ci-throwaway-key-9f3b7c1e4a8d2f6b0c5e7a1d3b9f8e2c4a6d0b1e3c5f7a9b
+          DJANGO_ALLOWED_HOSTS: api.example.com
+          DATABASE_URL: postgres://uadas:uadas@localhost:5432/uadas
+        run: python manage.py check --deploy --fail-level WARNING
+
+      - name: bandit (apps/api)
+        # Only B101 (assert_used) is skipped -- the API has no accepted findings.
+        # Tests are not scanned (they assert freely and spawn subprocesses).
+        run: python -m bandit -r apps/api/uadas_api -q --skip B101
+
   lint:
     # `ruff check` and `bandit` were once enforced only by .claude/hooks/ and
     # .pre-commit-config.yaml -- never in CI itself, so a commit made outside a Claude
@@ -107,11 +200,16 @@ jobs:
         run: python -m pip install ruff==0.16.3 bandit==1.9.4 black==26.5.1 isort==8.0.1 import-linter==2.15
 
       - name: ruff check
-        run: python -m ruff check uadas_core/ tests/
+        run: python -m ruff check uadas_core/ tests/ apps/api/
 
       - name: import-linter (uadas_core stays Qt-free)
-        # Three contracts: Qt/Django forbidden, provenance is a leaf, and the
-        # `layers` stack (see .importlinter).
+        # Five contracts: Qt/Django forbidden in the core, provenance is a leaf, the
+        # `layers` stack, the core never imports uadas_api, and uadas_api never
+        # imports uadas_core.plugins / .jobs (see .importlinter). uadas_api is a root
+        # package there but is not installed in this job, so apps/api goes on
+        # PYTHONPATH -- without it lint-imports cannot find the package.
+        env:
+          PYTHONPATH: apps/api
         run: lint-imports
 
       - name: bandit
@@ -132,10 +230,10 @@ jobs:
         run: python -m bandit -r uadas_core -q --skip B101,B107,B608
 
       - name: black --check
-        run: python -m black --check uadas_core/ tests/ scripts/
+        run: python -m black --check uadas_core/ tests/ scripts/ apps/api/
 
       - name: isort --check-only
-        run: python -m isort --check-only uadas_core/ tests/ scripts/
+        run: python -m isort --check-only uadas_core/ tests/ scripts/ apps/api/
 
   dco:
     # Phase 0.8: Developer Certificate of Origin. Every commit introduced

@@ -58,3 +58,8 @@ dist/
 
 # graphify knowledge-graph output (rebuilt on demand via `graphify update .`)
 graphify-out/
+
+# --- Django backend (apps/api/) ---
+db.sqlite3
+db.sqlite3-journal
+staticfiles/

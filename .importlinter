@@ -3,10 +3,15 @@
 # The Qt-free carve-out packages now live under uadas_core (Phase 1.1). No module in
 # uadas_core may import a GUI toolkit or a web framework. Run: lint-imports.
 # Enforced in CI's lint job (see .github/workflows/ci.yml).
+#
+# Phase 3.1 adds the Django backend `uadas_api` (apps/api) as a second root package.
+# It is not on the default import path, so run with PYTHONPATH=apps/api (CI's lint job
+# sets it) or `pip install -e apps/api`; without that, lint-imports cannot find it.
 
 [importlinter]
 root_packages =
     uadas_core
+    uadas_api
 include_external_packages = True
 
 [importlinter:contract:uadas-core-qt-and-framework-free]
@@ -90,3 +95,34 @@ ignore_imports =
     # no runtime cycle exists. Remove if ApplicationState moves above core or
     # the annotation becomes a Protocol.
     uadas_core.core.application_state -> uadas_core.models
+
+# Phase 3.1: dependency direction between the core and the web backend. The API
+# depends on the core, never the other way round -- the core stays a framework-free
+# library. (Contract 1 above already forbids django; this one forbids the backend
+# package itself, which would otherwise be a legal import for a stray module.)
+[importlinter:contract:core-does-not-import-api]
+name = uadas_core must not import uadas_api
+type = forbidden
+source_modules =
+    uadas_core
+forbidden_modules =
+    uadas_api
+allow_indirect_imports = False
+
+# Phase 3.1 (plans/phase-3-readiness.md ruling 1): the API reaches the core through
+# its services, not through the two subpackages that are unsafe in a multi-tenant
+# server -- `plugins` (arbitrary third-party code; hard-off in server mode) and
+# `jobs` (the process-global desktop job runner; the API uses django.tasks instead).
+# allow_indirect_imports stays False on purpose: if a core service the API legitimately
+# imports starts importing `plugins` or `jobs` itself, this contract fails and that
+# edge must be re-examined, not silently permitted. Remove an entry only by a
+# reviewed change to the readiness ruling.
+[importlinter:contract:api-avoids-plugins-and-jobs]
+name = uadas_api must not import uadas_core.plugins or uadas_core.jobs
+type = forbidden
+source_modules =
+    uadas_api
+forbidden_modules =
+    uadas_core.plugins
+    uadas_core.jobs
+allow_indirect_imports = False

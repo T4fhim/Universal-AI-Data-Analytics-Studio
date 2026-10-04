@@ -38,7 +38,7 @@ target-version = ["py313"]
 [tool.isort]
 profile = "black"
 line_length = 88
-known_first_party = ["uadas_core"]
+known_first_party = ["uadas_core", "uadas_api"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

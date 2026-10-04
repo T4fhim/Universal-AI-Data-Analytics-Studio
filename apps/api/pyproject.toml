@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# Phase 3.1 of the desktop->web transition: the Django 6 + Django Ninja backend lives
+# in its own distribution so the Qt-free core (`uadas_core`, root pyproject.toml) never
+# acquires a web-framework dependency -- see plans/phase-3-readiness.md ruling 1. It
+# depends on the root distribution (install both: `pip install -e . -e apps/api`).
+# There is deliberately no uv workspace yet: the root distribution's dependencies are
+# `requirements.txt`, which still mixes runtime and dev tools.
+[project]
+name = "uadas-api"
+version = "0.0.0"
+description = "Django + Django Ninja backend for the Universal AI Data Analytics Studio web app."
+requires-python = ">=3.13"
+license = { text = "AGPL-3.0-or-later" }
+dependencies = [
+    "universal-ai-data-analytics-studio",
+    "django>=6.0,<7",
+    "django-ninja>=1.4",
+    "django-cors-headers",
+    "psycopg[binary]",
+    "dj-database-url",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest-django",
+    "pytest-cov",
+    "django-stubs[compatible-mypy]",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["uadas_api*"]
+
+[tool.pytest.ini_options]
+# Scoped to apps/api on purpose (plans/phase-3-readiness.md ruling 4): pytest takes the
+# nearest ini-file above the paths it is given, so `pytest apps/api/tests` reads this
+# table and `python -m pytest tests` at the repo root keeps reading the root one. The
+# settings module must NOT become a global env var -- pytest-django would then
+# initialise Django during the core suite's run.
+DJANGO_SETTINGS_MODULE = "uadas_api.settings.test"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+
+[tool.mypy]
+# Run from apps/api (`cd apps/api && python -m mypy uadas_api`): mypy reads the config
+# in the current directory, and this table loads the django-stubs plugin, which the
+# repo-root [tool.mypy] (the core's curated, plugin-free run) must not.
+python_version = "3.13"
+plugins = ["mypy_django_plugin.main"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+
+[tool.django-stubs]
+django_settings_module = "uadas_api.settings.dev"
