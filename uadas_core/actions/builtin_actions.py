@@ -4,7 +4,7 @@
 Populated once at import time (bottom of this module), the same convention
 :func:`~uadas_core.visualization.chart_registry._register_builtins` already
 established -- both ``main_window.py`` (via ``menu_bar.py``/``toolbar.py``)
-and ``tests/ui/actions/`` import this module, so import-time population
+and ``tests/actions/`` import this module, so import-time population
 guarantees the registry is full before either first reads from it, with no
 separate "initialize the actions" call any entry point would need to
 remember to make.

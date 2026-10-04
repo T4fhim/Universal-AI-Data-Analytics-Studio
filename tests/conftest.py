@@ -4,7 +4,7 @@
 Every fixture here exists to satisfy one specific rule: tests must never
 read or write the project's real ``config/config.yaml`` or ``logs/``
 directory. ``Application.create()``'s own docstring (see
-:mod:`src.app`) states this separation is exactly why
+``src.app``) states this separation is exactly why
 ``bootstrap()`` accepts overridable ``config_path``/``log_dir``
 arguments — this module is what exercises that path.
 
@@ -31,7 +31,7 @@ from uadas_core.visualization import chart_registry
 # no longer populate their built-ins as a module-import side effect (see
 # plans/phase-1-3-startup-graph.md §9) -- bootstrap() does. The test suite needs
 # them seeded independently of bootstrap(): many tests read a registry without
-# booting, and tests/ui/help/test_manual_anti_rot.py builds a
+# booting, and tests/help/test_manual_anti_rot.py builds a
 # @pytest.mark.parametrize id list from list_renderers() at *collection* time, so
 # a fixture (which runs only once collection is done) is too late. Doing it here,
 # at root-conftest import, runs before any test module is collected. Each

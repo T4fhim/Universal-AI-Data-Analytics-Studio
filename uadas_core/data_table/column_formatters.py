@@ -1,5 +1,5 @@
 # File: uadas_core/data_table/column_formatters.py
-"""Cell-value formatting for :class:`~src.ui.widgets.data_table.pandas_table_model.PandasTableModel`.
+"""Cell-value formatting for ``PandasTableModel``.
 
 Kept as plain functions in their own module (rather than inlined into the
 model's ``data()`` method) so they are unit-testable with zero Qt and zero

@@ -3,7 +3,7 @@
 
 This is the list that makes :mod:`uadas_core.theme.tokens` trustworthy. Each
 entry names two token fields and the ratio they must reach;
-``tests/ui/theme/test_contrast.py`` asserts all of them against every theme,
+``tests/theme/test_contrast.py`` asserts all of them against every theme,
 so editing a colour cannot quietly break legibility.
 
 Two deliberate exclusions, both grounded in what WCAG actually requires

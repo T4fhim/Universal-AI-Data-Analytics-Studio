@@ -1,4 +1,4 @@
-# File: tests/ui/test_command_stack.py
+# File: tests/core/test_command_stack.py
 """Tests for CommandStack -- pure Python, no QApplication.
 
 Acceptance criterion 2 of milestone 23: "Undo reverses the active-dataset pointer to the parent

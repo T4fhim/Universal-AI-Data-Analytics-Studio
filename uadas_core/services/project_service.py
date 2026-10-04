@@ -12,7 +12,7 @@ remain independently registered container singletons, per
 :mod:`uadas_core.bootstrap`'s established pattern. Rather than either
 service reaching into the other, :meth:`ProjectService.save_project`
 and :meth:`ProjectService.open_project` accept dataset references as
-explicit parameters; :mod:`src.ui.main_window` (which already holds
+explicit parameters; ``src.ui.main_window`` (which already holds
 references to both services) is responsible for passing the current
 dataset list through. This keeps each service's dependencies exactly
 as narrow as :mod:`uadas_core.bootstrap`'s original registration order
@@ -181,7 +181,7 @@ class ProjectService:
         adding a typed field to :class:`~uadas_core.models.Project` itself, matching that
         class's existing "open-ended contents dict" design. Does not
         itself call :meth:`save_project`; callers (typically
-        :mod:`src.ui.main_window`) call this to update
+        ``src.ui.main_window``) call this to update
         ``project.contents`` and then call :meth:`save_project`
         separately, keeping "what belongs in the project" and "write
         it to disk" as two distinct steps.
@@ -195,8 +195,7 @@ class ProjectService:
                 :meth:`~uadas_core.services.workspace_service.WorkspaceService.
                 list_datasets`'s return value. Typed as a plain
                 ``list`` rather than ``list[Dataset]`` for the same
-                reason :meth:`~src.ui.dock_manager.DockManager.
-                refresh_dataset_list` avoids importing
+                reason ``DockManager.refresh_dataset_list`` avoids importing
                 ``uadas_core.services.workspace_service`` for a type hint
                 alone — this service has no other dependency on that
                 module and importing it here would create exactly the
@@ -241,7 +240,7 @@ class ProjectService:
         from this method's point of view, and both correctly produce
         "nothing to reload" rather than an error.
 
-        The caller (:mod:`src.ui.main_window`) is responsible for
+        The caller (``src.ui.main_window``) is responsible for
         actually re-reading each path through
         :func:`~uadas_core.readers.reader_registry.get_reader_for_path` and
         registering the result with
@@ -295,7 +294,7 @@ class ProjectService:
         :meth:`record_analysis_log` wrote, returning an empty dict for
         a project saved before milestone 9 (or one with no pipeline
         history yet) rather than raising. The caller (typically
-        :mod:`src.ui.main_window`, resolving
+        ``src.ui.main_window``, resolving
         :class:`~uadas_core.services.analysis_orchestrator_service.
         AnalysisOrchestratorService` from the same container) is
         responsible for turning each dict back into an

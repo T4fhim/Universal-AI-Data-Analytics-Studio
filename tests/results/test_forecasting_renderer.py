@@ -2,7 +2,7 @@
 """Tests for uadas_core.results.renderers.forecasting -- milestone 25's own two renderers.
 
 Pure Python, zero ``QApplication`` -- same "renderer tests require zero QApplication" convention
-tests/ui/results/test_renderers.py's own docstring establishes. Real ``ForecastResult``/
+tests/results/test_renderers.py's own docstring establishes. Real ``ForecastResult``/
 ``ModelComparisonResult`` objects produced by real forecasters/``compare_forecast_models`` (not
 hand-built fixtures), so this test proves the actual milestone-25 acceptance criteria: a ranked
 table with the winner marked, and an overlay chart with one trace per candidate.

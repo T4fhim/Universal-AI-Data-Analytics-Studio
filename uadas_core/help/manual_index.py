@@ -163,7 +163,7 @@ class ManualIndex:
         Raises:
             ServiceError: If ``anchor`` is not claimed by any page under
                 :data:`MANUAL_ROOT` -- this is the exact failure
-                ``tests/ui/help/test_manual_anti_rot.py``'s contract test asserts never happens
+                ``tests/help/test_manual_anti_rot.py``'s contract test asserts never happens
                 for any real ``help_anchor`` value in the codebase.
         """
         index = cls._index()
@@ -189,7 +189,7 @@ class ManualIndex:
     def resolve_path(cls, path: Path) -> str | None:
         """Return an anchor that resolves to the page at ``path``, or ``None``.
 
-        Used by :class:`~src.ui.dialogs.manual_dialog.ManualDialog` to follow a clicked
+        Used by ``ManualDialog`` to follow a clicked
         cross-reference link (manual pages link to each other by relative file path, e.g.
         ``[Clean](../pipeline/clean.md)`` -- see this module's own docstring for why pages are
         authored against real, browsable file paths rather than a second, parallel anchor-only

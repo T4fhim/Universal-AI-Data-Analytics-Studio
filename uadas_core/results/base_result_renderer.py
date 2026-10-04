@@ -13,7 +13,7 @@ renderer instead returns a list of :class:`ResultSection` values: small frozen d
 describe *what to show*, not *how to show it*. Qt lives nowhere in this module -- not an import,
 not a type hint. That is what lets ``TTestResultRenderer.sections(result, ExpertiseLevel.
 BEGINNER)`` be asserted against with plain ``==`` in a test that never touches ``QApplication``
-(see ``tests/ui/results/``), and what keeps :class:`~src.ui.results.result_card.ResultCard` the
+(see ``tests/ui/results/``), and what keeps ``ResultCard`` the
 *only* place in this package that converts a section into a widget -- one Qt/theming/
 accessibility code path instead of one per result type, exactly as the plan's A5 section
 requires.
@@ -37,8 +37,7 @@ class KeyValueSection:
         items: ``(label, value)`` pairs, in display order. ``value`` is already a display
             string (renderers format numbers themselves) rather than a raw ``float``/``int`` --
             keeping formatting decisions ("3 decimal places", "as a percentage") in the renderer
-            that knows the semantics, not pushed down into :class:`~src.ui.results.result_card.
-            ResultCard`, which would then need to special-case every field name to format it
+            that knows the semantics, not pushed down into ``ResultCard``, which would then need to special-case every field name to format it
             sensibly.
     """
 
@@ -135,8 +134,8 @@ class BaseResultRenderer(ABC):
     def headline(cls, result: Any, level: ExpertiseLevel) -> str:
         """One-sentence takeaway, phrased for ``level`` -- e.g. a BEGINNER headline names the
         conclusion in plain language, an ENGINEER headline is terser and may reference the
-        statistic directly. Shown above every :class:`ResultSection` in :class:`~src.ui.
-        results.result_card.ResultCard`."""
+        statistic directly. Shown above every :class:`ResultSection` in ``ResultCard``.
+        """
         raise NotImplementedError
 
     @classmethod
@@ -152,6 +151,6 @@ class BaseResultRenderer(ABC):
     @abstractmethod
     def help_anchor(cls) -> str:
         """Manual anchor F1 should open when this renderer's card has focus -- read the same
-        way :class:`~src.ui.workbench.stage_page.StagePage.help_anchor` is, via
-        :func:`~src.ui.a11y.accessible.describe`'s ``help_anchor`` keyword."""
+        way ``StagePage.help_anchor`` is, via
+        ``describe``'s ``help_anchor`` keyword."""
         raise NotImplementedError

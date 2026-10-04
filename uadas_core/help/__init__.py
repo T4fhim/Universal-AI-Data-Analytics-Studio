@@ -1,5 +1,5 @@
 # File: uadas_core/help/__init__.py
-"""Qt-free in-app manual model, lifted from :mod:`src.ui.help` in the
+"""Qt-free in-app manual model, lifted from ``src.ui.help`` in the
 desktop->web transition's Phase 2.1.
 
 * :mod:`~uadas_core.help.manual_index` -- ``ManualIndex``, a pure anchor ->

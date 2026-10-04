@@ -4,7 +4,7 @@
 Uses ``markdown_it`` (already a project dependency -- see ``requirements.txt``'s own comment
 naming this exact milestone as the reason it is listed explicitly rather than relying on it
 arriving transitively via ``rich``), compiled with the ``QTextBrowser``-safe subset in mind:
-``QTextBrowser`` (this project's chosen display widget -- see :mod:`~src.ui.dialogs.manual_dialog`'s
+``QTextBrowser`` (this project's chosen display widget -- see ``manual_dialog``'s
 own docstring for why it, not ``QWebEngineView``, was chosen) supports a real but bounded HTML
 subset. ``markdown_it``'s ``"commonmark"`` preset -- headings, paragraphs, lists, links, code
 spans/blocks, emphasis, tables (via the ``tables`` plugin) -- stays comfortably inside that
@@ -34,7 +34,7 @@ class RenderedManualPage:
     Attributes:
         anchor: The anchor this page was resolved for.
         title: Page heading.
-        html: Compiled HTML body -- what :class:`~src.ui.dialogs.manual_dialog.ManualDialog`
+        html: Compiled HTML body -- what ``ManualDialog``
             hands to ``QTextBrowser.setHtml``.
     """
 

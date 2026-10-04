@@ -119,7 +119,7 @@ class ReportService:
             included_stages: If given, only these stages' log entries
                 become sections — lets the "Generate Report" wizard's
                 section checklist (see
-                :mod:`src.ui.dialogs.generate_report_dialog`) skip
+                ``src.ui.dialogs.generate_report_dialog``) skip
                 stages the user doesn't want in the document. ``None``
                 (the default) includes every stage the log has an
                 entry for.

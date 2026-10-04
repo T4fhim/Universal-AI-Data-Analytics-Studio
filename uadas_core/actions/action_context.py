@@ -2,10 +2,10 @@
 """An immutable snapshot of "what can the user do right now."
 
 :class:`ActionContext` is what
-:meth:`~src.ui.actions.action_binder.ActionBinder.refresh_enablement` checks
+``ActionBinder.refresh_enablement`` checks
 every :class:`~uadas_core.actions.action_registry.ActionSpec`'s ``requires``/
 ``predicate`` against. Captured fresh on every recompute (see
-:mod:`src.ui.ui_state_bus` for when that happens) rather than incrementally
+``src.ui.ui_state_bus`` for when that happens) rather than incrementally
 updated, since the source of truth is always the live services
 (:class:`~uadas_core.services.project_service.ProjectService`,
 :class:`~uadas_core.services.workspace_service.WorkspaceService`), and re-deriving

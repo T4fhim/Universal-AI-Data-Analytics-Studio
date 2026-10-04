@@ -22,7 +22,7 @@ and receives its outcome over an HTTP webhook. Both fit the same shape
 **Thread affinity is not this protocol's problem.** Callbacks fire from
 the runner's own execution context (a pool thread, an HTTP handler,
 whatever). A consumer that needs them marshalled onto a specific thread —
-e.g. :class:`~src.workers.base_worker.BaseWorker`, which must re-emit them
+e.g. ``BaseWorker``, which must re-emit them
 as Qt signals on the UI thread — is responsible for that itself. This
 keeps :mod:`uadas_core.jobs` free of any GUI event-loop assumption.
 
@@ -70,7 +70,7 @@ class JobRunner(Protocol):
     (1.2), a future out-of-process ``DjangoTasksJobRunner`` (Phase 3).
 
     :meth:`run` is the whole protocol. There is deliberately no
-    ``cancel`` / ``result`` / ``wait`` — :class:`~src.workers.base_worker.BaseWorker`,
+    ``cancel`` / ``result`` / ``wait`` — ``BaseWorker``,
     the only 1.2 consumer, has no cancellation today, and adding surface
     area the transition does not yet need would be speculative (see the
     scope fence in ``plans/phase-1-2-jobrunner-design.md``). The protocol
@@ -98,7 +98,7 @@ class JobRunner(Protocol):
         * If ``report_progress`` is ``True``, a
           ``progress_callback: Callable[[int, str], None]`` is injected
           into ``kwargs`` before ``fn`` is called — exactly as
-          :class:`~src.workers.base_worker.BaseWorker` does today
+          ``BaseWorker`` does today
           (``base_worker.py``: the ``report_progress`` branch of
           ``__init__``). It forwards to ``on_progress`` when that was
           supplied, and is a no-op otherwise, so ``fn`` can always call

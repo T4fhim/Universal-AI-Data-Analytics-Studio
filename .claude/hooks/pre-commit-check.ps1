@@ -34,51 +34,27 @@ if (-not $stagedPy) {
 }
 
 Write-Host "Running pytest..."
-# NOT a bare `python -m pytest`: verified directly (2026-09-01) that this exact bare
-# invocation can report a fully clean pytest summary (e.g. "1384 passed, 103 skipped,
-# 0 failed") and STILL exit non-zero -- a real Windows CPython/Qt interpreter-shutdown
-# crash occurring after pytest's own result is already known, previously believed to be
-# CI-only (see .github/workflows/ci.yml's own comment) but reproduced locally here too.
-# scripts/run_tests_and_exit_cleanly.py (os._exit() once pytest's real result is known)
-# is CI's actual fix for this and CLAUDE.md's documented command -- this hook had never
-# been updated to match, so it could spuriously block a commit with all tests passing.
-# Pass/fail is judged by Test-PytestPassed, not the bare exit code. Verified 2026-10-04: the full-suite run
-# exits with the native access-violation code (-1073741819, 0xC0000005) AFTER pytest prints a clean
-# summary, on every run here -- so demanding exit 0 blocked every commit with all tests green.
-# os._exit() in the runner does not help: the crash lands inside pytest.main()'s own teardown. A crash
-# code is forgiven ONLY when the final summary line shows passes and no failed/error count; a real
-# failure exit, a crash with no summary, or a summary with failed/error still blocks.
-function Test-PytestPassed {
-    param([long]$ExitCode, $Output)
-    if ($ExitCode -eq 0) { return $true }
-    if (@(-1073741819, 3221225477, 139) -notcontains $ExitCode) { return $false }
-    $text = ($Output | ForEach-Object { "$_" }) -join "`n"
-    $summary = [regex]::Matches($text, '(?m)^\s*=*\s*(\d+ passed[^\r\n]*?) in [\d.]+s') | Select-Object -Last 1
-    if (-not $summary) { return $false }
-    if ($summary.Groups[1].Value -match '\b\d+ (failed|error)') { return $false }
-    Write-Host "pre-commit-check: pytest exited $ExitCode after a clean summary ($($summary.Groups[1].Value.Trim())) -- known Windows/Qt teardown crash, treated as a pass."
-    return $true
-}
-
-# Phase 2.5: a single invocation. The two-invocation split existed only because the Qt tests under
-# tests/ui/ (test_worker_runner.py's real-QThreadPool tests) were flaky late in a long run; that
-# directory is gone, so the surviving suite is one plain run.
-& $py "scripts\run_tests_and_exit_cleanly.py" "tests" -q 2>&1 | Tee-Object -Variable out1 | Out-Host
+# Plain pytest. Until Phase 2.5 this gate ran scripts/run_tests_and_exit_cleanly.py and then
+# judged the run by its summary line, because a Windows/Qt interpreter-shutdown crash
+# (0xC0000005, after pytest had already printed a clean summary) made a fully green suite exit
+# non-zero. Qt is gone with the desktop shell; verified 2026-10-04 that a bare run exits 0
+# (868 passed). If a non-zero exit with a clean summary ever returns, investigate it rather than
+# forgive it -- that is a real regression, not the old crash.
+& $py -m pytest tests -q -p no:cacheprovider
 $testExit1 = $LASTEXITCODE
 
-if (-not (Test-PytestPassed $testExit1 $out1)) {
+if ($testExit1 -ne 0) {
     Write-Error "Tests failed (exit $testExit1). Commit blocked."
     exit 2
 }
 
 Write-Host "Running Bandit..."
-# -b .bandit-baseline.json: `bandit -r src -q` has a known, accepted baseline of
-# low-severity findings (asserts, the deliberate parametrised-SQL construction in
-# src/database, empty-string password *defaults* on a profile dataclass that
-# holds no real password). Added in Phase 0.6 of the web-transition plan, same
-# invocation the CI `lint` job runs. Phase 1.8's security pass removes baseline
-# entries as it fixes them; anything NOT in the baseline fails the commit.
-& $py -m bandit -r src uadas_core -q --skip B101,B107,B608
+# Same invocation as the CI `lint` job. `bandit -r uadas_core` has a known, accepted set of findings
+# (asserts; the deliberate parametrised-SQL construction in uadas_core/database; empty-string password
+# *defaults* on a profile dataclass that holds no real password), skipped by code (B101, B107, B608)
+# rather than by a path-keyed baseline file, which breaks between Windows and Linux. See ci.yml's
+# bandit step for the per-code rationale. Anything outside that skip set fails the commit.
+& $py -m bandit -r uadas_core -q --skip B101,B107,B608
 $banditExit = $LASTEXITCODE
 
 if ($banditExit -ne 0) {

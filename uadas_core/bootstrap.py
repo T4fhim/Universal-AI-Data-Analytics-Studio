@@ -29,7 +29,7 @@ container in dependency order — most recently the Qt-free
 per-project SQLite + Parquet store and reads it back.
 
 The result is a :class:`BootstrapContext` — a small, immutable bundle
-handed to :mod:`src.app`, which is the only other module that
+handed to ``src.app``, which is the only other module that
 should call :func:`bootstrap`. Nothing downstream of ``app.py`` should
 need to call this function directly.
 """
@@ -66,7 +66,7 @@ from uadas_core.visualization import chart_registry
 
 @dataclass(frozen=True)
 class BootstrapContext:
-    """Everything :mod:`src.app` needs after a successful bootstrap.
+    """Everything ``src.app`` needs after a successful bootstrap.
 
     Attributes:
         config: The loaded, typed application configuration.

@@ -14,8 +14,7 @@ forecast_charts.ForecastChart` figure and embed it via ``FigureSection`` rather 
 result to numbers alone.
 
 :class:`ModelComparisonResultRenderer`'s ranked table marks the winning row's ``Model`` cell with
-a literal ``" (Winner)"`` suffix rather than relying on :class:`~src.ui.results.result_card.
-ResultCard`'s plain ``QTableWidget`` rendering to distinguish it by color or bold weight alone --
+a literal ``" (Winner)"`` suffix rather than relying on ``ResultCard``'s plain ``QTableWidget`` rendering to distinguish it by color or bold weight alone --
 matching this overhaul's A7 accessibility rule ("never color alone"): a screen reader, a
 colorblind user, and a sighted user glancing at the table all get the same unambiguous answer to
 "which model won" from the cell text itself, with no change needed to ``ResultCard``'s single

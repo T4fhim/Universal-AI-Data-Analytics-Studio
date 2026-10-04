@@ -38,7 +38,7 @@ from uadas_core.results.base_result_renderer import (
 # Cap on rows rendered from a DataFrame result -- a generic fallback has no result-specific
 # reason to know a "reasonable" size the way, say, a correlation matrix renderer would; this
 # just keeps an accidentally huge aggregate/crosstab result from freezing
-# :class:`~src.ui.results.result_card.ResultCard` while building hundreds of table rows.
+# ``ResultCard`` while building hundreds of table rows.
 _MAX_TABLE_ROWS = 200
 
 

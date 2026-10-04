@@ -2,13 +2,13 @@
 """Interactive HTML report exporter — embeds live, zoomable/hoverable Plotly figures.
 
 The only exporter in this package that keeps charts interactive
-(matching :class:`~src.ui.widgets.chart_view.ChartView`'s in-app
+(matching ``ChartView``'s in-app
 rendering) rather than flattening them to a static image, since HTML
 alone among this package's four formats has a notion of an interactive
 widget at all. One Plotly.js build is referenced from the CDN exactly
 once, in the document head; each section's own figure is rendered with
 ``include_plotlyjs=False`` so the ~4MB bundle is not re-embedded once
-per chart the way :class:`~src.ui.widgets.chart_view.ChartView`
+per chart the way ``ChartView``
 embeds it per single-figure temp file (that duplication is fine for
 one figure at a time in a Qt view; it would bloat a multi-section
 report badly).

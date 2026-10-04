@@ -1,5 +1,5 @@
 # File: uadas_core/actions/__init__.py
-"""Qt-free action catalogue, lifted from :mod:`src.ui.actions` in the
+"""Qt-free action catalogue, lifted from ``src.ui.actions`` in the
 desktop->web transition's Phase 2.1.
 
 The "what actions exist / what can the user do right now" data, split from

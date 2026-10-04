@@ -4,7 +4,7 @@
 Points :data:`~uadas_core.help.manual_index.MANUAL_ROOT` at a small, hand-built temporary tree via
 monkeypatch rather than exercising the real docs/manual/ content here -- the real tree's own
 correctness (every real anchor resolves, zero stub pages) is
-tests/ui/help/test_manual_anti_rot.py's job; this module is about ManualIndex's own parsing and
+tests/help/test_manual_anti_rot.py's job; this module is about ManualIndex's own parsing and
 lookup logic in isolation, with cases (a duplicate anchor, a missing frontmatter block) the real
 manual is never expected to actually have.
 """

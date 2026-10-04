@@ -35,8 +35,8 @@ class TestThreadPoolExecutorJobRunnerContract(JobRunnerContract):
     def _shutdown_created_runners(self) -> Iterator[None]:
         # Every make_runner() call spins up a real ThreadPoolExecutor;
         # without this the suite would leak idle worker threads into the
-        # long-lived pytest process (exactly the kind of teardown-time
-        # fragility run_tests_and_exit_cleanly.py exists to work around).
+        # long-lived pytest process (teardown-time fragility of exactly the kind
+        # that once made the suite exit non-zero after a clean summary).
         self._created: list[ThreadPoolExecutorJobRunner] = []
         yield
         for runner in self._created:

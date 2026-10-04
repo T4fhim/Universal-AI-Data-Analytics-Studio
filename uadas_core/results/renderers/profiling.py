@@ -2,9 +2,9 @@
 """Renders :class:`~uadas_core.analysis.dataset_profile.DatasetProfile` -- ``profile_dataset``'s result.
 
 The first result renderer this milestone shipped a real caller for --
-:class:`~src.ui.workbench.pages.understand_page.UnderstandPage.show_profile_summary` formats
+``UnderstandPage.show_profile_summary`` formats
 this same data informally as one line of text (see that module's own docstring). This renderer
-is the real replacement path: :class:`~src.ui.results.result_card.ResultCard` given a
+is the real replacement path: ``ResultCard`` given a
 ``DatasetProfile`` renders the equivalent (and more -- a per-column table) as real sections, but
 ``UnderstandPage`` itself is left on its existing text-label rendering for this milestone -- see
 this milestone's own scope note in ``plans/ui-overhaul-pioneering-adaptive-workbench.md`` for why

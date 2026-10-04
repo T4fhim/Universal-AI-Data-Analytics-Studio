@@ -7,7 +7,7 @@ implementation as of Phase 1.2. It runs each job on a shared
 the pool thread that ran the job.
 
 Why a bounded pool rather than a thread per job (which is what the
-``QThread``-based :class:`~src.workers.base_worker.BaseWorker` effectively
+``QThread``-based ``BaseWorker`` effectively
 did before this): the same reason ``BaseWorker`` itself sat on
 ``QThreadPool`` — every call site in the app (dataset reads, dashboard
 renders, project reload, AI turns, report generation) funnels through one
@@ -19,7 +19,7 @@ tuning this is expected and is a constructor argument, not a constant.
 jobs queue rather than fail.)*
 
 Callbacks run on the pool thread. A consumer that needs them on a
-particular thread — :class:`~src.workers.base_worker.BaseWorker` marshals
+particular thread — ``BaseWorker`` marshals
 them onto the Qt UI thread by re-emitting them as queued signals — does
 that itself; see :class:`~uadas_core.jobs.job_runner.JobRunner`'s
 docstring for why thread affinity is deliberately not this layer's job.

@@ -56,7 +56,7 @@ class Density(StrEnum):
     Milestone 26 maps :class:`~uadas_core.core.expertise_level.ExpertiseLevel` onto
     these so a beginner gets large targets and generous spacing while an
     engineer gets compact rows -- see :data:`DENSITY_BY_EXPERTISE_LEVEL` and
-    :meth:`~src.ui.theme_manager.ThemeManager.set_density` (built in
+    ``ThemeManager.set_density`` (built in
     milestone 15, unused until this milestone actually drives it from
     something). The enum ships now, in milestone 15, because the spacing
     scale has to be derived from *something* and hard-coding one density

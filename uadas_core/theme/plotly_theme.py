@@ -2,7 +2,7 @@
 """Translates design tokens into a Plotly layout template.
 
 Charts render inside a ``QWebEngineView`` (see
-:mod:`src.ui.widgets.chart_view`), which is a separate rendering engine that
+``src.ui.widgets.chart_view``), which is a separate rendering engine that
 Qt's stylesheet cannot reach. Without this module a chart keeps Plotly's
 default white canvas and its default ten-colour qualitative palette, so
 switching the application to the dark theme leaves a glaring white rectangle

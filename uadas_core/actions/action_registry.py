@@ -15,7 +15,7 @@ works as pure data resolvable at import time because a
 imported, and constructing a ``QIcon`` before ``QApplication`` exists is
 undefined behavior in Qt. Putting either here would force per-window
 mutable state onto what should stay pure, testable-without-Qt data --
-:class:`~src.ui.actions.action_binder.ActionBinder` is where the handler
+``ActionBinder`` is where the handler
 and the icon actually get attached, once a window exists to attach them to.
 """
 
@@ -56,8 +56,7 @@ class ActionCategory(Enum):
 
 
 class Requirement(Enum):
-    """Named preconditions :meth:`~src.ui.actions.action_binder.ActionBinder.
-    refresh_enablement` checks generically against an
+    """Named preconditions ``ActionBinder.refresh_enablement`` checks generically against an
     :class:`~uadas_core.actions.action_context.ActionContext`, so the common
     "needs an open project" / "needs an active dataset" cases don't each
     need their own one-line predicate lambda repeated across every action
@@ -83,7 +82,7 @@ class ActionSpec:
             passed straight to ``QAction(label, parent)``.
         category: Which menu/palette group this belongs to.
         icon_name: A filename stem under ``resources/icons/`` (see
-            :class:`~src.ui.theme.icon_provider.IconProvider`), or ``None``
+            ``IconProvider``), or ``None``
             for an action with no natural icon. A test asserts every
             non-``None`` value here actually exists on disk.
         shortcut: A ``QKeySequence``-parseable string (``"Ctrl+S"``), or

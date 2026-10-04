@@ -2,10 +2,10 @@
 """Qt-free design tokens: the semantic colour/space/type vocabulary and the
 two token consumers that need no ``QApplication``.
 
-Lifted from :mod:`src.ui.theme` in the desktop->web transition's Phase 2.1.
+Lifted from ``src.ui.theme`` in the desktop->web transition's Phase 2.1.
 The Qt-bound members of that package stay behind under ``src/ui/`` until the
 shell is retired: ``qss_compiler`` (emits a Qt stylesheet), ``icon_provider``
-(builds ``QIcon`` objects), and :class:`~src.ui.theme_manager.ThemeManager`
+(builds ``QIcon`` objects), and ``ThemeManager``
 (applies stylesheets at the ``QApplication`` level).
 
 What lives here:

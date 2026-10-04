@@ -114,8 +114,8 @@ class AssistantTurnResult:
             JSON-friendly ``dict`` objects :meth:`_execute_tool`
             already serializes into the model's own tool-result text
             — captured here too, unmodified, so
-            :class:`~src.ui.widgets.chat_panel.ChatPanel` can hand
-            each one to :class:`~src.ui.results.result_card.ResultCard`
+            ``ChatPanel`` can hand
+            each one to ``ResultCard``
             via :func:`~uadas_core.results.result_renderer_registry.
             get_renderer` — the *same* rendering path a stage page
             uses, not a second one built for the chat panel. Per
@@ -239,7 +239,7 @@ class AssistantService:
         """The expertise level currently guiding the system prompt and (via milestone 21's chat
         panel) tool-result rendering — exposed as a read-only property, mirroring
         :attr:`active_provider_name`, so a caller (a test, or
-        :class:`~src.ui.controllers.assistant_controller.AssistantController` rendering a
+        ``AssistantController`` rendering a
         tool-call's result at the level the conversation is actually running at) can read the
         live value :meth:`set_expertise_level` last wrote without reaching into ``_expertise_level``
         directly.

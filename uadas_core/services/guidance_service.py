@@ -192,7 +192,7 @@ class GuidanceService:
             (source 1) -- the same session-scoped instance
             :mod:`uadas_core.bootstrap` already registers, so this service's PIPELINE
             suggestion always reflects the same pipeline state the workbench's own
-            :class:`~src.ui.workbench.stage_rail.StageRail` displays.
+            ``StageRail`` displays.
 
     Stateless beyond that one collaborator reference -- registered as a container singleton
     in :mod:`uadas_core.bootstrap`, alongside ``AnalysisOrchestratorService``, per this repo's

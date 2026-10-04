@@ -20,11 +20,8 @@ dataset (which may have columns this chart has no use for).
 columns a picker dialog can offer as a ``QComboBox``) fits every chart type a user builds by
 picking column names out of an arbitrary dataset — it does not fit a chart whose real parameter
 is a list of already-fitted :class:`~uadas_core.forecasting.model_comparison.ModelCandidateResult`
-objects, which nothing in :class:`~src.ui.dialogs.create_visualization_dialog.
-CreateVisualizationDialog`'s or :class:`~src.ui.workbench.pages.visualize_page.VisualizePage`'s
-column-picker machinery could construct. :class:`~src.ui.workbench.pages.predict_page.
-PredictPage` calls :meth:`ForecastChart.build` directly instead, the same way :class:`~src.ui.
-workbench.pages.explain_page.ExplainPage` calls into its own result type directly rather than
+objects, which nothing in ``CreateVisualizationDialog``'s or ``VisualizePage``'s
+column-picker machinery could construct. ``PredictPage`` calls :meth:`ForecastChart.build` directly instead, the same way ``ExplainPage`` calls into its own result type directly rather than
 going through a registry built for a different shape of caller.
 """
 
@@ -65,7 +62,7 @@ class ForecastChart(BaseChart):
     """Overlays historical values with one or more forecast models' projections.
 
     A single-element ``forecast_results`` list renders one model's own history-plus-forecast
-    (:class:`~src.ui.workbench.pages.predict_page.PredictPage`'s single-forecaster path); a
+    (``PredictPage``'s single-forecaster path); a
     multi-element list overlays every candidate from :func:`~uadas_core.forecasting.model_comparison.
     compare_forecast_models` on the same axes, with ``winner_method`` naming which trace to
     render as the winner -- the "Automatic Model Competition" made visible for the first time

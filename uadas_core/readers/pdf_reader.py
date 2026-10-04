@@ -11,7 +11,7 @@ reader's job is table *extraction*, not simple parsing, and the
 "zero tables found" case is a normal, valid outcome (a text-only PDF
 is not a malformed file) rather than an error — see
 :mod:`uadas_core.readers.base_reader`'s ``list_tables`` contract, and
-:mod:`src.ui.main_window`'s ``_NO_TABLES_AVAILABLE`` handling, both
+``src.ui.main_window``'s ``_NO_TABLES_AVAILABLE`` handling, both
 extended in this milestone specifically to accommodate this case
 honestly.
 
@@ -73,7 +73,7 @@ instead it returns a single-column pseudo-table with each paragraph as
 a separate row, treating any block of left-aligned text as a
 candidate table. Left unhandled, this would have made this reader's
 entire "zero tables found" case (the reason
-:mod:`src.ui.main_window`'s dataset-opening flow was extended with a
+``src.ui.main_window``'s dataset-opening flow was extended with a
 dedicated ``_NO_TABLES_AVAILABLE`` state — see that module) effectively
 unreachable for any PDF containing ordinary paragraph text, which is
 most PDFs. :meth:`_extract_tables` filters out single-column
@@ -112,7 +112,7 @@ class PdfReader(BaseReader):
     A known inefficiency, documented rather than silently accepted:
     :meth:`list_tables` and :meth:`read` each independently re-run
     ``camelot``'s extraction (there is no caching between the two
-    calls). Since :mod:`src.ui.main_window`'s dataset-opening flow
+    calls). Since ``src.ui.main_window``'s dataset-opening flow
     always calls :meth:`list_tables` first and then :meth:`read`
     immediately after with the user's choice, this means a PDF's
     tables are effectively extracted twice per open. Every reader in
@@ -140,7 +140,7 @@ class PdfReader(BaseReader):
         prose-only document, not an error. See
         :meth:`~uadas_core.readers.base_reader.BaseReader.list_tables`'s own
         docstring for how callers (specifically
-        :mod:`src.ui.main_window`) are expected to handle an empty
+        ``src.ui.main_window``) are expected to handle an empty
         result.
 
         Raises:

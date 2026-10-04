@@ -3,7 +3,7 @@
 
 Web-transition Phase 1.2 lifts the *policy* of "run this callable off the
 calling thread and deliver its outcome through callbacks" out of
-:mod:`src.workers.base_worker` (which is welded to ``QThread``/``QRunnable``
+``src.workers.base_worker`` (which is welded to ``QThread``/``QRunnable``
 and dies with the desktop shell in Phase 2) and into this package, where it
 carries no GUI-toolkit dependency. The ``.importlinter`` contract forbids
 anything under :mod:`uadas_core` — this package included — from importing
@@ -18,7 +18,7 @@ breaking change — which is why the contract is callback-based rather than
 handing back an in-process ``Future``.
 
 **The module-level default-runner registry below is a Phase-1.2-only
-bridge.** :class:`~src.workers.base_worker.BaseWorker` must acquire a
+bridge.** ``BaseWorker`` must acquire a
 :class:`~uadas_core.jobs.job_runner.JobRunner` without a change to its
 public ``__init__`` signature (de-risking plan Control A10 forbids
 touching it), so ``bootstrap()`` stashes the one runner here via
