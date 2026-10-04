@@ -22,21 +22,15 @@ docstring: "mutating in place would... make undo impossible without a separate u
 "[a fresh, immutable result] sidesteps both problems by construction rather than by discipline") --
 :class:`CommandStack` is that sidestep made concrete.
 
-**Why this lives in ``src/ui/`` rather than ``uadas_core/services/``.** Every other session-wide service
-(``WorkspaceService``, ``ProjectService``, ...) is registered in
-:func:`~uadas_core.bootstrap.bootstrap` and resolved from the shared
-:class:`~uadas_core.core.dependency_container.DependencyContainer`, per this overhaul's cross-cutting rule
-2. ``bootstrap.py`` lives under ``uadas_core/``, and ``src/ui/`` is the *only* package allowed to
-import ``src.ui`` at all (``tests/ui/test_import_layering.py`` enforces this both ways) -- so a
-"service" registered there could never itself live under ``src/ui/`` without breaking that
-one-way dependency direction. This is not actually a session-wide *service* in the same sense
-those are, though: it holds no data of its own beyond two id stacks, and its only job is
-translating "the user pressed Ctrl+Z" into a call the already-registered ``WorkspaceService``
-answers. That is exactly the shape :class:`~src.ui.ui_state_bus.UiStateBus` and
-:class:`~src.ui.worker_runner.WorkerRunner` already have -- both are UI-session infrastructure
-constructed directly in ``main_window.py``, not container services -- so :class:`CommandStack`
-follows that precedent rather than inventing a third construction pattern for what is, at bottom,
-the same kind of object.
+**Where this lives, and why it is not a container service.** It is not registered in
+:func:`~uadas_core.bootstrap.bootstrap` or resolved from the shared
+:class:`~uadas_core.core.dependency_container.DependencyContainer`, unlike ``WorkspaceService`` and
+``ProjectService``. It holds no data of its own beyond two id stacks, and its only job is translating
+"the user pressed Ctrl+Z" into a call the already-registered ``WorkspaceService`` answers, so
+whoever owns a user session constructs one directly -- the same shape the desktop shell's UI-state
+bus and worker runner had. It originally lived in the desktop shell (``src/ui/``) for that reason.
+It never imported Qt, so Phase 2.4 lifted it into ``uadas_core`` rather than letting the shell's
+deletion take the undo model with it; a non-Qt front end gets the same semantics.
 
 **Qt-free by construction.** Nothing here imports PySide6. A :class:`CommandStack` is exercised
 end to end -- push, undo, redo, the "never re-mutates" guarantee -- against a real
@@ -110,9 +104,8 @@ class CommandStack:
         """Record ``command`` as the most recent action, and discard any redo history.
 
         Called once, immediately after a cleaning operation's resulting dataset has already
-        been added to the workspace and made active (see
-        :meth:`~src.ui.controllers.pipeline_controller.PipelineController.
-        register_clean_operation`) -- this method itself never adds a dataset or changes the
+        been added to the workspace and made active (the desktop shell's pipeline
+        controller did this in ``register_clean_operation``) -- this method itself never adds a dataset or changes the
         active pointer; it only remembers that the change already made is now undoable.
         """
         self._undo_stack.append(command)

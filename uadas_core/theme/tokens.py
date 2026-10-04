@@ -3,14 +3,16 @@
 
 Qt Style Sheets have no variable mechanism — there is no QSS equivalent of a
 CSS custom property — so a "design token" layer cannot live in the stylesheet
-itself. It lives here instead, in Python, and
-:func:`~src.ui.theme.qss_compiler.compile_qss` substitutes these values into
-``resources/styles/base.qss.template`` at theme-apply time.
+itself. It lives here instead, in Python. The desktop shell substituted these
+values into a Qt stylesheet template at theme-apply time; that shell was removed
+in Phase 2.5 (the template's hardcoded component metrics are recorded in
+``assets/ui-contract/ui-constants.json``), and these tokens remain the single
+source of truth for whatever renders the theme next.
 
 Before this module, ``resources/styles/dark.qss`` and ``light.qss`` each held
 twelve hand-maintained literal hex values with no shared naming, and
 ``dark.qss``'s own header comment flagged that as future work. Both files are
-now deleted: one template plus the token sets below is the only definition,
+since deleted: the token sets below are the only definition,
 so the two themes cannot drift out of step.
 
 Fields are named for **what a color means**, not what it looks like
@@ -19,7 +21,7 @@ role are frequently inverted — a literal name like ``dark_grey`` would be a
 lie in one theme.
 
 Every pairing these tokens produce on screen is asserted against WCAG 2.2
-Level AA by :mod:`tests.ui.theme.test_contrast`, and the values below were
+Level AA by :mod:`tests.theme.test_contrast`, and the values below were
 chosen by running that check rather than by eye. Two findings from that pass
 are baked into the shape of this dataclass:
 
@@ -144,7 +146,7 @@ class ThemeTokens:
     font_size_md: int = 13
     font_size_lg: int = 16
     # Unit 5 (UI-friendliness pass, welcome/onboarding polish): added because
-    # QLabel#welcomeTitle in base.qss.template was the one hardcoded "24px" literal in an
+    # QLabel#welcomeTitle in the (since-removed) Qt stylesheet template was the one hardcoded "24px" literal in an
     # otherwise fully token-driven stylesheet -- every other font-size already used a
     # ${font_size_*} placeholder. Default matches that literal exactly (no visual change at
     # the default base font size), but now scales with with_base_font_size() like every
@@ -252,7 +254,7 @@ class ThemeTokens:
 # in that enum's declaration order (UPLOAD, UNDERSTAND, CLEAN, EXPLORE,
 # ANALYZE, VISUALIZE, PREDICT, EXPLAIN, REPORT, REPRODUCE). Indexed by
 # position rather than keyed by the enum so this module stays free of any
-# import from uadas_core.services — tokens are consumed by the QSS compiler, which
+# import from uadas_core.services — tokens are consumed by theme code, which
 # must remain loadable with nothing else in the application constructed.
 _DARK_STAGE_HUES = (
     "#7AA2F7",

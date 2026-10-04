@@ -1,9 +1,7 @@
-PySide6
 pandas
-polars
 numpy
 plotly
-# Real, unconditional runtime dependency of src/visualization/continuous_charts.py
+# Real, unconditional runtime dependency of uadas_core/visualization/continuous_charts.py
 # (LineChart/ScatterChart's automatic large-dataset downsampling, milestone 5a) --
 # missing from this file entirely until now. Found via a real, reproduced CI-only
 # failure: this dev venv has had plotly-resampler installed directly (not via any
@@ -22,7 +20,7 @@ openpyxl
 pyxlsb
 odfpy
 pymupdf
-# Real, unconditional runtime dependency of src/readers/pdf_reader.py --
+# Real, unconditional runtime dependency of uadas_core/readers/pdf_reader.py --
 # missing from this file entirely until now, same class of gap as
 # plotly-resampler above and found the same way (a real, reproduced
 # CI-only failure). pdf_reader.py's own module docstring already admits
@@ -51,22 +49,15 @@ python-magic
 chardet
 reportlab
 requests
-aiohttp
-watchdog
 tqdm
 pyyaml
-ydata-profiling
-xgboost
-lightgbm
-catboost
-networkx
 duckdb
 # Bounded, not left fully unpinned like most of this file: these three SDKs
 # release breaking major versions with no warning (confirmed directly --
 # investigating a real, reproduced CI-only pytest failure found this dev
 # venv frozen at anthropic==0.122.0/openai==2.49.0, while a fresh install of
 # this same unpinned line resolves anthropic==1.0.0/openai==3.3.1, both
-# major-version jumps). src/ai/llm_provider.py's usage (Anthropic()/
+# major-version jumps). uadas_core/ai/llm_provider.py's usage (Anthropic()/
 # OpenAI() constructors, .messages.create/.chat.completions.create,
 # APIError/OpenAIError) was verified compatible with the new majors before
 # raising these lower bounds, so this pins the floor to what's proven to
@@ -78,27 +69,17 @@ google-genai>=2.19.0,<3
 python-dotenv
 rich
 # Explicit rather than relying on it arriving transitively via rich: the
-# milestone-27 in-app manual (src/ui/help/) compiles docs/manual/*.md through
+# milestone-27 in-app manual (uadas_core/help/) compiles docs/manual/*.md through
 # markdown_it. It has been importable in this venv only as rich's own
 # dependency, which is fragile -- a future rich upgrade could drop it.
 markdown-it-py
-joblib
-numba
-dask
 pytest
-# The standard pytest plugin for PySide6/PyQt testing (qtbot fixture: simulated
-# key/mouse events, waitSignal/waitSignals, auto-fail on exceptions in Qt virtual
-# methods/slots), runs fully offscreen. Added 2026-09-01 -- this project already
-# hand-rolls offscreen QT_QPA_PLATFORM=offscreen widget tests without it; adopt
-# qtbot incrementally in new/rewritten tests rather than migrating the existing
-# suite wholesale in one pass.
-pytest-qt
 black==26.5.1
 isort==8.0.1
 mypy==2.1.0
 ruff==0.16.3
 # The standalone git pre-commit hook framework (see .pre-commit-config.yaml). Added
-# 2026-09-01 alongside pytest-qt -- distinct from .claude/hooks/*.ps1, which only
+# 2026-09-01 -- distinct from .claude/hooks/*.ps1, which only
 # fire inside a Claude Code session; this is the tool-agnostic enforcement layer for
 # commits made from a plain terminal, another editor, or another machine.
 pre-commit==4.6.2
@@ -109,11 +90,3 @@ bandit==1.9.4
 # or Django. Pinned like the other lint tools above; run via `lint-imports`, and
 # wired into CI's `lint` job in the same commit as Phase 1.1's `git mv`.
 import-linter==2.15
-# Milestone 28 follow-up (Tier 1 UIA verification, tests/ui/a11y/
-# test_uia_integration.py): the real Windows UI Automation driver. Windows-
-# only by nature of what it wraps (win32com/comtypes underneath) -- this
-# project's own verified dev/CI environment is windows-latest (see
-# .github/workflows/ci.yml's own comment), so an unconditional entry here
-# matches how every other dependency in this file is listed, rather than a
-# platform marker no other line uses.
-pywinauto
