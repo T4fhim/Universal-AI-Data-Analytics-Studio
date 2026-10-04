@@ -184,9 +184,19 @@ class PersistenceService:
 
         Full-replace: the DB is rebuilt from scratch and any ``.parquet`` in
         ``base`` whose stem is not one of the datasets written is deleted
-        (garbage from datasets closed since the last save). The DB is built at
-        ``workspace.db.tmp`` and ``os.replace``d into place so a crash mid-write
-        cannot leave a half-written ``workspace.db``.
+        (garbage from datasets closed since the last save).
+
+        Ordering is what keeps the *previous* save loadable if this one fails
+        (Phase 1 diagnosis D4). Frames are staged as ``{id}.parquet.tmp`` and the
+        DB is built at ``workspace.db.tmp``; only once both are complete are the
+        frames promoted into place (``os.replace``, atomic per file) and then the
+        DB swapped in. Orphan frames are collected only **after** the swap, because
+        until then the old DB may still reference them. If anything fails before
+        the swap, staging files are discarded and frames this save newly promoted
+        are rolled back, leaving the previous workspace intact. A hard process
+        kill cannot run that cleanup, but every on-disk state it can leave is
+        still loadable and consistent: the worst case is harmless extra frames
+        (or ``.tmp`` files) that the next save removes.
 
         Raises:
             ServiceError: On any filesystem / SQLite / Parquet failure, or if a
@@ -225,115 +235,145 @@ class PersistenceService:
                 skipped_visualization_ids.append(visualization.visualization_id)
 
         temp_db = base / "workspace.db.tmp"
-        # A stale ``.tmp`` from a previously crashed save would make
-        # ``executescript(_SCHEMA)`` fail with "table already exists"; drop it
-        # first rather than reusing whatever is there.
+        # Stale staging files from a previously crashed save: a leftover
+        # ``workspace.db.tmp`` would make ``executescript(_SCHEMA)`` fail with
+        # "table already exists", and leftover ``*.parquet.tmp`` frames are
+        # garbage. Drop them first rather than reusing whatever is there.
         try:
-            temp_db.unlink(missing_ok=True)
-        except OSError as exc:
-            raise ServiceError(f"Could not clear stale {temp_db.name}: {exc}") from exc
-
-        try:
-            connection = sqlite3.connect(temp_db)
-        except sqlite3.Error as exc:
-            raise ServiceError(f"Could not open {temp_db} for writing: {exc}") from exc
-        try:
-            # SQLite ignores FOREIGN KEY clauses unless this is set per-connection.
-            # Must precede executescript() (which issues an implicit COMMIT). Save
-            # already filters orphan visualizations (kept_visualizations above) and
-            # only writes tiles for dashboards being written, so this only bites if
-            # that filter logic regresses -- turning a silently inconsistent
-            # workspace.db into a loud IntegrityError (caught -> ServiceError below).
-            connection.execute("PRAGMA foreign_keys = ON")
-            connection.executescript(_SCHEMA)
-
-            dataset_rows = [
-                (
-                    dataset.dataset_id,
-                    dataset.name,
-                    (
-                        str(dataset.source_path)
-                        if dataset.source_path is not None
-                        else None
-                    ),
-                    dataset.source_format,
-                    int(dataset.row_count),
-                    int(dataset.column_count),
-                    json.dumps(list(dataset.read_warnings)),
-                    dataset.parent_dataset_id,
-                    dataset.derivation_description,
-                )
-                for dataset in datasets
-            ]
-            for dataset in datasets:
-                _write_parquet_frame(
-                    dataset.dataframe, base / f"{dataset.dataset_id}.parquet"
-                )
-            connection.executemany(
-                'INSERT INTO datasets ("dataset_id", "name", "source_path", '
-                '"source_format", "row_count", "column_count", "read_warnings", '
-                '"parent_dataset_id", "derivation_description") '
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                dataset_rows,
-            )
-
-            visualization_rows = [
-                (
-                    visualization.visualization_id,
-                    visualization.dataset_id,
-                    visualization.name,
-                    _registry_name_for(visualization, class_to_name),
-                    json.dumps(visualization.chart_parameters),
-                )
-                for visualization in kept_visualizations
-            ]
-            connection.executemany(
-                'INSERT INTO visualizations ("visualization_id", "dataset_id", '
-                '"name", "chart_type", "chart_parameters") '
-                "VALUES (?, ?, ?, ?, ?)",
-                visualization_rows,
-            )
-
-            dashboard_rows = [
-                (dashboard.dashboard_id, dashboard.name) for dashboard in dashboards
-            ]
-            tile_rows = [
-                (
-                    tile.tile_id,
-                    dashboard.dashboard_id,
-                    tile.visualization_id,
-                    int(tile.row),
-                    int(tile.column),
-                    ordinal,
-                )
-                for dashboard in dashboards
-                for ordinal, tile in enumerate(dashboard.tiles)
-            ]
-            connection.executemany(
-                'INSERT INTO dashboards ("dashboard_id", "name") VALUES (?, ?)',
-                dashboard_rows,
-            )
-            connection.executemany(
-                'INSERT INTO dashboard_tiles ("tile_id", "dashboard_id", '
-                '"visualization_id", "row", "column", "ordinal") '
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                tile_rows,
-            )
-
-            connection.commit()
-        except sqlite3.Error as exc:
-            raise ServiceError(f"Failed writing workspace database: {exc}") from exc
-        finally:
-            connection.close()
-
-        _gc_orphan_parquet(base, saved_ids)
-
-        try:
-            os.replace(temp_db, base / "workspace.db")
+            _clear_staging(base)
         except OSError as exc:
             raise ServiceError(
-                f"Could not commit {temp_db.name} into place: {exc}"
+                f"Could not clear stale staging files in {base}: {exc}"
             ) from exc
+
+        staged: list[tuple[Path, Path]] = []  # (staging path, final path)
+        promoted_new: list[Path] = []  # final frames this save created
+        try:
+            try:
+                connection = sqlite3.connect(temp_db)
+            except sqlite3.Error as exc:
+                raise ServiceError(
+                    f"Could not open {temp_db} for writing: {exc}"
+                ) from exc
+            try:
+                # SQLite ignores FOREIGN KEY clauses unless this is set per-connection.
+                # Must precede executescript() (which issues an implicit COMMIT). Save
+                # already filters orphan visualizations (kept_visualizations above) and
+                # only writes tiles for dashboards being written, so this only bites if
+                # that filter logic regresses -- turning a silently inconsistent
+                # workspace.db into a loud IntegrityError (caught -> ServiceError below).
+                connection.execute("PRAGMA foreign_keys = ON")
+                connection.executescript(_SCHEMA)
+
+                dataset_rows = [
+                    (
+                        dataset.dataset_id,
+                        dataset.name,
+                        (
+                            str(dataset.source_path)
+                            if dataset.source_path is not None
+                            else None
+                        ),
+                        dataset.source_format,
+                        int(dataset.row_count),
+                        int(dataset.column_count),
+                        json.dumps(list(dataset.read_warnings)),
+                        dataset.parent_dataset_id,
+                        dataset.derivation_description,
+                    )
+                    for dataset in datasets
+                ]
+                for dataset in datasets:
+                    final = base / f"{dataset.dataset_id}.parquet"
+                    staging = base / f"{dataset.dataset_id}.parquet.tmp"
+                    staged.append((staging, final))
+                    _write_parquet_frame(dataset.dataframe, staging)
+                connection.executemany(
+                    'INSERT INTO datasets ("dataset_id", "name", "source_path", '
+                    '"source_format", "row_count", "column_count", "read_warnings", '
+                    '"parent_dataset_id", "derivation_description") '
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    dataset_rows,
+                )
+
+                visualization_rows = [
+                    (
+                        visualization.visualization_id,
+                        visualization.dataset_id,
+                        visualization.name,
+                        _registry_name_for(visualization, class_to_name),
+                        json.dumps(visualization.chart_parameters),
+                    )
+                    for visualization in kept_visualizations
+                ]
+                connection.executemany(
+                    'INSERT INTO visualizations ("visualization_id", "dataset_id", '
+                    '"name", "chart_type", "chart_parameters") '
+                    "VALUES (?, ?, ?, ?, ?)",
+                    visualization_rows,
+                )
+
+                dashboard_rows = [
+                    (dashboard.dashboard_id, dashboard.name) for dashboard in dashboards
+                ]
+                tile_rows = [
+                    (
+                        tile.tile_id,
+                        dashboard.dashboard_id,
+                        tile.visualization_id,
+                        int(tile.row),
+                        int(tile.column),
+                        ordinal,
+                    )
+                    for dashboard in dashboards
+                    for ordinal, tile in enumerate(dashboard.tiles)
+                ]
+                connection.executemany(
+                    'INSERT INTO dashboards ("dashboard_id", "name") VALUES (?, ?)',
+                    dashboard_rows,
+                )
+                connection.executemany(
+                    'INSERT INTO dashboard_tiles ("tile_id", "dashboard_id", '
+                    '"visualization_id", "row", "column", "ordinal") '
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    tile_rows,
+                )
+
+                connection.commit()
+            except sqlite3.Error as exc:
+                raise ServiceError(f"Failed writing workspace database: {exc}") from exc
+            finally:
+                connection.close()
+
+            # Promote staged frames, then swap the DB. Frames first: the old DB
+            # (still in place) only references ids whose frames are valid either
+            # way, whereas a new DB in place before its frames would not load.
+            for staging, final in staged:
+                already_there = final.exists()
+                os.replace(staging, final)
+                if not already_there:
+                    promoted_new.append(final)
+            os.replace(temp_db, base / "workspace.db")
+        except BaseException as exc:
+            _discard_failed_save(temp_db, staged, promoted_new)
+            if isinstance(exc, OSError):
+                raise ServiceError(
+                    f"Could not commit the workspace into {base}: {exc}"
+                ) from exc
+            raise
+
+        # Only now is the old DB gone, so only now are orphans unreferenced. The
+        # save has succeeded; collecting orphans is housekeeping, so a failure
+        # here is logged, not raised -- the next save retries it.
+        try:
+            _gc_orphan_parquet(base, saved_ids)
+        except ServiceError as exc:
+            _logger.warning(
+                "Saved workspace to %s but could not collect orphaned frames "
+                "(the next save retries): %s",
+                base,
+                exc,
+            )
 
         _logger.info(
             "Saved workspace to %s: %d dataset(s), %d visualization(s) "
@@ -726,6 +766,32 @@ def _rebuild_visualization(
         chart_parameters=filtered,
         visualization_id=record["visualization_id"],
     )
+
+
+def _clear_staging(base: Path) -> None:
+    """Remove ``*.parquet.tmp`` and ``workspace.db.tmp`` left by an earlier save."""
+    for path in (*base.glob("*.parquet.tmp"), base / "workspace.db.tmp"):
+        path.unlink(missing_ok=True)
+
+
+def _discard_failed_save(
+    temp_db: Path, staged: list[tuple[Path, Path]], promoted_new: list[Path]
+) -> None:
+    """Best-effort rollback of a save that failed before the DB swap.
+
+    Removes staging files and the temp DB, and any frame this save newly promoted
+    (it has no row in the still-current DB). Frames that already existed for a
+    saved id are left alone: they were replaced with identical content because a
+    ``Dataset`` is never mutated in place. Never raises -- the original failure is
+    what the caller reports.
+    """
+    for path in (temp_db, *(staging for staging, _ in staged), *promoted_new):
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as exc:
+            _logger.warning(
+                "Could not remove %s while rolling back a save: %s", path, exc
+            )
 
 
 def _gc_orphan_parquet(base: Path, saved_ids: set[str]) -> None:
