@@ -1,4 +1,4 @@
-# File: tests/ui/theme/test_plotly_theme.py
+# File: tests/theme/test_plotly_theme.py
 """Tests for the Plotly layout/config translation.
 
 No QApplication needed -- these return plain dicts with no Qt involvement.

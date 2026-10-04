@@ -1,4 +1,4 @@
-# File: tests/ui/help/test_manual_anti_rot.py
+# File: tests/help/test_manual_anti_rot.py
 """The anti-rot contract test: every real ``help_anchor`` in the codebase resolves.
 
 Per the plan's own A8 section: "a test asserts every ``ActionSpec.help_anchor`` and every
@@ -9,11 +9,11 @@ stub pages" acceptance criterion, additionally asserts every resolved page has r
 content rather than a placeholder.
 
 Deliberately enumerates every anchor from the real, live registries (``list_actions()``,
-``list_registered_stages()``, ``list_renderers()``) rather than a hand-maintained literal list --
+``PipelineStage``, ``list_renderers()``) rather than a hand-maintained literal list --
 a hand-maintained list would silently stop catching a new anchor added later exactly the way this
-test exists to prevent stub/missing pages in the first place. ``import src.ui.actions.
-builtin_actions`` (for its import-time registration side effect) mirrors the same pattern
-``src.ui.main_window`` itself relies on -- see that module's own comment on the identical import.
+test exists to prevent stub/missing pages in the first place. The
+``uadas_core.actions.builtin_actions`` import (for its import-time registration side effect)
+mirrors the same pattern the application's own startup relies on.
 """
 
 from __future__ import annotations
@@ -21,10 +21,10 @@ from __future__ import annotations
 import pytest
 
 import uadas_core.actions.builtin_actions  # noqa: F401 -- import-time registration side effect
-from src.ui.workbench.stage_registry import get_stage_page_class, list_registered_stages
 from uadas_core.actions.action_registry import list_actions
 from uadas_core.help.manual_index import ManualIndex
 from uadas_core.results.result_renderer_registry import list_renderers
+from uadas_core.services.analysis_orchestrator_service import PipelineStage
 
 # A stub page would be short; every hand-authored page in docs/manual/ as of this milestone is
 # comfortably longer than this. Not tuned to any single page's exact length -- this only needs
@@ -44,12 +44,19 @@ def _every_action_help_anchor() -> set[str]:
 
 
 def _every_stage_page_help_anchor() -> set[str]:
-    anchors = set()
-    for stage in list_registered_stages():
-        page_class = get_stage_page_class(stage)
-        assert page_class is not None  # list_registered_stages guarantees this
-        anchors.add(page_class.help_anchor)
-    return anchors
+    """One ``pipeline.<stage>`` anchor per stage that has a page -- every stage but UPLOAD.
+
+    This used to be read off the Qt ``StagePage`` classes (``StagePage.help_anchor``), which no
+    longer exist. Each of those nine classes declared exactly ``"pipeline.<stage.value>"`` for its
+    own stage and UPLOAD has no page (the welcome page stands in for it), so the same set is
+    derived here from :class:`PipelineStage`; the manual pages under ``docs/manual/pipeline/``
+    are what the assertions below actually check.
+    """
+    return {
+        f"pipeline.{stage.value}"
+        for stage in PipelineStage
+        if stage is not PipelineStage.UPLOAD
+    }
 
 
 def _every_result_renderer_help_anchor() -> set[str]:

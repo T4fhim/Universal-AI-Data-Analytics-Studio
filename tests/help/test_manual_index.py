@@ -1,4 +1,4 @@
-# File: tests/ui/help/test_manual_index.py
+# File: tests/help/test_manual_index.py
 """Unit coverage for ManualIndex's frontmatter parsing and anchor resolution.
 
 Points :data:`~uadas_core.help.manual_index.MANUAL_ROOT` at a small, hand-built temporary tree via

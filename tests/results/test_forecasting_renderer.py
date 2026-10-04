@@ -1,4 +1,4 @@
-# File: tests/ui/results/test_forecasting_renderer.py
+# File: tests/results/test_forecasting_renderer.py
 """Tests for uadas_core.results.renderers.forecasting -- milestone 25's own two renderers.
 
 Pure Python, zero ``QApplication`` -- same "renderer tests require zero QApplication" convention

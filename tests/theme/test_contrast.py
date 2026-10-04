@@ -1,4 +1,4 @@
-# File: tests/ui/theme/test_contrast.py
+# File: tests/theme/test_contrast.py
 """Proves every theme meets WCAG 2.2 Level AA, rather than asserting it does.
 
 This is the test that makes the token layer worth having. Colours in the

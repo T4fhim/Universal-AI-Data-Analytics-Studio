@@ -1,4 +1,4 @@
-# File: tests/ui/help/test_manual_renderer.py
+# File: tests/help/test_manual_renderer.py
 """ManualRenderer compiles Markdown to the HTML QTextBrowser is handed -- covered against a
 small temporary manual tree, the same isolation tests/ui/help/test_manual_index.py uses.
 """

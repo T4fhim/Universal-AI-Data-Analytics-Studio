@@ -1,4 +1,4 @@
-# File: tests/ui/results/test_renderers.py
+# File: tests/results/test_renderers.py
 """Renderer tests: pure Python, zero ``QApplication`` -- deliberately no ``qapp`` fixture import
 anywhere in this file, per milestone 22's acceptance criterion "Renderer tests require zero
 QApplication -- sections() returns comparable dataclasses."

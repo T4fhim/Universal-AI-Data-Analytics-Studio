@@ -1,4 +1,4 @@
-# File: tests/ui/theme/test_tokens.py
+# File: tests/theme/test_tokens.py
 """Tests for ThemeTokens: mapping shape, density scaling, and immutability.
 
 The WCAG correctness of the actual colour values is covered by

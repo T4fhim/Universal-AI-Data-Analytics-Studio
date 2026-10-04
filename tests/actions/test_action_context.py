@@ -1,4 +1,4 @@
-# File: tests/ui/actions/test_action_context.py
+# File: tests/actions/test_action_context.py
 """Tests for ActionContext.capture() and satisfies().
 
 Uses minimal duck-typed stand-ins for ProjectService/WorkspaceService/

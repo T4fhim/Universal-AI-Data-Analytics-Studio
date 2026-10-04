@@ -1,4 +1,4 @@
-# File: tests/ui/actions/test_action_registry.py
+# File: tests/actions/test_action_registry.py
 """Tests for the Qt-free action registry.
 
 No QApplication anywhere in this file -- ActionSpec/register_action/

@@ -1,4 +1,4 @@
-# File: tests/ui/widgets/data_table/test_column_formatters.py
+# File: tests/data_table/test_column_formatters.py
 """Tests for column_formatters.py -- pure functions, zero Qt."""
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-# File: tests/ui/results/test_result_renderer_registry.py
+# File: tests/results/test_result_renderer_registry.py
 """Registry tests, including milestone 22's acceptance criterion 2's contract test.
 
 No ``qapp`` fixture anywhere in this file -- the registry itself (``result_renderer_registry.py``)
