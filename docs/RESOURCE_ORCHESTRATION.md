@@ -80,18 +80,18 @@ tiering > `resource-router` defaults. The more specific and more recently verifi
   `credentials.json`, `*.pem`, `*.key`. A block means route the change elsewhere (document the
   env var), not fight it.
 - **`pre-commit-check.ps1`** (PreToolUse commit, reached via `pretooluse-git-commit-gate.ps1`):
-  two-stage `pytest` + `bandit`, blocks on failure. Matcher is `"Bash|PowerShell"`; it fast-exits
-  when no `.py` file is staged. **History:** the old inline `-Command` wrapper single-quoted
-  `'$CLAUDE_PROJECT_DIR\…'`, which PowerShell never expands, so the gate silently never ran
-  through all of Phase 2.1/2.2 (every commit was suite-verified by hand). Re-wired to the
-  `-File …\pretooluse-git-commit-gate.ps1` form in `57bb810`; both script branches were exercised
-  directly, but the *positive* path (full suite on a staged `.py`) is **unverified until the
-  first `.py` commit after a window reload** — a PreToolUse hook's stdout is not shown on
-  success, so the only evidence is the **~8-minute pause**; a `.py` commit that returns in seconds
-  means it is still not firing (a *failing* gate does show: exit 2 + message). **A hook-config change needs a
-  session reload to take effect** (observation 0019) — until verified, run
-  `scripts/run_tests_and_exit_cleanly.py` manually before a `.py` commit. Once proven live it
-  *is* the "one suite run per commit" evidence — don't also run pytest by hand right before it.
+  runs `python -m pytest tests -q` and `bandit`, blocks on failure. Matcher is `"Bash|PowerShell"`;
+  it fast-exits when no `.py` file is staged. A `.py` commit takes minutes (the suite is running) —
+  that pause is the only sign it fired, because a PreToolUse hook's stdout is not shown on success;
+  a *failing* gate does show (exit 2 + message). **A hook-config change needs a session reload to
+  take effect** (observation 0019). Once live it *is* the "one suite run per commit" evidence — don't
+  also run pytest by hand right before it. **History** (three separate bugs, all found by the gate
+  being exercised, not by reading it): the old inline `-Command` wrapper single-quoted
+  `'$CLAUDE_PROJECT_DIR\…'`, which PowerShell never expands, so it silently never ran through
+  Phase 2.1/2.2; re-wired in `57bb810`. Once wired it was un-passable, because it demanded exit 0
+  from a run that exited with the Windows/Qt shutdown access violation after a clean summary
+  (observation 0030); `ddd8d3d` judged runs by their summary line instead. Phase 2.5/2.6 deleted
+  Qt, and with it the crash and the workaround: it is now a plain `pytest` run (verified: exit 0).
 - **ECC `gateguard-fact-force`** (PreToolUse Edit/Write): the fact-forcing gate — state
   callers / affected API / data shape / the verbatim user instruction before an edit. Keep it on
   for risky edits; relax per-session with
@@ -99,9 +99,12 @@ tiering > `resource-router` defaults. The more specific and more recently verifi
   (observation 0015). It also fact-forces the first Bash command and destructive `git`/`rm`
   commands, and its per-file dedup is defeated by the `C:`/`c:` working-directory case flip
   (observation 0025), so expect it to re-fire — present the fact block each time. When it loops on
-  a *destructive* command even with facts, the gate's own sanctioned escape is an inline
-  `ECC_GATEGUARD=off <command>` for that single command (used this way for the Phase 2.1 recovery
-  `git stash`); never set it session-wide.
+  a *destructive* command even with facts, an inline `ECC_GATEGUARD=off <command>` for that single
+  command is the gate's own documented escape (used for the Phase 2.1 recovery `git stash` and for
+  Phase 2.5's `git rm`); never set it session-wide. **Caveat (2026-10-04):** the auto-mode
+  classifier flagged a *subagent's* use of that escape as a safety bypass and blocked its next
+  command. Do not delegate destructive commands to subagents, and prefer asking the user over
+  repeating the bypass for anything that is not essential.
 - **`graphify hook-guard`** (global, PreToolUse Bash/Grep/Read): advisory nudges, inert until
   `graphify-out/graph.json` exists; building the graph activates them (never blocking). Once the
   graph exists, answer codebase-structure questions with `graphify query / path / explain`
@@ -111,31 +114,21 @@ tiering > `resource-router` defaults. The more specific and more recently verifi
 - **`gh`**: at `C:\Program Files\GitHub CLI\gh.exe`, **not on the Bash tool's PATH** — call it
   by full path, or via the PowerShell tool. Authenticated as `T4fhim`. This is how CI status is
   checked (`gh run list --branch <b>`, `gh run view <id>`).
-- **`0xC0000005` note:** a non-zero exit from `scripts/run_tests_and_exit_cleanly.py` on the
-  *second* invocation is the expected Windows Qt-shutdown access violation *after* a clean
-  `pytest` result — CI-green-equivalent (it surfaces as exit **139** under git-bash). The
-  pytest **summary line is the truth**; never pipe the runner through `tail`/`head` (the pipe's
-  exit code masks the runner's — observation 0026). Any Bash-capable subagent must be told this
-  or it reports a passing suite as failed.
-- **CI** (`.github/workflows/ci.yml`): `test` (Windows, full pytest), `lint`
-  (ruff / black / isort / bandit / `lint-imports`), `dco` (**enforcing**, `DCO_ENFORCING=1` since
-  PR #4 — runs only on pull requests, so it shows *skipped* on a plain branch push until the
-  Phase 2 PR opens; every commit from Phase 2 on must be `git commit -s`), `uia_integration`
-  (separate; deleted at 2.6), and the Linux `import uadas_core` job (promoted to the sole `test`
-  job at 2.6). The `test` job also runs black / isort / mypy (the curated clean-packages list,
-  currently 161 files — add new clean packages there, not repo-wide). `bandit` runs
-  `--skip B101,B107,B608` — **B608 (SQL-injection) detection is OFF**, so a new SQL-building
-  module has *no automated* injection gate; a directed manual security review is the only one.
-- **MCP servers (verified with `claude mcp list`, 2026-10-01):** connected — `context7`
-  (user-scope; kept deliberately because ecc's `docs-lookup` agent binds to the
-  `mcp__context7__*` names), `playwright` (user-scope, pinned `@playwright/mcp@0.0.80`, per the
-  global `CLAUDE.md`), `chrome-devtools` (ecc plugin), `skillspector`; none need auth. `vercel`
-  needs OAuth (Phase 6). The plugin-provided `context7` / `playwright` / `github` duplicates are
-  **disabled** (`claude plugin disable …`), and the user-scope `github` MCP was **removed** — it
-  held a plaintext PAT; `gh` (authed as `T4fhim`) covers GitHub, so there is deliberately no
-  github MCP. Never re-add one with an inline token; use an env-var reference.
-
----
+- **Test-run exit codes:** the Windows/Qt shutdown access violation (`0xC0000005`, exit **139** under
+  git-bash) that used to follow a clean `pytest` summary is **gone** with Qt (Phase 2.5; a bare
+  `pytest` now exits 0). The habit that outlived it still holds: the `pytest` **summary line is the
+  truth**, and never pipe a test run through `tail`/`head` — the pipe's exit code masks pytest's
+  (observation 0026). Any Bash-capable subagent should be told to read the summary line.
+- **CI** (`.github/workflows/ci.yml`, one Linux workflow since Phase 2.6): `test` (imports with no Qt
+  binding installed, `import uadas_core` smoke, mypy over the curated clean-packages list — add new
+  clean packages there, not repo-wide — a collected-test floor of 860, then `pytest tests/`), `lint`
+  (ruff / `lint-imports` / bandit / black / isort) and `dco` (**enforcing**, `DCO_ENFORCING=1` since
+  PR #4 — runs only on pull requests, so it shows *skipped* on a plain branch push; every commit
+  from Phase 2 on must be `git commit -s`). `bandit` runs `--skip B101,B107,B608` — **B608
+  (SQL-injection) detection is OFF**, so a new SQL-building module has *no automated* injection gate;
+  a directed manual security review is the only one. A clean-room install in CI is the real test of
+  `requirements.txt`: dropping three unimported packages once lifted an unstated `pandas<3` cap and
+  only the CI install noticed (observation 0032).
 
 ## §3 — Living-truth discipline
 
@@ -144,10 +137,11 @@ Plans and design docs in this repo lag the tree. Before acting on any claim in a
 - **Re-verify `file:line` citations against the current tree** — the `plans/phase-1-6-*` and
   `phase-1-7-*` docs cite pre-1.1 `src/` paths throughout.
 - **Re-verify counts against reality, not a hard-coded number** — the golden baseline is a
-  *rolling* number (currently **1540 / 82 / 0** after Phase 2.2; Phase 1 ended at 1542 / 92 / 0),
-  recorded in `plans/phase-2-baseline.md` and the SDD ledger. It legitimately *moves* during
-  Phase 2: three `tests/ui/` meta-tests glob `src/ui/**` (see A10's collected-count caveat), so
-  the gate is "0 failed + no *named* test lost", checked with `pytest --collect-only` + `comm`.
+  *rolling* number: **868 passed / 0 failed / 0 skipped (collected 868)** after Phase 2.5, plus the
+  new persistence tests from 2.7. It moved sharply in Phase 2 by design (the Qt tests were deleted);
+  the CI step `Collected-test count is not silently shrinking` holds the floor, and a count change
+  should be proved with `pytest --collect-only` + `comm`, not assumed. History in
+  `plans/phase-2-baseline.md` and the SDD ledger.
 - **Re-verify branch / merge state against `origin/*` after a fetch**, never local refs
   (observation 0014).
 - **Re-verify a "tool passes / is clean" claim by running the tool** — never inherit it from a
@@ -202,7 +196,7 @@ is real. Phase 1's detail lives in `plans/phase-1-resource-plan.md`.
 |---|---|---|---|---|---|
 | **0** ground truth | done | — | — | CI, `gh` | — |
 | **1** extract `uadas_core/` | refactor (frozen) + 2 additive subsystems | `safe-refactor`, `surgical-patch`, `migration`, `lean-build`, TDD, `milestone-verification` | `architect` (+opus), `code-reviewer`, `python-reviewer`, `type-design-analyzer`, `silent-failure-hunter`, `security-reviewer`, `code-explorer`, `test-engineer`, `implementer` (1.6/1.7) | graphify graph; Linux CI job | Django, React, any UI redesign |
-| **2** retire desktop UI | deletion + shell collapse | `safe-refactor`, `lean-build`, `milestone-doc-sync` | `architect`, `code-reviewer`, `refactor-cleaner` (now appropriate), `code-explorer` | — | new features |
+| **2** retire desktop UI (✅ done; PR pending) | deletion + shell collapse | `safe-refactor`, `lean-build`, `milestone-doc-sync` | `architect`, `code-reviewer`, `refactor-cleaner` (now appropriate), `code-explorer` | — | new features |
 | **3** Django backend | greenfield API over `uadas_core/` | `migration`, `ecc:django-*`, `contract-first`, `api-design`, `dev-resource-map` | `django-reviewer`, `django-build-resolver`, `database-reviewer`, `fastapi-reviewer`, `architect` (opus), `security-reviewer` | `context7` / `docs-lookup`; `django` + `ninja` installed | React, glass-box UI |
 | **4** React frontend | greenfield SPA — first runnable web app | `frontend-design`, `ecc:react-*`, `vite-patterns`, `dev-resource-map` | `react-reviewer`, `react-build-resolver`, `typescript-reviewer`, `a11y-architect`, `e2e-runner`, `gan-*` | `playwright` + `chrome-devtools` MCP; pnpm; `apps/web/` | Phase-5 differentiators |
 | **5** glass-box | the differentiators (provenance UI, explainability, eval) | `mlflow:*` (AI-assistant eval), `lean-build` | `mle-reviewer`, `rag-pipeline-reviewer` (if RAG), `architect` (opus), `agent-evaluator` | mlflow tracing | polish / marketing |
@@ -211,7 +205,7 @@ is real. Phase 1's detail lives in `plans/phase-1-resource-plan.md`.
 
 ---
 
-## §6 — Phase 2 (ACTIVE — executing one sub-step at a time on `phase-2/retire-desktop-ui`)
+## §6 — Phase 2 (COMPLETE on `phase-2/retire-desktop-ui`; the single PR to `main` is pending)
 
 **Phase 1 is DONE** — merged to `main` 2026-09-10 as merge commit `4d61b93` (PR #3, 71 commits,
 merge-not-squash). Final rolling baseline **1542 / 92 / 0**. `DCO_ENFORCING=1` since this merge.
@@ -223,21 +217,19 @@ owns D1 / D2 / D4 / D5 / D6.
 - **Execution loop + per-step gates:** `plans/phase-2-execution-playbook.md`
 - **Per-sub-step resource matrix + corrected facts:** `plans/phase-2-resource-plan.md`
 - **Pre-Phase-2 baseline:** captured 2026-09-10 on `main` @ `8ab95f6` — **1542 / 92 / 0**
-  (`plans/phase-2-baseline.md`). **Current baseline after 2.2: 1540 / 82 / 0** — the drift is the
-  three `src/ui/**`-glob meta-tests shedding moved modules (see A10's collected-count caveat in
-  `plans/phase-2-derisking-and-readiness.md`); gate = 0 failed + no *named* test lost, verified
-  per step with `pytest --collect-only` + `comm`.
+  (`plans/phase-2-baseline.md`). **After 2.5: 868 / 0 / 0** — the Qt test tree was deleted by design;
+  A9's check (collected-before minus collected-after equals exactly the deleted tests) held: 1676 -> 868.
 - **State ledger:** `.superpowers/sdd/phase-2/progress.md` (gitignored; the recovery map).
-- **Progress (2026-09-29):** 2.0 ✅ · 2.1 ✅ (10 modules) · 2.2 ✅ · **2.3 next** — JIT plans in
-  `plans/phase-2-1-plan.md` / `phase-2-2-plan.md`; the local commit gate is un-wired (see the
-  `pretooluse-git-commit-gate.ps1` note in `.claude/hooks/`), so run the suite by hand per commit.
+- **Progress (2026-10-04):** 2.0–2.7 ✅ (2.4 was reopened and finished: a stranded module, a second export
+  batch and 12 relocated test files were found by a completeness sweep) · 2.8 (doc + tooling sync) in
+  progress · then the single PR. The commit gate works (see §2).
 
 Phase 2 = **retire the desktop UI**: 2.0 scope lock (`ecc:code-explorer` inventory +
 `ecc:architect` structural rulings + CI-transformation design) → 2.1 lift the 10 Qt-free
 stranded modules (D5 + actions) → 2.2 extract `uadas_core/models/` (D1, cuts the `services↔ai` cycle) →
 2.3 top-level `bootstrap.py` + `layers` contract (D2) → 2.4 mine remaining assets to committed
 data files → 2.5 `git rm` `src/ui/` + `tests/ui/` + Qt entry paths + Qt deps → 2.6 CI
-transformation (Linux single-invocation `test` job; delete `run_tests_and_exit_cleanly.py`) →
+transformation (Linux `test` job; `run_tests_and_exit_cleanly.py` deleted) →
 2.7 D4 persistence-atomicity follow-up (optional) → 2.8 doc + `.claude/` tooling sync → one PR
 `phase-2/retire-desktop-ui → main`. `ecc:refactor-cleaner` / `ecc:code-simplifier` are
 **in-scope** now (deletion work). Screenshot parity retires at 2.5 (no runnable app until

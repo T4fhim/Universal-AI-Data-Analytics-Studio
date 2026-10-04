@@ -6,15 +6,27 @@ as currently implemented — not the full aspirational scope described in
 [CLAUDE.md](../CLAUDE.md) for the canonical, actively-maintained architecture reference; this
 document expands on it for readers working outside a Claude Code session.
 
+The repository is a **Qt-free Python core (`uadas_core/`) plus its tests**. It began as a PySide6
+desktop application and is mid-transition to a web application
+([plans/web-transition-glass-box-studio.md](../plans/web-transition-glass-box-studio.md)); the Qt
+desktop shell was deleted in Phase 2.5 (last commit containing it: `8d3ec4d`). There is currently
+no UI and no runnable application — application startup and UI composition return in Phase 4,
+when the web UI is built. The verification floor until then is the test suite, `lint-imports`
+and CI.
+
 ## Module layout and dependency direction
 
-Web-transition Phase 1 carved the Qt-free core out of `src/` into a top-level **`uadas_core/`**
-package (machine-checked by `.importlinter`: nothing in `uadas_core/` may import PySide6 / PyQt /
-Django). The PySide6 desktop shell — the part Phase 2 deletes — stays under **`src/`**.
+Web-transition Phase 1 carved the Qt-free core out of the old `src/` tree into a top-level
+**`uadas_core/`** package (machine-checked by `.importlinter`: nothing in `uadas_core/` may
+import PySide6 / PyQt / Django). Phase 2 then lifted the last Qt-free pieces of the shell into
+it and deleted the rest; `src/` no longer exists.
 
 ```
 uadas_core/          # the Qt-free core (import-clean of any GUI toolkit / web framework)
-├── core/            # config, logging, DI container, bootstrap, exceptions, constants — the lowest layer
+├── bootstrap.py     # bootstrap() — builds the DI container and registers every session-wide service
+├── command_stack.py # real undo/redo built on the never-mutate-in-place cleaning contract (milestone 23)
+├── models/          # Dataset / Visualization / Dashboard / DashboardTile / Project value types (extracted from services in Phase 2.2)
+├── core/            # config, logging, DI container, exceptions, constants — the lowest layer
 ├── services/        # SettingsService, ProjectService, WorkspaceService, AnalysisOrchestratorService — depends on core
 ├── readers/         # CSV/JSON/Text/Excel/SQLite/PDF/Word/XML/Image/Archive readers — depends on core, services
 ├── cleaning/        # duplicate/missing-value/text/type-conversion operations — depends on core, services
@@ -25,33 +37,39 @@ uadas_core/          # the Qt-free core (import-clean of any GUI toolkit / web f
 ├── database/        # BaseDatabaseConnection + Postgres/MySQL/SQL Server/Oracle/DuckDB connectors, DatabaseReader (milestone 14)
 ├── plugins/         # plugin manager + loader + built-in plugin categories (milestone 12)
 ├── reports/         # report exporters (HTML/PDF/…) + the report-generation wizard backend (milestone 13)
-├── results/         # Qt-free result-renderer registry + section models (lifted from src/ui/results/ in web-transition 1.5)
+├── results/         # Qt-free result-renderer registry + section models (lifted from the old shell's results package in web-transition 1.5)
+├── actions/         # action catalogue data (ActionSpec / action_registry) — no handlers, no QAction (lifted in Phase 2.1)
+├── theme/           # semantic colour/space/type design tokens + contrast checker (lifted in Phase 2.1)
+├── a11y/            # contrast_manifest — the foreground/background token pairings that must meet WCAG 2.2 AA (lifted in Phase 2.1)
+├── help/            # in-app manual model: ManualIndex anchor resolver + ManualRenderer (lifted in Phase 2.1)
+├── data_table/      # per-dtype dataframe cell formatters (lifted in Phase 2.1)
 ├── jobs/            # JobRunner protocol + ThreadPoolExecutorJobRunner + the process-wide default runner (web-transition 1.2)
 ├── persistence/     # PersistenceService — SQLite metadata + Parquet frames, per-project <stem>.workspace/ (web-transition 1.6)
 └── provenance/      # analysis_logs_to_dag / analysis_logs_to_recipe — a read-only lineage view over the AnalysisLog set (web-transition 1.7)
 
-src/                 # the PySide6 desktop shell (deleted in Phase 2)
-├── ui/              # main window, dialogs, widgets, dock/menu/toolbar/theme managers, controllers, workbench — depends on all of uadas_core/
-├── workers/         # BaseWorker (QRunnable) + WorkerRunner — marshals uadas_core.jobs callbacks onto the Qt UI thread (milestone 6)
-└── app.py           # Application composition root — builds the container via uadas_core.bootstrap, constructs MainWindow
+tests/                # mirrors uadas_core/'s package layout, plus tests/assets/ (guards assets/ui-contract/)
+assets/ui-contract/   # data mined from the deleted Qt shell (layout, copy, constants, a11y rules, behaviour rules)
+resources/web/        # chart_host.html + chart_bridge.js + the vendored Plotly bundle — the chart host page that survived
 ```
 
-> `src/models/`, `src/resources/`, and `src/utils/` were empty scaffold directories that no
-> milestone ever populated; they were removed in Phase 0.4 of the desktop→web transition
-> (`plans/web-transition-glass-box-studio.md`). QSS theme files live in `resources/styles/` at the
-> repo root — referenced directly by `ThemeManager`, never through a `src/` package. Dataclasses in
-> this codebase are co-located with their consumers (`Dataset` in `workspace_service.py`,
-> `AnalysisLog` in `analysis_orchestrator_service.py`), not gathered into a central `models/`
-> package.
+> The dataclasses that used to live beside their consumers (`Dataset`, `Visualization`,
+> `Dashboard`, `DashboardTile`, `Project`) were extracted into `uadas_core/models/` in Phase 2.2
+> so that `core` can sit at the bottom of the layered-import stack without importing upward
+> into `services`. `AnalysisLog` still lives in `analysis_orchestrator_service.py`.
 
-Dependency direction is one-way down this list: `core` depends on nothing else in `src/`;
-`ui` is the only package that depends on nearly everything else. Nothing in `core`, `services`,
-`readers`, `cleaning`, `analysis`, `forecasting`, or `visualization` imports from `ui`.
+Dependency direction is one-way down the package list: `core` sits at the bottom and depends on
+nothing above it; `services`, `readers`, `cleaning`, `analysis`, `forecasting`, and
+`visualization` build on it; `ai` depends on most of them. `.importlinter` enforces this with
+three contracts: (1) `uadas_core` must not import PySide6 / PyQt / Django, (2) only `provenance`
+itself may import `uadas_core.provenance` (it is a leaf), and (3) a `layers` contract that
+makes the subpackages a strict dependency stack. Run `lint-imports` to check them.
 
 ## Application startup sequence
 
-`main.py` → `Application.create()` (`src/app.py`) → `bootstrap()` (`uadas_core/bootstrap.py`),
-in a fixed order:
+Startup is `bootstrap()` (`uadas_core/bootstrap.py`), in a fixed order. (The old entry path
+`main.py` → `Application.create()` → `bootstrap()` went away with the Qt shell; a new
+application entry point and UI composition root return in Phase 4 with the web UI. Until then
+`bootstrap()` is called directly — by tests and by any future backend.)
 
 1. **`AppConfig.load()`** (`uadas_core/core/config.py`) — reads `config/config.yaml`; self-healing,
    writes a default file if missing or empty. Deliberately does not import the project logger,
@@ -78,11 +96,11 @@ in a fixed order:
    `PersistenceService` registered (web-transition 1.6 — the Qt-free workspace save/load
    singleton; last, since it only serializes the plain-data output of the services above).
 
-`bootstrap()` returns a `BootstrapContext` (config, container, state). `Application.run()` is
-the only place a `QApplication` is constructed — before doing so it forces software OpenGL
-(`AA_UseSoftwareOpenGL`, `AA_ShareOpenGLContexts`) to work around a confirmed
-`QWebEngineView` blank-render bug on some Windows GPU/driver combinations — then applies the
-configured theme via `ThemeManager`, builds `MainWindow`, and enters the Qt event loop.
+`bootstrap()` returns a `BootstrapContext` (config, container, state). That is the end of
+application startup in the current repository: there is no event loop, window, or theme-application
+step. In the Qt era `Application.run()` consumed this context to construct the single
+`QApplication`, apply a theme and build `MainWindow`; the Phase 4 web UI will have its own
+composition root on top of the same `bootstrap()`.
 
 ## Dependency container
 
@@ -90,7 +108,7 @@ configured theme via `ThemeManager`, builds `MainWindow`, and enters the Qt even
 singleton=True)` / `resolve(key)`. Keys are conventionally the service's type. Registration is
 lazy — a factory only runs on first `resolve()` call, and (for singletons) only once. New
 session-wide services are registered in `bootstrap.py` alongside the existing ones, not
-constructed ad hoc inside UI code.
+constructed ad hoc inside other services or any future UI/backend code.
 
 ## The `Base*` extension-point pattern
 
@@ -146,9 +164,9 @@ derived datasets (no `source_path` to re-read from).
 
 - **Stateless bootstrap singleton.** Two pure verbs —
   `save_workspace(datasets, visualizations, dashboards, base) -> SaveReport` and
-  `load_workspace(base) -> WorkspaceSnapshot` — that take/return plain data, so the desktop
-  shell runs them on a worker thread. State is installed back into the live `WorkspaceService`
-  singleton on the UI thread via the new **`WorkspaceService.load_snapshot(...)`** restore
+  `load_workspace(base) -> WorkspaceSnapshot` — that take/return plain data, so a caller can run
+  them on a worker thread or job (the old desktop shell did). State is installed back into the
+  live `WorkspaceService` singleton via the **`WorkspaceService.load_snapshot(...)`** restore
   entry point (the non-interactive peer of `add_dataset`/`add_visualization`/`add_dashboard`:
   it installs the lists as-is, tolerating dangling `parent_dataset_id` / tile
   `visualization_id`, and only rejects a `parent_dataset_id` cycle).
@@ -162,8 +180,16 @@ derived datasets (no `source_path` to re-read from).
 - **Non-cascading orphans round-trip** unchanged — a derived dataset whose parent was closed,
   a dashboard tile pointing at a closed visualization. No FK is declared on
   `datasets.parent_dataset_id` or `dashboard_tiles.visualization_id` for exactly that reason.
-- Save is atomic (`workspace.db.tmp` → `os.replace`) and full-replace (orphaned `.parquet`
-  frames are garbage-collected); Save-As is just a full `save_workspace` to the new base.
+- Save is full-replace and its **ordering is load-bearing** (Phase 2.7, diagnosis D4 — see
+  `save_workspace`'s docstring): frames are staged as `<id>.parquet.tmp` and the DB is built at
+  `workspace.db.tmp`; only once both are complete are the frames promoted into place
+  (`os.replace`, atomic per file) and *then* `workspace.db` swapped in; orphaned `.parquet`
+  frames are garbage-collected only **after** the swap, because until then the previous DB may
+  still reference them. A failure before the swap discards the staging files and rolls back newly
+  promoted frames, so the previous workspace stays loadable; a hard process kill leaves at worst
+  harmless extra frames or `.tmp` files that the next save clears.
+  `tests/persistence/test_persistence_atomicity.py` injects each failure. Save-As is just a full
+  `save_workspace` to the new base.
 - `dataset_id` is uuid4-validated before it is ever joined into a filesystem path; all SQL is
   `?`-parameterized against a static DDL string.
 
@@ -213,19 +239,19 @@ All fixed paths (`config/`, `logs/`, `projects/`) are anchored to the project ro
 `uadas_core/core/constants.py`'s `PROJECT_ROOT`, derived from that file's own location rather than
 `Path.cwd()` — so behavior doesn't depend on the working directory the app is launched from.
 
-## PySide6/Qt layer specifics
+## The removed Qt shell
 
-- **Exactly one `QApplication` per process**, constructed only in `Application.run()`.
-- **Chart rendering** (`src/ui/widgets/chart_view.py`): a Plotly figure is rendered to HTML and
-  loaded into a `QWebEngineView` via a temporary file + `setUrl()`, not `setHtml()` — a fully
-  inlined Plotly bundle can be large enough that `setHtml()` silently fails to load.
-- **Theming** (`src/ui/theme_manager.py`): `.qss` files in `resources/styles/` are applied at
-  the `QApplication` level via `setStyleSheet()`, cascading to every widget; switching themes at
-  runtime just re-applies a different file.
-- **Dock widgets** (`src/ui/dock_manager.py`): Project Explorer and Dataset Explorer are
-  tabbed together; Console and Log are tabbed together; the Chart dock is left un-tabbed since
-  chart content is significant enough to want default visibility. The Logging dock attaches a
-  live `logging.Handler` to the root logger and must be detached before window close.
+There is no Qt layer any more: the PySide6 shell (`src/ui`, `src/workers`, `src/app.py`,
+`main.py`) was deleted in Phase 2.5, and `uadas_core/` must stay Qt-free (`.importlinter`
+contract 1, plus a CI step that asserts no Qt binding is importable). The facts worth keeping
+from it — default dock layout, menus and command palette, UI constants and stylesheet metrics,
+file-picker filters, mapping tables, user-facing strings, accessibility rules, and the product
+rules with their rejected alternatives — were mined into data under
+[`assets/ui-contract/`](../assets/ui-contract/) (start with `ui-behaviour-rules.md`) and are
+guarded by `tests/assets/`. See [CLAUDE.md](../CLAUDE.md#the-removed-qt-shell-and-where-its-facts-live)
+for the canonical summary. The chart host page (`resources/web/chart_host.html`,
+`chart_bridge.js`) survives. Docstrings that still name `src.ui.*`, `MainWindow` or controllers
+describe the deleted shell and are kept as design history.
 
 ## Important architectural constraints to preserve
 
@@ -233,26 +259,33 @@ All fixed paths (`config/`, `logs/`, `projects/`) are anchored to the project ro
   everything before it, not a stub — see the Roadmap document for the milestone sequence this
   codebase has actually followed.
 - **Multi-file touchpoints that do not auto-sync**: adding a reader requires updating both
-  `reader_registry.py`'s `_BUILTIN_READERS` tuple *and* the hardcoded `_DATASET_FILE_FILTER`
-  string in `src/ui/main_window.py` — the second does not derive from the first automatically.
-- **A real test suite and enforced tooling exist and are CI-gated.** `tests/` mirrors `src/`'s
-  package layout; `black`, `isort`, `mypy` (scoped to a curated clean-module list — see
+  `reader_registry.py`'s `_BUILTIN_READERS` tuple *and* the file-picker filter groups in
+  `assets/ui-contract/file-picker-filters.json` (which replaced the old hardcoded
+  `_DATASET_FILE_FILTER` string in the deleted `src/ui/main_window.py`) — the second does not
+  derive from the first automatically, but `tests/assets/` fails if their extension sets differ.
+- **A real test suite and enforced tooling exist and are CI-gated.** `tests/` mirrors
+  `uadas_core/`'s package layout (plus `tests/assets/`, which guards `assets/ui-contract/`);
+  there are no pytest markers and no Qt, so the suite is plain pytest and runs the same on any OS.
+  `black`, `isort`, `mypy` (scoped to a curated clean-package list — see
   [docs/MYPY_DEBT.md](MYPY_DEBT.md)), `ruff`, and `bandit` all have committed configuration in
-  `pyproject.toml` with pinned versions in `requirements.txt`. `.github/workflows/ci.yml` gates on
-  `black`, `isort`, scoped `mypy`, and `pytest` on `windows-latest`, and — added in Phase 0.6 of the
-  web-transition plan — `ruff check` + `bandit` on a `ubuntu-latest` lint job. `ruff` and `bandit`
-  are *also* enforced pre-CI by `.claude/hooks/` (on every Edit/Write and `git commit`) and by
-  `.pre-commit-config.yaml`. "Tests pass" (and "lint/type/security checks pass") is a meaningful
-  verification signal — see [CLAUDE.md](../CLAUDE.md#commands) for the exact commands, including why
-  the full suite must be run via `scripts/run_tests_and_exit_cleanly.py` in two invocations rather
-  than a bare `pytest tests/`. Keep this note current going forward: it went stale once already
+  `pyproject.toml` with pinned versions in `requirements.txt`. `.github/workflows/ci.yml` is a
+  single Linux (`ubuntu-latest`) workflow with three jobs: `test` (assert no Qt binding is
+  importable, import `uadas_core`, scoped `mypy`, a collected-test floor so a shrinking suite
+  fails, then `python -m pytest tests/`), `lint` (`ruff check`, `lint-imports`, `bandit`,
+  `black --check`, `isort --check-only`), and `dco` (Signed-off-by on every PR commit). Running
+  on Linux — the Phase-3 web-backend target — means a Windows-only assumption in the core fails
+  CI instead of surviving until deployment. `ruff` and `bandit` are *also* enforced pre-CI by
+  `.claude/hooks/` (on every Edit/Write and `git commit`) and by `.pre-commit-config.yaml`.
+  "Tests pass" (and "lint/type/security checks pass") is a meaningful verification signal — see
+  [CLAUDE.md](../CLAUDE.md#commands) for the exact commands (the full suite is just
+  `python -m pytest tests -q`). Keep this note current going forward: it went stale once already
   (written when milestone 16 first observed the opposite state, then claimed ruff/bandit were
   CI-gated when they were not) and nothing caught the drift until a later audit — treat a milestone
   that changes test/tooling state as also owning an update here.
-- **No `src/` subpackage is an empty placeholder any more.** `database/`, `plugins/`, `workers/`,
-  and `reports/` are built out (milestones 14, 12, 6, 13). The three that never had a purpose —
-  `models/`, `resources/`, `utils/` — were deleted in Phase 0.4 of the web-transition plan. QSS
-  theme files live in `resources/styles/` at the repo root, referenced directly by `ThemeManager`,
-  not through a `src/` package. See
+- **No `uadas_core/` subpackage is an empty placeholder any more.** `database/`, `plugins/`,
+  `jobs/` and `reports/` are built out (milestones 14, 12, web-transition 1.2, 13). The three
+  empty scaffold packages that never had a purpose — `models/`, `resources/`, `utils/` under
+  the old `src/` — were deleted in Phase 0.4 of the web-transition plan (`uadas_core/models/` is
+  an unrelated, later package holding the extracted value types). See
   [docs/ROADMAP.md](ROADMAP.md#what-is-explicitly-not-built-yet) for what genuinely does not exist
-  yet (all of it now web-transition scope, not desktop).
+  yet (all of it web-transition scope, not desktop).

@@ -5,19 +5,34 @@ docstrings (which consistently cite the milestone that introduced them), [CLAUDE
 and [SPECIFICATION.md](../SPECIFICATION.md). It does not invent requirements, timelines, or
 features beyond what these sources already state.
 
+## Current state (Phase 2 complete)
+
+The desktop-shell milestones listed below (`MainWindow`, `ChartView`, dialogs, the workbench,
+`src/workers/`, accessibility enforcement in `src/ui/a11y/`, and so on) describe a PySide6 shell
+that **was deleted in Phase 2.5** (the last commit that still contains it is `8d3ec4d`). What
+remains is the Qt-free core, `uadas_core/`, plus its tests; there is currently no UI and no
+runnable application. Facts worth keeping from the shell were mined into
+[`assets/ui-contract/`](../assets/ui-contract/). The milestone entries below are kept as history
+and still name `src/...` paths for the code as it was when each milestone landed; the Qt-free
+parts of those modules now live under `uadas_core/`.
+
+The next work is Phase 3 onward (backend, then the Phase 4 web UI) per
+[plans/web-transition-glass-box-studio.md](../plans/web-transition-glass-box-studio.md).
+
 ## Development model
 
 The project is built **milestone by milestone**, not as a single pass. Each milestone is
 expected to be complete and integrated with everything before it — not a stub — but later
 milestones' functionality genuinely does not exist until reached. This is stated explicitly in
-CLAUDE.md and confirmed throughout `src/`'s own docstrings, which cite the specific milestone
-that introduced or extended each module.
+CLAUDE.md and confirmed throughout the code's own docstrings (`uadas_core/`, and formerly
+`src/`), which cite the specific milestone that introduced or extended each module.
 
 ## Milestones completed, reconstructed from module docstrings
 
 The following sequence is what the codebase's own docstrings document as already built. Not
 every milestone is separately git-tagged; this is reconstructed from in-code citations
-(`grep -rn "milestone" src/`), not from commit messages alone.
+(`grep -rn "milestone" uadas_core/`; the shell-era citations are only in git history at and
+before `8d3ec4d`), not from commit messages alone.
 
 - **1a** — Core bootstrap: `AppConfig`, logging configuration, `Application`/`bootstrap()`
   skeleton (initially a placeholder `run()` body).
@@ -105,17 +120,21 @@ accessibility enforcement (`src/ui/a11y/`), and the in-app manual / F1 help / on
 Their plan is `plans/ui-overhaul-pioneering-adaptive-workbench.md`; their detail lives in git
 history and module docstrings rather than being re-narrated here.
 
-**The desktop roadmap is now closed.** No further desktop milestones are planned. Active
-direction is the desktop→web transition — see
+**The desktop roadmap is now closed, and the desktop shell itself is gone** (Phase 2.5). No
+further desktop milestones are planned. Active direction is the desktop→web transition — see
 [plans/web-transition-glass-box-studio.md](../plans/web-transition-glass-box-studio.md).
 
 ## What is explicitly not built yet
 
-The empty scaffold packages `src/models/`, `src/resources/`, and `src/utils/` were **deleted** in
-Phase 0.4 of the web transition (no milestone ever named a purpose for them). QSS theme files
-live in `resources/styles/` at the repo root, referenced directly by `ThemeManager`.
+No `uadas_core/` subpackage is an empty placeholder: every one holds real code. The empty
+scaffold packages `src/models/`, `src/resources/`, and `src/utils/` of the old tree were
+**deleted** in Phase 0.4 of the web transition (no milestone ever named a purpose for them);
+`uadas_core/models/` is a different, later package holding the extracted value types.
 
 Still genuinely absent (carried into web-transition scope, not desktop):
+
+- **Any UI and any runnable application entry point** — the Qt shell is deleted and the web UI
+  is Phase 4.
 
 - **Association rules.** Explicitly deferred in milestone 11 (no `mlxtend` dependency).
 - **Report-format plugin extensibility and a `forecast_models`/`ai_providers` plugin category.**
@@ -123,8 +142,9 @@ Still genuinely absent (carried into web-transition scope, not desktop):
   `uadas_core/plugins/plugin_manifest.py`'s `SUPPORTED_CATEGORIES` and `uadas_core/services/report_service.py`'s
   own docstrings for why.
 - **Orchestrator REPORT-stage UI.** `AnalysisOrchestratorService` is registered in the dependency
-  container but was never resolved by any UI code before milestone 13 — "Generate Report" is
-  reachable via the Analysis menu only, not a pipeline-stage checkpoint.
+  container but was never resolved by any UI code before milestone 13 — "Generate Report" was
+  reachable via the (now-deleted) desktop Analysis menu only, not a pipeline-stage checkpoint.
+  Revisit when the Phase 4 web UI is designed.
 
 `tests/` (empty at the point CLAUDE.md's own commands section was written) now has real
 coverage — see git history for the milestone-by-milestone test additions.
@@ -136,28 +156,12 @@ milestone 14 — additional file formats (SPSS, Stata, SAS, MATLAB, NetCDF, DICO
 third-party plugin), association-rule mining, and further chart types (sunburst, parallel
 coordinates, candlestick, geographic maps, 3D scatter/surface, animated charts) among them. This
 is recorded here only as SPECIFICATION.md's own stated scope — it is explicitly a superset of
-what exists in `src/` today (per CLAUDE.md's own
+what exists in `uadas_core/` today (per CLAUDE.md's own
 instruction not to assume something described there already exists), and nothing in this
 document should be read as a committed timeline for building it.
 
 ## Visual verification
 
-Prior milestones were verified either by informally running `python main.py` and looking at it,
-or by trusting the test suite alone — neither leaves an artifact a reviewer (or another agent, in
-a later session with no memory of what the screen actually looked like) can inspect after the
-fact. `scripts/screenshot_app_state.py` (added in the M27 remediation pass) closes that gap: it
-boots the real `Application`/`bootstrap()`/`MainWindow` composition path offscreen
-(`QT_QPA_PLATFORM=offscreen`) and saves a PNG via `QWidget.grab()`.
-
-```powershell
-python scripts/screenshot_app_state.py --output out.png
-python scripts/screenshot_app_state.py --output out.png --new-project
-python scripts/screenshot_app_state.py --output out.png --open-dataset path/to/file.csv
-```
-
-See that script's own module docstring for the full rationale (why it mirrors
-`Application.run()`'s construction sequence rather than a simplified stand-in, why
-`--open-dataset` stubs `QFileDialog` rather than skipping `DatasetController.open_dataset()`
-entirely, and why it never calls `QApplication.exec()`). The coordinator should run this after
-any future milestone that changes what the application looks like, the same way it already runs
-the test suite and `mypy`/`black`/`isort` after every milestone.
+The Qt screenshot tooling (`scripts/screenshot_app_state.py`, and running the app via
+`main.py`) was removed in Phase 2.5 along with the shell; there is no visual verification until
+the Phase 4 web UI exists, and the verification floor is the test suite, `lint-imports` and CI.
