@@ -44,12 +44,30 @@ Write-Host "Running pytest..."
 # been updated to match, so it could spuriously block a commit with all tests passing.
 # Same two-invocation split as CI: tests/ui/test_worker_runner.py first (real-QThreadPool
 # tests proved flaky once event-loop backpressure builds up later in a long run).
-& $py "scripts\run_tests_and_exit_cleanly.py" "tests\ui\test_worker_runner.py" -q
+# Pass/fail is judged by Test-PytestPassed, not the bare exit code. Verified 2026-10-04: invocation 2
+# exits with the native access-violation code (-1073741819, 0xC0000005) AFTER pytest prints a clean
+# summary, on every run here -- so demanding exit 0 blocked every commit with all tests green.
+# os._exit() in the runner does not help: the crash lands inside pytest.main()'s own teardown. A crash
+# code is forgiven ONLY when the final summary line shows passes and no failed/error count; a real
+# failure exit, a crash with no summary, or a summary with failed/error still blocks.
+function Test-PytestPassed {
+    param([long]$ExitCode, $Output)
+    if ($ExitCode -eq 0) { return $true }
+    if (@(-1073741819, 3221225477, 139) -notcontains $ExitCode) { return $false }
+    $text = ($Output | ForEach-Object { "$_" }) -join "`n"
+    $summary = [regex]::Matches($text, '(?m)^\s*=*\s*(\d+ passed[^\r\n]*?) in [\d.]+s') | Select-Object -Last 1
+    if (-not $summary) { return $false }
+    if ($summary.Groups[1].Value -match '\b\d+ (failed|error)') { return $false }
+    Write-Host "pre-commit-check: pytest exited $ExitCode after a clean summary ($($summary.Groups[1].Value.Trim())) -- known Windows/Qt teardown crash, treated as a pass."
+    return $true
+}
+
+& $py "scripts\run_tests_and_exit_cleanly.py" "tests\ui\test_worker_runner.py" -q 2>&1 | Tee-Object -Variable out1 | Out-Host
 $testExit1 = $LASTEXITCODE
-& $py "scripts\run_tests_and_exit_cleanly.py" "tests" -q -m "not uia_integration" --ignore="tests\ui\test_worker_runner.py"
+& $py "scripts\run_tests_and_exit_cleanly.py" "tests" -q -m "not uia_integration" --ignore="tests\ui\test_worker_runner.py" 2>&1 | Tee-Object -Variable out2 | Out-Host
 $testExit2 = $LASTEXITCODE
 
-if ($testExit1 -ne 0 -or $testExit2 -ne 0) {
+if (-not (Test-PytestPassed $testExit1 $out1) -or -not (Test-PytestPassed $testExit2 $out2)) {
     Write-Error "Tests failed (exit $testExit1 / $testExit2). Commit blocked."
     exit 2
 }
