@@ -23,6 +23,12 @@ PROD_ENV = {
     "DJANGO_SECRET_KEY": "k" * 60,
     "DJANGO_ALLOWED_HOSTS": "api.example.com",
     "DATABASE_URL": "postgres://uadas:pw@db.internal:5432/uadas",
+    # Added in 3.3: auth needs a shared cache (rate limits), a mail relay (verification
+    # and password-reset mail) and the SPA's address (links inside those mails).
+    "REDIS_URL": "redis://cache.internal:6379/0",
+    "DEFAULT_FROM_EMAIL": "UADAS <no-reply@example.com>",
+    "EMAIL_HOST": "smtp.example.com",
+    "FRONTEND_BASE_URL": "https://app.example.com",
 }
 
 

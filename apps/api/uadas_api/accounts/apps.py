@@ -17,3 +17,7 @@ class AccountsConfig(AppConfig):
     name = "uadas_api.accounts"
     label = "accounts"
     default_auto_field = "django.db.models.BigAutoField"
+
+    def ready(self) -> None:
+        # Connect the login/logout audit receivers (imported for their side effect).
+        from uadas_api.accounts import signals  # noqa: F401

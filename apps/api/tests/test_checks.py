@@ -48,6 +48,11 @@ def test_check_deploy_passes_with_valid_prod_environment(
         DJANGO_SECRET_KEY=secrets.token_urlsafe(64),
         DJANGO_ALLOWED_HOSTS="api.example.com",
         DATABASE_URL="sqlite://:memory:",
+        # Required since 3.3 (shared cache, mail relay, SPA address):
+        REDIS_URL="redis://localhost:6379/0",
+        DEFAULT_FROM_EMAIL="UADAS <no-reply@example.com>",
+        EMAIL_HOST="smtp.example.com",
+        FRONTEND_BASE_URL="https://app.example.com",
     )
     result = _manage(["check", "--deploy", "--fail-level", "WARNING"], env)
     assert result.returncode == 0, result.stdout + result.stderr

@@ -17,10 +17,21 @@ license = { text = "AGPL-3.0-or-later" }
 dependencies = [
     "universal-ai-data-analytics-studio",
     "django>=6.0,<7",
-    "django-ninja>=1.4",
+    # `Status(...)` (explicit response status) replaced the deprecated tuple return.
+    "django-ninja>=1.7",
     "django-cors-headers",
     "psycopg[binary]",
     "dj-database-url",
+    # 3.3 auth. The `socialaccount` extra pulls the OAuth client libraries (PyJWT,
+    # requests-oauthlib, cryptography) the GitHub/Google providers need; headless, the
+    # JSON API, is in the base distribution. The lower bound is the first release this
+    # configuration was verified against (ACCOUNT_LOGIN_METHODS / ACCOUNT_SIGNUP_FIELDS,
+    # ALLAUTH_TRUSTED_PROXY_COUNT and the `HEADLESS_*` names are 65.x-era), the upper bound
+    # keeps a major release from changing the auth surface unreviewed.
+    "django-allauth[socialaccount]>=65.19,<66",
+    # Django's built-in Redis cache backend (`REDIS_URL`) needs the client library; the
+    # shared cache is what makes allauth's rate limits hold across workers.
+    "redis>=5",
 ]
 
 [project.optional-dependencies]
@@ -43,7 +54,9 @@ include = ["uadas_api*"]
 DJANGO_SETTINGS_MODULE = "uadas_api.settings.test"
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-ra"
+# `-p uadas_api.pytest_env` scrubs OAuth credentials from the environment before pytest-django
+# reads the settings (a conftest would be too late); see that module and test_hermetic_env.py.
+addopts = "-ra -p uadas_api.pytest_env"
 
 # Ruff: inherit the repo-root configuration (rule selection, line length), and relax only
 # RUF012 ("mutable class attribute needs ClassVar") where Django's own API requires a
@@ -72,6 +85,12 @@ no_implicit_optional = true
 # it; treating it as untyped keeps the core's debt out of this job.
 [[tool.mypy.overrides]]
 module = ["uadas_core", "uadas_core.*"]
+ignore_missing_imports = true
+
+# django-allauth ships no type information (no py.typed); the adapters we subclass are
+# therefore `Any` to mypy. Treated as untyped rather than silenced line by line.
+[[tool.mypy.overrides]]
+module = ["allauth", "allauth.*"]
 ignore_missing_imports = true
 
 [tool.django-stubs]

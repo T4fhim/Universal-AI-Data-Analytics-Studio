@@ -251,8 +251,9 @@ def test_role_is_a_closed_set_enforced_by_the_database() -> None:
 
 
 def test_deleting_a_user_removes_their_memberships_but_not_the_organization() -> None:
+    # An editor: deleting a *sole owner* is refused since 3.3 (tests/test_last_owner.py).
     user, org = make_user(), make_organization()
-    Membership.objects.create(user=user, organization=org, role=Role.OWNER)
+    Membership.objects.create(user=user, organization=org, role=Role.EDITOR)
     user.delete()
     assert not Membership.objects.filter(organization=org).exists()
     assert Organization.objects.filter(pk=org.pk).exists()

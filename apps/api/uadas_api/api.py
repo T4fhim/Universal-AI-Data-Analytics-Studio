@@ -3,8 +3,17 @@
 
 Why one module: every endpoint is mounted on this single :data:`api`, so the OpenAPI
 contract (``/api/openapi.json``, later consumed by Schemathesis and the web client's
-type generation) has exactly one source. Feature apps will each contribute a router
-and be attached in :func:`_wire_routers`; 3.1 ships only the liveness router.
+type generation) has exactly one source. Feature apps each contribute a router and are
+attached in :func:`_wire_routers`: the liveness router (3.1) and the accounts router (3.3).
+
+**Authentication is the default, not an opt-in.** The API is built with
+``auth=session_auth`` (session cookie + CSRF), so a router added later is protected unless
+it says otherwise; the one public route, the liveness probe, opts out with ``auth=None``.
+This matters because Django Ninja exempts every view from Django's CSRF middleware and
+leaves the check to the auth class: a route with no auth has neither authentication *nor*
+CSRF protection. ``tests/test_api_auth_guard.py`` fails if any other operation is public.
+Sign-in itself (signup, login, logout, password reset, OAuth) is allauth headless, mounted
+at ``/api/auth/`` in ``urls.py``.
 
 The interactive docs UI is a development convenience and is served only when
 ``DEBUG`` is on (``docs_url=None`` removes the route entirely in production).
@@ -16,6 +25,9 @@ from typing import Literal
 
 from django.conf import settings
 from ninja import NinjaAPI, Router, Schema
+
+from uadas_api.accounts.api import router as accounts_router
+from uadas_api.accounts.security import session_auth
 
 health_router = Router(tags=["health"])
 
@@ -31,6 +43,7 @@ class HealthOut(Schema):
     response=HealthOut,
     summary="Liveness probe",
     operation_id="health",
+    auth=None,
 )
 def health(request: object) -> HealthOut:
     """Report that the process is up.
@@ -46,6 +59,7 @@ def health(request: object) -> HealthOut:
 def _wire_routers(target: NinjaAPI) -> None:
     """Attach every router to ``target`` (one line per feature app, added as they land)."""
     target.add_router("", health_router)
+    target.add_router("", accounts_router)
 
 
 def build_api(*, debug: bool) -> NinjaAPI:
@@ -59,6 +73,7 @@ def build_api(*, debug: bool) -> NinjaAPI:
     built = NinjaAPI(
         title="UADAS API",
         version="0.0.0",
+        auth=session_auth,
         docs_url="/docs" if debug else None,
         openapi_url="/openapi.json" if debug else None,
     )

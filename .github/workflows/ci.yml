@@ -145,10 +145,11 @@ jobs:
         run: python -m mypy uadas_api tests
 
       - name: Collected-test count is not silently shrinking
-        # Same guard as the core job (observation 0022), with its own floor. 484 tests
-        # at the 3.2 data model (65 at the 3.1 skeleton; most of the growth is the
-        # discovery-based tenant-isolation harness, which multiplies one check across
-        # every tenant model, so adding a model raises the count). The floor is that
+        # Same guard as the core job (observation 0022), with its own floor. 731 tests
+        # at 3.3 auth (484 at the 3.2 data model, 65 at the 3.1 skeleton; most of the
+        # growth is the discovery-based tenant-isolation harness, which multiplies one
+        # check across every tenant model, and 3.3's auth/role/last-owner suites). The
+        # count includes two Postgres-only race tests that skip on SQLite. The floor is that
         # minus 2, leaving room to prune a couple deliberately while failing on a real
         # collapse (e.g. a conftest import error that silently drops a whole module).
         # Raise it as the suite grows -- lowering it should be a conscious, reviewed
@@ -159,7 +160,7 @@ jobs:
           count="$(echo "$out" | grep -oE '^[0-9]+ tests? collected' | grep -oE '^[0-9]+')"
           test -n "$count" || { echo "::error::could not read a collected-test count"; exit 1; }
           echo "collected: $count"
-          test "$count" -ge 482 || { echo "::error::collected $count tests, expected at least 482"; exit 1; }
+          test "$count" -ge 729 || { echo "::error::collected $count tests, expected at least 729"; exit 1; }
 
       - name: pytest (apps/api)
         # DJANGO_SETTINGS_MODULE comes from apps/api/pyproject.toml, not the
@@ -175,6 +176,13 @@ jobs:
           DJANGO_SECRET_KEY: ci-throwaway-key-9f3b7c1e4a8d2f6b0c5e7a1d3b9f8e2c4a6d0b1e3c5f7a9b
           DJANGO_ALLOWED_HOSTS: api.example.com
           DATABASE_URL: postgres://uadas:uadas@localhost:5432/uadas
+          # Required since 3.3 (prod refuses to start without them): the shared cache for
+          # allauth's rate limits, the SMTP relay + sender for verification mail, and the
+          # SPA's address for the links inside it. Throwaway values; no credentials.
+          REDIS_URL: redis://localhost:6379/0
+          DEFAULT_FROM_EMAIL: UADAS <no-reply@example.com>
+          EMAIL_HOST: smtp.example.com
+          FRONTEND_BASE_URL: https://app.example.com
         run: python manage.py check --deploy --fail-level WARNING
 
       - name: bandit (apps/api)

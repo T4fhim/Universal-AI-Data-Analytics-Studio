@@ -67,8 +67,10 @@ immutability check; deferred loads; cross-tenant `parent_dataset_id`; email look
 - `PROTECT` on a project only stops `Project.delete()`; `DatasetRecord.delete()`/`Report.delete()` succeed and orphan the
   bucket object. Deleting such rows must go through a service that deletes the object first (Phase 3.4).
 - `AuditEvent` is append-only in Python only (a trigger or revoked privileges would survive raw SQL). An organization with
-  audit history can never be deleted, and no organization-offboarding path exists: **a 3.3 follow-up.**
-- **Last-owner protection** (an organization must keep an owner) is deferred to 3.3 with permissions.
+  audit history can never be deleted, and no organization-offboarding path exists: **deferred past 3.3**
+  ([phase-3-3-auth.md](phase-3-3-auth.md)).
+- **Last-owner protection** (an organization must keep an owner): **done in 3.3** (model, queryset and
+  user-delete paths; see [phase-3-3-auth.md](phase-3-3-auth.md)).
 - Storage-key prefixing is not a DB `CHECK` (UUID text casts differ between SQLite and Postgres).
 - UUIDv4 keys fragment B-tree indexes; UUIDv7 is a later optimisation, not done here.
 - Verified on SQLite only; Postgres 17 runs in CI's `api-test` job (Docker was down locally).

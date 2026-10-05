@@ -5,11 +5,13 @@ The Django 6 + Django Ninja backend for the Universal AI Data Analytics Studio w
 It is a separate distribution from the framework-free core (`uadas_core`, repo root) and
 depends on it; the core never imports it (enforced by `.importlinter`).
 
-**Status: sub-step 3.2, the data model and tenancy.** Five Django apps (`accounts`,
-`workspaces`, `pipeline`, `ai`, `exports`), split settings, one endpoint, `GET /api/health`
-(`{"status": "ok"}`, liveness only, no database access), and the models described under
-[Data model](#data-model). No authentication flow, storage, background tasks or API
-endpoints over the models yet (3.3 onwards). `AUTH_USER_MODEL = "accounts.User"`.
+**Status: sub-step 3.3, authentication and per-organization roles.** Five Django apps
+(`accounts`, `workspaces`, `pipeline`, `ai`, `exports`), split settings, the models described
+under [Data model](#data-model), sign-in through django-allauth (headless, session cookies),
+and the account endpoints listed under [Authentication](#authentication) and
+[Endpoints](#endpoints). `GET /api/health` stays public and database-free. No storage,
+background tasks or API endpoints over the *data* models yet (3.4 onwards).
+`AUTH_USER_MODEL = "accounts.User"`. Decisions and limits: [plans/phase-3-3-auth.md](../../plans/phase-3-3-auth.md).
 
 ## Install
 
@@ -53,6 +55,21 @@ Configuration is 12-factor: environment variables only. Do not commit `.env` fil
 | `DJANGO_SECURE_SSL_REDIRECT` | prod | `true` | Redirect HTTP to HTTPS; turn off when a proxy already does. |
 | `DJANGO_SECURE_HSTS_SECONDS` | prod | `31536000` | HSTS max-age; must be a positive integer. |
 | `DJANGO_SECURE_PROXY_SSL_HEADER` | prod | `false` | Trust `X-Forwarded-Proto: https`. Enable only behind a proxy that sets and strips it. |
+| `DJANGO_TRUSTED_PROXY_COUNT` | prod | `0` | Number of proxies you control in front of the app (allauth's per-IP rate limits read the client address from `X-Forwarded-For`). `0` behind a proxy makes every client share the proxy's address; too high lets a client spoof it. |
+| `REDIS_URL` | base, prod | none (`dev`/`test`: per-process cache) | Redis for the shared cache that holds allauth's rate-limit counters, e.g. `redis://host:6379/0`. **Required in prod.** |
+| `FRONTEND_BASE_URL` | prod | none (`dev`/`test`: `http://localhost:5173`) | The SPA's address; verification and password-reset emails link to it. Absolute URL; must be `https://` in prod. **Required in prod.** |
+| `DEFAULT_FROM_EMAIL` | prod | none | Sender of verification / reset mail, e.g. `UADAS <no-reply@example.com>`. **Required in prod.** |
+| `EMAIL_HOST` | prod | none | SMTP relay host. **Required in prod.** |
+| `EMAIL_PORT` | prod | `587` | SMTP port. |
+| `EMAIL_USE_TLS` | prod | `true` | STARTTLS to the relay. |
+| `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | prod | none | SMTP credentials; unset means an unauthenticated relay. Environment only, never committed. |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | base | none | Enable "sign in with GitHub". Both or neither: one alone fails start-up. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | base | none | Enable "sign in with Google". Both or neither. |
+
+Mail goes to the console in `dev`, to an in-memory outbox in `test`, to SMTP in `prod`
+(`EMAIL_BACKEND` is the pre-Django-7 spelling; moving to `MAILERS` is a recorded follow-up).
+Email verification is `optional` in `dev`, `none` in `test` and always `mandatory` in `prod`
+(not switchable by an environment variable).
 
 ## Health probe
 
@@ -62,6 +79,53 @@ configure the probe to send one of the allowed host names in its `Host` header.
 
 The OpenAPI schema and docs routes (`/api/openapi.json`, `/api/docs`) exist only when
 `DEBUG` is on; the contract is generated offline with `api.get_openapi_schema()`.
+
+## Authentication
+
+Sign-in is django-allauth in *headless* mode, **browser client only**: the SPA sends JSON and
+the session lives in an `HttpOnly`, `SameSite=Lax` cookie (`Secure` in prod). There are no
+bearer tokens; the `/api/auth/app/...` client is disabled. Email is the only login name.
+
+- **CSRF.** Every state-changing request (ours and allauth's) needs the CSRF token. Call
+  `GET /api/auth/browser/v1/config` first: it sets the `csrftoken` cookie (readable by the
+  SPA, not `HttpOnly`); echo it in an `X-CSRFToken` header on every `POST`/`PATCH`/`DELETE`.
+  Login rotates the token, so re-read the cookie after signing in.
+- **Flows** (all under `/api/auth/browser/v1/`): `auth/signup`, `auth/login`, `auth/session`
+  (`GET` state, `DELETE` logout), `auth/email/verify`, `auth/password/request`,
+  `auth/password/reset`, `auth/provider/redirect` (form `POST`: start GitHub/Google).
+  Full request/response shapes: allauth's headless specification.
+- **Signup** creates the user, a personal organization (named after the email's local part)
+  with the user as `owner`, and the audit rows, in one transaction. OAuth first logins do the same.
+- **OAuth** redirect URIs to register with the provider:
+  `https://<api-host>/api/auth/oauth/github/login/callback/` and `.../google/login/callback/`.
+  allauth only follows a `callback_url` whose host is the API's own or listed in
+  `DJANGO_ALLOWED_HOSTS` (host names only, no port): list the SPA's host in production, and in
+  development send a relative `callback_url` through the dev proxy. Anything else (an open
+  redirect) is bounced to the SPA's error page.
+- **Rate limits** (login, failed login per IP and per account, signup, password reset) are
+  counted in the shared cache, so prod needs `REDIS_URL`. A locked-out login answers `400`
+  with error code `too_many_login_attempts`; the per-IP limits answer `429`.
+
+## Endpoints
+
+All require a session and the CSRF token on writes, except `/api/health`. The organization is
+chosen by the **path** (`/api/organizations/{org_id}/...`), never by session state: a
+non-member gets `404` (identical to a nonexistent organization), a member with too low a role
+gets `403`, no session gets `401`.
+
+| Method and path | Role | Purpose |
+|---|---|---|
+| `GET /api/health` | public | Liveness. |
+| `GET /api/me` | any | The user and their memberships. |
+| `GET /api/organizations` | any | Organizations I belong to. |
+| `POST /api/organizations` | any | Create an organization; the caller becomes `owner` (`201`; `409` over the per-user cap). |
+| `GET /api/organizations/{org_id}/members` | viewer+ | List members. |
+| `PATCH /api/organizations/{org_id}/members/{membership_id}` | admin+ | Change a role (`{"role": ...}`); `403` above your own role or for a member not strictly below yours (peer admins, owners; only an owner may change those); `409` if it would leave no owner. |
+| `DELETE /api/organizations/{org_id}/members/{membership_id}` | admin+, or yourself | Remove a member / leave; `409` for the last owner. |
+
+Roles, lowest first: `viewer < editor < admin < owner` (one definition:
+`uadas_api/accounts/permissions.py`, with the capability matrix). Later routers reuse
+`require_membership(request, org_id, min_role)` from `uadas_api/accounts/security.py`.
 
 ## Data model
 
