@@ -26,7 +26,7 @@ from typing import Any
 import dj_database_url
 
 from . import _auth
-from ._env import get_bool, get_list, get_str
+from ._env import get_bool, get_choice, get_list, get_str
 
 # apps/api/ -- the directory holding manage.py. Anchored on this file, never on the
 # current working directory (same rule as uadas_core's PROJECT_ROOT).
@@ -198,4 +198,14 @@ SOCIALACCOUNT_EMAIL_AUTHENTICATION: bool = False
 FRONTEND_BASE_URL: str = get_str("FRONTEND_BASE_URL")
 HEADLESS_FRONTEND_URLS: dict[str, str] = (
     _auth.frontend_urls(FRONTEND_BASE_URL) if FRONTEND_BASE_URL else {}
+)
+
+# The framework-free core's log level (core session seam). The core runs in *server
+# mode* here (see uadas_api/core_bridge.py): it logs to stderr only, reads and writes no
+# YAML, loads no plugins -- so the only core setting the API needs is this one, and it
+# comes from the environment like everything else in this module.
+UADAS_CORE_LOG_LEVEL: str = get_choice(
+    "UADAS_CORE_LOG_LEVEL",
+    ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"),
+    default="INFO",
 )

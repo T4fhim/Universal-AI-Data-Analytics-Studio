@@ -35,7 +35,13 @@ from django.core.validators import validate_email
 
 from ._env import get_bool, get_int, get_str
 from .base import *  # noqa: F403 - the settings split is a star-import by design
-from .base import ALLOWED_HOSTS, DATABASES, FRONTEND_BASE_URL, SECRET_KEY
+from .base import (
+    ALLOWED_HOSTS,
+    DATABASES,
+    FRONTEND_BASE_URL,
+    SECRET_KEY,
+    UADAS_CORE_LOG_LEVEL,
+)
 
 # Django's own deployment check (W009) wants at least 50 characters; refuse anything
 # weaker here, because CI runs `check --deploy` against its own throwaway key, not
@@ -63,6 +69,12 @@ if "*" in ALLOWED_HOSTS:
 if not DATABASES:
     raise ImproperlyConfigured(
         "DATABASE_URL must be set for production (no database is configured)."
+    )
+# Production is never in Django debug mode, so the core must not log at DEBUG either:
+# those lines are emitted per state change from every tenant's session into one stream.
+if UADAS_CORE_LOG_LEVEL == "DEBUG":
+    raise ImproperlyConfigured(
+        "UADAS_CORE_LOG_LEVEL=DEBUG is not allowed in production; use INFO or above."
     )
 if not get_str("REDIS_URL"):
     raise ImproperlyConfigured(

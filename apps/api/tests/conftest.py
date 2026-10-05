@@ -47,6 +47,7 @@ SETTINGS_ENV_VARS: tuple[str, ...] = (
     "GITHUB_CLIENT_SECRET",
     "GOOGLE_CLIENT_ID",
     "GOOGLE_CLIENT_SECRET",
+    "UADAS_CORE_LOG_LEVEL",
 )
 
 _SETTINGS_PACKAGE = "uadas_api.settings"

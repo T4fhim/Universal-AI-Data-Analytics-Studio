@@ -256,3 +256,39 @@ def test_prod_security_knobs_are_env_configurable(load_settings: Loader) -> None
 def test_prod_rejects_a_non_integer_hsts_value(load_settings: Loader) -> None:
     with pytest.raises(ImproperlyConfigured, match="DJANGO_SECURE_HSTS_SECONDS"):
         load_settings("prod", DJANGO_SECURE_HSTS_SECONDS="a-lot", **PROD_ENV)
+
+
+# --- the core's log level (core session seam) ---------------------------------
+
+
+def test_core_log_level_defaults_to_info_and_reads_the_environment(
+    load_settings: Loader,
+) -> None:
+    assert load_settings("base").UADAS_CORE_LOG_LEVEL == "INFO"
+    assert load_settings("base", UADAS_CORE_LOG_LEVEL="debug").UADAS_CORE_LOG_LEVEL == (
+        "DEBUG"
+    )
+
+
+def test_core_log_level_rejects_an_unknown_level(load_settings: Loader) -> None:
+    with pytest.raises(ImproperlyConfigured, match="UADAS_CORE_LOG_LEVEL"):
+        load_settings("base", UADAS_CORE_LOG_LEVEL="verbose")
+
+
+def test_prod_refuses_core_debug_logging_but_accepts_other_levels(
+    load_settings: Loader,
+) -> None:
+    """DEBUG logs one line per state change from every tenant's session into one stream.
+
+    Production is never in Django debug mode, so it must not run the core at DEBUG
+    either (the same rule the bridge enforces at runtime for any settings module).
+    """
+    with pytest.raises(ImproperlyConfigured, match="UADAS_CORE_LOG_LEVEL"):
+        load_settings("prod", UADAS_CORE_LOG_LEVEL="DEBUG", **PROD_ENV)
+
+    assert (
+        load_settings(
+            "prod", UADAS_CORE_LOG_LEVEL="WARNING", **PROD_ENV
+        ).UADAS_CORE_LOG_LEVEL
+        == "WARNING"
+    )

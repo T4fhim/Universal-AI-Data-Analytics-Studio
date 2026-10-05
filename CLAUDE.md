@@ -76,7 +76,7 @@ whatever the tool defaults to:
 black --check uadas_core/ tests/ scripts/
 isort --check-only uadas_core/ tests/ scripts/
 bandit -r uadas_core -q --skip B101,B107,B608   # same skips as CI (rationale in ci.yml's bandit step)
-lint-imports                                      # the 3 .importlinter contracts
+PYTHONPATH=apps/api lint-imports                  # the 5 .importlinter contracts (PYTHONPATH finds uadas_api)
 ```
 
 `mypy` is **not** run repo-wide — it's scoped to an explicit, curated list of packages/modules that
@@ -132,14 +132,25 @@ constraints that must be preserved whenever this code is touched, not the explan
 
 `config.py` deliberately does not import the project logger (it's a dependency of the logger, not a
 consumer of it) — it uses a bare `logging.getLogger` for its own bootstrap-time messages instead. Don't
-"fix" this into a `get_logger` call. See
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#application-startup-sequence) for the full startup sequence
-and why its order can't be changed.
+"fix" this into a `get_logger` call. Startup is split in two (Phase 3 session seam):
+`bootstrap_process(server_mode=..., config=...)` builds the process-wide, tenant-free world once and
+`build_session(process)` builds the stateful per-user services into a child container; the legacy
+`bootstrap()` composes them and returns the same `BootstrapContext`. **`server_mode=True` must stay
+impossible to turn into desktop behaviour**: no plugin loading (the plugin package is not even
+imported), no YAML read/write, no log files (and never the host's root logger), no
+`set_default_job_runner` bridge — don't add a code path in `bootstrap_process` that does any of those.
+The mode is a one-way latch (`core/process_mode.py`): desktop and server bootstraps in one process raise.
+Never log `%r` of a dataset/project/setting value (tenant data and secrets share one server log). See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#application-startup-sequence) and
+[plans/phase-3-session-seam.md](plans/phase-3-session-seam.md) for the sequence and why its order can't be changed.
 
 ### Dependency container
 
-Register new session-wide services in `bootstrap.py` alongside the existing ones rather than constructing
-them ad hoc inside other services, so every consumer resolves the same instance. See
+`DependencyContainer(parent=...)`: a child resolves its own registrations first, then falls back to its
+parent, and nothing registered in a child leaks to the parent or siblings. Register a new **process-wide,
+stateless** service in `bootstrap_process()` and a new **per-user, stateful** one in `build_session()`
+(never on the process container — that would share it across tenants), rather than constructing them ad
+hoc inside other services, so every consumer resolves the same instance. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#dependency-container) for how the container itself works.
 
 ### The `Base*` extension-point pattern

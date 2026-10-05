@@ -17,6 +17,7 @@ application actually uses.
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 from typing import Any, TypeVar, overload
 
@@ -58,15 +59,33 @@ class DependencyContainer:
     requirement to register every service up front before any
     resolution occurs.
 
+    **Scoping (Phase 3 core session seam).** A container may be given a
+    ``parent``. A child resolves its *own* registrations first and falls
+    back to the parent (and, transitively, the parent's parent); anything
+    registered in a child stays in that child — it never leaks to the
+    parent or to a sibling. That is the whole mechanism by which one
+    process serves many tenants: the process-wide, tenant-free services
+    live in one parent container and each session gets a child holding the
+    stateful per-user services (see :func:`uadas_core.bootstrap.build_session`).
+    This replaced the earlier ``(session, type)`` composite-key idea: a
+    child container needs no new key type, keeps ``resolve(Type) -> Type``
+    sound, and a session that is dropped takes its services with it.
+    A singleton registered in the *parent* is constructed once and shared by
+    every child; a singleton registered in a *child* is per-child.
+
+    Construction of a singleton is guarded by a per-container re-entrant lock
+    so concurrent first resolutions (several request threads resolving one
+    parent service at once) build it exactly once. :meth:`resolve` releases a
+    container's own lock *before* delegating to its parent, so the only way two
+    container locks are ever held together is a child's factory resolving a
+    parent key from inside its (held) construction -- child then parent. A parent
+    factory never resolves a child key, so the order cannot invert and cannot
+    deadlock.
+
     A key is conventionally a service *type*, and :meth:`resolve` is
     typed for that case (``resolve(SettingsService) -> SettingsService``).
-    Any hashable value is still accepted, though, and that non-type path
-    is deliberate headroom: it is the seam a later phase's per-request
-    scoping is expected to use, keying on a ``(session, type)`` composite
-    once an HTTP request is a real resolution scope. The web-transition
-    plan (step 1.4) intentionally builds only the typed-resolution half
-    here; the request-scoped half is designed in Phase 3 against a real
-    consumer rather than speculatively now.
+    Any hashable value is still accepted, and that non-type path stays
+    available for keys that are not types.
 
     Two honesty caveats on that typing. First, :meth:`register` does not
     correlate a key with its factory's return type — ``register(X, ...)``
@@ -87,10 +106,26 @@ class DependencyContainer:
     work.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, parent: DependencyContainer | None = None) -> None:
+        """Create a container, optionally scoped beneath ``parent``.
+
+        Args:
+            parent: A container to fall back to for keys this one has not
+                registered. ``None`` (the default) is the original,
+                unscoped behaviour: a missing key raises
+                :class:`~uadas_core.core.exceptions.DependencyResolutionError`.
+        """
+        self._parent = parent
         self._factories: dict[object, _Factory] = {}
         self._singletons: dict[object, bool] = {}
         self._instances: dict[object, object] = {}
+        # Re-entrant: a factory may resolve another key of the same container.
+        self._lock = threading.RLock()
+
+    @property
+    def parent(self) -> DependencyContainer | None:
+        """The container this one falls back to, or ``None`` for a root."""
+        return self._parent
 
     def register(
         self,
@@ -122,9 +157,10 @@ class DependencyContainer:
         silently keeping a stale cached instance around under new
         factory logic.
         """
-        self._factories[key] = factory
-        self._singletons[key] = singleton
-        self._instances.pop(key, None)
+        with self._lock:
+            self._factories[key] = factory
+            self._singletons[key] = singleton
+            self._instances.pop(key, None)
         _logger.debug("Registered %s (singleton=%s)", _describe_key(key), singleton)
 
     @overload
@@ -153,17 +189,28 @@ class DependencyContainer:
                 differs.
 
         Raises:
-            DependencyResolutionError: If ``key`` was never registered,
-                or if the registered factory raises during
-                construction.
+            DependencyResolutionError: If ``key`` was never registered
+                here or in any ancestor container, or if the registered
+                factory raises during construction.
         """
-        if key not in self._factories:
-            raise DependencyResolutionError(
-                f"No service registered for key: {_describe_key(key)}. "
-                f"Register it with DependencyContainer.register(...) "
-                f"before requesting it."
-            )
+        with self._lock:
+            if key in self._factories:
+                return self._resolve_own(key)
 
+        if self._parent is not None:
+            # Own registrations were checked first above; only an
+            # unregistered key reaches the parent, whose own resolve()
+            # raises the "No service registered" error if it is missing too.
+            return self._parent.resolve(key)
+
+        raise DependencyResolutionError(
+            f"No service registered for key: {_describe_key(key)}. "
+            f"Register it with DependencyContainer.register(...) "
+            f"before requesting it."
+        )
+
+    def _resolve_own(self, key: object) -> Any:
+        """Resolve ``key`` from this container's own registrations (lock held)."""
         is_singleton = self._singletons[key]
 
         if is_singleton and key in self._instances:
@@ -188,14 +235,17 @@ class DependencyContainer:
         return instance
 
     def is_registered(self, key: object) -> bool:
-        """Return whether ``key`` has a registered factory.
+        """Return whether ``key`` has a registered factory here or in an ancestor.
 
         Useful for optional dependencies, where a caller wants to use
         a service only if some earlier startup step chose to register
         it, without triggering :class:`DependencyResolutionError` for
-        the common "not registered" case.
+        the common "not registered" case. A child container reports its
+        parents' registrations too, since :meth:`resolve` would find them.
         """
-        return key in self._factories
+        if key in self._factories:
+            return True
+        return self._parent is not None and self._parent.is_registered(key)
 
 
 def _describe_key(key: object) -> str:

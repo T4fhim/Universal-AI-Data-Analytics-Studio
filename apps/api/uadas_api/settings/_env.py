@@ -48,6 +48,23 @@ def get_list(name: str) -> list[str]:
     return [item.strip() for item in get_str(name).split(",") if item.strip()]
 
 
+def get_choice(name: str, choices: tuple[str, ...], default: str) -> str:
+    """Return the variable upper-cased if it is one of ``choices``; unset gives ``default``.
+
+    Anything else raises, for the same reason :func:`get_bool` does: a typo such as
+    ``UADAS_CORE_LOG_LEVEL=verbose`` must stop start-up, not silently pick a level.
+    """
+    raw = get_str(name)
+    if not raw:
+        return default
+    value = raw.upper()
+    if value not in choices:
+        raise ImproperlyConfigured(
+            f"{name} must be one of {', '.join(choices)}, got {raw!r}."
+        )
+    return value
+
+
 def get_int(name: str, default: int) -> int:
     """Parse an integer variable; unset or empty gives ``default``, junk raises."""
     raw = get_str(name)

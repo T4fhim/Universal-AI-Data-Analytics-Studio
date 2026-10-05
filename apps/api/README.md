@@ -58,6 +58,7 @@ Configuration is 12-factor: environment variables only. Do not commit `.env` fil
 | `DJANGO_TRUSTED_PROXY_COUNT` | prod | `0` | Number of proxies you control in front of the app (allauth's per-IP rate limits read the client address from `X-Forwarded-For`). `0` behind a proxy makes every client share the proxy's address; too high lets a client spoof it. |
 | `REDIS_URL` | base, prod | none (`dev`/`test`: per-process cache) | Redis for the shared cache that holds allauth's rate-limit counters, e.g. `redis://host:6379/0`. **Required in prod.** |
 | `FRONTEND_BASE_URL` | prod | none (`dev`/`test`: `http://localhost:5173`) | The SPA's address; verification and password-reset emails link to it. Absolute URL; must be `https://` in prod. **Required in prod.** |
+| `UADAS_CORE_LOG_LEVEL` | base | `INFO` | Log level of the framework-free core, which runs in server mode here (stderr only, no plugins, no YAML) via `uadas_api/core_bridge.py`. One of `DEBUG`/`INFO`/`WARNING`/`ERROR`/`CRITICAL`; anything else raises. `DEBUG` is refused unless Django `DEBUG` is on (and always in prod): core debug logs are shared by every tenant. |
 | `DEFAULT_FROM_EMAIL` | prod | none | Sender of verification / reset mail, e.g. `UADAS <no-reply@example.com>`. **Required in prod.** |
 | `EMAIL_HOST` | prod | none | SMTP relay host. **Required in prod.** |
 | `EMAIL_PORT` | prod | `587` | SMTP port. |

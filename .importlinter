@@ -82,19 +82,10 @@ layers =
     uadas_core.readers | uadas_core.a11y
     uadas_core.models | uadas_core.theme | uadas_core.help | uadas_core.data_table
     uadas_core.core
-ignore_imports =
-    # (1) The last strand of the old services<->ai cycle (Phase 1 diagnosis
-    # D1). AssistantService takes WorkspaceService purely as a constructor
-    # annotation (assistant_service.py:150,178) -- no runtime use -- but
-    # import-linter counts TYPE_CHECKING imports, so guarding it would not
-    # help. Remove when the annotation becomes a Protocol (2.7 / Phase 3).
-    uadas_core.ai.assistant_service -> uadas_core.services.workspace_service
-    # (2) The core<->models cycle Phase 2.2 left behind: application_state
-    # annotates with Dataset/Project/Visualization under TYPE_CHECKING while
-    # models.project raises core.exceptions.ServiceError. Annotation-only, so
-    # no runtime cycle exists. Remove if ApplicationState moves above core or
-    # the annotation becomes a Protocol.
-    uadas_core.core.application_state -> uadas_core.models
+# No ignore_imports: the two exemptions Phase 2.3 needed (ai.assistant_service ->
+# services.workspace_service, core.application_state -> models) were both removed by the
+# core session seam, which typed those collaborators as Protocols (AssistantWorkspace,
+# ProjectLike/DatasetLike/VisualizationLike) instead of importing the concrete classes.
 
 # Phase 3.1: dependency direction between the core and the web backend. The API
 # depends on the core, never the other way round -- the core stays a framework-free
@@ -117,6 +108,16 @@ allow_indirect_imports = False
 # imports starts importing `plugins` or `jobs` itself, this contract fails and that
 # edge must be re-examined, not silently permitted. Remove an entry only by a
 # reviewed change to the readiness ruling.
+#
+# The core session seam adds exactly ONE exception, and only at the composition root:
+# the API must call uadas_core.bootstrap (bootstrap_process / build_session), and
+# bootstrap builds the process-wide JobRunner and -- outside server mode -- lazily imports
+# the PluginManager. Those four edges are ignored so the chain
+# uadas_api -> bootstrap -> {jobs, plugins} is not counted; a *direct* uadas_api import of
+# either package, or any other indirect route to them, is still a violation. What the
+# ignore cannot express statically -- that server mode never imports or runs the plugin
+# loader -- is proved at runtime by tests/core/test_server_mode.py and
+# apps/api/tests/test_core_bridge.py (fresh-interpreter sys.modules probes).
 [importlinter:contract:api-avoids-plugins-and-jobs]
 name = uadas_api must not import uadas_core.plugins or uadas_core.jobs
 type = forbidden
@@ -126,3 +127,8 @@ forbidden_modules =
     uadas_core.plugins
     uadas_core.jobs
 allow_indirect_imports = False
+ignore_imports =
+    uadas_core.bootstrap -> uadas_core.jobs
+    uadas_core.bootstrap -> uadas_core.jobs.job_runner
+    uadas_core.bootstrap -> uadas_core.jobs.thread_pool_executor_job_runner
+    uadas_core.bootstrap -> uadas_core.plugins.plugin_manager

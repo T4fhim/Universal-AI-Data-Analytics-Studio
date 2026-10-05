@@ -23,7 +23,7 @@ it and deleted the rest; `src/` no longer exists.
 
 ```
 uadas_core/          # the Qt-free core (import-clean of any GUI toolkit / web framework)
-├── bootstrap.py     # bootstrap() — builds the DI container and registers every session-wide service
+├── bootstrap.py     # bootstrap_process() + build_session() (process vs per-user services); legacy bootstrap() composes them
 ├── command_stack.py # real undo/redo built on the never-mutate-in-place cleaning contract (milestone 23)
 ├── models/          # Dataset / Visualization / Dashboard / DashboardTile / Project value types (extracted from services in Phase 2.2)
 ├── core/            # config, logging, DI container, exceptions, constants — the lowest layer
@@ -60,25 +60,53 @@ resources/web/        # chart_host.html + chart_bridge.js + the vendored Plotly 
 Dependency direction is one-way down the package list: `core` sits at the bottom and depends on
 nothing above it; `services`, `readers`, `cleaning`, `analysis`, `forecasting`, and
 `visualization` build on it; `ai` depends on most of them. `.importlinter` enforces this with
-three contracts: (1) `uadas_core` must not import PySide6 / PyQt / Django, (2) only `provenance`
-itself may import `uadas_core.provenance` (it is a leaf), and (3) a `layers` contract that
-makes the subpackages a strict dependency stack. Run `lint-imports` to check them.
+five contracts: (1) `uadas_core` must not import PySide6 / PyQt / Django, (2) only `provenance`
+itself may import `uadas_core.provenance` (it is a leaf), (3) a `layers` contract that
+makes the subpackages a strict dependency stack (with **no** `ignore_imports`: the two old
+exemptions were removed by typing `AssistantService`'s workspace and `ApplicationState`'s
+values as Protocols), (4) `uadas_core` must not import `uadas_api`, and (5) `uadas_api` must not
+import `uadas_core.plugins` / `.jobs` (four ignored edges, all from `uadas_core.bootstrap`, the
+composition root). Run `PYTHONPATH=apps/api lint-imports` to check them.
 
 ## Application startup sequence
 
-Startup is `bootstrap()` (`uadas_core/bootstrap.py`), in a fixed order. (The old entry path
-`main.py` → `Application.create()` → `bootstrap()` went away with the Qt shell; a new
-application entry point and UI composition root return in Phase 4 with the web UI. Until then
-`bootstrap()` is called directly — by tests and by any future backend.)
+Startup (`uadas_core/bootstrap.py`) has two halves, split in the Phase 3 **core session seam**
+(design and limits: [plans/phase-3-session-seam.md](../plans/phase-3-session-seam.md)):
+
+* **`bootstrap_process(*, server_mode=False, config=None)`** → `ProcessContext` — the
+  process-wide, tenant-free world, built once: config, logging, the built-in registries, the
+  `JobRunner`, `PersistenceService` (and, outside server mode, `PluginManager`). Its container is
+  the *parent* of every session.
+* **`build_session(process)`** → a *child* `DependencyContainer` holding the stateful per-user
+  services (`ApplicationState`, `SettingsService`, `ProjectService`, `WorkspaceService`,
+  `AnalysisOrchestratorService`, `GuidanceService`, `ReportService`, `DatabaseConnectionService`).
+  Two sessions from one process share no mutable service state.
+* **`bootstrap()`** — the legacy single-user entry point, unchanged in result: one process plus
+  one session, returning the same `BootstrapContext` (config, container, state) and still the only
+  caller of `set_default_job_runner`. (The old entry path `main.py` → `Application.create()` →
+  `bootstrap()` went away with the Qt shell; a new application entry point returns in Phase 4.)
+
+`server_mode=True` (plan 3.8's server half) makes the desktop-shaped behaviours impossible:
+plugins are never loaded (the plugin package is not imported, no `PluginManager` exists,
+`sys.path` is untouched); no YAML is read or written (config comes from the passed `AppConfig`
+or `AppConfig.defaults()`, and sessions get in-memory `SettingsService`s); logging goes to stderr
+through a handler on the `uadas_core` logger only (`propagate=False`) — no rotating files and the
+host's root logger is never touched; the process-global default-runner bridge is not installed.
+The mode is a **one-way latch** (`uadas_core/core/process_mode.py`): a process that bootstrapped in
+one mode raises `BootstrapError` on any call for the other, and `configure_logging` refuses to
+switch mode too. Services log names/ids and settings key paths, never object reprs or values. The
+API reaches all of this through `apps/api/uadas_api/core_bridge.py`.
+
+The fixed order inside `bootstrap_process` (unchanged from the old `bootstrap()`):
 
 1. **`AppConfig.load()`** (`uadas_core/core/config.py`) — reads `config/config.yaml`; self-healing,
    writes a default file if missing or empty. Deliberately does not import the project logger,
    since logging configuration is itself sourced from config — it uses a bare
-   `logging.getLogger` for its own bootstrap-time messages.
+   `logging.getLogger` for its own bootstrap-time messages. (Server mode skips the file entirely.)
 2. **`configure_logging()`** — must run only after config is loaded, since log level/rotation
-   settings come from it.
-3. **`DependencyContainer` constructed**, `AppConfig` and `ApplicationState` registered into it.
-4. **Built-in registries populated** — `bootstrap()` calls `_register_builtins()` on
+   settings come from it. (`log_dir=None` selects console-only logging, used by server mode.)
+3. **`DependencyContainer` constructed**, `AppConfig` registered into it.
+4. **Built-in registries populated** — `bootstrap_process()` calls `_register_builtins()` on
    `uadas_core/cleaning/operation_registry.py`, `uadas_core/visualization/chart_registry.py`, and
    `uadas_core/results/result_renderer_registry.py`. Before the desktop→web transition's step 1.3
    these ran as a side effect of *importing* each registry module; they now run here so that
@@ -87,28 +115,36 @@ application entry point and UI composition root return in Phase 4 with the web U
    flag, mirroring `logger._configured`). Must precede step 6 — `PluginManager.load_plugins()`
    registers plugin-provided operations and chart types into these same registries. The test
    suite seeds them from `tests/conftest.py` (module level) instead of calling `bootstrap()`.
-5. **`SettingsService`, `ProjectService`, `WorkspaceService` constructed and registered** into
-   the same container — one instance per running process, so every consumer resolves the same
-   instance rather than each constructing its own. `AnalysisOrchestratorService`,
-   `GuidanceService`, `ReportService`, `DatabaseConnectionService` follow, each in dependency
-   order.
-6. **`PluginManager` constructed and `load_plugins()` run**, then `JobRunner` registered, then
-   `PersistenceService` registered (web-transition 1.6 — the Qt-free workspace save/load
-   singleton; last, since it only serializes the plain-data output of the services above).
+5. **`PluginManager` constructed and `load_plugins()` run** (desktop mode only; the import is
+   deferred into that branch), then `JobRunner` registered, then `PersistenceService` registered
+   (web-transition 1.6 — the Qt-free workspace save/load singleton; stateless, so process-wide).
+   The `set_default_job_runner()` bridge is *not* installed here — only the legacy `bootstrap()`
+   does that.
 
-`bootstrap()` returns a `BootstrapContext` (config, container, state). That is the end of
-application startup in the current repository: there is no event loop, window, or theme-application
-step. In the Qt era `Application.run()` consumed this context to construct the single
-`QApplication`, apply a theme and build `MainWindow`; the Phase 4 web UI will have its own
-composition root on top of the same `bootstrap()`.
+`build_session()` then constructs, in dependency order, `ApplicationState`, `SettingsService`
+(persisting to the YAML path in desktop mode, in memory when `process.config_path is None`),
+`ProjectService`, `WorkspaceService`, `AnalysisOrchestratorService`, `GuidanceService`,
+`ReportService` and `DatabaseConnectionService`, each registered into the *session* container.
+That is the end of startup: there is no event loop, window, or theme-application step. In the
+Qt era `Application.run()` consumed the context to construct the single `QApplication`; the
+Phase 4 web UI's composition root is `uadas_api.core_bridge` on top of the same two functions.
 
 ## Dependency container
 
 `uadas_core/core/dependency_container.py` is a minimal service locator: `register(key, factory,
 singleton=True)` / `resolve(key)`. Keys are conventionally the service's type. Registration is
-lazy — a factory only runs on first `resolve()` call, and (for singletons) only once. New
-session-wide services are registered in `bootstrap.py` alongside the existing ones, not
-constructed ad hoc inside other services or any future UI/backend code.
+lazy — a factory only runs on first `resolve()` call, and (for singletons) only once (guarded by
+a re-entrant lock, so concurrent first resolutions build it once).
+
+`DependencyContainer(parent=None)` adds **scoping**: a child resolves its own registrations
+first and falls back to its parent; `is_registered` consults the chain; a registration in a child
+never leaks to the parent or a sibling. A singleton in the parent is shared by every child, one
+in a child is per-child — which is exactly how process-wide services and per-session services
+coexist (`ProcessContext.container` is the parent, each `build_session()` result a child).
+`parent=None` keeps the original behaviour and errors. New process-wide services are registered
+in `bootstrap_process()` and new per-user ones in `build_session()` — not constructed ad hoc
+inside other services or any future UI/backend code. If a service holds mutable per-user state it
+belongs in `build_session()`; putting it in the process container would share it across tenants.
 
 ## The `Base*` extension-point pattern
 
@@ -238,6 +274,12 @@ needs to catch that specific failure mode.
 All fixed paths (`config/`, `logs/`, `projects/`) are anchored to the project root via
 `uadas_core/core/constants.py`'s `PROJECT_ROOT`, derived from that file's own location rather than
 `Path.cwd()` — so behavior doesn't depend on the working directory the app is launched from.
+`PROJECT_ROOT` is only the repository root in a source/editable checkout (in a non-editable
+install `parents[2]` points into `site-packages`), so the override-aware accessors
+`data_root()` / `config_file_path()` / `log_dir()` / `projects_dir()` honour the
+`UADAS_DATA_ROOT` environment variable (must be absolute — a relative value raises `ConfigError`;
+it is normalised) and otherwise return exactly the `PROJECT_ROOT`-anchored constants. `bootstrap()` uses them for its defaults; server mode needs none of them (it reads and
+writes no config or logs).
 
 ## The removed Qt shell
 

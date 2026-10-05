@@ -148,7 +148,8 @@ jobs:
         # Same guard as the core job (observation 0022), with its own floor. 731 tests
         # at 3.3 auth (484 at the 3.2 data model, 65 at the 3.1 skeleton; most of the
         # growth is the discovery-based tenant-isolation harness, which multiplies one
-        # check across every tenant model, and 3.3's auth/role/last-owner suites). The
+        # check across every tenant model, and 3.3's auth/role/last-owner suites) and 744
+        # after the core session seam (core_bridge tests). The
         # count includes two Postgres-only race tests that skip on SQLite. The floor is that
         # minus 2, leaving room to prune a couple deliberately while failing on a real
         # collapse (e.g. a conftest import error that silently drops a whole module).
@@ -160,7 +161,7 @@ jobs:
           count="$(echo "$out" | grep -oE '^[0-9]+ tests? collected' | grep -oE '^[0-9]+')"
           test -n "$count" || { echo "::error::could not read a collected-test count"; exit 1; }
           echo "collected: $count"
-          test "$count" -ge 729 || { echo "::error::collected $count tests, expected at least 729"; exit 1; }
+          test "$count" -ge 742 || { echo "::error::collected $count tests, expected at least 742"; exit 1; }
 
       - name: pytest (apps/api)
         # DJANGO_SETTINGS_MODULE comes from apps/api/pyproject.toml, not the

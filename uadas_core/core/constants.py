@@ -20,7 +20,10 @@ packaged executable).
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+from uadas_core.core.exceptions import ConfigError
 
 # --------------------------------------------------------------------------
 # Application identity
@@ -42,6 +45,59 @@ CONFIG_FILE_PATH: Path = CONFIG_DIR / "config.yaml"
 LOG_DIR: Path = PROJECT_ROOT / "logs"
 
 PROJECTS_DIR: Path = PROJECT_ROOT / "projects"
+
+# --------------------------------------------------------------------------
+# Data-root override (server mode)
+# --------------------------------------------------------------------------
+# PROJECT_ROOT above is only the repository root in a source/editable checkout;
+# installed non-editable, ``parents[2]`` points into site-packages. A server must
+# not depend on that, so ``UADAS_DATA_ROOT`` names the directory fixed *data*
+# paths (config/, logs/, projects/) are anchored on instead. The constants above
+# are import-time defaults and are deliberately NOT rewritten by the environment;
+# the functions below are the override-aware accessors. Unset (or blank), they
+# return exactly the constants, so the desktop-era behaviour is unchanged.
+DATA_ROOT_ENV_VAR: str = "UADAS_DATA_ROOT"
+
+
+def data_root() -> Path:
+    """Return the directory fixed data paths hang off: the env override or ``PROJECT_ROOT``.
+
+    Read on every call (not cached at import) so a process that sets the variable
+    after importing this module, or a test using ``monkeypatch.setenv``, is honoured.
+
+    Raises:
+        ConfigError: If the variable is set to a *relative* path. It would be resolved
+            against whatever directory the process happened to start in -- the very
+            launch-directory dependence this override exists to remove -- so it must be
+            absolute (``~`` is expanded first). An absolute value is normalised
+            (``..`` and symlinks resolved).
+    """
+    override = os.environ.get(DATA_ROOT_ENV_VAR, "").strip()
+    if not override:
+        return PROJECT_ROOT
+    candidate = Path(override).expanduser()
+    if not candidate.is_absolute():
+        raise ConfigError(
+            f"{DATA_ROOT_ENV_VAR} must be an absolute path, got {override!r}: a relative "
+            "path would depend on the directory the process was started from."
+        )
+    return candidate.resolve()
+
+
+def config_file_path() -> Path:
+    """Return ``<data root>/config/config.yaml`` (``CONFIG_FILE_PATH`` when unset)."""
+    return data_root() / "config" / "config.yaml"
+
+
+def log_dir() -> Path:
+    """Return ``<data root>/logs`` (``LOG_DIR`` when unset)."""
+    return data_root() / "logs"
+
+
+def projects_dir() -> Path:
+    """Return ``<data root>/projects`` (``PROJECTS_DIR`` when unset)."""
+    return data_root() / "projects"
+
 
 # --------------------------------------------------------------------------
 # Logging defaults

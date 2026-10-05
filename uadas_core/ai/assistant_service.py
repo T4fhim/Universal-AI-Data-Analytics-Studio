@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol
 
 import plotly.graph_objects as go
 
@@ -31,7 +31,6 @@ from uadas_core.core.exceptions import ApplicationError, ServiceError
 from uadas_core.core.expertise_level import EXPERTISE_LEVEL_GUIDANCE, ExpertiseLevel
 from uadas_core.core.logger import get_logger
 from uadas_core.models import Dataset, Visualization
-from uadas_core.services.workspace_service import WorkspaceService
 
 _logger = get_logger(__name__)
 
@@ -132,6 +131,24 @@ class AssistantTurnResult:
     new_tool_results: list[Any] = field(default_factory=list)
 
 
+class AssistantWorkspace(Protocol):
+    """The slice of :class:`~uadas_core.services.workspace_service.WorkspaceService` the assistant uses.
+
+    ``WorkspaceService`` satisfies this structurally. Typing the assistant against a
+    Protocol instead of importing the concrete service removes the last strand of the old
+    ``services`` <-> ``ai`` import cycle (Phase 1 diagnosis D1) without a runtime or
+    TYPE_CHECKING edge -- import-linter counts the latter, so guarding the import never
+    helped -- and lets ``.importlinter`` drop its ``ai.assistant_service -> services``
+    exemption.
+    """
+
+    def get_active_dataset(self) -> Dataset | None: ...
+
+    def add_dataset(self, dataset: Dataset) -> None: ...
+
+    def add_visualization(self, visualization: Visualization) -> None: ...
+
+
 class AssistantService:
     """Runs conversations with an LLM, executing tool calls against the active dataset.
 
@@ -140,11 +157,12 @@ class AssistantService:
         api_key: The selected provider's API key.
         workspace_service: Used to resolve the active dataset for tool
             calls and to register any new dataset a cleaning tool
-            produces.
+            produces. Anything satisfying :class:`AssistantWorkspace`
+            (in practice the session's ``WorkspaceService``).
     """
 
     def __init__(
-        self, provider_name: str, api_key: str, workspace_service: WorkspaceService
+        self, provider_name: str, api_key: str, workspace_service: AssistantWorkspace
     ) -> None:
         # Wrapped in a single-profile ProviderRotationService rather than
         # calling create_provider() directly — this constructor's
@@ -172,7 +190,7 @@ class AssistantService:
         cls,
         config_profiles: list[dict[str, Any]],
         rotation_enabled: bool,
-        workspace_service: WorkspaceService,
+        workspace_service: AssistantWorkspace,
         expertise_level: str = ExpertiseLevel.BEGINNER,
         active_provider_index: int = 0,
     ) -> AssistantService:
