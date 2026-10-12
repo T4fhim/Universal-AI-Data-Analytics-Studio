@@ -144,10 +144,10 @@ jobs:
         # real-store tests were verified against): `latest` could change behaviour -- or
         # drop a feature the tests rely on -- between two runs of the same commit.
         run: |
-          docker run -d --name minio -p 9000:9000 \
+          docker run -d --name minio --user 0:0 -p 9000:9000 \
             -e MINIO_ROOT_USER=ci-minio-user \
             -e MINIO_ROOT_PASSWORD=ci-minio-secret-0123456789 \
-            minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+            cgr.dev/chainguard/minio@sha256:dc455cdd4db6e390b1b26514f15ff37681a777bf8dab41aac445a0259f751e56 server /data
           ready=0
           for i in $(seq 1 60); do
             if curl -sf http://localhost:9000/minio/health/ready; then ready=1; break; fi

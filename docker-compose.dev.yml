@@ -46,7 +46,13 @@ services:
       retries: 12
 
   minio:
-    image: minio/minio:latest
+    # MinIO stopped publishing images to Docker Hub and Quay (minio/minio no longer
+    # exists there), so this is Chainguard's build, pinned by digest so CI and local
+    # dev run the exact same server (RELEASE.2026-09-22T19-25-18Z when pinned).
+    image: cgr.dev/chainguard/minio@sha256:dc455cdd4db6e390b1b26514f15ff37681a777bf8dab41aac445a0259f751e56
+    # The image runs as uid 65532, which cannot write a fresh root-owned named volume;
+    # throwaway local dev data, so run as root rather than chown the volume.
+    user: "0:0"
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -59,7 +65,8 @@ services:
 
   # One-shot: wait for MinIO, create the buckets the app expects, then exit 0.
   minio-init:
-    image: minio/mc:latest
+    # The -dev variant ships a shell (the plain image is shell-less and the script below needs one).
+    image: cgr.dev/chainguard/minio-client@sha256:799f7e86017c3ee8d00f6372e1ee28dd73453f271d5b306a47af8e8a408a777a
     depends_on:
       - minio
     restart: "no"
