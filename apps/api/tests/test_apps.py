@@ -1,5 +1,5 @@
 # File: apps/api/tests/test_apps.py
-"""The five (empty) Django apps are registered with the labels later phases rely on.
+"""The Django apps (five from 3.1, plus ``storage`` from 3.4) keep the labels later phases rely on.
 
 Why: Phase 3.2+ attach models, migrations and ``AUTH_USER_MODEL`` to these apps by
 label. A wrong ``AppConfig.name`` / ``label`` now would force a migration-breaking
@@ -13,7 +13,7 @@ import importlib
 import pytest
 from django.apps import apps
 
-APP_LABELS = ("accounts", "workspaces", "pipeline", "ai", "exports")
+APP_LABELS = ("accounts", "workspaces", "pipeline", "ai", "exports", "storage")
 
 
 @pytest.mark.parametrize("label", APP_LABELS)

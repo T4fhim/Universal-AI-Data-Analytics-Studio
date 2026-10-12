@@ -53,6 +53,12 @@ def test_check_deploy_passes_with_valid_prod_environment(
         DEFAULT_FROM_EMAIL="UADAS <no-reply@example.com>",
         EMAIL_HOST="smtp.example.com",
         FRONTEND_BASE_URL="https://app.example.com",
+        # Required since 3.4 (object storage): bucket, https endpoint, real-looking credentials.
+        STORAGE_SSE="aes256",
+        STORAGE_BUCKET="uadas-tenant-data",
+        STORAGE_ENDPOINT_URL="https://objects.example.com",
+        STORAGE_ACCESS_KEY_ID="ci-key-4f7q2m9xj3kd8tlp",
+        STORAGE_SECRET_ACCESS_KEY="wJ9r3Kd8Zx2PqL7mV5nB1cT6yH4sG0aE9uRf",
     )
     result = _manage(["check", "--deploy", "--fail-level", "WARNING"], env)
     assert result.returncode == 0, result.stdout + result.stderr

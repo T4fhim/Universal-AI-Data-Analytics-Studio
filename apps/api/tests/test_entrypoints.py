@@ -28,6 +28,11 @@ VALID_PROD_ENV = {
     "DEFAULT_FROM_EMAIL": "UADAS <no-reply@example.com>",
     "EMAIL_HOST": "smtp.example.com",
     "FRONTEND_BASE_URL": "https://app.example.com",
+    "STORAGE_SSE": "aes256",
+    "STORAGE_BUCKET": "uadas-tenant-data",
+    "STORAGE_ENDPOINT_URL": "https://objects.example.com",
+    "STORAGE_ACCESS_KEY_ID": "ci-key-4f7q2m9xj3kd8tlp",
+    "STORAGE_SECRET_ACCESS_KEY": "wJ9r3Kd8Zx2PqL7mV5nB1cT6yH4sG0aE9uRf",
 }
 
 

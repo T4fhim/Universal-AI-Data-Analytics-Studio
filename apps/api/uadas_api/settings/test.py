@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import dj_database_url
 
-from . import _auth
+from . import _auth, _storage
 from .base import *  # noqa: F403 - the settings split is a star-import by design
 
 DEBUG = False
@@ -37,3 +37,9 @@ DEFAULT_FROM_EMAIL = "UADAS test <no-reply@example.test>"
 
 FRONTEND_BASE_URL = "http://localhost:5173"
 HEADLESS_FRONTEND_URLS = _auth.frontend_urls(FRONTEND_BASE_URL)
+
+# Object storage is an in-memory fake (uadas_api.storage.memory): no network, no credentials,
+# and -- like the secret key -- never read from the environment, so a developer's STORAGE_*
+# can neither reach a real bucket from the suite nor change its outcome.
+UADAS_STORAGE = _storage.memory_storage()
+STORAGES = _storage.django_storages(UADAS_STORAGE)

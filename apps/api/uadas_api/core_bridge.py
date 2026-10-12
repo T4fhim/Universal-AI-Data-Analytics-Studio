@@ -13,7 +13,8 @@ view, task or service ever calls ``bootstrap_process`` / ``build_session`` itsel
   services (workspace, settings, analysis log, ...). Two sessions share nothing mutable.
 
 Deliberately **not** here: any endpoint, and any storage/persistence wiring. A session
-built here is empty; loading a tenant's datasets into it from object storage is 3.4. The
+built here is empty; loading a tenant's workspace into it from object storage is
+:class:`uadas_api.storage.workspace.StorageBackedPersistence` (3.4). The
 job runner is reached only as ``get_process_context().job_runner`` -- ``uadas_api`` must
 not import ``uadas_core.jobs`` or ``uadas_core.plugins`` (``.importlinter``, contract
 ``api-avoids-plugins-and-jobs``), and the static import chain through ``uadas_core.

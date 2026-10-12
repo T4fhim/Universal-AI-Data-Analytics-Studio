@@ -77,8 +77,11 @@ plugin package" is a runtime test, not a static one.
 
 ## NOT solved
 
-- `PersistenceService` still writes a local filesystem; object storage and tenant-keyed frames are 3.4.
-- A session is empty: loading a tenant's datasets (per-request Parquet cost, lazy frames) is unsolved.
+- `PersistenceService` still writes a local filesystem; **3.4 wraps it** (unchanged) in
+  `uadas_api.storage.workspace.StorageBackedPersistence`, which moves its files to/from tenant-keyed object
+  storage with the same atomicity ([phase-3-4-storage.md](phase-3-4-storage.md)).
+- A session is empty: installing a loaded snapshot into it (`WorkspaceService.load_snapshot`) is the 3.6 API's job;
+  the per-request Parquet cost is reduced by 3.4's `load(dataset_ids=...)`, not eliminated.
 - Module-global registries (`reader_registry._PLUGIN_READERS`, built-ins) are shared by design; a future
   per-tenant plugin story would need scoped registries.
 - `logger._configured` is still a once-per-process global (now lock-guarded); `ThreadPoolExecutorJobRunner`

@@ -48,6 +48,19 @@ SETTINGS_ENV_VARS: tuple[str, ...] = (
     "GOOGLE_CLIENT_ID",
     "GOOGLE_CLIENT_SECRET",
     "UADAS_CORE_LOG_LEVEL",
+    "STORAGE_BUCKET",
+    "STORAGE_ENDPOINT_URL",
+    "STORAGE_ACCESS_KEY_ID",
+    "STORAGE_SECRET_ACCESS_KEY",
+    "STORAGE_REGION",
+    "STORAGE_ADDRESSING",
+    "STORAGE_SSE",
+    "STORAGE_PRESIGN_SECONDS",
+    "STORAGE_MAX_OBJECT_BYTES",
+    "STORAGE_GC_GRACE_SECONDS",
+    "STORAGE_ENCRYPTION_ACKNOWLEDGED",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
 )
 
 _SETTINGS_PACKAGE = "uadas_api.settings"
@@ -96,6 +109,20 @@ def _fresh_cache() -> Iterator[None]:
     cache.clear()
     yield
     cache.clear()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_object_store() -> Iterator[None]:
+    """Give every test an empty in-memory object store (``test`` settings select it).
+
+    The store is a process-wide singleton (like the real client), so without this one
+    test's objects -- or an injected fault -- would be visible to the next.
+    """
+    from uadas_api.storage.store import reset_backend
+
+    reset_backend()
+    yield
+    reset_backend()
 
 
 @pytest.fixture

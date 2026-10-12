@@ -136,6 +136,39 @@ jobs:
         # `dev` extra (pytest-django, pytest-cov, django-stubs).
         run: python -m pip install -r requirements.txt -e . -e "apps/api[dev]"
 
+      - name: Start MinIO (a real S3-compatible store for the storage tests)
+        # Phase 3.4: `test_storage_*` run against an in-memory fake by default, and against
+        # this real MinIO as well when STORAGE_INTEGRATION=1 (set on the pytest step below).
+        # Throwaway CI-only credentials; the container lives only for this job. The image is
+        # pinned to a release (the one docker-compose.dev.yml uses, and the one the
+        # real-store tests were verified against): `latest` could change behaviour -- or
+        # drop a feature the tests rely on -- between two runs of the same commit.
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=ci-minio-user \
+            -e MINIO_ROOT_PASSWORD=ci-minio-secret-0123456789 \
+            minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+          ready=0
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:9000/minio/health/ready; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "::error::MinIO did not become ready within 60 s; the real-store tests cannot run"
+            docker logs minio || true
+            exit 1
+          fi
+          python - <<'PY'
+          import boto3
+          boto3.client(
+              "s3",
+              endpoint_url="http://localhost:9000",
+              aws_access_key_id="ci-minio-user",
+              aws_secret_access_key="ci-minio-secret-0123456789",
+              region_name="us-east-1",
+          ).create_bucket(Bucket="uadas-ci")
+          PY
+
       - name: mypy (apps/api, django-stubs)
         # Its own run, from apps/api, so mypy reads apps/api/pyproject.toml (which loads
         # the django-stubs plugin) instead of the repo-root config (the core's curated,
@@ -149,11 +182,14 @@ jobs:
         # at 3.3 auth (484 at the 3.2 data model, 65 at the 3.1 skeleton; most of the
         # growth is the discovery-based tenant-isolation harness, which multiplies one
         # check across every tenant model, and 3.3's auth/role/last-owner suites) and 744
-        # after the core session seam (core_bridge tests). The
-        # count includes two Postgres-only race tests that skip on SQLite. The floor is that
-        # minus 2, leaving room to prune a couple deliberately while failing on a real
-        # collapse (e.g. a conftest import error that silently drops a whole module).
-        # Raise it as the suite grows -- lowering it should be a conscious, reviewed
+        # after the core session seam (core_bridge tests) and 1271 at 3.4 storage (settings,
+        # keys, facade, lifecycle, D4-on-object-storage atomicity; the facade and workspace
+        # suites are parametrized over an in-memory fake and a real MinIO, so they count
+        # twice). The count includes three Postgres-only race tests that skip on SQLite and
+        # the MinIO-parametrized tests, which this job runs against the container above.
+        # The floor is that minus 2, leaving room to prune a couple deliberately while failing
+        # on a real collapse (e.g. a conftest import error that silently drops a whole
+        # module). Raise it as the suite grows -- lowering it should be a conscious, reviewed
         # change.
         run: |
           out="$(python -m pytest apps/api/tests --collect-only -q -p no:cacheprovider)"
@@ -161,12 +197,31 @@ jobs:
           count="$(echo "$out" | grep -oE '^[0-9]+ tests? collected' | grep -oE '^[0-9]+')"
           test -n "$count" || { echo "::error::could not read a collected-test count"; exit 1; }
           echo "collected: $count"
-          test "$count" -ge 742 || { echo "::error::collected $count tests, expected at least 742"; exit 1; }
+          test "$count" -ge 1269 || { echo "::error::collected $count tests, expected at least 1269"; exit 1; }
 
       - name: pytest (apps/api)
         # DJANGO_SETTINGS_MODULE comes from apps/api/pyproject.toml, not the
         # environment, so the core suite above never initialises Django.
-        run: python -m pytest apps/api/tests -q --tb=long -p no:cacheprovider
+        # STORAGE_* point the opt-in real-store tests at the MinIO started above; the
+        # `test` settings never read them (the suite itself stays hermetic).
+        env:
+          STORAGE_INTEGRATION: "1"
+          STORAGE_ENDPOINT_URL: http://localhost:9000
+          STORAGE_BUCKET: uadas-ci
+          STORAGE_ACCESS_KEY_ID: ci-minio-user
+          STORAGE_SECRET_ACCESS_KEY: ci-minio-secret-0123456789
+        # Skips are budgeted, not ignored. About a hundred storage tests skip silently when the
+        # real-store environment is lost, which would turn the build green while removing the
+        # strongest evidence; `test_storage_ci_guard.py` fails that case (CI=true), and this
+        # fails the job if more than the known skips occur. The budget is 2: the one SSE test
+        # (MinIO has no KMS, so STORAGE_TEST_SSE is off) plus one spare, not a free allowance.
+        shell: bash
+        run: |
+          python -m pytest apps/api/tests -q --tb=long -p no:cacheprovider -rs | tee pytest-api.log
+          skipped="$(grep -oE '[0-9]+ skipped' pytest-api.log | tail -n 1 | grep -oE '^[0-9]+' || true)"
+          skipped="${skipped:-0}"
+          echo "skipped: $skipped"
+          test "$skipped" -le 2 || { echo "::error::$skipped tests skipped, budget is 2 (is the MinIO integration environment intact?)"; exit 1; }
 
       - name: manage.py check --deploy (prod settings)
         # The deployment checklist must be clean with a valid production environment;
@@ -184,6 +239,13 @@ jobs:
           DEFAULT_FROM_EMAIL: UADAS <no-reply@example.com>
           EMAIL_HOST: smtp.example.com
           FRONTEND_BASE_URL: https://app.example.com
+          # Required since 3.4 (prod refuses to start without a bucket and real-looking
+          # credentials, and an https endpoint). Random-looking throwaways, not placeholders.
+          STORAGE_SSE: aes256
+          STORAGE_BUCKET: uadas-ci-data
+          STORAGE_ENDPOINT_URL: https://objects.example.com
+          STORAGE_ACCESS_KEY_ID: ci-key-4f7q2m9xj3kd8tlp
+          STORAGE_SECRET_ACCESS_KEY: wJ9r3Kd8Zx2PqL7mV5nB1cT6yH4sG0aE9uRf
         run: python manage.py check --deploy --fail-level WARNING
 
       - name: bandit (apps/api)

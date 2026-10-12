@@ -27,6 +27,7 @@ from typing import Any
 from uadas_api.accounts.models import AuditEvent, Organization, User
 from uadas_api.exports.models import Report
 from uadas_api.pipeline.models import PipelineEdge, PipelineNode, Recipe
+from uadas_api.storage.models import OrphanedObject, WorkspaceHead
 from uadas_api.tenancy import TenantOwnedModel
 from uadas_api.workspaces.models import ChartSpec, Dashboard, DatasetRecord, Project
 
@@ -190,6 +191,21 @@ def _recipe(organization: Organization, **kw: Any) -> Recipe:
     kw.setdefault("version", 1)
     kw.setdefault("definition", {"version": "1.0", "steps": []})
     return Recipe(organization=organization, project=project, **kw)
+
+
+@register(WorkspaceHead)
+def _workspace_head(organization: Organization, **kw: Any) -> WorkspaceHead:
+    project = _parent(Project, organization, kw, "project")
+    kw.setdefault("version", 1)
+    kw.setdefault("manifest", {})
+    return WorkspaceHead(organization=organization, project=project, **kw)
+
+
+@register(OrphanedObject)
+def _orphaned_object(organization: Organization, **kw: Any) -> OrphanedObject:
+    kw.setdefault("storage_key", f"{organization.pk}/objects/{uuid.uuid4()}")
+    kw.setdefault("reason", "test")
+    return OrphanedObject(organization=organization, **kw)
 
 
 @register(Report)

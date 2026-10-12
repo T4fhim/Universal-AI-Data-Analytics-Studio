@@ -18,10 +18,11 @@ own no stored object (``ChartSpec``, ``Dashboard``, the pipeline rows); the rows
 own one (``DatasetRecord``, ``Report``) hold their project with ``PROTECT``.
 
 What that ``PROTECT`` does and does not do: it stops ``Project.delete()`` while such rows
-exist. It does **not** protect the stored object -- ``DatasetRecord.delete()`` and
-``Report.delete()`` succeed and leave the object in the bucket. Deleting a row that owns a
-stored object must therefore go through a service that deletes the object first (Phase
-3.4, storage); until then nothing here prevents orphaned objects.
+exist. It does **not** by itself protect the stored object. Since Phase 3.4 a ``post_delete``
+receiver (``uadas_api.storage.signals``) queues the row's objects for deletion in the delete's own
+transaction and they are removed after commit (``uadas_api.storage.lifecycle``), so
+``DatasetRecord.delete()`` -- by instance, queryset or cascade -- no longer orphans the bucket
+object; ``QuerySet._raw_delete`` and raw SQL still bypass it.
 
 ``parent_dataset_id`` may dangle (the parent was closed, or never saved) but may not name
 a dataset of *another organization*; that is checked on every write path.

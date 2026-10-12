@@ -202,6 +202,17 @@ swap. Garbage-collecting earlier means a failure in between leaves the *previous
 pointing at frames that are already gone. Don't reorder it; `tests/persistence/test_persistence_atomicity.py`
 injects each failure.
 
+**The same property now also holds over object storage (Phase 3.4)**, in
+`apps/api/uadas_api/storage/workspace.py` (`StorageBackedPersistence`; the core's `PersistenceService`
+is unchanged and runs against a per-call temp dir): every object of a save is written under a *new,
+never-reused* key (a PUT overwrites in place, so a key the current head references is never
+rewritten), the one-row compare-and-swap of `WorkspaceHead` is the swap (it also rejects a second
+concurrent writer), and the objects the old manifest alone referenced are queued for deletion *in
+the swap's transaction* and deleted only **after** commit, tolerating failure. Don't write a frame
+or the database to an existing key, don't delete before the swap, and don't touch the bucket except
+through `uadas_api.storage.store.get_store()`; `apps/api/tests/test_storage_workspace.py` injects
+each failure (and runs on a real MinIO in CI).
+
 ### Configuration
 
 Adding a new config key means updating `_default_config_dict`, `_TOP_LEVEL_SCHEMA`/`_NESTED_SCHEMA`, and

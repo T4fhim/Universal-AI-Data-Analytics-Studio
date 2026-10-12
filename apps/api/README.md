@@ -5,13 +5,15 @@ The Django 6 + Django Ninja backend for the Universal AI Data Analytics Studio w
 It is a separate distribution from the framework-free core (`uadas_core`, repo root) and
 depends on it; the core never imports it (enforced by `.importlinter`).
 
-**Status: sub-step 3.3, authentication and per-organization roles.** Five Django apps
-(`accounts`, `workspaces`, `pipeline`, `ai`, `exports`), split settings, the models described
-under [Data model](#data-model), sign-in through django-allauth (headless, session cookies),
-and the account endpoints listed under [Authentication](#authentication) and
-[Endpoints](#endpoints). `GET /api/health` stays public and database-free. No storage,
-background tasks or API endpoints over the *data* models yet (3.4 onwards).
-`AUTH_USER_MODEL = "accounts.User"`. Decisions and limits: [plans/phase-3-3-auth.md](../../plans/phase-3-3-auth.md).
+**Status: sub-step 3.4, object storage** (on top of 3.3 authentication and per-organization
+roles). Six Django apps (`accounts`, `workspaces`, `pipeline`, `ai`, `exports`, `storage`),
+split settings, the models described under [Data model](#data-model), sign-in through
+django-allauth (headless, session cookies), the account endpoints listed under
+[Authentication](#authentication) and [Endpoints](#endpoints), and tenant-scoped S3-compatible
+storage ([Object storage](#object-storage)). `GET /api/health` stays public and database-free.
+No upload endpoint, background tasks or API endpoints over the *data* models yet (3.5 onwards).
+`AUTH_USER_MODEL = "accounts.User"`. Decisions and limits: [plans/phase-3-3-auth.md](../../plans/phase-3-3-auth.md),
+[plans/phase-3-4-storage.md](../../plans/phase-3-4-storage.md).
 
 ## Install
 
@@ -64,6 +66,17 @@ Configuration is 12-factor: environment variables only. Do not commit `.env` fil
 | `EMAIL_PORT` | prod | `587` | SMTP port. |
 | `EMAIL_USE_TLS` | prod | `true` | STARTTLS to the relay. |
 | `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | prod | none | SMTP credentials; unset means an unauthenticated relay. Environment only, never committed. |
+| `STORAGE_BUCKET` | base, prod | none (`dev`: `uadas-uploads`) | The S3-compatible bucket holding every tenant's objects (3-63 lowercase letters, digits, dots, hyphens). The bucket and both credentials travel together; any one alone fails start-up. **Required in prod.** |
+| `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` | base, prod | none (`dev`: the docker-compose MinIO root pair) | Explicit credentials; ambient `AWS_*` variables, profiles and instance roles are deliberately never consulted. **Required in prod**, where a short (< 24 characters), low-variety, placeholder-looking (`changeme`, `example`, `minioadmin`, ...) or access-key-equal secret is refused. Environment only. |
+| `STORAGE_ENDPOINT_URL` | base, prod | none = AWS (`dev`: `http://localhost:9000`) | S3-compatible endpoint (MinIO, R2); scheme and host only, no credentials, path or query. Must be `https://` in prod. |
+| `STORAGE_REGION` | base | `us-east-1` | Signing region, e.g. `us-east-1` (`auto` for Cloudflare R2). |
+| `STORAGE_ADDRESSING` | base | `auto` (`dev`: `path`) | `auto`, `path` or `virtual` (S3 addressing style; MinIO needs `path`). |
+| `STORAGE_SSE` | base, prod | `none` | `none` or `aes256`: send `ServerSideEncryption: AES256` (SSE-S3) on writes; where the store reports the encryption it applied, a different answer fails the write and removes the object. **Prod requires `aes256`**, or `none` together with `STORAGE_ENCRYPTION_ACKNOWLEDGED=1`. MinIO rejects the header without a KMS; R2 always encrypts. |
+| `STORAGE_ENCRYPTION_ACKNOWLEDGED` | prod | `false` | `1` in prod when `STORAGE_SSE=none` is deliberate (the bucket/store encrypts at rest by default and rejects the header). Ignored when `aes256` is set. |
+| `STORAGE_GC_GRACE_SECONDS` | base | `3600` (`test`: `0`) | Grace period before an owed deletion is paid, 0 to 604800: retired objects wait this long after the swap (a reader that loaded the previous workspace may still need them) and a directory purge never touches objects younger than this or written after its debt was queued (an in-flight save's upload). `purge_orphaned_objects --min-age` overrides it per run. |
+| `STORAGE_PRESIGN_SECONDS` | base | `300` | Default and maximum lifetime of a presigned download URL, 1-900. |
+| `STORAGE_MAX_OBJECT_BYTES` | base | `1073741824` | Deployment-wide size cap of one stored object; no call can raise it. |
+| `STORAGE_INTEGRATION` | tests only | unset | `1` (with `STORAGE_ENDPOINT_URL`, `STORAGE_BUCKET` and the two credentials) also runs the storage tests against a real store. The `test` settings never read any `STORAGE_*`. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | base | none | Enable "sign in with GitHub". Both or neither: one alone fails start-up. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | base | none | Enable "sign in with Google". Both or neither. |
 
@@ -138,6 +151,7 @@ Full table, constraints and limitations: [plans/phase-3-2-data-model.md](../../p
 | `workspaces` | `Project`, `DatasetRecord`, `ChartSpec`, `Dashboard` |
 | `pipeline` | `PipelineNode`, `PipelineEdge` (the provenance DAG), `Recipe` |
 | `exports` | `Report` |
+| `storage` | `WorkspaceHead` (the compare-and-swap pointer of a project's saved workspace), `OrphanedObject` (durable queue of owed object deletions) |
 | `ai` | none yet |
 
 Every model except `User`/`Organization`/`Membership` inherits `TenantOwnedModel`
@@ -163,6 +177,36 @@ Adding a tenant model: subclass `TenantOwnedModel` with `class Meta(TenantOwnedM
 or unique constraint that leads with `organization`, register a factory in `tests/factories.py`
 (the isolation harness fails until you do), `makemigrations`, done.
 
+## Object storage
+
+Tenant data (uploaded originals, Parquet frames, workspace snapshots, exports) lives in one
+S3-compatible bucket, keyed `"<organization_id>/..."`. Design and limits:
+[plans/phase-3-4-storage.md](../../plans/phase-3-4-storage.md).
+
+- **One way in.** Application code uses `uadas_api.storage.store.get_store(organization)` and
+  nothing else. The returned `TenantObjectStore` re-validates every key against the organization
+  before any request (a key of organization A can never be read, written, deleted, listed, copied
+  or presigned through B's handle), caps sizes, allow-lists content types, records and verifies a
+  SHA-256, refuses to overwrite by default, and issues short-lived presigned URLs (at most 15
+  minutes). `tests/test_storage_boundary.py` fails if another module imports boto3 /
+  django-storages or a backend module. Keys come from `uadas_api.storage.keys` (fixed layouts built
+  from identifiers; a user's file name is metadata, never a key segment).
+- **Workspaces keep the Phase 2.7 guarantee.** `uadas_api.storage.workspace.StorageBackedPersistence`
+  loads and saves a project's workspace through the core's unchanged `PersistenceService`: new
+  immutable objects under unique keys, one conditional update of the `WorkspaceHead` row as the
+  swap (also the optimistic-concurrency check), garbage collected only afterwards.
+  `load(dataset_ids=[...])` fetches only the requested frames. A caller passes the version it
+  loaded as `expected_version` to `save`; a stale one raises `ConcurrentSaveError`.
+- **Rows own objects.** Deleting a `DatasetRecord`, `Report` or `WorkspaceHead` queues its objects in
+  the same transaction and deletes them after commit; failures stay queued. Run
+  `python manage.py purge_orphaned_objects [--min-age SECONDS]` (cron / worker) to retry, and
+  `python manage.py reconcile_storage <organization-id>` for a read-only rows-versus-objects report.
+- **Configuration is fail-closed.** `base` has no default bucket, endpoint or credential; `dev` points
+  at the docker-compose MinIO (`docker compose -f docker-compose.dev.yml up -d`, bucket
+  `uadas-uploads`); `test` uses an in-memory fake; `prod` refuses to start without real values.
+  The bucket must not be public (the app never sends ACLs; use the provider's block-public-access
+  and a bucket policy).
+
 ## Test
 
 ```bash
@@ -172,7 +216,12 @@ python -m pytest apps/api/tests -q      # from the repo root
 The pytest settings (`DJANGO_SETTINGS_MODULE = uadas_api.settings.test`) live in
 `apps/api/pyproject.toml`, so the core suite (`python -m pytest tests -q`) is unaffected.
 CI's `api-test` job runs this suite against a Postgres 17 service container by setting
-`DATABASE_URL`; locally it falls back to in-memory SQLite.
+`DATABASE_URL`; locally it falls back to in-memory SQLite. The storage tests run against an
+in-memory fake; to run them against a real store too, start the compose MinIO and export
+`STORAGE_INTEGRATION=1 STORAGE_ENDPOINT_URL=http://localhost:9000 STORAGE_BUCKET=uadas-uploads
+STORAGE_ACCESS_KEY_ID=... STORAGE_SECRET_ACCESS_KEY=...` (the root pair from
+`docker-compose.dev.yml`; CI starts its own MinIO). Each test uses a random organization id and
+deletes only its own objects.
 
 Lint-imports needs the API on the path when run without the editable install:
 `PYTHONPATH=apps/api lint-imports`.

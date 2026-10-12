@@ -5,8 +5,9 @@ Why: a mis-configured production process must fail loudly at start-up, not run w
 guessable key, an open host list, a per-process rate-limit cache or no way to send the
 verification mail that sign-up now depends on. Importing this module raises
 ``ImproperlyConfigured`` unless ``DJANGO_SECRET_KEY``, ``DJANGO_ALLOWED_HOSTS``,
-``DATABASE_URL``, ``REDIS_URL``, ``DEFAULT_FROM_EMAIL``, ``EMAIL_HOST`` and
-``FRONTEND_BASE_URL`` are set and sane. ``DEBUG`` is hard-wired off (``DJANGO_DEBUG`` is
+``DATABASE_URL``, ``REDIS_URL``, ``DEFAULT_FROM_EMAIL``, ``EMAIL_HOST``,
+``FRONTEND_BASE_URL`` and the object store (``STORAGE_BUCKET``, ``STORAGE_ACCESS_KEY_ID``,
+``STORAGE_SECRET_ACCESS_KEY``; https endpoint, no placeholder secrets) are set and sane. ``DEBUG`` is hard-wired off (``DJANGO_DEBUG`` is
 ignored here on purpose -- an env var must not be able to turn tracebacks and settings
 dumps on in production), and email verification is hard-wired ``mandatory`` for the same
 reason. Cookie, HSTS and redirect hardening is on by default; the knobs that depend on
@@ -33,6 +34,7 @@ from email.utils import parseaddr
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.validators import validate_email
 
+from . import _storage
 from ._env import get_bool, get_int, get_str
 from .base import *  # noqa: F403 - the settings split is a star-import by design
 from .base import (
@@ -41,6 +43,7 @@ from .base import (
     FRONTEND_BASE_URL,
     SECRET_KEY,
     UADAS_CORE_LOG_LEVEL,
+    UADAS_STORAGE,
 )
 
 # Django's own deployment check (W009) wants at least 50 characters; refuse anything
@@ -92,6 +95,10 @@ if not FRONTEND_BASE_URL.lower().startswith("https://"):
         "FRONTEND_BASE_URL must be an https:// URL in production: it carries the "
         "single-use verification and password-reset links."
     )
+
+# Object storage (3.4): a bucket, explicit credentials that are not placeholders, https for a
+# custom endpoint. Private objects and short-lived signed URLs are fixed in settings/_storage.
+_storage.validate_for_production(UADAS_STORAGE)
 
 DEBUG = False
 

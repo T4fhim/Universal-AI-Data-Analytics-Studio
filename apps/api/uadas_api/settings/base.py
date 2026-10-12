@@ -25,7 +25,7 @@ from typing import Any
 
 import dj_database_url
 
-from . import _auth
+from . import _auth, _storage
 from ._env import get_bool, get_choice, get_list, get_str
 
 # apps/api/ -- the directory holding manage.py. Anchored on this file, never on the
@@ -74,6 +74,8 @@ INSTALLED_APPS: list[str] = [
     "uadas_api.pipeline",
     "uadas_api.ai",
     "uadas_api.exports",
+    # 3.4: tenant object-storage facade, workspace persistence, orphan queue.
+    "uadas_api.storage",
 ]
 
 MIDDLEWARE: list[str] = [
@@ -209,3 +211,16 @@ UADAS_CORE_LOG_LEVEL: str = get_choice(
     ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"),
     default="INFO",
 )
+
+# --- object storage (3.4) -----------------------------------------------------------
+
+# S3-compatible object storage for uploaded originals, Parquet frames, workspace snapshots
+# and exports. Parsed strictly from STORAGE_* (see settings/_storage.py): no default bucket,
+# endpoint or credential exists here -- `dev` supplies the docker-compose MinIO pair, `test`
+# swaps in an in-memory store, `prod` refuses to start without real values. Unconfigured
+# (backend "") means the store is unavailable and every access fails closed.
+UADAS_STORAGE: dict[str, Any] = _storage.parse_storage()
+# Declaring STORAGES replaces Django's default mapping, so `default` / `staticfiles` are
+# carried over inside `django_storages`. `tenant_objects` (S3 only) is reached solely through
+# `uadas_api.storage`; no other module may touch it.
+STORAGES: dict[str, Any] = _storage.django_storages(UADAS_STORAGE)

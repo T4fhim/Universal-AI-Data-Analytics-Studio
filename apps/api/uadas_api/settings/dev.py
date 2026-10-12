@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import dj_database_url
 
-from . import _auth
+from . import _auth, _storage
 from ._env import get_str
 from .base import *  # noqa: F403 - the settings split is a star-import by design
 from .base import BASE_DIR
@@ -42,3 +42,19 @@ DEFAULT_FROM_EMAIL = "UADAS dev <no-reply@localhost>"
 
 FRONTEND_BASE_URL = get_str("FRONTEND_BASE_URL", "http://localhost:5173")
 HEADLESS_FRONTEND_URLS = _auth.frontend_urls(FRONTEND_BASE_URL)
+
+# Object storage defaults to the docker-compose MinIO (`docker-compose.dev.yml`): its
+# throwaway root credentials and the bucket `minio-init` creates. They are supplied HERE and
+# nowhere else -- `base` has no defaults and `prod` rejects these values -- and any STORAGE_*
+# variable in the environment wins over them, so a developer can point at another store.
+_MINIO_ROOT = "minioadmin"  # the compose file's MINIO_ROOT_USER and _PASSWORD
+UADAS_STORAGE = _storage.parse_storage(
+    {
+        "STORAGE_BUCKET": "uadas-uploads",
+        "STORAGE_ENDPOINT_URL": "http://localhost:9000",
+        "STORAGE_ACCESS_KEY_ID": _MINIO_ROOT,
+        "STORAGE_SECRET_ACCESS_KEY": _MINIO_ROOT,
+        "STORAGE_ADDRESSING": "path",
+    }
+)
+STORAGES = _storage.django_storages(UADAS_STORAGE)

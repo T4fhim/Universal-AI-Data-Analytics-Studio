@@ -65,7 +65,8 @@ immutability check; deferred loads; cross-tenant `parent_dataset_id`; email look
 - `update()` verifies a model/PK value; an expression on a tenant reference is refused, not checked.
 - Same-**project** consistency (an edge whose endpoints sit in different projects of one organization) is not enforced.
 - `PROTECT` on a project only stops `Project.delete()`; `DatasetRecord.delete()`/`Report.delete()` succeed and orphan the
-  bucket object. Deleting such rows must go through a service that deletes the object first (Phase 3.4).
+  bucket object. **Done in 3.4:** `post_delete` receivers queue the row's objects in the delete's transaction and
+  they are removed after commit ([phase-3-4-storage.md](phase-3-4-storage.md)); `_raw_delete` and raw SQL still bypass it.
 - `AuditEvent` is append-only in Python only (a trigger or revoked privileges would survive raw SQL). An organization with
   audit history can never be deleted, and no organization-offboarding path exists: **deferred past 3.3**
   ([phase-3-3-auth.md](phase-3-3-auth.md)).

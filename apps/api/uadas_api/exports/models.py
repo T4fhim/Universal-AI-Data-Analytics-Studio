@@ -10,9 +10,9 @@ tracks that lifecycle and, once ``ready``, names the stored object.
 may be empty while the report is ``pending`` or ``failed`` (there is no object yet), and
 the database refuses a ``ready`` report without one. When present it must start with
 ``"<organization_id>/"``. The project foreign key is ``PROTECT``, which only stops
-``Project.delete()`` while reports exist: ``Report.delete()`` itself succeeds and leaves
-the stored file behind, so deleting a report must go through a service that removes the
-object first (Phase 3.4).
+``Project.delete()`` while reports exist. ``Report.delete()`` itself succeeds; since Phase 3.4
+a ``post_delete`` receiver (``uadas_api.storage.signals``) queues the stored file for deletion in
+the same transaction and it is removed after commit, so the file is not left behind.
 """
 
 from __future__ import annotations
