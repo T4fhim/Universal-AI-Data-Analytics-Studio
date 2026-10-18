@@ -60,13 +60,16 @@ resources/web/        # chart_host.html + chart_bridge.js + the vendored Plotly 
 Dependency direction is one-way down the package list: `core` sits at the bottom and depends on
 nothing above it; `services`, `readers`, `cleaning`, `analysis`, `forecasting`, and
 `visualization` build on it; `ai` depends on most of them. `.importlinter` enforces this with
-five contracts: (1) `uadas_core` must not import PySide6 / PyQt / Django, (2) only `provenance`
+six contracts: (1) `uadas_core` must not import PySide6 / PyQt / Django, (2) only `provenance`
 itself may import `uadas_core.provenance` (it is a leaf), (3) a `layers` contract that
 makes the subpackages a strict dependency stack (with **no** `ignore_imports`: the two old
 exemptions were removed by typing `AssistantService`'s workspace and `ApplicationState`'s
 values as Protocols), (4) `uadas_core` must not import `uadas_api`, and (5) `uadas_api` must not
 import `uadas_core.plugins` / `.jobs` (four ignored edges, all from `uadas_core.bootstrap`, the
-composition root). Run `PYTHONPATH=apps/api lint-imports` to check them.
+composition root), and (6) `uadas_api` may import `uadas_core.readers` or a parsing library
+(camelot, PyMuPDF, openpyxl, lxml, OpenCV ...) only in `uadas_api.sandbox.child`, the sandboxed
+parser process (Phase 3.5; direct imports only, and a fresh-interpreter test covers the rest).
+Run `PYTHONPATH=apps/api lint-imports` to check them.
 
 ## Application startup sequence
 

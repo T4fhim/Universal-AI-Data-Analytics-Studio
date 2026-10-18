@@ -17,6 +17,8 @@ from pathlib import Path
 
 import pytest
 
+from uadas_api.sandbox.limits import limits_enforceable
+
 API_ROOT = Path(__file__).resolve().parents[1]
 EnvBuilder = Callable[..., dict[str, str]]
 
@@ -29,6 +31,8 @@ VALID_PROD_ENV = {
     "EMAIL_HOST": "smtp.example.com",
     "FRONTEND_BASE_URL": "https://app.example.com",
     "STORAGE_SSE": "aes256",
+    "SANDBOX_ISOLATION_ACKNOWLEDGED": "container",
+    "SANDBOX_NETWORK_ISOLATION": "container",
     "STORAGE_BUCKET": "uadas-tenant-data",
     "STORAGE_ENDPOINT_URL": "https://objects.example.com",
     "STORAGE_ACCESS_KEY_ID": "ci-key-4f7q2m9xj3kd8tlp",
@@ -62,6 +66,11 @@ def test_entrypoint_refuses_to_start_unconfigured(
     assert "ImproperlyConfigured" in result.stderr
 
 
+@pytest.mark.skipif(
+    not limits_enforceable(),
+    reason="prod settings start only on Linux (the sandbox must enforce its limits); "
+    "CI runs this on Linux and test_sandbox_ci_guard.py fails it if it skipped there",
+)
 @pytest.mark.parametrize("module", ["uadas_api.wsgi", "uadas_api.asgi"])
 def test_entrypoint_selects_prod_settings_with_debug_off(
     subprocess_env: EnvBuilder, module: str
@@ -69,3 +78,16 @@ def test_entrypoint_selects_prod_settings_with_debug_off(
     result = _import(module, subprocess_env(**VALID_PROD_ENV))
     assert result.returncode == 0, result.stderr
     assert result.stdout.split() == ["uadas_api.settings.prod", "False"]
+
+
+@pytest.mark.skipif(
+    limits_enforceable(),
+    reason="the twin of the test above, for platforms without rlimits",
+)
+@pytest.mark.parametrize("module", ["uadas_api.wsgi", "uadas_api.asgi"])
+def test_entrypoint_refuses_prod_where_the_sandbox_cannot_enforce_limits(
+    subprocess_env: EnvBuilder, module: str
+) -> None:
+    result = _import(module, subprocess_env(**VALID_PROD_ENV))
+    assert result.returncode != 0
+    assert "memory and CPU limits" in result.stderr

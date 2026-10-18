@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import dj_database_url
 
-from . import _auth, _storage
+from . import _auth, _jobs, _storage
 from .base import *  # noqa: F403 - the settings split is a star-import by design
 
 DEBUG = False
@@ -43,3 +43,11 @@ HEADLESS_FRONTEND_URLS = _auth.frontend_urls(FRONTEND_BASE_URL)
 # can neither reach a real bucket from the suite nor change its outcome.
 UADAS_STORAGE = _storage.memory_storage()
 STORAGES = _storage.django_storages(UADAS_STORAGE)
+
+# Jobs run eagerly (inline, in the test's own thread) against an in-memory broker, and the
+# sandbox uses its built-in defaults: none of it is read from the environment, so a developer's
+# CELERY_BROKER_URL / SANDBOX_* can neither reach a real Redis from the suite nor change a
+# test's outcome. The real worker is exercised by the opt-in integration test.
+UADAS_JOBS = _jobs.hermetic_jobs()
+UADAS_SANDBOX = _jobs.parse_sandbox({})
+globals().update(_jobs.celery_settings(UADAS_JOBS))

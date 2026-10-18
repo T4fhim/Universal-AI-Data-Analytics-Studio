@@ -19,7 +19,13 @@ from types import ModuleType
 
 import pytest
 
+from uadas_api.sandbox import limits as _sandbox_limits
+
 API_ROOT = Path(__file__).resolve().parents[1]
+
+# The real platform check, captured at import so `load_settings` can tell whether a test has
+# replaced it (see the comment in `load`).
+_REAL_LIMITS_ENFORCEABLE = _sandbox_limits.limits_enforceable
 
 # Every variable the settings modules read. Cleared before each settings load so a
 # developer's (or CI's) own shell environment can never decide a test's outcome.
@@ -61,6 +67,35 @@ SETTINGS_ENV_VARS: tuple[str, ...] = (
     "STORAGE_ENCRYPTION_ACKNOWLEDGED",
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
+    # 3.5: the job queue and the parser sandbox.
+    "CELERY_BROKER_URL",
+    "JOBS_EAGER",
+    "JOBS_QUEUE",
+    "JOBS_MAX_ATTEMPTS",
+    "JOBS_STALE_AFTER_SECONDS",
+    "JOBS_SOFT_TIME_LIMIT_SECONDS",
+    "JOBS_TIME_LIMIT_SECONDS",
+    "JOBS_VISIBILITY_TIMEOUT_SECONDS",
+    "JOBS_RETRY_BACKOFF_BASE_SECONDS",
+    "JOBS_RETRY_BACKOFF_MAX_SECONDS",
+    "JOBS_REQUEUE_AFTER_SECONDS",
+    "JOBS_PROGRESS_INTERVAL_MS",
+    "SANDBOX_WALL_SECONDS",
+    "SANDBOX_CPU_SECONDS",
+    "SANDBOX_MEMORY_MB",
+    "SANDBOX_MAX_INPUT_MB",
+    "SANDBOX_MAX_OUTPUT_MB",
+    "SANDBOX_MAX_ROWS",
+    "SANDBOX_MAX_COLUMNS",
+    "SANDBOX_PROCESS_HEADROOM",
+    "SANDBOX_MAX_ARCHIVE_ENTRIES",
+    "SANDBOX_MAX_DECOMPRESSED_MB",
+    "SANDBOX_MAX_COMPRESSION_RATIO",
+    "SANDBOX_TMP_ROOT",
+    "SANDBOX_CHILD_UID",
+    "SANDBOX_CHILD_GID",
+    "SANDBOX_NETWORK_ISOLATION",
+    "SANDBOX_ISOLATION_ACKNOWLEDGED",
 )
 
 _SETTINGS_PACKAGE = "uadas_api.settings"
@@ -90,6 +125,15 @@ def load_settings(
         for var, value in env.items():
             monkeypatch.setenv(var, value)
         _purge_settings_modules()
+        # `prod` refuses to start where the sandbox cannot enforce its limits (anywhere but
+        # Linux). The tests of *other* production settings must still run on a laptop, so
+        # unless a test has already chosen the platform answer itself, pretend it is Linux.
+        from uadas_api.sandbox import limits as sandbox_limits
+
+        if sandbox_limits.limits_enforceable is _REAL_LIMITS_ENFORCEABLE:
+            monkeypatch.setattr(
+                sandbox_limits, "limits_enforceable", lambda *a, **k: True
+            )
         return importlib.import_module(f"{_SETTINGS_PACKAGE}.{name}")
 
     yield load

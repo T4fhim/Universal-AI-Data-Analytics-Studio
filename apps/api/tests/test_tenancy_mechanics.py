@@ -197,4 +197,5 @@ def test_discovery_includes_every_workspace_pipeline_and_export_model() -> None:
         "exports.Report",
         "storage.WorkspaceHead",
         "storage.OrphanedObject",
+        "jobs.Job",
     } == labels

@@ -26,6 +26,7 @@ from typing import Any
 
 from uadas_api.accounts.models import AuditEvent, Organization, User
 from uadas_api.exports.models import Report
+from uadas_api.jobs.models import Job
 from uadas_api.pipeline.models import PipelineEdge, PipelineNode, Recipe
 from uadas_api.storage.models import OrphanedObject, WorkspaceHead
 from uadas_api.tenancy import TenantOwnedModel
@@ -206,6 +207,15 @@ def _orphaned_object(organization: Organization, **kw: Any) -> OrphanedObject:
     kw.setdefault("storage_key", f"{organization.pk}/objects/{uuid.uuid4()}")
     kw.setdefault("reason", "test")
     return OrphanedObject(organization=organization, **kw)
+
+
+@register(Job)
+def _job(organization: Organization, **kw: Any) -> Job:
+    project = _parent(Project, organization, kw, "project")
+    kw.setdefault("kind", "ingest_dataset")
+    kw.setdefault("idempotency_key", f"key-{next(_counter)}")
+    kw.setdefault("params", {})
+    return Job(organization=organization, project=project, **kw)
 
 
 @register(Report)

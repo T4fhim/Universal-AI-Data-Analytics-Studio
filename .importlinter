@@ -118,6 +118,47 @@ allow_indirect_imports = False
 # ignore cannot express statically -- that server mode never imports or runs the plugin
 # loader -- is proved at runtime by tests/core/test_server_mode.py and
 # apps/api/tests/test_core_bridge.py (fresh-interpreter sys.modules probes).
+# Phase 3.5 (the parser sandbox): untrusted files are parsed ONLY in the sandbox child process.
+# `uadas_core.readers` feeds camelot, PyMuPDF, pdfplumber, python-docx, openpyxl, lxml, OpenCV and
+# Tesseract with attacker-controlled bytes -- a large CVE surface -- so no web or worker module
+# may import a reader or one of those libraries; the one module that may is
+# `uadas_api.sandbox.child`, which runs in its own rlimit'd, network-blocked, environment-
+# stripped process (see plans/phase-3-5-jobs.md). This contract is the static half; the
+# runtime half (a fresh interpreter importing the whole parent side loads none of them) is
+# tests/test_sandbox_boundary.py.
+#
+# `allow_indirect_imports = True` on purpose, unlike the contracts above: the composition root
+# `uadas_api.core_bridge` legitimately reaches `uadas_core.bootstrap`, whose services import the
+# reader registry (readers import their parsing libraries lazily or at module level -- either
+# way that chain is the *core's* business and is exactly what `core_bridge` is allowed to hold).
+# What this contract forbids is a *direct* import from API code, which is the mistake someone
+# makes when they "just need to read one file". The parent side never calls the core's readers:
+# `tests/test_sandbox_boundary.py` proves it by importing every parent module in a fresh
+# interpreter (no `core_bridge`) and checking that no reader library was loaded.
+[importlinter:contract:readers-only-in-the-sandbox-child]
+name = uadas_api imports uadas_core.readers and the parsing libraries only in uadas_api.sandbox.child
+type = forbidden
+source_modules =
+    uadas_api
+forbidden_modules =
+    uadas_core.readers
+    camelot
+    fitz
+    pymupdf
+    pdfplumber
+    docx
+    openpyxl
+    lxml
+    cv2
+    pytesseract
+    pptx
+    odf
+    pyxlsb
+    bs4
+allow_indirect_imports = True
+ignore_imports =
+    uadas_api.sandbox.child -> uadas_core.readers.**
+
 [importlinter:contract:api-avoids-plugins-and-jobs]
 name = uadas_api must not import uadas_core.plugins or uadas_core.jobs
 type = forbidden

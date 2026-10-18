@@ -96,7 +96,7 @@ class XmlReader(BaseReader):
             raise ReaderError(f"XML file does not exist: {path}")
 
         try:
-            tree = etree.parse(str(path))
+            tree = etree.parse(str(path), _safe_parser())
         except etree.XMLSyntaxError as exc:
             raise ReaderError(f"File {path} is not well-formed XML: {exc}") from exc
 
@@ -225,6 +225,21 @@ class XmlReader(BaseReader):
             record["value"] = element.text.strip()
 
         return record, warnings
+
+
+def _safe_parser() -> etree.XMLParser:
+    """A parser for *untrusted* XML: no entity expansion, no DTD loading, no network, no huge trees.
+
+    Why explicit: ``lxml``'s defaults changed between versions (before 5.0 external ``SYSTEM``
+    entities were resolved, so a ``.xml`` upload could put a local file's contents into a cell --
+    XXE; and an exponential "billion laughs" entity chain could exhaust memory). The reader must not
+    depend on which version it is installed beside. With ``resolve_entities=False`` an entity
+    reference is left as an unexpanded node (its text is simply absent from the table), and
+    ``huge_tree=False`` keeps libxml2's built-in size and depth limits on.
+    """
+    return etree.XMLParser(
+        resolve_entities=False, no_network=True, load_dtd=False, huge_tree=False
+    )
 
 
 def _local_tag(element) -> str:

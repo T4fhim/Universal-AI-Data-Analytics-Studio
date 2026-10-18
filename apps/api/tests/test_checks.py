@@ -19,6 +19,8 @@ from pathlib import Path
 import pytest
 from django.core.management import call_command
 
+from uadas_api.sandbox.limits import limits_enforceable
+
 API_ROOT = Path(__file__).resolve().parents[1]
 EnvBuilder = Callable[..., dict[str, str]]
 
@@ -40,6 +42,43 @@ def test_check_passes_under_test_settings() -> None:
     call_command("check")
 
 
+PROD_CHECK_ENV = {
+    "DJANGO_SETTINGS_MODULE": "uadas_api.settings.prod",
+    "DJANGO_ALLOWED_HOSTS": "api.example.com",
+    "DATABASE_URL": "sqlite://:memory:",
+    "REDIS_URL": "redis://localhost:6379/0",
+    "DEFAULT_FROM_EMAIL": "UADAS <no-reply@example.com>",
+    "EMAIL_HOST": "smtp.example.com",
+    "FRONTEND_BASE_URL": "https://app.example.com",
+    "STORAGE_SSE": "aes256",
+    # 3.5: production must say what separates the parser child and what isolates its network.
+    "SANDBOX_ISOLATION_ACKNOWLEDGED": "container",
+    "SANDBOX_NETWORK_ISOLATION": "container",
+    "STORAGE_BUCKET": "uadas-tenant-data",
+    "STORAGE_ENDPOINT_URL": "https://objects.example.com",
+    "STORAGE_ACCESS_KEY_ID": "ci-key-4f7q2m9xj3kd8tlp",
+    "STORAGE_SECRET_ACCESS_KEY": "wJ9r3Kd8Zx2PqL7mV5nB1cT6yH4sG0aE9uRf",
+}
+
+
+@pytest.mark.skipif(
+    limits_enforceable(),
+    reason="the twin of the deploy test below, for platforms without rlimits",
+)
+def test_check_deploy_refuses_prod_where_the_sandbox_cannot_enforce_limits(
+    subprocess_env: EnvBuilder,
+) -> None:
+    env = subprocess_env(DJANGO_SECRET_KEY=secrets.token_urlsafe(64), **PROD_CHECK_ENV)
+    result = _manage(["check", "--deploy", "--fail-level", "WARNING"], env)
+    assert result.returncode != 0
+    assert "memory and CPU limits" in result.stderr
+
+
+@pytest.mark.skipif(
+    not limits_enforceable(),
+    reason="prod settings start only on Linux (see the twin above); CI runs this on Linux "
+    "and test_sandbox_ci_guard.py fails the build if it skipped there",
+)
 def test_check_deploy_passes_with_valid_prod_environment(
     subprocess_env: EnvBuilder,
 ) -> None:
@@ -55,6 +94,9 @@ def test_check_deploy_passes_with_valid_prod_environment(
         FRONTEND_BASE_URL="https://app.example.com",
         # Required since 3.4 (object storage): bucket, https endpoint, real-looking credentials.
         STORAGE_SSE="aes256",
+        # Required since 3.5: what separates the parser child, and what isolates its network.
+        SANDBOX_ISOLATION_ACKNOWLEDGED="container",
+        SANDBOX_NETWORK_ISOLATION="container",
         STORAGE_BUCKET="uadas-tenant-data",
         STORAGE_ENDPOINT_URL="https://objects.example.com",
         STORAGE_ACCESS_KEY_ID="ci-key-4f7q2m9xj3kd8tlp",

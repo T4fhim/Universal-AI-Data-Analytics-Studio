@@ -82,6 +82,10 @@ class DatasetRecord(TenantOwnedModel):
     # Plain UUID, NOT a ForeignKey: mirrors the core's non-cascade lineage rule.
     parent_dataset_id = models.UUIDField(null=True, blank=True)
     storage_key = models.CharField(max_length=512)
+    # SHA-256 (lower-case hex) of the stored Parquet frame, as verified when it was written
+    # (3.5 ingest). Blank only for rows that predate it; lets a reader check the object
+    # against the row without a ``HEAD`` and survives a bucket-side metadata edit.
+    sha256 = models.CharField(max_length=64, blank=True)
     row_count = models.PositiveBigIntegerField()
     column_count = models.PositiveBigIntegerField()
     derivation_description = models.TextField(blank=True)
@@ -89,6 +93,11 @@ class DatasetRecord(TenantOwnedModel):
 
     class Meta(TenantOwnedModel.Meta):
         constraints = [
+            models.CheckConstraint(
+                condition=models.Q(sha256="")
+                | models.Q(sha256__regex=r"^[0-9a-f]{64}$"),
+                name="ck_dataset_sha256_shape",
+            ),
             models.CheckConstraint(
                 condition=models.Q(row_count__gte=0), name="ck_dataset_rows_nonneg"
             ),

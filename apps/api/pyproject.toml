@@ -30,8 +30,18 @@ dependencies = [
     # keeps a major release from changing the auth surface unreviewed.
     "django-allauth[socialaccount]>=65.19,<66",
     # Django's built-in Redis cache backend (`REDIS_URL`) needs the client library; the
-    # shared cache is what makes allauth's rate limits hold across workers.
-    "redis>=5",
+    # shared cache is what makes allauth's rate limits hold across workers. The upper bound is
+    # Celery's: `celery[redis]` 5.6 (kombu 5.6) supports redis-py up to 6.4, and an unbounded
+    # `redis` would resolve 7+/8 and make pip pick between the two (observed: celery[redis]
+    # downgraded an installed redis 8.1.0 to 6.4.0).
+    "redis>=5,<7",
+    # 3.5 background jobs. Celery is the courier behind the `uadas_api.jobs` facade (the only
+    # three modules that import it: celery_app, tasks, queue); Redis is the broker. Chosen over
+    # `django.tasks` (6.1 ships only an in-process Immediate and a Dummy backend) and its
+    # third-party backends (none gives acks-late, visibility-timeout and time-limit control,
+    # bounded retries with backoff): see plans/phase-3-5-jobs.md. The ceiling keeps a Celery 6
+    # from changing the delivery semantics unreviewed. JSON serialization only (settings/_jobs.py).
+    "celery[redis]>=5.6,<6",
     # 3.4 object storage: django-storages' S3Storage builds the configured boto3 client (any
     # S3-compatible endpoint: MinIO, AWS S3, R2); only `uadas_api/storage/s3.py` imports
     # either. 1.14 is the first line with the `STORAGES` setting and `client_config`; boto3
@@ -75,12 +85,22 @@ extend = "../../pyproject.toml"
 [tool.ruff.lint.per-file-ignores]
 "uadas_api/*/models.py" = ["RUF012"]
 "uadas_api/*/migrations/*.py" = ["RUF012"]
+# Tests unpack fixtures positionally (`org, user, project, job = setup_job()`) and use only what
+# the test needs; naming the rest `_` everywhere would hurt readability more than it helps.
+"tests/*.py" = ["RUF059"]
+# The hostile-reader stand-in is *meant* to swallow exceptions, loop forever and hold a mutable
+# class attribute like the parsers it models (see the module docstring).
+"tests/sandbox_launcher.py" = ["BLE001", "SIM105", "RUF012"]
 
 [tool.mypy]
 # Run from apps/api (`cd apps/api && python -m mypy uadas_api`): mypy reads the config
 # in the current directory, and this table loads the django-stubs plugin, which the
 # repo-root [tool.mypy] (the core's curated, plugin-free run) must not.
 python_version = "3.13"
+# The deployment platform, and CI's: the sandbox is written for Linux (os.killpg, setrlimit,
+# SIGXCPU ...), with Windows branches guarded by `sys.platform`. Pinning the platform makes the
+# report identical on a Windows laptop and on the Linux runner instead of "attribute missing" noise.
+platform = "linux"
 plugins = ["mypy_django_plugin.main"]
 check_untyped_defs = true
 warn_unused_ignores = true
@@ -98,6 +118,17 @@ ignore_missing_imports = true
 # therefore `Any` to mypy. Treated as untyped rather than silenced line by line.
 [[tool.mypy.overrides]]
 module = ["allauth", "allauth.*"]
+ignore_missing_imports = true
+
+# Celery and kombu (3.5) ship no type information either; `uadas_api.jobs.{celery_app,tasks,queue}`
+# are the only modules that import them. openpyxl / python-docx are imported by the tests only
+# (to build fixtures); the API code never imports a parsing library. (pandas in the tests carries
+# an inline ignore, like the existing storage tests.)
+[[tool.mypy.overrides]]
+module = [
+    "celery", "celery.*", "kombu", "kombu.*",
+    "openpyxl", "openpyxl.*", "docx", "docx.*",
+]
 ignore_missing_imports = true
 
 # boto3 / botocore / django-storages ship no type information. Treated as untyped rather than

@@ -4,8 +4,8 @@
 Why: a model change without its migration only fails at deploy time, and a migration
 graph with a wrong cross-app dependency can apply in the wrong order on a fresh database.
 So the suite checks (a) ``makemigrations --check`` finds nothing left to generate,
-(b) every app that has models has exactly one ``0001_initial`` and ``ai`` (no models
-yet) has none, (c) the cross-app dependencies are the ones the foreign keys require, and
+(b) every app that has models has exactly the migrations listed in ``EXPECTED_MIGRATIONS``
+(so none appears by accident) and ``ai`` (no models yet) has none, (c) the cross-app dependencies are the ones the foreign keys require, and
 (d) the user model really is ``accounts.User`` in the migration state -- the thing that
 cannot be changed after the first migration is applied anywhere.
 """
@@ -18,7 +18,18 @@ from django.conf import settings
 from django.core.management import call_command
 from django.db.migrations.loader import MigrationLoader
 
-MODEL_APPS = ("accounts", "workspaces", "pipeline", "exports")
+# Every migration each model app is expected to have, in order. This was "exactly one
+# 0001_initial per app" through 3.4; 3.5 adds `jobs` (its initial) and the first follow-up
+# migration anywhere (workspaces 0002: DatasetRecord.sha256). Adding a migration is a
+# deliberate edit here -- the point of the pin is that none appears by accident.
+EXPECTED_MIGRATIONS: dict[str, list[str]] = {
+    "accounts": ["0001_initial"],
+    "workspaces": ["0001_initial", "0002_datasetrecord_sha256_and_more"],
+    "pipeline": ["0001_initial"],
+    "exports": ["0001_initial"],
+    "jobs": ["0001_initial", "0002_job_not_before"],
+}
+MODEL_APPS = tuple(EXPECTED_MIGRATIONS)
 
 
 def _loader() -> MigrationLoader:
@@ -32,9 +43,9 @@ def test_makemigrations_check_finds_nothing_to_generate() -> None:
 
 
 @pytest.mark.parametrize("app", MODEL_APPS)
-def test_each_model_app_has_exactly_one_initial_migration(app: str) -> None:
+def test_each_model_app_has_exactly_its_expected_migrations(app: str) -> None:
     names = sorted(name for (label, name) in _loader().disk_migrations if label == app)
-    assert names == ["0001_initial"]
+    assert names == EXPECTED_MIGRATIONS[app]
 
 
 def test_the_ai_app_has_no_models_and_no_migrations() -> None:
@@ -61,6 +72,10 @@ def test_cross_app_dependencies_follow_the_foreign_keys() -> None:
         ("accounts", "0001_initial"),
         ("workspaces", "0001_initial"),
     } <= _dependencies("exports")
+    assert {
+        ("accounts", "0001_initial"),
+        ("workspaces", "0001_initial"),
+    } <= _dependencies("jobs")
 
 
 def test_the_workspaces_migration_depends_on_the_swappable_user_model() -> None:
@@ -76,7 +91,7 @@ def test_the_workspaces_migration_depends_on_the_swappable_user_model() -> None:
 def test_the_migrations_apply_in_dependency_order_to_one_leaf_per_app() -> None:
     loader = _loader()
     leaves = {key for key in loader.graph.leaf_nodes() if key[0] in MODEL_APPS}
-    assert leaves == {(app, "0001_initial") for app in MODEL_APPS}
+    assert leaves == {(app, EXPECTED_MIGRATIONS[app][-1]) for app in MODEL_APPS}
 
 
 def test_auth_user_model_is_set_to_the_accounts_user() -> None:

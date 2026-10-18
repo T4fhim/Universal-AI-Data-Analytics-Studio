@@ -34,7 +34,9 @@ from email.utils import parseaddr
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.validators import validate_email
 
-from . import _storage
+from uadas_api.sandbox import limits as _sandbox_limits
+
+from . import _jobs, _storage
 from ._env import get_bool, get_int, get_str
 from .base import *  # noqa: F403 - the settings split is a star-import by design
 from .base import (
@@ -43,6 +45,8 @@ from .base import (
     FRONTEND_BASE_URL,
     SECRET_KEY,
     UADAS_CORE_LOG_LEVEL,
+    UADAS_JOBS,
+    UADAS_SANDBOX,
     UADAS_STORAGE,
 )
 
@@ -99,6 +103,18 @@ if not FRONTEND_BASE_URL.lower().startswith("https://"):
 # Object storage (3.4): a bucket, explicit credentials that are not placeholders, https for a
 # custom endpoint. Private objects and short-lived signed URLs are fixed in settings/_storage.
 _storage.validate_for_production(UADAS_STORAGE)
+
+# Background jobs (3.5): a real broker (CELERY_BROKER_URL, defaulting to REDIS_URL), no eager
+# mode, and -- the part that cannot be faked -- a platform on which the parser sandbox can
+# enforce its memory and CPU limits (Linux). A Windows or macOS host does not start in
+# production; it can still run `dev`. `limits_enforceable` is looked up on the module at call
+# time so a test can stand in for the platform.
+_jobs.validate_for_production(
+    UADAS_JOBS,
+    UADAS_SANDBOX,
+    enforceable=_sandbox_limits.limits_enforceable(),
+    cache_url=get_str("REDIS_URL"),
+)
 
 DEBUG = False
 

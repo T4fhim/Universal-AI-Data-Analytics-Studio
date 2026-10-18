@@ -25,7 +25,7 @@ from typing import Any
 
 import dj_database_url
 
-from . import _auth, _storage
+from . import _auth, _jobs, _storage
 from ._env import get_bool, get_choice, get_list, get_str
 
 # apps/api/ -- the directory holding manage.py. Anchored on this file, never on the
@@ -76,6 +76,10 @@ INSTALLED_APPS: list[str] = [
     "uadas_api.exports",
     # 3.4: tenant object-storage facade, workspace persistence, orphan queue.
     "uadas_api.storage",
+    # 3.5: the Job table (durable state + progress sink) and its queue facade. The parser
+    # sandbox (`uadas_api.sandbox`) is deliberately NOT an app: it has no models and must
+    # stay importable without Django (the child process never loads it).
+    "uadas_api.jobs",
 ]
 
 MIDDLEWARE: list[str] = [
@@ -224,3 +228,17 @@ UADAS_STORAGE: dict[str, Any] = _storage.parse_storage()
 # carried over inside `django_storages`. `tenant_objects` (S3 only) is reached solely through
 # `uadas_api.storage`; no other module may touch it.
 STORAGES: dict[str, Any] = _storage.django_storages(UADAS_STORAGE)
+
+# --- background jobs and the parser sandbox (3.5) -----------------------------------
+#
+# The queue is Celery over Redis behind `uadas_api.jobs` (call sites never import celery);
+# its settings are the `CELERY_*` names Celery reads with `namespace="CELERY"`, derived from
+# one parsed mapping so the invariants (JSON only, late ack, a visibility timeout longer than
+# any task) cannot be set one at a time. The broker is `CELERY_BROKER_URL`, else `REDIS_URL`,
+# else none -- `prod` refuses none, `dev` supplies the docker-compose Redis, `test` is eager.
+# `UADAS_SANDBOX` holds the parser sandbox's limits (see `uadas_api.sandbox.limits`).
+UADAS_JOBS: dict[str, Any] = _jobs.parse_jobs(os.environ)
+UADAS_SANDBOX: dict[str, Any] = _jobs.parse_sandbox(os.environ)
+# The timeouts must nest (sandbox wall < heartbeat window, < Celery hard limit); see the function.
+_jobs.validate_consistency(UADAS_JOBS, UADAS_SANDBOX)
+globals().update(_jobs.celery_settings(UADAS_JOBS))

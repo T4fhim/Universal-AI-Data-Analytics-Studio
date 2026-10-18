@@ -42,6 +42,8 @@ PROD_ENV = {
     **STORAGE_ENV,
     # Production must say how objects are encrypted at rest (see settings/_storage.py).
     "STORAGE_SSE": "aes256",
+    "SANDBOX_ISOLATION_ACKNOWLEDGED": "container",
+    "SANDBOX_NETWORK_ISOLATION": "container",
 }
 
 

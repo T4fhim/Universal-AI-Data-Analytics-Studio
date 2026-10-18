@@ -5,15 +5,18 @@ The Django 6 + Django Ninja backend for the Universal AI Data Analytics Studio w
 It is a separate distribution from the framework-free core (`uadas_core`, repo root) and
 depends on it; the core never imports it (enforced by `.importlinter`).
 
-**Status: sub-step 3.4, object storage** (on top of 3.3 authentication and per-organization
-roles). Six Django apps (`accounts`, `workspaces`, `pipeline`, `ai`, `exports`, `storage`),
-split settings, the models described under [Data model](#data-model), sign-in through
-django-allauth (headless, session cookies), the account endpoints listed under
-[Authentication](#authentication) and [Endpoints](#endpoints), and tenant-scoped S3-compatible
-storage ([Object storage](#object-storage)). `GET /api/health` stays public and database-free.
-No upload endpoint, background tasks or API endpoints over the *data* models yet (3.5 onwards).
-`AUTH_USER_MODEL = "accounts.User"`. Decisions and limits: [plans/phase-3-3-auth.md](../../plans/phase-3-3-auth.md),
-[plans/phase-3-4-storage.md](../../plans/phase-3-4-storage.md).
+**Status: sub-step 3.5, background jobs and the parser sandbox** (on top of 3.4 object storage,
+3.3 authentication and per-organization roles). Seven Django apps (`accounts`, `workspaces`,
+`pipeline`, `ai`, `exports`, `storage`, `jobs`), split settings, the models described under
+[Data model](#data-model), sign-in through django-allauth (headless, session cookies), the
+account endpoints listed under [Authentication](#authentication) and [Endpoints](#endpoints),
+tenant-scoped S3-compatible storage ([Object storage](#object-storage)) and durable background
+jobs with a sandboxed file parser ([Background jobs](#background-jobs-and-the-parser-sandbox)).
+`GET /api/health` stays public and database-free. No upload endpoint (3.6) or API endpoints over
+the *data* models yet. `AUTH_USER_MODEL = "accounts.User"`. Decisions and limits:
+[plans/phase-3-3-auth.md](../../plans/phase-3-3-auth.md),
+[plans/phase-3-4-storage.md](../../plans/phase-3-4-storage.md),
+[plans/phase-3-5-jobs.md](../../plans/phase-3-5-jobs.md).
 
 ## Install
 
@@ -77,6 +80,28 @@ Configuration is 12-factor: environment variables only. Do not commit `.env` fil
 | `STORAGE_PRESIGN_SECONDS` | base | `300` | Default and maximum lifetime of a presigned download URL, 1-900. |
 | `STORAGE_MAX_OBJECT_BYTES` | base | `1073741824` | Deployment-wide size cap of one stored object; no call can raise it. |
 | `STORAGE_INTEGRATION` | tests only | unset | `1` (with `STORAGE_ENDPOINT_URL`, `STORAGE_BUCKET` and the two credentials) also runs the storage tests against a real store. The `test` settings never read any `STORAGE_*`. |
+| `CELERY_BROKER_URL` | base, prod | `REDIS_URL` **moved to another database number** (`/1`, or `/2` if the cache is on 1; `dev`: `redis://localhost:6379/0`; `test`: in-memory, ignored) | The job queue's broker, `redis://` / `rediss://`. **Prod requires one** (and refuses `memory://`) and **refuses one on the cache's Redis database**: the cache's `clear()` flushes its whole database, queued jobs included. |
+| `JOBS_EAGER` | dev | `false` | `1` runs jobs inline in the calling process (a quick poke without a worker; the parse itself still happens in the sandbox child). **Refused in prod.** `test` is always eager. |
+| `JOBS_QUEUE` | base | `uadas-jobs` | Queue name (1-64 of `A-Za-z0-9._-`). |
+| `JOBS_MAX_ATTEMPTS` | base | `3` | 1-10. Runs per job (the first plus retries), counted in the database so it also bounds broker redeliveries of a task that kills its worker. |
+| `JOBS_STALE_AFTER_SECONDS` | base | `300` | 30-3600. A `running` job whose heartbeat is older is considered dead (another worker may take it over; the sweeper repairs it). A heartbeat thread beats for the whole run, so this is the window for a *dead* worker. **Must exceed `SANDBOX_WALL_SECONDS` by more than 60** (and so must `JOBS_TIME_LIMIT_SECONDS`), or start-up fails. |
+| `JOBS_SOFT_TIME_LIMIT_SECONDS`, `JOBS_TIME_LIMIT_SECONDS` | base | `600`, soft + 60 | Celery's soft limit (raised inside the task) and hard limit (kills the worker child). Not enforced by the `solo` pool (Windows). |
+| `JOBS_RETRY_BACKOFF_BASE_SECONDS`, `JOBS_RETRY_BACKOFF_MAX_SECONDS` | base | `5`, `120` | Exponential retry delay (with jitter) for retryable failures only (storage or sandbox momentarily unavailable). |
+| `JOBS_VISIBILITY_TIMEOUT_SECONDS` | base | the larger of `1800` and hard limit + max backoff + `600` | Redis redelivers an unacknowledged message after this long. **Must exceed the hard time limit plus the max backoff**; start-up refuses otherwise. |
+| `JOBS_REQUEUE_AFTER_SECONDS` | base | `300` | A `queued` job whose message was never sent, or sent longer ago than this and still unclaimed, is sent again by the sweeper. |
+| `JOBS_PROGRESS_INTERVAL_MS` | base | `1000` | Minimum time between progress writes of one job (it doubles as the heartbeat). |
+| `SANDBOX_WALL_SECONDS`, `SANDBOX_CPU_SECONDS` | base | `120`, `120` | Wall-clock timeout (the parent kills the whole process tree) and CPU-seconds `RLIMIT_CPU` of one parse. |
+| `SANDBOX_MEMORY_MB` | base | `4096` | `RLIMIT_AS` of the parser child (256-262144). Raise it only with a reason: it is the memory-bomb defence. |
+| `SANDBOX_MAX_INPUT_MB`, `SANDBOX_MAX_OUTPUT_MB` | base | `100`, `512` | Largest file the sandbox accepts, and largest Parquet it may produce (also `RLIMIT_FSIZE`). |
+| `SANDBOX_MAX_ROWS`, `SANDBOX_MAX_COLUMNS` | base | `10000000`, `5000` | Table-size caps on what the child may report. |
+| `SANDBOX_MAX_DECOMPRESSED_MB`, `SANDBOX_MAX_COMPRESSION_RATIO`, `SANDBOX_MAX_ARCHIVE_ENTRIES` | base | `1024`, `200`, `10000` | Zip / gzip bomb limits, checked from the archive's central directory before any parse. |
+| `SANDBOX_PROCESS_HEADROOM` | base | `64` | `RLIMIT_NPROC` = the user's current tasks + this (`0` switches the cap off). See the notes below on shared uids. |
+| `SANDBOX_TMP_ROOT` | base | system temp | Absolute directory under which each parse gets a private temp dir (`0700`: this separates *users*; see the isolation rows below). Directories a killed worker left behind are removed once untouched for longer than the Celery hard limit + 5 minutes (at least 30). |
+| `SANDBOX_CHILD_UID`, `SANDBOX_CHILD_GID` | base, prod | unset | Run the parser child as this dedicated, unprivileged user (both or neither; not root). The worker must be root or hold `CAP_SETUID`, `CAP_SETGID` and `CAP_CHOWN` (`check --deploy`: `uadas_jobs.E006`). This is what keeps the child away from the worker's files and secrets. |
+| `SANDBOX_ISOLATION_ACKNOWLEDGED` | base, prod | unset | `container`: the operator states that the worker runs in a container (or other boundary) that separates the child from the worker and from other jobs, in place of a dedicated uid. A root worker with neither is `uadas_jobs.E005`. |
+| `SANDBOX_NETWORK_ISOLATION` | base, prod | unset (the child still *tries* a network namespace and reports the outcome) | `unshare`: refuse a parse whose child could not unshare a network namespace (`E007` if the host cannot); `container`: the worker has no route out (stated, not measured); `none-acknowledged`: accept the bypassable in-process socket guard alone. **Prod requires one of the three.** |
+| `SANDBOX_REQUIRE_NETNS` | tests only | unset | `1` makes the network-isolation test *demand* a namespace instead of asserting the honest "not isolated" report; set it where the kernel is known to allow `unshare` (CI sets it only if `unshare --user --net true` works on the runner). |
+| `JOBS_INTEGRATION` | tests only | unset | `1` (with a broker, a **PostgreSQL** `DATABASE_URL` and the `STORAGE_*` variables) also runs `test_jobs_integration.py`: a real `celery worker` process. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | base | none | Enable "sign in with GitHub". Both or neither: one alone fails start-up. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | base | none | Enable "sign in with Google". Both or neither. |
 
@@ -152,6 +177,7 @@ Full table, constraints and limitations: [plans/phase-3-2-data-model.md](../../p
 | `pipeline` | `PipelineNode`, `PipelineEdge` (the provenance DAG), `Recipe` |
 | `exports` | `Report` |
 | `storage` | `WorkspaceHead` (the compare-and-swap pointer of a project's saved workspace), `OrphanedObject` (durable queue of owed object deletions) |
+| `jobs` | `Job` (state machine, progress sink, heartbeat, sanitized error, idempotency key) |
 | `ai` | none yet |
 
 Every model except `User`/`Organization`/`Membership` inherits `TenantOwnedModel`
@@ -207,11 +233,80 @@ S3-compatible bucket, keyed `"<organization_id>/..."`. Design and limits:
   The bucket must not be public (the app never sends ACLs; use the provider's block-public-access
   and a bucket policy).
 
+## Background jobs and the parser sandbox
+
+Every long operation is a `Job` row (`uadas_api/jobs/`); Celery over Redis only carries its id.
+Design, threat model and limits: [plans/phase-3-5-jobs.md](../../plans/phase-3-5-jobs.md).
+
+- **Create / cancel / read** through `uadas_api.jobs.services` (`create_job` is authorized,
+  idempotent per `(organization, kind, idempotency_key)` and enqueues after commit; `request_cancel`;
+  `get_job`). Call sites never import Celery: `uadas_api.jobs.queue.enqueue` is the only door.
+  The ingest job has a service, no endpoint yet: `uadas_api.ingest.service.request_ingest(...)` takes
+  an already-stored original and its declared file name.
+- **Run a worker.** `DJANGO_SETTINGS_MODULE` must be set (a worker, like `wsgi`, does not default to
+  dev): `celery -A uadas_api.jobs.celery_app worker --queues uadas-jobs` (add `--pool=solo` on
+  Windows, where the prefork pool and Celery's time limits do not exist) and **one** `celery -A
+  uadas_api.jobs.celery_app beat` (it schedules `uadas.jobs.sweep` every minute), or run
+  `python manage.py sweep_jobs` from cron. The sweeper requeues or fails jobs whose worker died and
+  re-sends queued jobs whose message was lost; it is idempotent.
+- **Local dev:** `docker compose -f docker-compose.dev.yml up -d` (Redis on `localhost:6379`), then
+  `python manage.py runserver` plus the worker above. Without a worker, set `JOBS_EAGER=1`.
+- **Production needs Linux.** The parser sandbox applies `setrlimit` memory/CPU/file-size/descriptor/
+  process limits in a child (`python -I -m uadas_api.sandbox.child`), which exist only on POSIX and are
+  only meaningful on Linux. `prod` settings **refuse to start** where they cannot be enforced; on
+  Windows/macOS the sandbox still runs (timeout, size caps, socket block, process-tree kill) and
+  reports `limits_enforced=False`. Install the packages into the interpreter's own site-packages (a
+  virtualenv; **not** `pip install --user`, which `python -I` ignores -- `check --deploy` fails with
+  `uadas_jobs.E004` if the child cannot start).
+- **What separates the child from the worker (read this before deploying).** A child that runs as the
+  worker's own user is *not* separated from it: `0700` directories and a stripped environment mean
+  nothing between processes of one uid. What the code does: the worker makes itself non-dumpable (so the
+  child cannot read `/proc/<worker>/environ`), the child is killed with its parent and by its own
+  alarm, and a directory a SIGKILLed worker left behind is reaped. What it cannot do alone: stop a
+  same-uid child reading the worker's files and *other jobs'* inputs. Production therefore requires one
+  of **`SANDBOX_CHILD_UID`/`GID`** (a dedicated user; the worker runs as root or holds
+  `CAP_SETUID/SETGID/CHOWN`) **or `SANDBOX_ISOLATION_ACKNOWLEDGED=container`** (the worker is in a
+  container that does the separating); concurrent children of one dedicated uid can still read each
+  other's directories, so give each worker process its own uid or container if that matters.
+- **The network.** The child tries to unshare a network namespace (`CLONE_NEWNET`, plus `CLONE_NEWUSER`
+  when unprivileged) and reports `network_isolated`; Docker's default seccomp profile and Ubuntu 24.04's
+  AppArmor restriction refuse it. The in-process socket guard is bypassable (the raw `_socket` class is
+  reachable from Python) and is **not** counted. Production requires an explicit
+  `SANDBOX_NETWORK_ISOLATION` (`unshare`, `container` or `none-acknowledged`); the real isolation is a
+  worker container with no route out beyond Redis, PostgreSQL and the object store. `setsid()`
+  grandchildren escape a process-group kill; the bounds are `RLIMIT_NPROC` and the cgroup `pids_limit`.
+  A compose sketch for a network-less sandbox service is in `docker-compose.dev.yml`.
+- **System libraries for the parser child.** The readers import OpenCV, so the worker image needs
+  `libgl1 libglib2.0-0 libxcb1` (Debian/Ubuntu; Tesseract is needed only to OCR images). A bare
+  `python:3.13-slim` lacks them and every parse fails as `parse_error` (`ImportError: libxcb.so.1`).
+- **Readers never run in a web or worker process.** Only `uadas_api.sandbox.child` imports
+  `uadas_core.readers` (contract `readers-only-in-the-sandbox-child` in `.importlinter`, which sees direct
+  imports only; fresh-interpreter tests in `test_sandbox_boundary.py` cover the parent side and the
+  composition root `core_bridge`). Admission (extension and content signature, a zip size budget that
+  reads *declared* sizes and is a heuristic -- the child's rlimits are the bound; `.gz`/`.gzip` are not
+  admitted) happens before a child exists; failures are a closed set of codes with fixed sentences, never
+  an exception's text.
+- **Several workers are safe.** Every worker-side write is fenced by the attempt number the worker was
+  given, a heartbeat thread keeps a long silent run alive, a retry's backoff is honoured by the sweeper,
+  and a job the sweeper fails or cancels (or a user cancels while queued) cleans up its stored objects.
+
 ## Test
 
 ```bash
 python -m pytest apps/api/tests -q      # from the repo root
 ```
+
+The job queue and the sandbox are hermetic by default: Celery runs eagerly against an in-memory broker
+and the sandbox children are real subprocesses. The **Linux-only** guarantees (memory, CPU, file-size,
+descriptor and fork limits, the `/proc` hardening, the kill-with-parent and alarm tests, the network
+namespace) skip on Windows with a stated reason and run in CI; `test_sandbox_ci_guard.py` fails a CI run
+that could not run them (it reads the skip condition out of the very marks the tests use, in
+`tests/sandbox_support.py`). The dedicated-uid tests need a root worker and skip on the unprivileged CI
+runner (budgeted in `ci.yml`); run them in a root Linux container. `test_jobs_integration.py` starts a
+real `celery worker` against real Redis, PostgreSQL and MinIO when `JOBS_INTEGRATION=1`
+`CELERY_BROKER_URL=redis://localhost:6379/5 DATABASE_URL=postgres://...` and the `STORAGE_*` variables
+are exported (`test_jobs_ci_guard.py` fails CI if they are lost). To run the sandbox tests on Linux
+from Windows, run the suite inside a `python:3.13` container as a non-root user (see the plan).
 
 The pytest settings (`DJANGO_SETTINGS_MODULE = uadas_api.settings.test`) live in
 `apps/api/pyproject.toml`, so the core suite (`python -m pytest tests -q`) is unaffected.

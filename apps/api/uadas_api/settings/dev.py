@@ -14,9 +14,11 @@ SPA is assumed at the Vite dev server's address.
 
 from __future__ import annotations
 
+import os
+
 import dj_database_url
 
-from . import _auth, _storage
+from . import _auth, _jobs, _storage
 from ._env import get_str
 from .base import *  # noqa: F403 - the settings split is a star-import by design
 from .base import BASE_DIR
@@ -48,6 +50,15 @@ HEADLESS_FRONTEND_URLS = _auth.frontend_urls(FRONTEND_BASE_URL)
 # nowhere else -- `base` has no defaults and `prod` rejects these values -- and any STORAGE_*
 # variable in the environment wins over them, so a developer can point at another store.
 _MINIO_ROOT = "minioadmin"  # the compose file's MINIO_ROOT_USER and _PASSWORD
+# Background jobs default to the docker-compose Redis (like the MinIO defaults below); an
+# explicit CELERY_BROKER_URL or REDIS_URL wins. Not eager: `celery -A uadas_api.jobs.celery_app
+# worker --pool=solo` (solo is the pool that works on Windows) picks jobs up, and without a
+# worker they simply wait. JOBS_EAGER=1 runs them inline for a quick poke without a worker
+# (the parse itself still happens in the sandbox child).
+UADAS_JOBS = _jobs.parse_jobs(os.environ, broker_default="redis://localhost:6379/0")
+_jobs.validate_consistency(UADAS_JOBS, _jobs.parse_sandbox(os.environ))
+globals().update(_jobs.celery_settings(UADAS_JOBS))
+
 UADAS_STORAGE = _storage.parse_storage(
     {
         "STORAGE_BUCKET": "uadas-uploads",

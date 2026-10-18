@@ -76,7 +76,7 @@ whatever the tool defaults to:
 black --check uadas_core/ tests/ scripts/
 isort --check-only uadas_core/ tests/ scripts/
 bandit -r uadas_core -q --skip B101,B107,B608   # same skips as CI (rationale in ci.yml's bandit step)
-PYTHONPATH=apps/api lint-imports                  # the 5 .importlinter contracts (PYTHONPATH finds uadas_api)
+PYTHONPATH=apps/api lint-imports                  # the 6 .importlinter contracts (PYTHONPATH finds uadas_api)
 ```
 
 `mypy` is **not** run repo-wide — it's scoped to an explicit, curated list of packages/modules that
@@ -213,6 +213,26 @@ or the database to an existing key, don't delete before the swap, and don't touc
 through `uadas_api.storage.store.get_store()`; `apps/api/tests/test_storage_workspace.py` injects
 each failure (and runs on a real MinIO in CI).
 
+### Parsers run only in the sandbox child (Phase 3.5)
+
+`uadas_core/readers/` feeds untrusted PDF/Office/XML/zip/image bytes to camelot, PyMuPDF, pdfplumber, python-docx,
+openpyxl, lxml, OpenCV and Tesseract, so **no web or worker process may import a reader**: parsing happens only in
+`python -I -m uadas_api.sandbox.child` (rlimits, socket block, stripped environment, wall-clock kill), launched by
+`uadas_api/sandbox/runner.py`. `.importlinter` contract `readers-only-in-the-sandbox-child` forbids `uadas_api` from
+importing `uadas_core.readers` or a parsing library anywhere but that child, and `apps/api/tests/test_sandbox_boundary.py`
+proves it in a fresh interpreter -- never "just read one file" in API code; add an `ingest`-style job instead. The
+child reports a closed set of error codes (never exception text or paths) and nothing it returns is trusted unchecked.
+Do not write "isolated" about a protection the code does not establish: a child of the worker's own uid reads the worker's
+files and other jobs' inputs (`0700` and a stripped environment separate nothing), the in-process socket shim is
+bypassable and is **never** counted as enforcement, and the zip budget reads declared sizes. Real separation is a dedicated
+child uid or a container, a network namespace the child verified, and the rlimits; production settings demand an explicit
+statement of the first two (`SANDBOX_CHILD_UID`/`SANDBOX_ISOLATION_ACKNOWLEDGED`, `SANDBOX_NETWORK_ISOLATION`).
+Long work is a `Job` row (`uadas_api/jobs/`): enqueue through `jobs.queue.enqueue`, never import Celery outside
+`jobs/{celery_app,tasks,queue}.py`; a task message carries only a job id and the worker re-checks ownership. **Every
+worker-side write to a job is fenced by the attempt number the worker was claimed with** (`services._running`): add a new
+one the same way, or a superseded worker can overwrite its successor. Production requires Linux (the limits cannot be
+enforced elsewhere). See [plans/phase-3-5-jobs.md](plans/phase-3-5-jobs.md).
+
 ### Configuration
 
 Adding a new config key means updating `_default_config_dict`, `_TOP_LEVEL_SCHEMA`/`_NESTED_SCHEMA`, and
@@ -249,7 +269,9 @@ and the product rules with their rejected alternatives (`ui-behaviour-rules.md`)
 
 Adding a reader requires updating both `reader_registry.py`'s `_BUILTIN_READERS` tuple *and* the file-picker
 filter groups in `assets/ui-contract/file-picker-filters.json` — the second does not derive from the first
-automatically, but `tests/assets/` now fails if their extension sets differ. Watch for the same class of gap (a registry plus a separately-hardcoded consumer)
+automatically, but `tests/assets/` now fails if their extension sets differ. It also needs a content rule in
+`apps/api/uadas_api/sandbox/admission.py`'s `_RULES` (and a `SourceFormat` choice if it stamps a new format);
+`apps/api/tests/test_sandbox_admission.py` fails if that table and the registry disagree in either direction. Watch for the same class of gap (a registry plus a separately-hardcoded consumer)
 when extending charts, cleaning operations, or plugin categories.
 
 ## Conventions to follow

@@ -115,6 +115,19 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        # Phase 3.5: the job queue's broker. `test_jobs_integration.py` starts a real
+        # `celery worker` against it (and against the Postgres above and the MinIO below), so
+        # the task message, the cross-process claim and the sandbox child are exercised for
+        # real; every other test runs Celery eagerly against an in-memory broker.
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     env:
       DATABASE_URL: postgres://uadas:uadas@localhost:5432/uadas
     steps:
@@ -128,8 +141,27 @@ jobs:
             requirements.txt
             apps/api/pyproject.toml
 
-      - name: OS deps for pyodbc / python-magic
-        run: sudo apt-get update && sudo apt-get install -y unixodbc-dev libmagic1
+      - name: OS deps for pyodbc / python-magic and the sandboxed parser
+        # libgl1 / libglib2.0-0 / libxcb1: the parser child imports OpenCV through the core's
+        # readers, which needs them (a bare python:3.13-slim lacks them and every parse then fails
+        # as `parse_error`; verified in a clean container). The GitHub runner image already has
+        # them, so this is documentation that cannot rot silently, not a new requirement. Tesseract
+        # itself is not installed: no test OCRs an image.
+        run: sudo apt-get update && sudo apt-get install -y unixodbc-dev libmagic1 libgl1 libglib2.0-0 libxcb1
+
+      - name: Allow unprivileged user namespaces (the sandbox's network isolation)
+        # The child isolates its network with unshare(CLONE_NEWUSER|CLONE_NEWNET). Ubuntu 24.04
+        # runners restrict that through AppArmor; lift it for this job and, only if a namespace
+        # then really works, make the isolation test *require* it (SANDBOX_REQUIRE_NETNS=1).
+        # If the host still refuses, the test asserts the honest report instead (the child says
+        # `network_isolated=False`) and a warning is printed -- it never silently passes as isolated.
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          if unshare --user --net true; then
+            echo "SANDBOX_REQUIRE_NETNS=1" >> "$GITHUB_ENV"
+          else
+            echo "::warning::this runner refuses unprivileged user namespaces; network-namespace isolation is not exercised"
+          fi
 
       - name: Install dependencies
         # The root distribution (uadas_core) plus the API in editable mode, with its
@@ -197,7 +229,7 @@ jobs:
           count="$(echo "$out" | grep -oE '^[0-9]+ tests? collected' | grep -oE '^[0-9]+')"
           test -n "$count" || { echo "::error::could not read a collected-test count"; exit 1; }
           echo "collected: $count"
-          test "$count" -ge 1269 || { echo "::error::collected $count tests, expected at least 1269"; exit 1; }
+          test "$count" -ge 1790 || { echo "::error::collected $count tests, expected at least 1790"; exit 1; }
 
       - name: pytest (apps/api)
         # DJANGO_SETTINGS_MODULE comes from apps/api/pyproject.toml, not the
@@ -210,18 +242,34 @@ jobs:
           STORAGE_BUCKET: uadas-ci
           STORAGE_ACCESS_KEY_ID: ci-minio-user
           STORAGE_SECRET_ACCESS_KEY: ci-minio-secret-0123456789
+          # Phase 3.5: the real-worker test (a real `celery worker`, Redis, Postgres, MinIO).
+          # `test_jobs_ci_guard.py` fails the build if either is lost. Database 5 so the worker's
+          # private queue cannot meet the cache's keys.
+          JOBS_INTEGRATION: "1"
+          CELERY_BROKER_URL: redis://localhost:6379/5
         # Skips are budgeted, not ignored. About a hundred storage tests skip silently when the
         # real-store environment is lost, which would turn the build green while removing the
-        # strongest evidence; `test_storage_ci_guard.py` fails that case (CI=true), and this
-        # fails the job if more than the known skips occur. The budget is 2: the one SSE test
-        # (MinIO has no KMS, so STORAGE_TEST_SSE is off) plus one spare, not a free allowance.
+        # strongest evidence; `test_storage_ci_guard.py` (and, for the real worker and the Linux-only
+        # sandbox limits, `test_jobs_ci_guard.py` / `test_sandbox_ci_guard.py`) fail those cases
+        # (CI=true), and this fails the job if more than the known skips occur. The budget is 8 with **no
+        # spare**, counted by running this suite on Linux as an unprivileged uid with the guard
+        # variables set (the PostgreSQL row-lock tests and the MinIO / Redis ones run in this job,
+        # so they are not skips). Exactly:
+        #   1  the SSE storage test (MinIO has no KMS, so STORAGE_TEST_SSE is off);
+        #   5  Windows/macOS twins that skip on Linux *by design* (they assert what a platform
+        #      WITHOUT rlimits reports): test_checks.py (the `check --deploy` twin),
+        #      test_entrypoints.py (the wsgi and asgi twins), test_sandbox_guards.py and
+        #      test_sandbox_malformed.py (the "honesty" tests);
+        #   2  the dedicated-uid tests in test_sandbox_isolation.py, which need a *root* worker
+        #      (the runner is unprivileged; they run in a root Linux container instead).
+        # Any new skip is a reviewed change to this number that says what skips and why.
         shell: bash
         run: |
           python -m pytest apps/api/tests -q --tb=long -p no:cacheprovider -rs | tee pytest-api.log
           skipped="$(grep -oE '[0-9]+ skipped' pytest-api.log | tail -n 1 | grep -oE '^[0-9]+' || true)"
           skipped="${skipped:-0}"
           echo "skipped: $skipped"
-          test "$skipped" -le 2 || { echo "::error::$skipped tests skipped, budget is 2 (is the MinIO integration environment intact?)"; exit 1; }
+          test "$skipped" -le 8 || { echo "::error::$skipped tests skipped, budget is 8 (is the MinIO / Redis integration environment intact, and is this an unprivileged Linux runner?)"; exit 1; }
 
       - name: manage.py check --deploy (prod settings)
         # The deployment checklist must be clean with a valid production environment;
@@ -242,6 +290,11 @@ jobs:
           # Required since 3.4 (prod refuses to start without a bucket and real-looking
           # credentials, and an https endpoint). Random-looking throwaways, not placeholders.
           STORAGE_SSE: aes256
+          # Required since 3.5: say what separates the parser child from the worker and what
+          # isolates its network (the CI runner is an unprivileged user, not a container, so
+          # these are the operator's statements a real deployment would make for its container).
+          SANDBOX_ISOLATION_ACKNOWLEDGED: container
+          SANDBOX_NETWORK_ISOLATION: container
           STORAGE_BUCKET: uadas-ci-data
           STORAGE_ENDPOINT_URL: https://objects.example.com
           STORAGE_ACCESS_KEY_ID: ci-key-4f7q2m9xj3kd8tlp
@@ -277,9 +330,10 @@ jobs:
         run: python -m ruff check uadas_core/ tests/ apps/api/
 
       - name: import-linter (uadas_core stays Qt-free)
-        # Five contracts: Qt/Django forbidden in the core, provenance is a leaf, the
-        # `layers` stack, the core never imports uadas_api, and uadas_api never
-        # imports uadas_core.plugins / .jobs (see .importlinter). uadas_api is a root
+        # Six contracts: Qt/Django forbidden in the core, provenance is a leaf, the
+        # `layers` stack, the core never imports uadas_api, uadas_api never
+        # imports uadas_core.plugins / .jobs, and (3.5) uadas_api imports uadas_core.readers and
+        # the parsing libraries only in the sandbox child (see .importlinter). uadas_api is a root
         # package there but is not installed in this job, so apps/api goes on
         # PYTHONPATH -- without it lint-imports cannot find the package.
         env:
