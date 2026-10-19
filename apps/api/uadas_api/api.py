@@ -28,11 +28,13 @@ from ninja import NinjaAPI, Router, Schema
 
 from uadas_api.accounts.api import router as accounts_router
 from uadas_api.accounts.security import session_auth
+from uadas_api.web.assistant import router as assistant_router
 from uadas_api.web.charts import router as charts_router
 from uadas_api.web.dashboards import router as dashboards_router
 from uadas_api.web.datasets import router as datasets_router
 from uadas_api.web.datasets import upload_router
 from uadas_api.web.errors import install_error_handlers
+from uadas_api.web.job_events import router as job_events_router
 from uadas_api.web.jobs import router as jobs_router
 from uadas_api.web.pipeline import router as pipeline_router
 from uadas_api.web.projects import router as projects_router
@@ -79,6 +81,8 @@ def _wire_routers(target: NinjaAPI) -> None:
         upload_router,  # before datasets_router: see web/datasets.py
         datasets_router,
         jobs_router,
+        job_events_router,  # 3.7: SSE (async views)
+        assistant_router,  # 3.7: SSE (async views)
         pipeline_router,
         charts_router,
         dashboards_router,

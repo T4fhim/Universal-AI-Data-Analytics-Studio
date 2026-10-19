@@ -169,15 +169,26 @@ def workspace_db_key(
     )
 
 
-def export_key(organization: OrganizationRef, report_id: Any, extension: str) -> str:
-    """Key for a generated report file; ``extension`` is a short lowercase suffix, no dot."""
+def export_key(
+    organization: OrganizationRef,
+    report_id: Any,
+    extension: str,
+    token: str | None = None,
+) -> str:
+    """Key for a generated report file; ``extension`` is a short lowercase suffix, no dot.
+
+    ``token`` names the build attempt (``j<attempt>-<job>``, like a stage run's derived frame) so
+    every attempt of a job writes under a key of its own and a cleanup can only name its own
+    object; without one the key is random (still unique, but not derivable).
+    """
     org = organization_id(organization)
     report = uuid_text(report_id, "report id")
     if not isinstance(extension, str) or not _EXTENSION.fullmatch(extension):
         raise InvalidKeyError(
             "an export extension must be 1-8 lowercase letters or digits"
         )
-    return check_key(org, f"{org}/exports/{report}/{uuid.uuid4().hex}.{extension}")
+    name = _token(token) if token is not None else uuid.uuid4().hex
+    return check_key(org, f"{org}/exports/{report}/{name}.{extension}")
 
 
 def is_deletable_prefix(organization: OrganizationRef, prefix: str) -> bool:

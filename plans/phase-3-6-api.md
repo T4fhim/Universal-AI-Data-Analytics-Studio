@@ -26,6 +26,8 @@
 * `tests/test_web_idor.py` walks **every** schema operation as an org-B owner: foreign org, foreign ids, foreign ids in bodies (each with an own-ids twin); an unclassifiable route fails the walk.
 * Errors: one envelope, closed code set, fixed sentences, 422 details = location + type only; job failures are closed codes.
 * Upload: Django parses a multipart body before auth runs, so the upload handler itself gates the upload route (signed in, editor of the path's organization, throttle) *before* any body byte is read; a run's `periods`/`k`/`n_components`/`seasonal_periods`/`degree` are bounded in the catalog schema; the stored original is always `application/octet-stream`.
+* Every other route takes no file part and a multipart body ≤1 MiB (refused in the upload handler before any temp file; `415`/`413`). Production must run WSGI plus a proxy body cap: under ASGI Django spools the whole body before any handler.
+* `Idempotency-Key` (optional) on upload and report create; preview/summary throttled (`preview` 120/min); report titles may not start with `= + - @` (and the core's Excel exporter pins every string cell to the string type); PATCHes write only the changed columns.
 * Limits: page ≤200; JSON body ≤1 MiB; upload ≤ sandbox input cap enforced **while streaming** (only upload handler; no memory handler); upload throttle 30/h, run 120/h, render 600/h, report 30/h per user+org (atomic fixed-window counter in the cache).
 
 ## Decisions

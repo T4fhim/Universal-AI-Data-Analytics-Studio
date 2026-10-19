@@ -7,7 +7,8 @@ This is the Schemathesis item of 3.8, kept small and deterministic:
   (positive and negative) through the real Django WSGI application, with a logged-in session, and every
   response must be a documented status, content type and body (``not_a_server_error``,
   ``status_code_conformance``, ``content_type_conformance``, ``response_schema_conformance``).
-  Hypothesis is derandomized and its database off, so a failure reproduces and the run cannot flake.
+  Hypothesis is derandomized and its *example* database off (the test itself uses the test
+  database, inside the test's transaction, for its fixtures), so a failure reproduces and the run cannot flake.
 * **smoke** -- every ``GET`` operation is then called *with real ids* (a project that holds a dataset,
   a chart, a dashboard, a job, a report ...) and must answer ``200`` with a body that conforms to its
   schema: the conformance of the success shapes, which random ids never reach.
@@ -84,6 +85,22 @@ def _keep_the_test_connection(world: World) -> Iterator[None]:
     request_finished.connect(close_old_connections)
 
 
+@pytest.fixture(autouse=True)
+def _short_streams(settings: Any) -> None:
+    """3.7: a real-id call of the job-event stream is a *stream* -- through WSGI it is consumed whole.
+
+    The fixture's job never finishes, so the stream would run for its full maximum (15 minutes).
+    A sub-second maximum makes the call return with the documented `200 text/event-stream`, which is
+    what the smoke checks; the stream's behaviour itself is tested over real ASGI in
+    ``test_web_streaming.py``.
+    """
+    settings.UADAS_API = {
+        "sse_max_seconds": 0.4,
+        "sse_poll_seconds": 0.1,
+        "sse_poll_max_seconds": 0.1,
+    }
+
+
 @pytest.fixture
 def world() -> World:
     built = make_world()
@@ -145,7 +162,7 @@ def test_every_read_operation_answers_200_with_a_conforming_body_for_real_ids(
     ids = _real_ids(world)
     checked: list[str] = []
     for result in schema.get_all_operations():
-        operation = result.ok()  # type: ignore[union-attr]
+        operation = result.ok()  # type: ignore[union-attr, unused-ignore]
         if operation.method.upper() != "GET":
             continue
         names = [p for p in operation.path.split("/") if p.startswith("{")]

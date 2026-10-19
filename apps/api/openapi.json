@@ -1,6 +1,29 @@
 {
   "components": {
     "schemas": {
+      "AssistantMessageIn": {
+        "properties": {
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryItem"
+            },
+            "maxItems": 20,
+            "title": "History",
+            "type": "array"
+          },
+          "message": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "title": "AssistantMessageIn",
+        "type": "object"
+      },
       "AssumptionsOut": {
         "properties": {
           "assumptions": {
@@ -639,6 +662,30 @@
           "status"
         ],
         "title": "HealthOut",
+        "type": "object"
+      },
+      "HistoryItem": {
+        "description": "One earlier turn the client keeps (the server keeps none).",
+        "properties": {
+          "role": {
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 8000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role",
+          "text"
+        ],
+        "title": "HistoryItem",
         "type": "object"
       },
       "JobListParams": {
@@ -2640,6 +2687,250 @@
         "summary": "Create an organization (the caller becomes its owner)",
         "tags": [
           "accounts"
+        ]
+      }
+    },
+    "/api/organizations/{org_id}/assistant/messages": {
+      "post": {
+        "operationId": "assistant_messages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Org Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantMessageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "enum": [
+                        "done",
+                        "error",
+                        "message",
+                        "tool_call"
+                      ],
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "text/event-stream of one assistant turn: `message` parts, `tool_call` proposals, then `done` (or `error`). Proposals are never executed by this endpoint.",
+            "x-sse-events": {
+              "done": {
+                "description": "The turn finished.",
+                "properties": {
+                  "dropped": {
+                    "type": "integer"
+                  },
+                  "tool_calls": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "tool_calls",
+                  "dropped"
+                ],
+                "type": "object"
+              },
+              "error": {
+                "description": "The turn failed; the stream ends.",
+                "properties": {
+                  "code": {
+                    "enum": [
+                      "provider_error",
+                      "provider_timeout",
+                      "event_too_large"
+                    ],
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code",
+                  "message"
+                ],
+                "type": "object"
+              },
+              "message": {
+                "description": "A part of the assistant's reply text (a whole turn, split only when long).",
+                "properties": {
+                  "index": {
+                    "type": "integer"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "index",
+                  "text"
+                ],
+                "type": "object"
+              },
+              "tool_call": {
+                "description": "A PROPOSED tool call. Nothing was run; run it through the stage endpoints.",
+                "properties": {
+                  "arguments": {
+                    "type": "object"
+                  },
+                  "call_id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "proposed": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "call_id",
+                  "name",
+                  "arguments",
+                  "proposed"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "Ask the assistant; the answer streams as Server-Sent Events (editor and above)",
+        "tags": [
+          "assistant"
         ]
       }
     },
@@ -5788,6 +6079,23 @@
               "title": "Project Id",
               "type": "string"
             }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9._:-]{1,56}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
           }
         ],
         "requestBody": {
@@ -7112,6 +7420,231 @@
         ]
       }
     },
+    "/api/organizations/{org_id}/projects/{project_id}/jobs/{job_id}/events": {
+      "get": {
+        "operationId": "jobs_events",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Org Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Set by EventSource on reconnect; the current state is always sent first.",
+            "in": "header",
+            "name": "Last-Event-ID",
+            "required": false,
+            "schema": {
+              "pattern": "^[0-9]{1,12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "enum": [
+                        "job"
+                      ],
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "text/event-stream. Frames: a `retry:` hint, `job` events (with a monotonic `id:`), and `: keep-alive` comments. Closes after the job's terminal state, after a hard maximum duration (reconnect with Last-Event-ID), or when the viewer loses access.",
+            "x-sse-events": {
+              "job": {
+                "description": "The job's current state; sent first on every (re)connect and on every change.",
+                "properties": {
+                  "error_code": {
+                    "type": "string"
+                  },
+                  "job_id": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "progress": {
+                    "maximum": 100,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "status": {
+                    "enum": [
+                      "queued",
+                      "running",
+                      "succeeded",
+                      "failed",
+                      "cancelled"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "job_id",
+                  "status",
+                  "progress",
+                  "message",
+                  "error_code"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "204": {
+            "description": "The client's Last-Event-ID is already the job's terminal event: stop reconnecting."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "SessionAuth": []
+          }
+        ],
+        "summary": "Stream a job's progress as Server-Sent Events (viewer and above)",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/organizations/{org_id}/projects/{project_id}/jobs/{job_id}/stage-result": {
       "get": {
         "operationId": "jobs_stage_result",
@@ -8136,6 +8669,23 @@
               "format": "uuid",
               "title": "Project Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[A-Za-z0-9._:-]{1,56}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
             }
           }
         ],

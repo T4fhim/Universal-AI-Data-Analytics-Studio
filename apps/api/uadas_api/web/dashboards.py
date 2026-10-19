@@ -93,7 +93,7 @@ def _require_charts(project: Project, tiles: list[TileIn]) -> None:
         raise ApiError(422, "A tile names a chart that is not in this project.")
 
 
-def _tiles_out(project: Project, dashboard: Dashboard) -> list[TileOut]:
+def _parsed_tiles(dashboard: Dashboard) -> list[TileIn]:
     layout = dashboard.layout if isinstance(dashboard.layout, dict) else {}
     raw = layout.get("tiles")
     items = [t for t in raw if isinstance(t, dict)] if isinstance(raw, list) else []
@@ -105,22 +105,43 @@ def _tiles_out(project: Project, dashboard: Dashboard) -> list[TileOut]:
             ValueError
         ):  # includes pydantic's ValidationError: a malformed stored tile is dropped
             continue
-    found = set(
-        scoped(ChartSpec, project)
-        .filter(pk__in={t.chart_id for t in parsed})
-        .values_list("pk", flat=True)
+    return parsed
+
+
+def dashboards_out(project: Project, dashboards: list[Dashboard]) -> list[DashboardOut]:
+    """Serialize a page of dashboards, resolving every tile's chart id in **one** query.
+
+    The ids come from a free JSON column, so each is checked through ``for_organization`` and the
+    project (the 3.2 obligation); doing it once per page keeps a list from being an N+1.
+    """
+    parsed = {d.pk: _parsed_tiles(d) for d in dashboards}
+    wanted = {t.chart_id for tiles in parsed.values() for t in tiles}
+    found = (
+        set(
+            scoped(ChartSpec, project)
+            .filter(pk__in=wanted)
+            .values_list("pk", flat=True)
+        )
+        if wanted
+        else set()
     )
-    return [TileOut(**t.model_dump(), chart_exists=t.chart_id in found) for t in parsed]
+    return [
+        DashboardOut(
+            id=d.pk,
+            project_id=d.project_id,
+            name=d.name,
+            tiles=[
+                TileOut(**t.model_dump(), chart_exists=t.chart_id in found)
+                for t in parsed[d.pk]
+            ],
+            created_at=d.created_at,
+        )
+        for d in dashboards
+    ]
 
 
 def dashboard_out(project: Project, dashboard: Dashboard) -> DashboardOut:
-    return DashboardOut(
-        id=dashboard.pk,
-        project_id=dashboard.project_id,
-        name=dashboard.name,
-        tiles=_tiles_out(project, dashboard),
-        created_at=dashboard.created_at,
-    )
+    return dashboards_out(project, [dashboard])[0]
 
 
 @router.get(
@@ -139,7 +160,7 @@ def dashboards_list(
     queryset = scoped(Dashboard, project).order_by("created_at", "pk")
     rows = list(queryset[params.offset : params.offset + params.limit])
     return {
-        "items": [dashboard_out(project, d) for d in rows],
+        "items": dashboards_out(project, rows),
         "total": queryset.count(),
         "limit": params.limit,
         "offset": params.offset,
@@ -198,14 +219,20 @@ def dashboards_update(
 ) -> DashboardOut:
     project = project_of(member(request, org_id, Role.EDITOR), project_id)
     dashboard = in_project(Dashboard, project, dashboard_id)
+    changed: list[str] = (
+        []
+    )  # only the patched columns are written (no clobbering of a concurrent PATCH)
     if payload.name is not None:
         dashboard.name = payload.name
+        changed.append("name")
     if payload.tiles is not None:
         _require_charts(project, payload.tiles)
         dashboard.layout = _layout(payload.tiles)
+        changed.append("layout")
     try:
-        with transaction.atomic():
-            dashboard.save()
+        if changed:
+            with transaction.atomic():
+                dashboard.save(update_fields=changed)
     except IntegrityError:
         raise ApiError(409, "This dashboard could not be saved.") from None
     return dashboard_out(project, dashboard)

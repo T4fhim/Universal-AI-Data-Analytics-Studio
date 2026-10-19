@@ -25,7 +25,8 @@ import re
 import uuid
 from typing import Any
 
-from django.core.exceptions import RequestDataTooBig
+from django.conf import settings
+from django.core.exceptions import RequestDataTooBig, SuspiciousOperation
 from django.core.files.uploadhandler import TemporaryFileUploadHandler
 
 from uadas_api.accounts.models import Role
@@ -43,7 +44,11 @@ _UPLOAD_PATH = re.compile(
 
 
 class UploadTooLarge(RequestDataTooBig):
-    """A file part exceeded the upload cap (answered ``413``)."""
+    """A body or file part exceeded its cap (answered ``413``)."""
+
+
+class UploadNotAllowed(SuspiciousOperation):
+    """A file part was sent to a route that takes none (``415`` from the API, ``400`` from a view)."""
 
 
 def max_upload_bytes() -> int:
@@ -57,24 +62,27 @@ class CappedTemporaryFileUploadHandler(TemporaryFileUploadHandler):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._cap = max_upload_bytes()
+        # Decided once per request in ``handle_raw_input``; until then nothing may be spooled.
+        self._is_upload = False
 
-    def _gate_upload_route(self) -> None:
-        """For the upload route only: signed in, an editor of the path's organization, and not throttled.
+    def _gate_upload_route(self) -> bool:
+        """Whether this is the upload route -- and, if so, signed in, an editor of the path's
+        organization and not throttled (else the matching 401 / 404 / 403 / 429 envelope).
 
-        Django parses a multipart body *before* the view's authentication runs (Ninja's CSRF check
-        reads ``request.POST``), so without this gate any anonymous client -- or any signed-in
-        stranger to the organization in the URL -- could make the server write up to the cap to disk
-        per request. Here the decision (401 / 404 / 403 / 429, the same envelope as the view's) is
-        taken from the request line and the session alone, before the first body byte is read. The
-        throttle is counted here, not again in the view. Other multipart posts (none exist in the API
-        today) keep only the size cap.
+        Django parses a multipart body *before* any view's authentication runs (Ninja's CSRF check
+        reads ``request.POST`` on **every** route), so without this an anonymous client -- or any
+        signed-in stranger to the organization in the URL -- could make the server write up to the
+        cap to disk per request, to this route or to any other POST route with a forged CSRF cookie.
+        The decision is taken from the request line and the session alone, before the first body
+        byte is read. The throttle is counted here, not again in the view. Every *other* route takes
+        no file at all and only a JSON-sized body (:meth:`handle_raw_input`, :meth:`new_file`).
         """
         request = self.request
         if request is None:  # a handler built without a request cannot know the route
-            return
+            return False
         match = _UPLOAD_PATH.fullmatch(request.path_info)
         if match is None:
-            return
+            return False
         user = getattr(request, "user", None)
         if user is None or not user.is_authenticated:
             raise ApiError(401, "Authentication required.")
@@ -84,6 +92,13 @@ class CappedTemporaryFileUploadHandler(TemporaryFileUploadHandler):
             raise ApiError(404, "Not found.") from None
         membership = require_membership(request, org_id, Role.EDITOR)
         throttle.enforce("upload", membership.user_id, membership.organization_id)
+        return True
+
+    def new_file(self, *args: Any, **kwargs: Any) -> None:
+        # Before the parent opens a temporary file: no other route spools anything to disk.
+        if not self._is_upload:
+            raise UploadNotAllowed("this route does not accept a file")
+        super().new_file(*args, **kwargs)
 
     def handle_raw_input(
         self,
@@ -93,9 +108,14 @@ class CappedTemporaryFileUploadHandler(TemporaryFileUploadHandler):
         boundary: str,
         encoding: str | None = None,
     ) -> None:
-        self._gate_upload_route()
-        if content_length > self._cap + _ENVELOPE_SLACK:
-            raise UploadTooLarge("the declared request size exceeds the upload cap")
+        self._is_upload = self._gate_upload_route()
+        if self._is_upload:
+            if content_length > self._cap + _ENVELOPE_SLACK:
+                raise UploadTooLarge("the declared request size exceeds the upload cap")
+        elif content_length > settings.DATA_UPLOAD_MAX_MEMORY_SIZE:
+            # Any other route: the body limit of a JSON request (the one number for "a request
+            # that is not an upload"), refused on the declared length before a byte is read.
+            raise UploadTooLarge("the declared request size exceeds the body limit")
 
     def receive_data_chunk(self, raw_data: bytes, start: int) -> bytes | None:
         if start + len(raw_data) > self._cap:

@@ -189,6 +189,16 @@ def install_error_handlers(api: NinjaAPI) -> None:
     def django_validation(request: HttpRequest, exc: Any) -> HttpResponse:
         return _django_validation(request, exc, api)
 
+    def not_a_file_route(request: HttpRequest, exc: Any) -> HttpResponse:
+        return api.create_response(
+            request,
+            error_body(415, "This route does not accept a file upload."),
+            status=415,
+        )
+
+    from uadas_api.web.uploads import UploadNotAllowed  # uploads imports this module
+
+    api.add_exception_handler(UploadNotAllowed, not_a_file_route)
     api.add_exception_handler(HttpError, http_error)
     api.add_exception_handler(NinjaValidationError, validation)
     api.add_exception_handler(Http404, missing)

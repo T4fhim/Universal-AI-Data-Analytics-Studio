@@ -19,7 +19,7 @@ from uadas_api.exports.models import Report
 from uadas_api.jobs.execution import execute_job
 from uadas_api.jobs.models import Job
 from uadas_api.storage.models import OrphanedObject
-from uadas_api.workspaces.models import DatasetRecord, Project
+from uadas_api.workspaces.models import ChartSpec, Dashboard, DatasetRecord, Project
 
 pytestmark = pytest.mark.django_db
 
@@ -160,6 +160,33 @@ def test_preview_validates_the_sort_column_and_caps_the_page(world: World) -> No
     assert _preview(world, world.dataset, "?limit=201").status_code == 422
 
 
+def test_preview_and_summary_are_throttled_per_user_and_organization(
+    world: World, settings: Any
+) -> None:
+    """Each call copies and hashes the whole Parquet object, so both share a bounded ``preview`` budget."""
+    settings.UADAS_API = {"throttles": {"preview": "3/60"}}
+    viewer = world.api("viewer")
+    assert _preview(world, world.dataset).status_code == 200
+    assert (
+        viewer.get(f"{world.base()}/datasets/{world.dataset.pk}/summary").status_code
+        == 200
+    )
+    assert _preview(world, world.dataset).status_code == 200
+    limited = _preview(world, world.dataset)
+    assert limited.status_code == 429 and error_code(limited) == "rate_limited"
+    summary = viewer.get(f"{world.base()}/datasets/{world.dataset.pk}/summary")
+    assert summary.status_code == 429  # one shared budget
+    assert (
+        world.api("admin")
+        .get(f"{world.base()}/datasets/{world.dataset.pk}/summary")
+        .status_code
+        == 200
+    )  # another user's budget
+    assert (
+        world.api("viewer").get(f"{world.base()}/datasets").status_code == 200
+    )  # lists are not metered
+
+
 def test_summary_reads_the_footer_statistics(world: World) -> None:
     body = (
         world.api("viewer")
@@ -211,6 +238,47 @@ def test_charts_are_validated_against_the_registry_and_the_project(
         .status_code
         == 404
     )  # a dataset of another project, same organization
+
+
+def test_patches_write_only_the_fields_they_change(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A PATCH that wrote every column would clobber a concurrent PATCH of another field."""
+    saved: list[tuple[str, Any]] = []
+    for model in (ChartSpec, Dashboard):
+        original = model.save
+
+        def spy(self: Any, *args: Any, _o: Any = original, **kwargs: Any) -> None:
+            saved.append((type(self).__name__, kwargs.get("update_fields")))
+            _o(self, *args, **kwargs)
+
+        monkeypatch.setattr(model, "save", spy)
+    charts = f"{world.base()}/charts"
+    chart_id = world.api("editor").post(charts, _chart(world)).json()["id"]
+    boards = f"{world.base()}/dashboards"
+    board_id = world.api("editor").post(boards, {"name": "B", "tiles": []}).json()["id"]
+    saved.clear()
+
+    assert (
+        world.api("editor").patch(f"{charts}/{chart_id}", {"title": "New"}).status_code
+        == 200
+    )
+    assert (
+        world.api("editor")
+        .patch(f"{boards}/{board_id}", {"name": "Renamed"})
+        .status_code
+        == 200
+    )
+    assert saved == [("ChartSpec", ["title"]), ("Dashboard", ["name"])]
+    both = world.api("editor").patch(
+        f"{charts}/{chart_id}",
+        {"title": "T2", "spec": {"x_column": "id", "y_column": "value"}},
+    )
+    assert both.status_code == 200 and saved[-1] == (
+        "ChartSpec",
+        ["title", "spec"],
+    )  # the twin
+    assert world.api("viewer").get(f"{charts}/{chart_id}").json()["title"] == "T2"
 
 
 def test_chart_render_builds_the_figure_from_a_bounded_sample(
@@ -297,6 +365,31 @@ def test_dashboards_resolve_tiles_inside_the_project(world: World) -> None:
     )  # an orphaned tile is normal state
 
 
+def test_the_dashboards_list_resolves_every_tile_in_one_query(
+    world: World, django_assert_max_num_queries: Any
+) -> None:
+    """The list must not be an N+1: tile chart ids are resolved for the whole page at once."""
+    charts = f"{world.base()}/charts"
+    chart_id = world.api("editor").post(charts, _chart(world)).json()["id"]
+    url = f"{world.base()}/dashboards"
+    tile = {"chart_id": chart_id, "row": 0, "column": 0}
+    for n in range(12):
+        assert (
+            world.api("editor")
+            .post(url, {"name": f"B{n}", "tiles": [tile]})
+            .status_code
+            == 201
+        )
+    client = world.api("viewer")
+    client.get(url)  # warm the session / CSRF cookie so only the list itself is counted
+    with django_assert_max_num_queries(
+        9
+    ):  # session, user, membership, project, count, page, charts
+        listed = client.get(url).json()
+    assert listed["total"] == 12
+    assert all(d["tiles"][0]["chart_exists"] for d in listed["items"])
+
+
 # ------------------------------------------------------------------ reports and jobs
 
 
@@ -347,6 +440,29 @@ def test_a_report_is_requested_built_by_its_job_and_downloaded(world: World) -> 
     assert OrphanedObject.objects.filter(storage_key=report.storage_key).exists()
 
 
+def test_a_report_title_that_a_spreadsheet_would_read_as_a_formula_is_refused(
+    world: World,
+) -> None:
+    url = f"{world.base()}/reports"
+    for title in (
+        '=HYPERLINK("http://evil.example")',
+        "+1+1",
+        "-2+3",
+        "@SUM(1)",
+        "\t=1",
+    ):
+        refused = world.api("editor").post(
+            url, {"title": title, "format": "xlsx", "dataset_id": str(world.dataset.pk)}
+        )
+        assert refused.status_code == 422, title
+    assert not Report.objects.filter(project=world.project).exists()
+    ok = world.api("editor").post(
+        url,
+        {"title": "Q3 = good", "format": "xlsx", "dataset_id": str(world.dataset.pk)},
+    )
+    assert ok.status_code == 202  # the twin: an inner "=" is fine
+
+
 def test_a_report_of_a_dataset_outside_the_project_is_refused(world: World) -> None:
     second = Project.objects.create(organization=world.org, name="Second")
     foreign = store_dataset(world.org, second, SAMPLE)
@@ -356,6 +472,40 @@ def test_a_report_of_a_dataset_outside_the_project_is_refused(world: World) -> N
     )
     assert refused.status_code == 404
     assert not Report.objects.filter(project=world.project).exists()
+
+
+def test_the_jobs_list_never_loads_the_result_column(
+    world: World, django_assert_max_num_queries: Any
+) -> None:
+    """A stage result is up to 4 MiB of JSON on the job row; a page of 200 jobs must not read it."""
+    import re
+
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    job_ids = [_request_report(world).json()["job_id"] for _ in range(3)]
+    Job.objects.filter(pk=job_ids[0]).update(result={"blob": "x" * 200_000})
+    execute_job(
+        job_ids[1]
+    )  # a finished job: its result names the report (the list must still show it)
+    with CaptureQueriesContext(connection) as queries:
+        listed = world.api("viewer").get(f"{world.base()}/jobs").json()
+    selects = [
+        q["sql"]
+        for q in queries
+        if '"exports_report"' not in q["sql"] and 'FROM "jobs_job"' in q["sql"]
+    ]
+    assert selects, "the list ran no query on the jobs table?"
+    for sql in selects:
+        # the JSON key extractions that feed ``report_id`` / ``dataset_id`` are fine; the column itself is not
+        # (a bare select-list column is followed by another column, an expression or FROM; a JSON
+        # key extraction has the column followed by a quoted path or ``->>``)
+        assert not re.search(r'"jobs_job"\."result"(?=,\s*["(]|\s+FROM)', sql), sql
+    assert len(listed["items"]) == 3
+    finished = next(j for j in listed["items"] if j["id"] == job_ids[1])
+    assert finished["status"] == "succeeded" and finished["report_id"] is not None
+    twin = world.api("viewer").get(f"{world.base()}/jobs/{job_ids[1]}").json()
+    assert twin["report_id"] == finished["report_id"]  # the single-job read agrees
 
 
 def test_jobs_are_listed_read_and_cancelled_inside_their_project(world: World) -> None:

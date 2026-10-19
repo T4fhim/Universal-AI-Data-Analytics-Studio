@@ -16,9 +16,10 @@ from typing import Any
 
 import pytest
 from apihelpers import Api
+from django.core.exceptions import RequestDataTooBig
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.files.uploadhandler import TemporaryFileUploadHandler
 from django.http import HttpRequest
-from factories import make_user
 from ninja.errors import HttpError
 from web_support import World, error_code, make_world
 
@@ -28,6 +29,7 @@ from uadas_api.storage.store import get_store
 from uadas_api.web.errors import ApiError
 from uadas_api.web.uploads import (
     CappedTemporaryFileUploadHandler,
+    UploadNotAllowed,
     UploadTooLarge,
     max_upload_bytes,
 )
@@ -148,15 +150,20 @@ def test_an_oversized_file_is_refused_and_nothing_is_stored(
 
 
 def test_the_handler_stops_the_parse_when_the_running_total_crosses_the_cap(
-    settings: Any,
+    world: World, settings: Any
 ) -> None:
     settings.UADAS_SANDBOX = {**settings.UADAS_SANDBOX, "max_input_bytes": 1000}
     assert max_upload_bytes() == 1000
     request = HttpRequest()
     request.user = (
-        make_user()
-    )  # a signed-in user: the handler parses nothing for anyone else
+        world.editor.user
+    )  # the upload route accepts a file part from an editor only
+    request.path_info = f"{world.base()}/datasets/upload"
     handler = CappedTemporaryFileUploadHandler(request)
+    # an honest Content-Length far above the cap is refused before a byte is read
+    with pytest.raises(UploadTooLarge):
+        handler.handle_raw_input(None, {}, 1000 + 2 * 1024 * 1024, "b")
+    handler.handle_raw_input(None, {}, 1500, "b")  # a small declared length passes
     handler.new_file("file", "x.csv", "text/csv", 0)
     assert handler.receive_data_chunk(b"x" * 600, 0) is None  # under the cap: accepted
     with pytest.raises(UploadTooLarge):
@@ -164,10 +171,6 @@ def test_the_handler_stops_the_parse_when_the_running_total_crosses_the_cap(
             b"x" * 600, 600
         )  # 1200 > 1000: stopped at this chunk
     handler.file.close()
-    # an honest Content-Length far above the cap is refused before a byte is read
-    with pytest.raises(UploadTooLarge):
-        handler.handle_raw_input(None, {}, 1000 + 2 * 1024 * 1024, "b")
-    handler.handle_raw_input(None, {}, 1500, "b")  # a small declared length passes
 
 
 def test_an_anonymous_multipart_body_is_refused_before_any_of_it_is_parsed(
@@ -205,11 +208,77 @@ def test_a_stranger_to_the_organization_is_refused_before_the_body_is_parsed(
     assert too_low.value.status_code == 403
     request.user = world.editor.user  # the twin: an editor passes the gate
     handler.handle_raw_input(None, {}, 100, "b")
-    request.path_info = (
-        "/api/auth/browser/v1/auth/login"  # any other multipart post: only the cap
-    )
-    request.user = world.outsider
+
+
+def _other_route_handler(
+    path: str = "/api/organizations",
+) -> CappedTemporaryFileUploadHandler:
+    request = HttpRequest()
+    request.path_info = path
+    return CappedTemporaryFileUploadHandler(request)
+
+
+def test_every_other_route_refuses_file_parts_and_oversized_multipart_before_spooling(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ninja's CSRF check reads ``request.POST`` on every route, so an anonymous multipart POST
+    (with a forged csrftoken cookie) to *any* route used to spool a cap-sized file to disk before
+    the 403. Only the upload route may take a file; elsewhere a body is the JSON-sized limit.
+    """
+    spooled: list[str] = []
+    original = TemporaryFileUploadHandler.new_file
+
+    def spy(self: Any, *args: Any, **kwargs: Any) -> None:
+        spooled.append(args[1])
+        original(self, *args, **kwargs)
+
+    monkeypatch.setattr(TemporaryFileUploadHandler, "new_file", spy)
+
+    # unit: no file part, a small body -> accepted (the twin); a file part, a big body -> refused
+    handler = _other_route_handler()
     handler.handle_raw_input(None, {}, 100, "b")
+    with pytest.raises(RequestDataTooBig):
+        handler.handle_raw_input(None, {}, 1024 * 1024 + 1, "b")
+    with pytest.raises(UploadNotAllowed):
+        handler.new_file("file", "x.csv", "text/csv", 5)
+    assert spooled == []
+
+    # HTTP, an anonymous client with a forged CSRF cookie, to a Ninja route and to an allauth view
+    anonymous = Api()
+    token = anonymous.token
+    for path, status in (
+        ("/api/organizations", 415),
+        ("/api/auth/browser/v1/auth/login", 400),
+    ):
+        refused = anonymous.client.post(
+            path,
+            {"file": SimpleUploadedFile("big.csv", CSV * 100, content_type="text/csv")},
+            headers={"X-CSRFToken": token},
+        )
+        assert refused.status_code == status, path
+    assert spooled == []  # not one temporary file was opened
+    envelope = anonymous.client.post(
+        "/api/organizations",
+        {"file": SimpleUploadedFile("big.csv", CSV, content_type="text/csv")},
+        headers={"X-CSRFToken": token},
+    )
+    assert error_code(envelope) == "unsupported_media_type"
+    too_big = anonymous.client.generic(
+        "POST",
+        "/api/organizations",
+        b"x",
+        content_type="multipart/form-data; boundary=b",
+        headers={"X-CSRFToken": token, "Content-Length": str(3 * 1024 * 1024)},
+    )
+    assert too_big.status_code in {400, 413}
+
+    # the twins: a legitimate JSON POST and the legitimate upload still work
+    assert (
+        world.api("editor").post("/api/organizations", {"name": "Fine"}).status_code
+        == 201
+    )
+    assert _upload(world).status_code == 202
+    assert spooled == ["sales.csv"]  # only the legitimate upload reached the spool
 
 
 def test_uploads_are_throttled_per_user_and_organization(

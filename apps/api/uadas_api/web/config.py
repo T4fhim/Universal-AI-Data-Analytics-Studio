@@ -26,6 +26,10 @@ DEFAULT_THROTTLES: dict[str, str] = {
     "run": "120/3600",  # 120 stage runs per hour
     "render": "600/3600",  # 600 synchronous chart renders per hour
     "report": "30/3600",  # 30 report builds per hour
+    # Preview pages and column summaries each copy and hash the whole Parquet object from the
+    # store: generous for a scrolling grid (2 a second), bounded for a loop.
+    "preview": "120/60",
+    "assistant": "60/3600",  # 60 assistant turns per hour (3.7)
 }
 
 
@@ -36,8 +40,8 @@ class ApiConfig:
     max_page_size: int = 200
     default_page_size: int = 50
     max_offset: int = 1_000_000
-    # The largest JSON request body (multipart file parts are capped separately, below).
-    max_body_bytes: int = 1 * MIB
+    # (The JSON body cap is Django's DATA_UPLOAD_MAX_MEMORY_SIZE, 1 MiB, in settings/base.py: one
+    # number, also used for the declared size of any multipart body on a non-upload route.)
     # Preview: the page-size cap, and the biggest frame a *sorted* page will read a column of.
     preview_max_rows: int = 200
     preview_max_sort_rows: int = 2_000_000
@@ -50,6 +54,29 @@ class ApiConfig:
     # A stage result stored on the job row (tables are capped by the renderers; figures here).
     stage_max_result_bytes: int = 4 * MIB
     max_parameters_bytes: int = 16 * 1024
+    # --- streaming (3.7): see plans/phase-3-7-streaming.md -----------------------------------
+    # Job-progress stream: DB poll cadence (jittered, backing off while nothing changes), the
+    # comment-frame interval that keeps proxies from closing an idle stream, the reconnect delay
+    # the browser is told to use, a hard ceiling on one stream's life, how often membership is
+    # re-checked while it is open, and the cap on one event's encoded size.
+    sse_poll_seconds: float = 1.0
+    sse_poll_max_seconds: float = 5.0
+    sse_heartbeat_seconds: float = 15.0
+    sse_retry_ms: int = 3000
+    sse_max_seconds: float = 900.0
+    sse_recheck_seconds: float = 30.0
+    sse_max_event_bytes: int = 16 * 1024
+    # Concurrent open job streams, per user (within one organization) and per organization.
+    stream_user_cap: int = 5
+    stream_org_cap: int = 50
+    # Assistant turn: bounds on what a client may send and how long one provider call may take.
+    assistant_max_message_chars: int = 8_000
+    assistant_max_history: int = 20
+    assistant_max_history_chars: int = 32_000
+    assistant_turn_seconds: float = 90.0
+    assistant_max_event_bytes: int = 64 * 1024
+    assistant_user_cap: int = 2
+    assistant_org_cap: int = 10
     # Overrides only; ``rate_for`` falls back to DEFAULT_THROTTLES per scope.
     throttles: Mapping[str, str] = field(default_factory=dict)
 

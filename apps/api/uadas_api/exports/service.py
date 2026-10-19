@@ -31,7 +31,7 @@ from uadas_api.accounts.models import User
 from uadas_api.exports.choices import ReportStatus
 from uadas_api.exports.models import Report
 from uadas_api.jobs.choices import JobKind
-from uadas_api.jobs.errors import JobError, JobErrorCode
+from uadas_api.jobs.errors import IdempotencyConflictError, JobError, JobErrorCode
 from uadas_api.jobs.models import Job
 from uadas_api.jobs.registry import Completion, JobContext, JobHandler
 from uadas_api.jobs.services import JobCreation, create_job
@@ -133,7 +133,12 @@ def request_report(
             "included_stages": included_stages,
         }
     )
+    job_key = f"report-{idempotency_key}" if idempotency_key else None
     with transaction.atomic():
+        if job_key is not None:
+            replayed = _replayed_report(project, job_key, title, report_format, config)
+            if replayed is not None:
+                return replayed  # a client retry: the same report and job, nothing new
         report = Report.objects.create(
             organization_id=project.organization_id,
             project=project,
@@ -147,9 +152,45 @@ def request_report(
             actor=actor,
             kind=JobKind.BUILD_REPORT.value,
             params={"report_id": str(report.pk)},
-            idempotency_key=idempotency_key or f"report-{report.pk}",
+            idempotency_key=job_key or f"report-{report.pk}",
         )
     return report, creation
+
+
+def _replayed_report(
+    project: Project,
+    job_key: str,
+    title: str,
+    report_format: str,
+    config: dict[str, Any],
+) -> tuple[Report, JobCreation] | None:
+    """The report and job an earlier request with this key made -- if it was *this* request.
+
+    ``None`` when the key is new (in this organization); the same key for another project or a
+    different title / format / dataset / stages is an ``IdempotencyConflictError`` (``409``).
+    """
+    existing = (
+        Job.objects.for_organization(project.organization_id)
+        .filter(kind=JobKind.BUILD_REPORT.value, idempotency_key=job_key)
+        .first()
+    )
+    if existing is None:
+        return None
+    report = (
+        Report.objects.for_organization(project.organization_id)
+        .filter(pk=existing.params.get("report_id"), project=project)
+        .first()
+        if existing.project_id == project.pk
+        else None
+    )
+    if (
+        report is None
+        or report.title != title
+        or report.format != report_format
+        or report.config != config
+    ):
+        raise IdempotencyConflictError
+    return report, JobCreation(existing, created=False)
 
 
 def _sections(
@@ -231,7 +272,11 @@ def build_report(ctx: JobContext) -> Completion:
     ctx.check_cancelled()
     ctx.report(40, "Building the file", force=True)
     extension = report.format
-    key = keys.export_key(org, report.pk, extension)
+    # One key per *attempt* (the stage runs' ``j<attempt>-<job>`` scheme): a superseded worker's
+    # cleanup can only ever name its own file, never the one the live attempt committed.
+    key = keys.export_key(
+        org, report.pk, extension, f"j{ctx.job.attempts:03d}-{ctx.job.pk.hex}"
+    )
     with tempfile.TemporaryDirectory(prefix="uadas-report-") as scratch:
         path = exporters()[report.format].export(
             content, Path(scratch) / f"report.{extension}"

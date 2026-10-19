@@ -21,7 +21,7 @@ from typing import Any, Literal
 from django.db import transaction
 from django.http import HttpRequest
 from ninja import Query, Router, Schema, Status
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from uadas_api.accounts.models import Role
 from uadas_api.exports.choices import ReportStatus
@@ -33,6 +33,7 @@ from uadas_api.storage.errors import StorageError
 from uadas_api.storage.store import get_store
 from uadas_api.web import throttle
 from uadas_api.web.errors import ApiError, responses
+from uadas_api.web.idempotency import IdempotencyKeyHeader
 from uadas_api.web.pagination import Page, PageParams
 from uadas_api.web.scope import in_project, member, project_of, scoped, user_of
 from uadas_api.workspaces.models import DatasetRecord, Project
@@ -40,6 +41,7 @@ from uadas_api.workspaces.models import DatasetRecord, Project
 router = Router(tags=["report"])
 _BASE = "/organizations/{org_id}/projects/{project_id}/reports"
 DOWNLOAD_URL_SECONDS = 60
+FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")  # mirrors the core exporter's rule
 
 ReportFormatName = Literal[
     "pdf", "html", "docx", "xlsx"
@@ -52,6 +54,17 @@ class ReportIn(Schema):
     dataset_id: uuid.UUID
     expertise_level: EXPERTISE_NAMES = "analyst"
     included_stages: list[STAGE_NAMES] | None = Field(default=None, max_length=10)
+
+    @field_validator("title")
+    @classmethod
+    def _title_is_not_a_formula(cls, value: str) -> str:
+        # A title is written into Excel / Word cells: one a spreadsheet reads as a formula
+        # (``=HYPERLINK(...)``) is refused here as well as neutralised by the core's exporter.
+        if value.startswith(FORMULA_TRIGGERS):
+            raise ValueError(
+                "a report title may not start with = + - @ or a control character"
+            )
+        return value
 
 
 class ReportOut(Schema):
@@ -132,7 +145,11 @@ def reports_list(
     operation_id="reports_create",
 )
 def reports_create(
-    request: HttpRequest, org_id: uuid.UUID, project_id: uuid.UUID, payload: ReportIn
+    request: HttpRequest,
+    org_id: uuid.UUID,
+    project_id: uuid.UUID,
+    payload: ReportIn,
+    idempotency_key: IdempotencyKeyHeader = None,
 ) -> Status[ReportAcceptedOut]:
     membership = member(request, org_id, Role.EDITOR)
     project = project_of(membership, project_id)
@@ -152,6 +169,7 @@ def reports_create(
                 if payload.included_stages is not None
                 else None
             ),
+            idempotency_key=idempotency_key,
         )
     except JobPermissionError:
         raise ApiError(403, "Your role does not allow this.") from None

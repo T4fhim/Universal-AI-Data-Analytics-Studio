@@ -104,6 +104,8 @@ Configuration is 12-factor: environment variables only. Do not commit `.env` fil
 | `SANDBOX_NETWORK_ISOLATION` | base, prod | unset (the child still *tries* a network namespace and reports the outcome) | `unshare`: refuse a parse whose child could not unshare a network namespace (`E007` if the host cannot); `container`: the worker has no route out (stated, not measured); `none-acknowledged`: accept the bypassable in-process socket guard alone. **Prod requires one of the three.** |
 | `SANDBOX_REQUIRE_NETNS` | tests only | unset | `1` makes the network-isolation test *demand* a namespace instead of asserting the honest "not isolated" report; set it where the kernel is known to allow `unshare` (CI sets it only if `unshare --user --net true` works on the runner). |
 | `JOBS_INTEGRATION` | tests only | unset | `1` (with a broker, a **PostgreSQL** `DATABASE_URL` and the `STORAGE_*` variables) also runs `test_jobs_integration.py`: a real `celery worker` process. |
+| `ASSISTANT_PROVIDER` | base | unset (assistant off: `503`) | `anthropic`, `gemini` or `groq` (`ollama` is refused on a server). Requires `ASSISTANT_API_KEY`; a key without a provider fails start-up. |
+| `ASSISTANT_API_KEY`, `ASSISTANT_MODEL` | base | none / the provider's default | The deployment's LLM credential (never a request field, never stored or logged) and an optional model name. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | base | none | Enable "sign in with GitHub". Both or neither: one alone fails start-up. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | base | none | Enable "sign in with Google". Both or neither. |
 
@@ -190,9 +192,16 @@ paged (`limit` ≤ 200, `offset`) and answer `{items, total, limit, offset}`; ev
 | `GET, POST .../dashboards`, `GET, PATCH, DELETE .../dashboards/{id}` | viewer / editor | Dashboards of chart tiles (tile chart ids resolved in the project). |
 | `GET, POST .../reports`, `GET, DELETE .../reports/{id}`, `GET .../reports/{id}/download` | viewer / editor | A report request is a job; download is a presigned URL valid 60 s. |
 
-Heavy endpoints (upload, stage run, chart render, report) are throttled per user and organization
+Upload and report request accept an optional `Idempotency-Key` header (1-56 of `A-Za-z0-9._:-`): a retry
+with the same key returns the same job and dataset/report; another body or project is a `409`. Preview and
+summary share a `preview` budget (120/min). Heavy endpoints (upload, stage run, chart render, report) are throttled per user and organization
 (`uadas_api/web/config.py`: 30/h, 120/h, 600/h, 30/h; a `429` envelope). JSON bodies are capped at
-1 MiB and an upload at the sandbox input cap, enforced while the bytes stream in.
+1 MiB and an upload at the sandbox input cap, enforced while the bytes stream in. Only the upload
+route takes a file part (and its auth, role and throttle are decided *before* the body is read, by the
+upload handler); a file part or a multipart body over 1 MiB sent to any other route is refused before
+a temporary file is opened (`415` / `413`). **Deployment:** run the API under **WSGI** (gunicorn) behind
+a proxy that caps the request body (for example nginx `client_max_body_size`): under ASGI Django
+spools the *whole* body before any handler runs, so none of these caps can act first.
 
 **OpenAPI 3.1** is generated offline and committed as [`openapi.json`](openapi.json); regenerate with
 `cd apps/api && python -m uadas_api.web.openapi` (add `--check` to fail on drift, as CI does). The HTTP
@@ -325,6 +334,24 @@ Design, threat model and limits: [plans/phase-3-5-jobs.md](../../plans/phase-3-5
 - **Several workers are safe.** Every worker-side write is fenced by the attempt number the worker was
   given, a heartbeat thread keeps a long silent run alive, a retry's backoff is honoured by the sweeper,
   and a job the sweeper fails or cancels (or a user cancels while queued) cleans up its stored objects.
+
+## Streaming (SSE, 3.7)
+
+Two routes answer `text/event-stream` (full design: `plans/phase-3-7-streaming.md`):
+
+* `GET /api/organizations/{org}/projects/{project}/jobs/{job}/events` -- a job's `status` / `progress`
+  as `job` events with a monotonic `id:`, a `retry:` hint and `: keep-alive` comments; viewers and above.
+  It closes after the terminal state (reconnect with `Last-Event-ID` and a terminal id gets `204`), after
+  15 minutes, or when the viewer is removed from the organization. Events never carry data rows.
+* `POST /api/organizations/{org}/assistant/messages` -- one assistant turn (`message`, `tool_call`
+  *proposals*, `done`, `error`); editors and above, CSRF, 60 turns/hour. Nothing is executed: the client
+  runs an accepted proposal through the stage endpoints. Providers return whole turns, so this is not
+  token-level streaming (deferred).
+
+Run it under **ASGI** (`uvicorn uadas_api.asgi:application`); under WSGI a stream pins a worker.
+Behind a proxy, do not buffer or compress `text/event-stream` (`X-Accel-Buffering: no` is sent) and keep
+the read timeout above 15 s. Caps: 5 job streams per user and 50 per organization, 2 assistant turns per
+user and 10 per organization (`429`); a client that leaves releases its slot immediately.
 
 ## Test
 

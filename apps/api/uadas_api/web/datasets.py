@@ -35,7 +35,9 @@ from pydantic import Field
 
 from uadas_api.accounts.models import Role
 from uadas_api.ingest.service import request_ingest
+from uadas_api.jobs.choices import JobKind
 from uadas_api.jobs.errors import IdempotencyConflictError, JobPermissionError
+from uadas_api.jobs.models import Job
 from uadas_api.sandbox.admission import check_content, check_extension
 from uadas_api.sandbox.errors import SandboxError, SandboxErrorCode
 from uadas_api.sandbox.limits import SandboxLimits
@@ -47,8 +49,10 @@ from uadas_api.storage.errors import (
     StorageError,
 )
 from uadas_api.storage.store import TenantObjectStore, get_store
+from uadas_api.web import throttle
 from uadas_api.web.config import api_config
 from uadas_api.web.errors import ApiError, not_found, responses
+from uadas_api.web.idempotency import IdempotencyKeyHeader
 from uadas_api.web.pagination import Page, PageParams, paginate
 from uadas_api.web.scope import in_project, member, project_of, scoped, user_of
 from uadas_api.workspaces.models import DatasetRecord, Project
@@ -191,6 +195,25 @@ def datasets_delete(
     return Status(204, None)
 
 
+def _metered_dataset(
+    request: HttpRequest,
+    org_id: uuid.UUID,
+    project_id: uuid.UUID,
+    dataset_id: uuid.UUID,
+) -> DatasetRecord:
+    """The dataset (viewer and above), after counting one ``preview``-scope read for the caller.
+
+    A preview page and a summary each make the store copy and hash the whole Parquet object, so
+    both draw on one bounded per-user, per-organization budget; the dataset is resolved first so a
+    foreign id is a 404 that costs nothing.
+    """
+    membership = member(request, org_id, Role.VIEWER)
+    project = project_of(membership, project_id)
+    record = in_project(DatasetRecord, project, dataset_id)
+    throttle.enforce("preview", membership.user_id, membership.organization_id)
+    return record
+
+
 def _open(store: TenantObjectStore, record: DatasetRecord) -> Any:
     try:
         return frames.open_frame(store, record)
@@ -213,8 +236,7 @@ def datasets_preview(
     dataset_id: uuid.UUID,
     params: Query[PreviewParams],
 ) -> PreviewOut:
-    project = project_of(member(request, org_id, Role.VIEWER), project_id)
-    record = in_project(DatasetRecord, project, dataset_id)
+    record = _metered_dataset(request, org_id, project_id, dataset_id)
     cfg = api_config()
     limit = min(params.limit, cfg.preview_max_rows)
     if params.sort is not None and record.row_count > cfg.preview_max_sort_rows:
@@ -263,8 +285,7 @@ def datasets_summary(
     project_id: uuid.UUID,
     dataset_id: uuid.UUID,
 ) -> SummaryOut:
-    project = project_of(member(request, org_id, Role.VIEWER), project_id)
-    record = in_project(DatasetRecord, project, dataset_id)
+    record = _metered_dataset(request, org_id, project_id, dataset_id)
     handle = _open(get_store(record.organization_id), record)
     try:
         with handle:
@@ -314,17 +335,44 @@ def datasets_upload(
     org_id: uuid.UUID,
     project_id: uuid.UUID,
     file: File[UploadedFile],
+    idempotency_key: IdempotencyKeyHeader = None,
 ) -> Status[UploadAcceptedOut]:
     membership = member(request, org_id, Role.EDITOR)
     project = project_of(membership, project_id)
     actor = user_of(membership)
     # The upload throttle is counted by the upload handler *before* the body is parsed
     # (uadas_api/web/uploads.py), so a refused or throttled request never costs a temp file.
-    return _accept_upload(project, actor, file)
+    return _accept_upload(project, actor, file, idempotency_key)
+
+
+def _replayed_upload(
+    project: Project, dataset_id: uuid.UUID, filename: str
+) -> Status[UploadAcceptedOut] | None:
+    """The answer for a retried upload (same ``Idempotency-Key``), or ``None`` if it is new."""
+    existing = (
+        Job.objects.for_organization(project.organization_id)
+        .filter(
+            kind=JobKind.INGEST_DATASET.value, idempotency_key=f"ingest-{dataset_id}"
+        )
+        .first()
+    )
+    if existing is None:
+        return None
+    if existing.project_id != project.pk or existing.params.get("filename") != filename:
+        raise ApiError(409, "This idempotency key was used for a different request.")
+    return Status(
+        202,
+        UploadAcceptedOut(
+            job_id=existing.pk, dataset_id=dataset_id, status=str(existing.status)
+        ),
+    )
 
 
 def _accept_upload(
-    project: Project, actor: Any, upload: UploadedFile
+    project: Project,
+    actor: Any,
+    upload: UploadedFile,
+    idempotency_key: str | None = None,
 ) -> Status[UploadAcceptedOut]:
     name = (upload.name or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
     if not name or not upload.size:
@@ -342,7 +390,17 @@ def _accept_upload(
         raise _admission_error(error) from None
 
     org = keys.organization_id(project.organization_id)
-    dataset_id = uuid.uuid4()
+    # With a client key the dataset id is derived from it (per organization), so a retry names the
+    # same dataset and the ingest job's own key (``ingest-<dataset id>``) dedups it.
+    dataset_id = (
+        uuid.uuid4()
+        if idempotency_key is None
+        else uuid.uuid5(project.organization_id, f"upload:{idempotency_key}")
+    )
+    if idempotency_key is not None:
+        replay = _replayed_upload(project, dataset_id, name)
+        if replay is not None:
+            return replay
     original_key = keys.dataset_original_key(org, dataset_id)
     # The declared type is advisory (it goes to the job as such); the *stored* original is always
     # opaque bytes, so a client cannot make the bucket serve its upload as text/html.

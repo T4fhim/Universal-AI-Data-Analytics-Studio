@@ -209,15 +209,22 @@ def charts_update(
     project = project_of(member(request, org_id, Role.EDITOR), project_id)
     chart = in_project(ChartSpec, project, chart_id)
     sent = payload.model_fields_set
-    if "title" in sent and payload.title is not None:
+    changed: list[str] = (
+        []
+    )  # only these columns are written: a concurrent PATCH of another
+    if "title" in sent and payload.title is not None:  # field must not be clobbered
         chart.title = payload.title
+        changed.append("title")
     if "dataset_id" in sent:
         chart.dataset = _dataset_in(project, payload.dataset_id)
+        changed.append("dataset")
     if "spec" in sent and payload.spec is not None:
         _check_spec(chart.chart_type, payload.spec)
         chart.spec = payload.spec
-    with transaction.atomic():
-        chart.save()
+        changed.append("spec")
+    if changed:
+        with transaction.atomic():
+            chart.save(update_fields=changed)
     return _one(project, chart)
 
 

@@ -19,6 +19,7 @@ import datetime
 import uuid
 from typing import Any
 
+from django.db.models.fields.json import KeyTextTransform
 from django.http import HttpRequest
 from ninja import Query, Router, Schema
 
@@ -66,22 +67,31 @@ def _uuid_or_none(value: Any) -> uuid.UUID | None:
         return None
 
 
+def for_listing(queryset: Any) -> Any:
+    """``queryset`` without the ``result`` column (up to 4 MiB of JSON per row), keeping only the
+    two ids the list shows, extracted by the database (``out_dataset`` / ``out_report``).
+    """
+    return queryset.defer("result").annotate(
+        out_dataset=KeyTextTransform("dataset_id", "result"),
+        out_report=KeyTextTransform("report_id", "result"),
+    )
+
+
+def _named(job: Job) -> tuple[Any, Any]:
+    """The raw dataset and report ids a job's result names (annotated by :func:`for_listing`, else read)."""
+    if "out_dataset" in job.__dict__:
+        return job.__dict__["out_dataset"], job.__dict__["out_report"]
+    result = job.result if isinstance(job.result, dict) else {}
+    return result.get("dataset_id"), result.get("report_id")
+
+
 def _outputs(
     project: Project, jobs: list[Job]
 ) -> tuple[set[uuid.UUID], set[uuid.UUID]]:
     """The dataset and report ids named by ``jobs``' results that really are this project's."""
-    datasets = {
-        i
-        for job in jobs
-        if isinstance(job.result, dict)
-        and (i := _uuid_or_none(job.result.get("dataset_id")))
-    }
-    reports = {
-        i
-        for job in jobs
-        if isinstance(job.result, dict)
-        and (i := _uuid_or_none(job.result.get("report_id")))
-    }
+    named = [_named(job) for job in jobs]
+    datasets = {i for d, _ in named if (i := _uuid_or_none(d))}
+    reports = {i for _, r in named if (i := _uuid_or_none(r))}
     org = project.organization_id
     found_datasets = set(
         DatasetRecord.objects.for_organization(org)
@@ -100,9 +110,9 @@ def jobs_out(project: Project, jobs: list[Job]) -> list[JobOut]:
     datasets, reports = _outputs(project, jobs)
     out: list[JobOut] = []
     for job in jobs:
-        result = job.result if isinstance(job.result, dict) else {}
-        dataset_id = _uuid_or_none(result.get("dataset_id"))
-        report_id = _uuid_or_none(result.get("report_id"))
+        raw_dataset, raw_report = _named(job)
+        dataset_id = _uuid_or_none(raw_dataset)
+        report_id = _uuid_or_none(raw_report)
         out.append(
             JobOut(
                 id=job.pk,
@@ -147,7 +157,7 @@ def jobs_list(
             raise ApiError(422, "Unknown job status.")
         queryset = queryset.filter(status=params.status)
     total = queryset.count()
-    rows = list(queryset[params.offset : params.offset + params.limit])
+    rows = list(for_listing(queryset)[params.offset : params.offset + params.limit])
     return {
         "items": jobs_out(project, rows),
         "total": total,

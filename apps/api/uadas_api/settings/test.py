@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import dj_database_url
 
-from . import _auth, _jobs, _storage
+from . import _assistant, _auth, _jobs, _storage
 from .base import *  # noqa: F403 - the settings split is a star-import by design
 
 DEBUG = False
@@ -51,3 +51,7 @@ STORAGES = _storage.django_storages(UADAS_STORAGE)
 UADAS_JOBS = _jobs.hermetic_jobs()
 UADAS_SANDBOX = _jobs.parse_sandbox({})
 globals().update(_jobs.celery_settings(UADAS_JOBS))
+
+# The assistant is unconfigured in the suite (a developer's ASSISTANT_* cannot reach a real provider
+# from a test); tests that need one set `settings.UADAS_ASSISTANT` and patch the provider factory.
+UADAS_ASSISTANT = _assistant.parse_assistant({})

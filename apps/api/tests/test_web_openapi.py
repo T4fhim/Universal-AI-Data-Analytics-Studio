@@ -122,8 +122,44 @@ def test_request_bodies_and_success_responses_are_typed() -> None:
             assert _is_typed(content["schema"]), (method, path)
         for status, response in op["responses"].items():
             if status.startswith("2") and status != "204":
+                if "text/event-stream" in response["content"]:
+                    # 3.7: OpenAPI 3.1 cannot type an event stream, so each event's `data` schema
+                    # is listed in `x-sse-events`; every one must be a typed, non-trivial schema.
+                    events = response["x-sse-events"]
+                    assert events, (method, path)
+                    for name, event_schema in events.items():
+                        assert _is_typed(event_schema), (method, path, name)
+                        assert event_schema["properties"], (method, path, name)
+                    continue
                 content = response["content"]["application/json"]
                 assert _is_typed(content["schema"]), (method, path, status)
+
+
+def test_exactly_the_two_stream_operations_are_documented_as_event_streams() -> None:
+    """3.7: an unlisted stream (a route that answers text/event-stream) must be a reviewed change."""
+    streams = {
+        op["operationId"]
+        for _, _, op in OPERATIONS
+        if any(
+            "text/event-stream" in r.get("content", {})
+            for r in op["responses"].values()
+        )
+    }
+    assert streams == {"jobs_events", "assistant_messages"}
+    by_id = {op["operationId"]: (method, path, op) for method, path, op in OPERATIONS}
+    method, path, op = by_id["jobs_events"]
+    assert method == "get" and "{job_id}" in path and path.endswith("/events")
+    assert (
+        "204" in op["responses"]
+    )  # the stop-reconnecting answer is part of the contract
+    assert any(p["name"] == "Last-Event-ID" for p in op["parameters"])
+    assert by_id["assistant_messages"][0] == "post"
+    # the twin: an ordinary operation is JSON-only and has no event list
+    ordinary = by_id["jobs_get"][2]["responses"]["200"]
+    assert (
+        set(ordinary["content"]) == {"application/json"}
+        and "x-sse-events" not in ordinary
+    )
 
 
 @pytest.mark.parametrize(

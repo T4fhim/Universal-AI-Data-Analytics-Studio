@@ -24,8 +24,9 @@ from pathlib import Path
 from typing import Any
 
 import dj_database_url
+from corsheaders.defaults import default_headers
 
-from . import _auth, _jobs, _storage
+from . import _assistant, _auth, _jobs, _storage
 from ._env import get_bool, get_choice, get_list, get_str
 
 # apps/api/ -- the directory holding manage.py. Anchored on this file, never on the
@@ -256,3 +257,12 @@ FILE_UPLOAD_HANDLERS: list[str] = [
 # Overrides for the API's page / preview / render / throttle limits (see uadas_api/web/config.py
 # for the keys and the defaults). Empty = the documented defaults.
 UADAS_API: dict[str, Any] = {}
+
+# --- streaming (3.7) -----------------------------------------------------------------
+
+# EventSource re-sends `Last-Event-ID` when it reconnects, and a cross-origin request carrying it
+# is preflighted: the header must be allowed or a resumed job stream fails in a split deployment.
+CORS_ALLOW_HEADERS: tuple[str, ...] = (*default_headers, "last-event-id")
+# The AI assistant's provider, from the deployment environment only (see settings/_assistant.py).
+# Unconfigured = the endpoint answers 503. The key never appears in a request, a row or a log.
+UADAS_ASSISTANT: dict[str, Any] = _assistant.parse_assistant(os.environ)

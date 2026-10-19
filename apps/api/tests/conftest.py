@@ -96,6 +96,10 @@ SETTINGS_ENV_VARS: tuple[str, ...] = (
     "SANDBOX_CHILD_GID",
     "SANDBOX_NETWORK_ISOLATION",
     "SANDBOX_ISOLATION_ACKNOWLEDGED",
+    # 3.7: the AI assistant's provider.
+    "ASSISTANT_PROVIDER",
+    "ASSISTANT_API_KEY",
+    "ASSISTANT_MODEL",
 )
 
 _SETTINGS_PACKAGE = "uadas_api.settings"

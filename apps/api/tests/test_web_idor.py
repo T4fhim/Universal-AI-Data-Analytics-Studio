@@ -25,6 +25,7 @@ import json
 import uuid
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlencode
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -92,6 +93,7 @@ BODIES: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
         "tiles": [_tile(i["chart_id"])],
     },
     "dashboards_update": lambda i: {"tiles": [_tile(i["chart_id"])]},
+    "assistant_messages": lambda i: {"message": "walk"},  # 3.7 (SSE; no ids to forge)
     "reports_create": lambda i: {
         "title": "walk",
         "format": "html",
@@ -349,6 +351,34 @@ def test_foreign_organization_and_foreign_ids_never_reach_organization_a_data(
                 response.status_code == 404
             ), f"{operation_id}: {response.status_code}"
         _no_leak(response, markers, f"{operation_id} (own org, foreign ids)")
+
+        # 2b. own organization in the path but A's *project* (and A's resource ids, in the path,
+        # the body and the query string): the project scope alone must make every such operation a
+        # 404 -- including list routes that name no resource. (Found by review: a project lookup
+        # that forgot ``for_organization`` passed attack 2 because B's own project was used there.)
+        if "project_id" in names:
+            foreign_project = {**a_ids, "org_id": b_ids["org_id"]}
+            url = (
+                _fill(path, foreign_project)
+                + "?"
+                + urlencode({k: str(v) for k, v in a_ids.items() if k not in names})
+            )
+            if operation_id in MULTIPART:
+                response = attacker.client.post(
+                    url,
+                    {
+                        "file": SimpleUploadedFile(
+                            "x.csv", b"a,b\n1,2\n", content_type="text/csv"
+                        )
+                    },
+                    headers={"X-CSRFToken": attacker.token},
+                )
+            else:
+                response = _call(attacker, method, url, body)
+            assert (
+                response.status_code == 404
+            ), f"{operation_id} (own org, A's project): {response.status_code}"
+            _no_leak(response, markers, f"{operation_id} (own org, A's project)")
         walked += 1
     assert walked == len(_operations())
     assert (

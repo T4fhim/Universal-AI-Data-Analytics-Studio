@@ -218,8 +218,11 @@ jobs:
         # keys, facade, lifecycle, D4-on-object-storage atomicity; the facade and workspace
         # suites are parametrized over an in-memory fake and a real MinIO, so they count
         # twice) and 1913 at 3.6 (the API surface: resources, stage routers, upload, the IDOR walk,
-        # the OpenAPI contract, Schemathesis -- 34 fuzzed read operations plus a real-id smoke).
-        # The count includes three Postgres-only race tests that skip on SQLite and
+        # the OpenAPI contract, Schemathesis -- 34 fuzzed read operations plus a real-id smoke) and
+        # 1999 at 3.7 streaming (+86: SSE framing, stream caps, the job-event loop on a fake clock,
+        # the real-ASGI stream tests and the assistant endpoint with a fake provider).
+        # The count includes four Postgres-only tests that skip on SQLite (three race tests and 3.7's
+        # server-side connection-count test, which must run in this job: it is the leak proof) and
         # the MinIO-parametrized tests, which this job runs against the container above.
         # The floor is that minus 2, leaving room to prune a couple deliberately while failing
         # on a real collapse (e.g. a conftest import error that silently drops a whole
@@ -231,7 +234,7 @@ jobs:
           count="$(echo "$out" | grep -oE '^[0-9]+ tests? collected' | grep -oE '^[0-9]+')"
           test -n "$count" || { echo "::error::could not read a collected-test count"; exit 1; }
           echo "collected: $count"
-          test "$count" -ge 1911 || { echo "::error::collected $count tests, expected at least 1911"; exit 1; }
+          test "$count" -ge 1997 || { echo "::error::collected $count tests, expected at least 1997"; exit 1; }
 
       - name: pytest (apps/api)
         # DJANGO_SETTINGS_MODULE comes from apps/api/pyproject.toml, not the
@@ -264,6 +267,8 @@ jobs:
         #      test_sandbox_malformed.py (the "honesty" tests);
         #   2  the dedicated-uid tests in test_sandbox_isolation.py, which need a *root* worker
         #      (the runner is unprivileged; they run in a root Linux container instead).
+        # 3.7 adds none: its only conditional test (server-side connection count) needs PostgreSQL, runs
+        # here, and *fails* rather than skips under CI=true if DATABASE_URL is lost.
         # Any new skip is a reviewed change to this number that says what skips and why.
         shell: bash
         run: |
@@ -286,7 +291,8 @@ jobs:
       - name: Schemathesis (committed schema, in process)
         # Contract fuzzing of the read endpoints through the real WSGI application with a logged-in
         # session, plus a real-id smoke of every GET: documented status, content type and body.
-        # Derandomized and database-free, so it cannot flake. Kept out of the main pytest step above
+        # Derandomized, with Hypothesis's example database off (it does use the test database, in the
+        # test's own transaction, for its fixtures), so it cannot flake. Kept out of the main pytest step above
         # (`--ignore`) so that step's skip budget stays what it was; it has no skips of its own.
         run: python -m pytest apps/api/tests/test_web_schemathesis.py -q --tb=long -p no:cacheprovider
 

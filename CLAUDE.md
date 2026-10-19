@@ -233,6 +233,10 @@ worker-side write to a job is fenced by the attempt number the worker was claime
 one the same way, or a superseded worker can overwrite its successor. Production requires Linux (the limits cannot be
 enforced elsewhere). See [plans/phase-3-5-jobs.md](plans/phase-3-5-jobs.md).
 
+### Streaming (SSE, Phase 3.7)
+
+SSE routes (`web/{job_events,assistant}.py`, async views under ASGI) send only closed event fields -- **never a data row, `params`, `result` or provider/exception text** -- build every frame with `web/sse.py`, hold a `web/streams.py` cap lease released on every exit path, and the assistant only *proposes* tool calls (never import `AssistantService`/`get_tool_by_name` there). **Never hold a DB connection or transaction across a sleep**: each poll ends in `release_connections()`; new stream routes get a `test_web_streaming`-style real-ASGI test. See [plans/phase-3-7-streaming.md](plans/phase-3-7-streaming.md).
+
 ### Configuration
 
 Adding a new config key means updating `_default_config_dict`, `_TOP_LEVEL_SCHEMA`/`_NESTED_SCHEMA`, and
