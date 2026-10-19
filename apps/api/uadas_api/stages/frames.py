@@ -117,7 +117,9 @@ def read_page(
     if sort is None:
         return _collect(pf, list(range(offset, min(offset + limit, total))))
     keys = pf.read(columns=[sort])
-    order = pc.sort_indices(  # type: ignore[attr-defined]
+    # pyarrow's stubs differ between environments (CI types this attribute, a local
+    # install may not), so the ignore is allowed to be unused.
+    order = pc.sort_indices(  # type: ignore[attr-defined, unused-ignore]
         keys,
         sort_keys=[(sort, "descending" if descending else "ascending")],
         null_placement="at_end",
