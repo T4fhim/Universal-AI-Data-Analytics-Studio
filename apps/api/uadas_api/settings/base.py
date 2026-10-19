@@ -242,3 +242,17 @@ UADAS_SANDBOX: dict[str, Any] = _jobs.parse_sandbox(os.environ)
 # The timeouts must nest (sandbox wall < heartbeat window, < Celery hard limit); see the function.
 _jobs.validate_consistency(UADAS_JOBS, UADAS_SANDBOX)
 globals().update(_jobs.celery_settings(UADAS_JOBS))
+
+# --- the API surface (3.6) ----------------------------------------------------------
+
+# Request-size caps. A JSON body is limited to 1 MiB (Django counts everything except file parts
+# against this); a file part is limited by the *only* upload handler configured, which stops the
+# parse as soon as the running total crosses the sandbox input cap (see uadas_api/web/uploads.py).
+# There is deliberately no in-memory handler: nothing a client sends is held in RAM unbounded.
+DATA_UPLOAD_MAX_MEMORY_SIZE: int = 1024 * 1024
+FILE_UPLOAD_HANDLERS: list[str] = [
+    "uadas_api.web.uploads.CappedTemporaryFileUploadHandler"
+]
+# Overrides for the API's page / preview / render / throttle limits (see uadas_api/web/config.py
+# for the keys and the defaults). Empty = the documented defaults.
+UADAS_API: dict[str, Any] = {}

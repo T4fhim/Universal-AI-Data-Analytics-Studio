@@ -27,9 +27,14 @@ from django.db import models
 
 
 class JobKind(models.TextChoices):
-    """What a job does. Grows with the pipeline (3.6+: profile, clean, analyse, export)."""
+    """What a job does. Grows with the pipeline (3.6: stage operations and report builds)."""
 
     INGEST_DATASET = "ingest_dataset", "Ingest dataset"
+    # One catalog operation of one pipeline stage on one dataset (profile, clean, analyse,
+    # forecast, chart): ``uadas_api.stages.run``.
+    RUN_OPERATION = "run_operation", "Run a stage operation"
+    # Render a Report row to its file in object storage: ``uadas_api.exports.service``.
+    BUILD_REPORT = "build_report", "Build a report"
 
 
 class JobStatus(models.TextChoices):

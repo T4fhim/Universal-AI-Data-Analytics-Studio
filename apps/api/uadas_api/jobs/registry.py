@@ -76,6 +76,9 @@ class Completion:
     result: Mapping[str, Any]
     commit: Callable[[], None] | None = None
     cleanup: Callable[[], None] | None = None
+    # ``None`` = the default 16 KiB ("ids and counts"). A handler whose result is a bounded, display-
+    # formatted document (the 3.6 stage result sections) names its own, larger cap.
+    max_result_bytes: int | None = None
 
 
 @dataclass(frozen=True)
@@ -97,6 +100,8 @@ class JobHandler:
 # kind -> "module:attribute" of the JobHandler. The only place a kind is tied to code.
 _HANDLER_PATHS: dict[str, str] = {
     JobKind.INGEST_DATASET.value: "uadas_api.ingest.service:HANDLER",
+    JobKind.RUN_OPERATION.value: "uadas_api.stages.run:HANDLER",
+    JobKind.BUILD_REPORT.value: "uadas_api.exports.service:HANDLER",
 }
 
 _overrides: dict[str, JobHandler] = {}

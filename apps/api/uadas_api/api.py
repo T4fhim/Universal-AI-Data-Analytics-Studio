@@ -28,6 +28,16 @@ from ninja import NinjaAPI, Router, Schema
 
 from uadas_api.accounts.api import router as accounts_router
 from uadas_api.accounts.security import session_auth
+from uadas_api.web.charts import router as charts_router
+from uadas_api.web.dashboards import router as dashboards_router
+from uadas_api.web.datasets import router as datasets_router
+from uadas_api.web.datasets import upload_router
+from uadas_api.web.errors import install_error_handlers
+from uadas_api.web.jobs import router as jobs_router
+from uadas_api.web.pipeline import router as pipeline_router
+from uadas_api.web.projects import router as projects_router
+from uadas_api.web.reports import router as reports_router
+from uadas_api.web.stages import STAGE_ROUTERS
 
 health_router = Router(tags=["health"])
 
@@ -57,9 +67,25 @@ def health(request: object) -> HealthOut:
 
 
 def _wire_routers(target: NinjaAPI) -> None:
-    """Attach every router to ``target`` (one line per feature app, added as they land)."""
+    """Attach every router to ``target`` (one line per feature app, added as they land).
+
+    Each router declares its full ``/organizations/{org_id}/...`` paths, so all mount at "".
+    The per-stage routers come from the core's ``PipelineStage`` enum (``web.stages``).
+    """
     target.add_router("", health_router)
     target.add_router("", accounts_router)
+    for module_router in (
+        projects_router,
+        upload_router,  # before datasets_router: see web/datasets.py
+        datasets_router,
+        jobs_router,
+        pipeline_router,
+        charts_router,
+        dashboards_router,
+        reports_router,
+        *STAGE_ROUTERS.values(),
+    ):
+        target.add_router("", module_router)
 
 
 def build_api(*, debug: bool) -> NinjaAPI:
@@ -77,6 +103,7 @@ def build_api(*, debug: bool) -> NinjaAPI:
         docs_url="/docs" if debug else None,
         openapi_url="/openapi.json" if debug else None,
     )
+    install_error_handlers(built)
     _wire_routers(built)
     return built
 

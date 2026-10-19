@@ -5,18 +5,20 @@ The Django 6 + Django Ninja backend for the Universal AI Data Analytics Studio w
 It is a separate distribution from the framework-free core (`uadas_core`, repo root) and
 depends on it; the core never imports it (enforced by `.importlinter`).
 
-**Status: sub-step 3.5, background jobs and the parser sandbox** (on top of 3.4 object storage,
-3.3 authentication and per-organization roles). Seven Django apps (`accounts`, `workspaces`,
-`pipeline`, `ai`, `exports`, `storage`, `jobs`), split settings, the models described under
-[Data model](#data-model), sign-in through django-allauth (headless, session cookies), the
-account endpoints listed under [Authentication](#authentication) and [Endpoints](#endpoints),
-tenant-scoped S3-compatible storage ([Object storage](#object-storage)) and durable background
-jobs with a sandboxed file parser ([Background jobs](#background-jobs-and-the-parser-sandbox)).
-`GET /api/health` stays public and database-free. No upload endpoint (3.6) or API endpoints over
-the *data* models yet. `AUTH_USER_MODEL = "accounts.User"`. Decisions and limits:
+**Status: sub-step 3.6, the API surface** (on top of 3.5 background jobs and the parser sandbox,
+3.4 object storage, 3.3 authentication and per-organization roles). Seven Django apps (`accounts`,
+`workspaces`, `pipeline`, `ai`, `exports`, `storage`, `jobs`), split settings, the models described
+under [Data model](#data-model), sign-in through django-allauth (headless, session cookies), the
+routes listed under [Authentication](#authentication) and [Endpoints](#endpoints) (projects,
+datasets with a paged preview and upload, jobs, charts, dashboards, reports, lineage and one router
+per pipeline stage), tenant-scoped S3-compatible storage ([Object storage](#object-storage)) and
+durable background jobs with a sandboxed file parser
+([Background jobs](#background-jobs-and-the-parser-sandbox)). `GET /api/health` stays public and
+database-free. `AUTH_USER_MODEL = "accounts.User"`. Decisions and limits:
 [plans/phase-3-3-auth.md](../../plans/phase-3-3-auth.md),
 [plans/phase-3-4-storage.md](../../plans/phase-3-4-storage.md),
-[plans/phase-3-5-jobs.md](../../plans/phase-3-5-jobs.md).
+[plans/phase-3-5-jobs.md](../../plans/phase-3-5-jobs.md),
+[plans/phase-3-6-api.md](../../plans/phase-3-6-api.md).
 
 ## Install
 
@@ -166,6 +168,40 @@ Roles, lowest first: `viewer < editor < admin < owner` (one definition:
 `uadas_api/accounts/permissions.py`, with the capability matrix). Later routers reuse
 `require_membership(request, org_id, min_role)` from `uadas_api/accounts/security.py`.
 
+### Resource routes (3.6)
+
+Below `/api/organizations/{org_id}/projects/{project_id}` (every id is resolved through
+`for_organization` *and* that project; a foreign id is a `404` identical to a missing one). Lists are
+paged (`limit` ≤ 200, `offset`) and answer `{items, total, limit, offset}`; every 4xx is
+`{"error": {"code", "message", "details"}}` with a code from a closed set
+(`uadas_api/web/errors.py`).
+
+| Route | Role | Purpose |
+|---|---|---|
+| `GET, POST /api/organizations/{org_id}/projects`; `GET, PATCH, DELETE .../{project_id}` | viewer / editor / admin to delete | Projects (`409` on a duplicate name or a non-empty delete). |
+| `GET .../datasets`, `GET, DELETE .../datasets/{id}` | viewer / editor | Datasets; delete queues the stored objects (3.4 outbox). |
+| `GET .../datasets/{id}/preview?offset&limit&sort&descending` | viewer | One formatted page, sorted server-side; page size ≤ 200. |
+| `GET .../datasets/{id}/summary` | viewer | Types, null counts, min/max from the file footer. |
+| `POST .../datasets/upload` (multipart `file`) | editor | Streamed under the size cap, admitted by extension and signature, then an ingest job: `202` + `job_id`. |
+| `GET .../jobs`, `GET .../jobs/{id}`, `POST .../jobs/{id}/cancel`, `GET .../jobs/{id}/stage-result` | viewer / editor to cancel | Job status and progress for polling; a stage run's result sections. |
+| `GET .../stages/{stage}/catalog`; `POST .../stages/{stage}/run` | viewer / editor | One router per `PipelineStage`: the stage's operations and JSON-Schema parameters from the core registry; a run validates against it and enqueues a job (`202`). Tags are the stage names. |
+| `GET .../pipeline/nodes`, `.../pipeline/edges`, `.../recipes`, `.../recipes/{id}` | viewer | Lineage and recipes (read-only). |
+| `GET, POST .../charts`, `GET, PATCH, DELETE .../charts/{id}`, `POST .../charts/{id}/render` | viewer / editor | Saved charts; render builds the figure from a bounded row sample (a bounded sync call). |
+| `GET, POST .../dashboards`, `GET, PATCH, DELETE .../dashboards/{id}` | viewer / editor | Dashboards of chart tiles (tile chart ids resolved in the project). |
+| `GET, POST .../reports`, `GET, DELETE .../reports/{id}`, `GET .../reports/{id}/download` | viewer / editor | A report request is a job; download is a presigned URL valid 60 s. |
+
+Heavy endpoints (upload, stage run, chart render, report) are throttled per user and organization
+(`uadas_api/web/config.py`: 30/h, 120/h, 600/h, 30/h; a `429` envelope). JSON bodies are capped at
+1 MiB and an upload at the sandbox input cap, enforced while the bytes stream in.
+
+**OpenAPI 3.1** is generated offline and committed as [`openapi.json`](openapi.json); regenerate with
+`cd apps/api && python -m uadas_api.web.openapi` (add `--check` to fail on drift, as CI does). The HTTP
+route `/api/openapi.json` still exists only when `DEBUG` is on.
+
+**Adding a route:** declare `operation_id`, `response=responses({...})`, call `member(request,
+org_id, <role>)` first, resolve every id with `project_of` / `in_project`, regenerate `openapi.json`
+-- the IDOR walk (`tests/test_web_idor.py`) then covers it automatically (and fails until it can).
+
 ## Data model
 
 Full table, constraints and limitations: [plans/phase-3-2-data-model.md](../../plans/phase-3-2-data-model.md).
@@ -307,6 +343,9 @@ real `celery worker` against real Redis, PostgreSQL and MinIO when `JOBS_INTEGRA
 `CELERY_BROKER_URL=redis://localhost:6379/5 DATABASE_URL=postgres://...` and the `STORAGE_*` variables
 are exported (`test_jobs_ci_guard.py` fails CI if they are lost). To run the sandbox tests on Linux
 from Windows, run the suite inside a `python:3.13` container as a non-root user (see the plan).
+
+`test_web_schemathesis.py` fuzzes the committed OpenAPI schema in process (derandomized, no network);
+it needs the `dev` extra (`schemathesis`).
 
 The pytest settings (`DJANGO_SETTINGS_MODULE = uadas_api.settings.test`) live in
 `apps/api/pyproject.toml`, so the core suite (`python -m pytest tests -q`) is unaffected.

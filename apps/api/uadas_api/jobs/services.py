@@ -272,11 +272,17 @@ def claim(job_id: uuid.UUID | str, *, now: datetime, stale_after: int) -> Job | 
     return Job.objects.filter(pk=job_id).first()
 
 
-def _checked_result(result: Mapping[str, Any]) -> dict[str, Any]:
-    """A JSON-safe, size-bounded copy of ``result`` (ids, keys, counts: never rows of data)."""
+def _checked_result(
+    result: Mapping[str, Any], limit: int | None = None
+) -> dict[str, Any]:
+    """A JSON-safe, size-bounded copy of ``result`` (ids, keys, counts: never rows of data).
+
+    ``limit`` raises the cap for a handler that returns a bounded, display-formatted document
+    (the 3.6 stage result sections); the default stays 16 KiB.
+    """
     plain = dict(result)
     encoded = json.dumps(plain, sort_keys=True)  # TypeError for a non-JSON value
-    if len(encoded) > _MAX_RESULT_BYTES:
+    if len(encoded) > (limit or _MAX_RESULT_BYTES):
         raise ValueError("a job result must be small: ids and counts, not data")
     return plain
 
@@ -298,13 +304,14 @@ def finish_succeeded(
     attempt: int,
     result: Mapping[str, Any],
     now: datetime,
+    max_result_bytes: int | None = None,
 ) -> bool:
     """``running -> succeeded`` with ``result``. ``False`` if this attempt no longer owns the job.
 
     Call it inside the transaction that commits whatever else the job produced, and raise if it
     returns ``False``: a job that lost its claim must not leave its side effects behind.
     """
-    payload = _checked_result(result)
+    payload = _checked_result(result, max_result_bytes)
     with allow_status_write():
         updated = _running(job_id, attempt).update(
             status=JobStatus.SUCCEEDED,

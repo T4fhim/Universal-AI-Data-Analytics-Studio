@@ -168,7 +168,11 @@ def _commit(job: Job, completion: Completion, now: datetime) -> None:
         if completion.commit is not None:
             completion.commit()
         if not services.finish_succeeded(
-            job.pk, attempt=job.attempts, result=completion.result, now=now
+            job.pk,
+            attempt=job.attempts,
+            result=completion.result,
+            now=now,
+            max_result_bytes=completion.max_result_bytes,
         ):
             raise JobLostError
 

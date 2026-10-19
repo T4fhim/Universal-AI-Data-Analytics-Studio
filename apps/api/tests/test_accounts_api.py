@@ -303,7 +303,7 @@ def test_the_last_owner_cannot_demote_themselves_but_can_with_a_co_owner(
 ) -> None:
     refused = _patch_role(world, world.owner, world.owner, "admin")
     assert refused.status_code == 409
-    assert refused.json()["detail"]
+    assert refused.json()["error"]["code"] == "conflict"  # the 3.6 envelope
     world.owner.refresh_from_db()
     assert world.owner.role == Role.OWNER
     _join(world.org, Role.OWNER)

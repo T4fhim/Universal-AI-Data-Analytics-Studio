@@ -66,6 +66,9 @@ class JobErrorCode(StrEnum):
     NOT_FOUND = "not_found"
     CONFLICT = "conflict"
     INVALID_REQUEST = "invalid_request"
+    # 3.6: the core refused or could not complete a stage operation on this dataset's columns or
+    # values (a missing column, too few rows, a singular matrix ...). The core's text is never kept.
+    OPERATION_FAILED = "operation_failed"
     STORAGE_UNAVAILABLE = "storage_unavailable"
     STORAGE_ERROR = "storage_error"
     TOO_MANY_ATTEMPTS = "too_many_attempts"
@@ -79,6 +82,7 @@ MESSAGES: dict[str, str] = {
     JobErrorCode.NOT_FOUND: "Something this job needs no longer exists.",
     JobErrorCode.CONFLICT: "This conflicts with something that already exists.",
     JobErrorCode.INVALID_REQUEST: "The request for this job was not valid.",
+    JobErrorCode.OPERATION_FAILED: "The operation could not be applied to this dataset.",
     JobErrorCode.STORAGE_UNAVAILABLE: "Storage is temporarily unavailable; please try again.",
     JobErrorCode.STORAGE_ERROR: "The stored file could not be used.",
     JobErrorCode.TOO_MANY_ATTEMPTS: "The job did not finish after several attempts.",

@@ -27,7 +27,11 @@ EXPECTED_MIGRATIONS: dict[str, list[str]] = {
     "workspaces": ["0001_initial", "0002_datasetrecord_sha256_and_more"],
     "pipeline": ["0001_initial"],
     "exports": ["0001_initial"],
-    "jobs": ["0001_initial", "0002_job_not_before"],
+    "jobs": [
+        "0001_initial",
+        "0002_job_not_before",
+        "0003_job_kinds_run_operation_build_report",
+    ],
 }
 MODEL_APPS = tuple(EXPECTED_MIGRATIONS)
 

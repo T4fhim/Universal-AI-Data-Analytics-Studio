@@ -217,7 +217,9 @@ jobs:
         # after the core session seam (core_bridge tests) and 1271 at 3.4 storage (settings,
         # keys, facade, lifecycle, D4-on-object-storage atomicity; the facade and workspace
         # suites are parametrized over an in-memory fake and a real MinIO, so they count
-        # twice). The count includes three Postgres-only race tests that skip on SQLite and
+        # twice) and 1913 at 3.6 (the API surface: resources, stage routers, upload, the IDOR walk,
+        # the OpenAPI contract, Schemathesis -- 34 fuzzed read operations plus a real-id smoke).
+        # The count includes three Postgres-only race tests that skip on SQLite and
         # the MinIO-parametrized tests, which this job runs against the container above.
         # The floor is that minus 2, leaving room to prune a couple deliberately while failing
         # on a real collapse (e.g. a conftest import error that silently drops a whole
@@ -229,7 +231,7 @@ jobs:
           count="$(echo "$out" | grep -oE '^[0-9]+ tests? collected' | grep -oE '^[0-9]+')"
           test -n "$count" || { echo "::error::could not read a collected-test count"; exit 1; }
           echo "collected: $count"
-          test "$count" -ge 1790 || { echo "::error::collected $count tests, expected at least 1790"; exit 1; }
+          test "$count" -ge 1911 || { echo "::error::collected $count tests, expected at least 1911"; exit 1; }
 
       - name: pytest (apps/api)
         # DJANGO_SETTINGS_MODULE comes from apps/api/pyproject.toml, not the
@@ -265,11 +267,28 @@ jobs:
         # Any new skip is a reviewed change to this number that says what skips and why.
         shell: bash
         run: |
-          python -m pytest apps/api/tests -q --tb=long -p no:cacheprovider -rs | tee pytest-api.log
+          python -m pytest apps/api/tests -q --tb=long -p no:cacheprovider -rs --ignore=apps/api/tests/test_web_schemathesis.py | tee pytest-api.log
           skipped="$(grep -oE '[0-9]+ skipped' pytest-api.log | tail -n 1 | grep -oE '^[0-9]+' || true)"
           skipped="${skipped:-0}"
           echo "skipped: $skipped"
           test "$skipped" -le 8 || { echo "::error::$skipped tests skipped, budget is 8 (is the MinIO / Redis integration environment intact, and is this an unprivileged Linux runner?)"; exit 1; }
+
+      - name: OpenAPI contract is committed and current (drift check)
+        # Phase 3.6: apps/api/openapi.json is the contract the web client's TypeScript is generated
+        # from (Phase 4.1). Regenerate it offline from the routers (no server, no database) and fail
+        # if the working tree then differs: a route change that did not update the committed
+        # schema cannot merge. `tests/test_web_openapi.py` makes the same comparison in the suite.
+        working-directory: apps/api
+        run: |
+          python -m uadas_api.web.openapi
+          git diff --exit-code -- openapi.json
+
+      - name: Schemathesis (committed schema, in process)
+        # Contract fuzzing of the read endpoints through the real WSGI application with a logged-in
+        # session, plus a real-id smoke of every GET: documented status, content type and body.
+        # Derandomized and database-free, so it cannot flake. Kept out of the main pytest step above
+        # (`--ignore`) so that step's skip budget stays what it was; it has no skips of its own.
+        run: python -m pytest apps/api/tests/test_web_schemathesis.py -q --tb=long -p no:cacheprovider
 
       - name: manage.py check --deploy (prod settings)
         # The deployment checklist must be clean with a valid production environment;

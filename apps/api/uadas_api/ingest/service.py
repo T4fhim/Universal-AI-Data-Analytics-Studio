@@ -206,6 +206,11 @@ def _retire_frame(organization_id: str, store: TenantObjectStore, key: str) -> N
         )
 
 
+retire_frame = (
+    _retire_frame  # public name: the 3.6 stage jobs retire their derived frames too
+)
+
+
 def _put_frame(
     store: TenantObjectStore, key: str, result: SandboxResult, limits: SandboxLimits
 ) -> StoredObject:

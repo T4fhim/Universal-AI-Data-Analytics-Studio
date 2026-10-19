@@ -274,6 +274,11 @@ automatically, but `tests/assets/` now fails if their extension sets differ. It 
 `apps/api/tests/test_sandbox_admission.py` fails if that table and the registry disagree in either direction. Watch for the same class of gap (a registry plus a separately-hardcoded consumer)
 when extending charts, cleaning operations, or plugin categories.
 
+Adding an API route (`apps/api`): call `member(request, org_id, <role>)` first, resolve every id with `project_of`/`in_project`
+(`for_organization` + the path's project), give it an `operation_id` and `responses(...)`, then regenerate the contract with
+`cd apps/api && python -m uadas_api.web.openapi` -- the IDOR walk (`tests/test_web_idor.py`) covers it automatically (and fails
+until its body is classified) and the OpenAPI drift check fails CI if `openapi.json` is stale. A new core tool/stage needs an entry in `uadas_api/stages/catalog.py`.
+
 ## Conventions to follow
 
 - Every module has a `# File: <path>` comment as its first line, followed by a module docstring explaining

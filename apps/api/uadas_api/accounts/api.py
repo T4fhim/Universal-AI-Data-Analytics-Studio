@@ -31,6 +31,7 @@ from uadas_api.accounts.models import (
     User,
 )
 from uadas_api.accounts.security import require_membership
+from uadas_api.web.errors import responses
 
 router = Router(tags=["accounts"])
 
@@ -112,7 +113,7 @@ def _member_out(membership: Membership) -> MemberOut:
 
 @router.get(
     "/me",
-    response=MeOut,
+    response=responses({200: MeOut}),
     summary="The signed-in user and their organizations",
     operation_id="me",
 )
@@ -131,7 +132,7 @@ def me(request: HttpRequest) -> MeOut:
 
 @router.get(
     "/organizations",
-    response=list[MembershipOut],
+    response=responses({200: list[MembershipOut]}),
     summary="Organizations I belong to",
     operation_id="organizations_list",
 )
@@ -146,7 +147,7 @@ def organizations_list(request: HttpRequest) -> list[MembershipOut]:
 
 @router.post(
     "/organizations",
-    response={201: MembershipOut},
+    response=responses({201: MembershipOut}),
     summary="Create an organization (the caller becomes its owner)",
     operation_id="organizations_create",
 )
@@ -166,7 +167,7 @@ def organizations_create(
 
 @router.get(
     "/organizations/{org_id}/members",
-    response=list[MemberOut],
+    response=responses({200: list[MemberOut]}),
     summary="Members of an organization (viewer and above)",
     operation_id="members_list",
 )
@@ -194,7 +195,7 @@ def _target(org_id: uuid.UUID, membership_id: uuid.UUID) -> Membership:
 
 @router.patch(
     "/organizations/{org_id}/members/{membership_id}",
-    response=MemberOut,
+    response=responses({200: MemberOut}),
     summary="Change a member's role (admin and above)",
     operation_id="member_update_role",
 )
@@ -221,7 +222,7 @@ def member_update_role(
 
 @router.delete(
     "/organizations/{org_id}/members/{membership_id}",
-    response={204: None},
+    response=responses({204: None}),
     summary="Remove a member (admin and above), or leave (any member)",
     operation_id="member_remove",
 )

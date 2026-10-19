@@ -49,6 +49,10 @@ dependencies = [
     # explicitly, so the lower bound is the first release with those config keys.
     "django-storages[s3]>=1.14,<2",
     "boto3>=1.36,<2",
+    # 3.6 API surface: a stage run's `parameters` are validated against the JSON Schema the core's
+    # tool registry already publishes for each operation (uadas_api/stages/catalog.py). 4.20 is
+    # the first line with the Draft 2020-12 validator and the `referencing` library it now uses.
+    "jsonschema>=4.20,<5",
 ]
 
 [project.optional-dependencies]
@@ -56,6 +60,10 @@ dev = [
     "pytest-django",
     "pytest-cov",
     "django-stubs[compatible-mypy]",
+    # 3.6 / 3.8: contract fuzzing of the committed OpenAPI schema, in process
+    # (tests/test_web_schemathesis.py). 4.x has `schemathesis.openapi.from_dict` and the
+    # `schema.auth()` provider API the test uses.
+    "schemathesis>=4.31,<5",
 ]
 
 [tool.setuptools.packages.find]
@@ -135,6 +143,15 @@ ignore_missing_imports = true
 # silenced line by line; `uadas_api/storage/s3.py` is the one SDK seam.
 [[tool.mypy.overrides]]
 module = ["boto3", "boto3.*", "botocore", "botocore.*", "storages", "storages.*"]
+ignore_missing_imports = true
+
+# jsonschema (3.6 parameter validation) ships no type information; pyarrow has partial stubs only
+# (the frame reader is the one module that uses it); hypothesis / schemathesis are test-only.
+[[tool.mypy.overrides]]
+module = [
+    "jsonschema", "jsonschema.*", "pyarrow", "pyarrow.*",
+    "hypothesis", "hypothesis.*", "schemathesis", "schemathesis.*",
+]
 ignore_missing_imports = true
 
 [tool.django-stubs]
