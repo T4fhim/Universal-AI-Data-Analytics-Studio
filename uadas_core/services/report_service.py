@@ -6,8 +6,8 @@ plans/defining-features-what-stateless-zebra.md) is "replay the log
 and render it" — this service does not compute anything new. Every
 number in a generated report already exists, either as a
 :class:`~uadas_core.services.workspace_service.WorkspaceService`-tracked
-:class:`~uadas_core.services.workspace_service.Dataset`/
-:class:`~uadas_core.services.workspace_service.Visualization` or as an
+:class:`~uadas_core.models.Dataset`/
+:class:`~uadas_core.models.Visualization` or as an
 :class:`~uadas_core.services.analysis_orchestrator_service.
 AnalysisOrchestratorService`'s recorded
 :class:`~uadas_core.services.analysis_orchestrator_service.AnalysisLogEntry`
@@ -119,7 +119,7 @@ class ReportService:
             included_stages: If given, only these stages' log entries
                 become sections — lets the "Generate Report" wizard's
                 section checklist (see
-                :mod:`src.ui.dialogs.generate_report_dialog`) skip
+                ``src.ui.dialogs.generate_report_dialog``) skip
                 stages the user doesn't want in the document. ``None``
                 (the default) includes every stage the log has an
                 entry for.

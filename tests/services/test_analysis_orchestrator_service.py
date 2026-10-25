@@ -17,13 +17,14 @@ import pytest
 
 from uadas_core.analysis.explanation import Explanation
 from uadas_core.core.exceptions import ServiceError
+from uadas_core.models import Dataset
 from uadas_core.services.analysis_orchestrator_service import (
     AnalysisLog,
     AnalysisLogEntry,
     AnalysisOrchestratorService,
     PipelineStage,
 )
-from uadas_core.services.workspace_service import Dataset, WorkspaceService
+from uadas_core.services.workspace_service import WorkspaceService
 
 
 def _make_dataset() -> Dataset:

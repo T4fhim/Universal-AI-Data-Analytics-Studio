@@ -150,7 +150,7 @@ def _is_clean_entry(entry: AnalysisLogEntry) -> bool:
 
     Keyed on ``"new_dataset_id" in entry.outputs``, never on ``entry.stage``:
     the orchestrator writes ``new_dataset_id`` into ``outputs`` for any stage
-    whose tool returned a new :class:`~uadas_core.services.workspace_service.Dataset`,
+    whose tool returned a new :class:`~uadas_core.models.Dataset`,
     not only CLEAN (see ``_summarize_result``).
     """
     return "new_dataset_id" in entry.outputs

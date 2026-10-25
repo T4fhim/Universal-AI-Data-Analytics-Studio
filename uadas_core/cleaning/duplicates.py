@@ -6,7 +6,7 @@ from __future__ import annotations
 from uadas_core.cleaning.base_operation import BaseOperation
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.core.logger import get_logger
-from uadas_core.services.workspace_service import Dataset
+from uadas_core.models import Dataset
 
 _logger = get_logger(__name__)
 

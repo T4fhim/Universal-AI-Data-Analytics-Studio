@@ -36,10 +36,9 @@ The name and email must match your commit author identity (`git config user.name
 git rebase --exec 'git commit --amend --no-edit -s' <base>
 ```
 
-CI runs a `dco` check on every pull request. It is currently **advisory**
-(`continue-on-error`) while the branch predating this policy is still open; it becomes a
-**required** check from the first Phase 1 commit of the web transition onward, at which
-point an unsigned commit blocks the merge.
+CI runs a `dco` check on every pull request. It has been **enforcing** since Phase 2 of the
+web transition: a commit introduced by the PR without a matching `Signed-off-by:` trailer
+fails the build. Commits that predate the policy were not rewritten and are not re-flagged.
 
 > A CLA (a signed contributor agreement, e.g. via CLA Assistant) is the stronger option
 > if commercial dual-licensing becomes a near-term intent — see
@@ -54,21 +53,23 @@ Python 3.13. A `.venv` is expected at the repo root.
 python -m venv .venv
 .venv/Scripts/Activate.ps1        # PowerShell;  source .venv/bin/activate on POSIX
 pip install -r requirements.txt   # or: uv sync   (uv.lock is committed)
-pip install -e .                  # editable install of the `src` package
+pip install -e .                  # editable install of the `uadas_core` package
 
 pre-commit install                # activates the tool-agnostic commit hooks
 ```
 
-Run the app: `python main.py`. Full commands (tests, formatters, linters, the visual
-verification script) are in [CLAUDE.md](CLAUDE.md#commands).
+There is no application to run: the PySide6 desktop shell and `main.py` were removed in
+Phase 2.5, and the web UI arrives in Phase 4. The repository is the Qt-free core
+(`uadas_core/`) plus its tests, so `python -m pytest tests -q` is the way to exercise a change.
+Full commands (tests, formatters, linters, types) are in [CLAUDE.md](CLAUDE.md#commands).
 
 ## Before you open a pull request
 
-- `black --check src/ tests/` and `isort --check-only src/ tests/` are clean.
-- `ruff check src/ tests/` and `bandit -r src -q` are clean (CI's `lint` job gates these).
-- The test suite passes — mirror CI:
-  `python scripts/run_tests_and_exit_cleanly.py tests/ui/test_worker_runner.py -q` then
-  `python scripts/run_tests_and_exit_cleanly.py tests/ -q -m "not uia_integration" --ignore=tests/ui/test_worker_runner.py`.
+- `black --check uadas_core/ tests/ scripts/` and `isort --check-only uadas_core/ tests/ scripts/`
+  are clean.
+- `ruff check uadas_core/ tests/`, `bandit -r uadas_core -q --skip B101,B107,B608` and
+  `lint-imports` are clean (CI's `lint` job gates these).
+- The test suite passes — exactly what CI runs: `python -m pytest tests -q`.
 - Every commit is signed off (`git commit -s`).
 - New modules follow the conventions in [CLAUDE.md](CLAUDE.md#conventions-to-follow):
   a `# File: <path>` first line, a rationale-focused module docstring,

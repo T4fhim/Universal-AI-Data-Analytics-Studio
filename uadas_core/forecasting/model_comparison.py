@@ -170,11 +170,10 @@ def compare_forecast_models(
         progress_callback: Optional ``(percent, message)`` callable
             invoked once per candidate model as it finishes being
             evaluated (whether it succeeded or was skipped) —
-            matching :class:`~src.workers.base_worker.WorkerSignals.
-            progress`'s own ``(int, str)`` contract, so a caller can
-            pass :class:`~src.workers.base_worker.BaseWorker`'s own
+            matching ``WorkerSignals.progress``'s own ``(int, str)`` contract, so a caller can
+            pass ``BaseWorker``'s own
             generated ``progress_callback`` straight through unchanged
-            (see :class:`~src.ui.worker_runner.WorkerRunner`). This is
+            (see ``WorkerRunner``). This is
             milestone 25's first real caller of that plumbing: fitting
             up to five models (two fits each, one against the holdout
             split and one against the full series) is the first

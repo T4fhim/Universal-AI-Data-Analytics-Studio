@@ -3,7 +3,7 @@
 
 Web-transition Phase 1.2 lifts the *policy* of "run this callable off the
 calling thread and deliver its outcome through callbacks" out of
-:mod:`src.workers.base_worker` (which is welded to ``QThread``/``QRunnable``
+``src.workers.base_worker`` (which is welded to ``QThread``/``QRunnable``
 and dies with the desktop shell in Phase 2) and into this package, where it
 carries no GUI-toolkit dependency. The ``.importlinter`` contract forbids
 anything under :mod:`uadas_core` — this package included — from importing
@@ -18,7 +18,7 @@ breaking change — which is why the contract is callback-based rather than
 handing back an in-process ``Future``.
 
 **The module-level default-runner registry below is a Phase-1.2-only
-bridge.** :class:`~src.workers.base_worker.BaseWorker` must acquire a
+bridge.** ``BaseWorker`` must acquire a
 :class:`~uadas_core.jobs.job_runner.JobRunner` without a change to its
 public ``__init__`` signature (de-risking plan Control A10 forbids
 touching it), so ``bootstrap()`` stashes the one runner here via
@@ -54,7 +54,7 @@ _default_job_runner: JobRunner | None = None
 def set_default_job_runner(runner: JobRunner) -> None:
     """Install the process-wide default :class:`JobRunner`.
 
-    Called once, by :func:`uadas_core.core.bootstrap.bootstrap`, right
+    Called once, by :func:`uadas_core.bootstrap.bootstrap`, right
     after it registers the same instance into the dependency container.
     Calling it again replaces the previous runner — harmless in
     production (bootstrap runs once) and convenient for tests that need
@@ -92,7 +92,7 @@ def get_default_job_runner() -> JobRunner:
     if _default_job_runner is None:
         raise RuntimeError(
             "No default JobRunner has been installed. "
-            "uadas_core.core.bootstrap.bootstrap() installs one via "
+            "uadas_core.bootstrap.bootstrap() installs one via "
             "set_default_job_runner(); this call happened before bootstrap ran "
             "(or outside an application session)."
         )

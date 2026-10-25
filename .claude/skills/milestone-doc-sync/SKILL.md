@@ -24,7 +24,7 @@ changed something they claim.
 
 Immediately after `milestone-verification` passes for a milestone that changed any of: test
 coverage/structure, CI configuration, linting/formatting/type-checking configuration, build
-tooling, or the set of empty/unbuilt `src/` subpackages. Skip for milestones that only add
+tooling, or the set of empty/unbuilt `uadas_core/` subpackages. Skip for milestones that only add
 application features without touching tooling/test/build state.
 
 ## What to check

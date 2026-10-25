@@ -9,13 +9,13 @@ datasets were loaded, so they can be reloaded automatically on open.
 :class:`ProjectService` does not depend on
 :class:`~uadas_core.services.workspace_service.WorkspaceService` — the two
 remain independently registered container singletons, per
-:mod:`uadas_core.core.bootstrap`'s established pattern. Rather than either
+:mod:`uadas_core.bootstrap`'s established pattern. Rather than either
 service reaching into the other, :meth:`ProjectService.save_project`
 and :meth:`ProjectService.open_project` accept dataset references as
-explicit parameters; :mod:`src.ui.main_window` (which already holds
+explicit parameters; ``src.ui.main_window`` (which already holds
 references to both services) is responsible for passing the current
 dataset list through. This keeps each service's dependencies exactly
-as narrow as :mod:`uadas_core.core.bootstrap`'s original registration order
+as narrow as :mod:`uadas_core.bootstrap`'s original registration order
 already established.
 
 :class:`ProjectService` is the single place that knows how a project
@@ -29,87 +29,17 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.core.logger import get_logger
+from uadas_core.models import Project
 
 _logger = get_logger(__name__)
 
 PROJECT_FILE_EXTENSION = ".uads.json"
 _MAX_RECENT_PROJECTS = 10
-
-
-@dataclass
-class Project:
-    """A single working session, serializable to and from disk.
-
-    Attributes:
-        name: Display name for the project. Does not need to match
-            the filename.
-        path: Location of this project's file on disk. ``None`` for a
-            newly created, not-yet-saved project — see
-            :meth:`ProjectService.new_project`.
-        contents: Open-ended project data. This milestone does not
-            define what goes in here beyond the empty dict a new
-            project starts with; later milestones (dataset tracking,
-            visualization tracking) will read and write specific keys
-            of this dict rather than this class growing a typed field
-            per feature.
-        last_saved_at: Unix timestamp of the last successful save, or
-            ``None`` if never saved.
-    """
-
-    name: str
-    path: Path | None = None
-    contents: dict[str, Any] = field(default_factory=dict)
-    last_saved_at: float | None = None
-
-    def to_json_dict(self) -> dict[str, Any]:
-        """Return a JSON-serializable representation of this project.
-
-        ``path`` is intentionally excluded: a project's file location
-        is where it lives, not data it contains about itself, and
-        serializing it would let a copied or moved project file
-        silently disagree with its own actual location on disk.
-        """
-        return {
-            "name": self.name,
-            "contents": self.contents,
-            "last_saved_at": self.last_saved_at,
-        }
-
-    @classmethod
-    def from_json_dict(cls, data: dict[str, Any], path: Path) -> Project:
-        """Reconstruct a :class:`Project` from a loaded JSON dict.
-
-        Args:
-            data: The parsed JSON contents of a project file.
-            path: The file path this data was loaded from — supplied
-                by the caller (see :meth:`ProjectService.open_project`)
-                rather than read from ``data`` itself, since ``path``
-                is deliberately not part of the serialized form.
-
-        Raises:
-            ServiceError: If ``data`` is missing the required ``name``
-                key or has the wrong shape for any field.
-        """
-        if "name" not in data:
-            raise ServiceError(
-                f"Project file at {path} is missing the required 'name' field."
-            )
-        if not isinstance(data.get("contents", {}), dict):
-            raise ServiceError(
-                f"Project file at {path} has a 'contents' field that is not a mapping."
-            )
-        return cls(
-            name=data["name"],
-            path=path,
-            contents=data.get("contents", {}),
-            last_saved_at=data.get("last_saved_at"),
-        )
 
 
 class ProjectService:
@@ -138,7 +68,7 @@ class ProjectService:
         self._active_project: Project | None = None
 
     def new_project(self, name: str) -> Project:
-        """Create a new, unsaved :class:`Project`.
+        """Create a new, unsaved :class:`~uadas_core.models.Project`.
 
         The returned project has ``path=None`` — it does not exist on
         disk until :meth:`save_project` is called with a destination
@@ -200,7 +130,7 @@ class ProjectService:
                 available, or if writing to disk fails.
 
         Returns:
-            The same :class:`Project` instance, mutated in place with
+            The same :class:`~uadas_core.models.Project` instance, mutated in place with
             its resolved ``path`` and updated ``last_saved_at``
             timestamp — returned for convenience so callers can chain
             without needing to separately track that this call
@@ -248,10 +178,10 @@ class ProjectService:
 
         Writes into ``project.contents["datasets"]`` — a list of
         ``{"name": ..., "source_path": ...}`` records — rather than
-        adding a typed field to :class:`Project` itself, matching that
+        adding a typed field to :class:`~uadas_core.models.Project` itself, matching that
         class's existing "open-ended contents dict" design. Does not
         itself call :meth:`save_project`; callers (typically
-        :mod:`src.ui.main_window`) call this to update
+        ``src.ui.main_window``) call this to update
         ``project.contents`` and then call :meth:`save_project`
         separately, keeping "what belongs in the project" and "write
         it to disk" as two distinct steps.
@@ -265,8 +195,7 @@ class ProjectService:
                 :meth:`~uadas_core.services.workspace_service.WorkspaceService.
                 list_datasets`'s return value. Typed as a plain
                 ``list`` rather than ``list[Dataset]`` for the same
-                reason :meth:`~src.ui.dock_manager.DockManager.
-                refresh_dataset_list` avoids importing
+                reason ``DockManager.refresh_dataset_list`` avoids importing
                 ``uadas_core.services.workspace_service`` for a type hint
                 alone — this service has no other dependency on that
                 module and importing it here would create exactly the
@@ -311,7 +240,7 @@ class ProjectService:
         from this method's point of view, and both correctly produce
         "nothing to reload" rather than an error.
 
-        The caller (:mod:`src.ui.main_window`) is responsible for
+        The caller (``src.ui.main_window``) is responsible for
         actually re-reading each path through
         :func:`~uadas_core.readers.reader_registry.get_reader_for_path` and
         registering the result with
@@ -365,7 +294,7 @@ class ProjectService:
         :meth:`record_analysis_log` wrote, returning an empty dict for
         a project saved before milestone 9 (or one with no pipeline
         history yet) rather than raising. The caller (typically
-        :mod:`src.ui.main_window`, resolving
+        ``src.ui.main_window``, resolving
         :class:`~uadas_core.services.analysis_orchestrator_service.
         AnalysisOrchestratorService` from the same container) is
         responsible for turning each dict back into an

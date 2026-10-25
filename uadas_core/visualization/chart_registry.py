@@ -52,11 +52,9 @@ class ChartRegistration:
         dialog_compatible: Milestone 12 defaulted this to ``False`` for
             chart types whose fields include a ``list[str]`` parameter
             (e.g. Treemap's ``path_columns``, Radar's ``value_columns``)
-            because :class:`~src.ui.dialogs.create_visualization_dialog.
-            CreateVisualizationDialog`'s column picker built one
+            because ``CreateVisualizationDialog``'s column picker built one
             ``QComboBox`` per field and had no multi-select variant.
-            Milestone 24 added :class:`~src.ui.widgets.
-            column_multi_select.ColumnMultiSelect` and wired the dialog
+            Milestone 24 added ``ColumnMultiSelect`` and wired the dialog
             to use it for any field named in :attr:`list_fields`, so
             Treemap/Radar are dialog-compatible again — this flag stays
             for the general mechanism (a future plugin chart with, say,
@@ -65,12 +63,10 @@ class ChartRegistration:
         list_fields: Which of :attr:`required_fields`/
             :attr:`optional_fields` take a ``list[str]`` of column names
             rather than a single column name — read by
-            :class:`~src.ui.dialogs.create_visualization_dialog.
-            CreateVisualizationDialog` and
-            :class:`~src.ui.workbench.pages.visualize_page.VisualizePage`
+            ``CreateVisualizationDialog`` and
+            ``VisualizePage``
             to decide whether a field gets a single :class:`QComboBox`
-            or a :class:`~src.ui.widgets.column_multi_select.
-            ColumnMultiSelect`. Empty by default — most chart types take
+            or a ``ColumnMultiSelect``. Empty by default — most chart types take
             only single-column fields.
     """
 
@@ -84,7 +80,7 @@ class ChartRegistration:
 _REGISTRY: dict[str, ChartRegistration] = {}
 
 # Web-transition 1.3: the built-ins are populated by
-# :func:`uadas_core.core.bootstrap.bootstrap` rather than as a side effect of
+# :func:`uadas_core.bootstrap.bootstrap` rather than as a side effect of
 # importing this module, so importing it has no global-state effect (see
 # plans/phase-1-3-startup-graph.md §9). This flag makes :func:`_register_builtins`
 # a no-op after its first successful call: ``bootstrap()`` runs several times per
@@ -173,13 +169,13 @@ def display_name_for(name: str) -> str:
 def _register_builtins() -> None:
     """Populate the registry with every built-in chart type.
 
-    Called from :func:`uadas_core.core.bootstrap.bootstrap` (web-transition 1.3
+    Called from :func:`uadas_core.bootstrap.bootstrap` (web-transition 1.3
     moved this off module import so importing this module has no global-state
     side effect). Idempotent via the module-level ``_builtins_registered`` guard,
     so the repeated ``bootstrap()`` calls in the test suite and the module-level
     registry seeding in ``tests/conftest.py`` are both safe.
     :mod:`~uadas_core.ai.tool_registry` and
-    :mod:`~src.ui.dialogs.create_visualization_dialog` read this registry live
+    ``create_visualization_dialog`` read this registry live
     (see :func:`~uadas_core.ai.tool_registry._chart_builders`), so they no longer
     depend on it being populated at their own import time.
     """

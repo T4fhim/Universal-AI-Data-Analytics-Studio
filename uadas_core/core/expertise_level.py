@@ -10,7 +10,7 @@ different notions of what "beginner" versus "engineer" means.
 
 A plain :class:`~enum.StrEnum`, not a service: this module has no
 behavior, no state, and nothing to register in
-:mod:`uadas_core.core.bootstrap`'s dependency container — it belongs next to
+:mod:`uadas_core.bootstrap`'s dependency container — it belongs next to
 :mod:`uadas_core.core.exceptions` as a small shared vocabulary type, matching
 how that module is also core-but-not-a-service.
 """

@@ -19,7 +19,7 @@ consistent with :class:`~uadas_core.database.base_connection.
 BaseDatabaseConnection` itself already being a documented departure
 from the ``Base*`` pattern for the same underlying reason (see that
 module's own docstring). It still produces the exact same
-:class:`~uadas_core.services.workspace_service.Dataset` shape every real
+:class:`~uadas_core.models.Dataset` shape every real
 reader does and raises the same :class:`~uadas_core.core.exceptions.
 ReaderError` on failure, so a dataset loaded this way is
 indistinguishable to the rest of the application (Dataset Explorer,
@@ -32,7 +32,7 @@ from __future__ import annotations
 from uadas_core.core.exceptions import ReaderError
 from uadas_core.core.logger import get_logger
 from uadas_core.database.base_connection import BaseDatabaseConnection
-from uadas_core.services.workspace_service import Dataset
+from uadas_core.models import Dataset
 
 _logger = get_logger(__name__)
 

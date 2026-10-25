@@ -40,9 +40,9 @@ import pandas as pd
 
 from uadas_core.core.exceptions import ReaderError
 from uadas_core.core.logger import get_logger
+from uadas_core.models import Dataset
 from uadas_core.readers.base_reader import BaseReader
 from uadas_core.readers.type_inference import find_ambiguous_type_columns
-from uadas_core.services.workspace_service import Dataset
 
 _logger = get_logger(__name__)
 

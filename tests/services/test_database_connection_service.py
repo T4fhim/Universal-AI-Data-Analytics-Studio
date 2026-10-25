@@ -2,7 +2,7 @@
 """Tests for uadas_core.services.database_connection_service.DatabaseConnectionService.
 
 Uses a real SettingsService backed by a tmp_path config.yaml (same
-construction pattern uadas_core.core.bootstrap.bootstrap itself uses), so
+construction pattern uadas_core.bootstrap.bootstrap itself uses), so
 save_profile()/list_profiles()/delete_profile() are tested against
 real persistence, not a mock — and against a real DuckDB connection
 for the live-connection half of this service, for the same "no mocked

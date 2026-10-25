@@ -36,9 +36,9 @@ import pandas as pd
 
 from uadas_core.core.exceptions import ReaderError
 from uadas_core.core.logger import get_logger
+from uadas_core.models import Dataset
 from uadas_core.readers.base_reader import BaseReader
 from uadas_core.readers.type_inference import find_ambiguous_type_columns
-from uadas_core.services.workspace_service import Dataset
 
 _logger = get_logger(__name__)
 
@@ -70,7 +70,7 @@ class CsvReader(BaseReader):
 
     Delimiter is auto-detected; encoding is detected via a fallback
     chain (see module docstring). Both detection results are recorded
-    in the resulting :class:`~uadas_core.services.workspace_service.Dataset`'s
+    in the resulting :class:`~uadas_core.models.Dataset`'s
     ``read_warnings`` only if something notable happened (a non-UTF-8
     encoding was needed, bad lines were skipped, or a column's type
     could not be confidently inferred) — a clean, standard UTF-8 comma

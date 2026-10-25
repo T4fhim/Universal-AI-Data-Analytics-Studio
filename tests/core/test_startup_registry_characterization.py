@@ -3,7 +3,7 @@
 
 Phase 1.3 moves ``_register_builtins()`` for the cleaning-operation, chart, and
 result-renderer registries off *module import* and into
-:func:`uadas_core.core.bootstrap.bootstrap`. This module pins, as an executable
+:func:`uadas_core.bootstrap.bootstrap`. This module pins, as an executable
 snapshot, two things every 1.3 commit must keep true:
 
 1. After ``bootstrap()``, each of the three built-in registries holds exactly the
@@ -25,9 +25,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from uadas_core.bootstrap import bootstrap
 from uadas_core.cleaning.operation_registry import list_operations
 from uadas_core.core.application_state import ApplicationState
-from uadas_core.core.bootstrap import bootstrap
 from uadas_core.core.config import AppConfig
 from uadas_core.jobs.job_runner import JobRunner
 from uadas_core.plugins.plugin_manager import PluginManager

@@ -11,16 +11,13 @@ This skill adds project-specific verification on top of generic verification wor
 
 ## Test Verification
 
-`tests/` mirrors `src/`'s package layout and has real, CI-gated coverage — this is no longer "may
+`tests/` mirrors `uadas_core/`'s package layout and has real, CI-gated coverage — this is no longer "may
 contain no tests." Still verify that the tests relevant to this milestone were actually collected
 and executed, not merely that some command's exit code was 0: a narrowed `--ignore`/`-k`/marker
 selection, or a collection error masked by `-q`, can silently produce a misleadingly-green run.
 
-Run the suite the way CI does, not a bare `pytest tests/` — see this project's root `CLAUDE.md`
-("Tests" under "Commands") for the exact two-invocation command via
-`scripts/run_tests_and_exit_cleanly.py` and why it exists (a real test-ordering flakiness issue in
-`tests/ui/test_worker_runner.py`, and a Windows CPython/Qt interpreter-shutdown crash that a bare
-`pytest` invocation can mask after pytest itself already reported a clean result).
+Run the suite the way CI does — `python -m pytest tests -q` — see this project's root `CLAUDE.md`
+("Tests" under "Commands"). Also run `lint-imports` (the 3 `.importlinter` contracts).
 
 `black`, `isort`, `mypy` (scoped to a curated clean-module list, not repo-wide — see
 `docs/MYPY_DEBT.md`), `ruff`, and `bandit` all have committed configuration in `pyproject.toml`,
@@ -41,31 +38,27 @@ Before declaring a milestone complete:
 - Confirm new configuration fields are registered through all required configuration/schema touchpoints.
 - Confirm new services are registered through the project's dependency-container/bootstrap mechanism.
 - Check the `project-architecture` skill when a change introduces a new extension point or configuration/service integration.
-- Verify that implementation exists in `src/`; do not treat `SPECIFICATION.md` as proof that functionality has already been implemented.
+- Verify that implementation exists in `uadas_core/`; do not treat `SPECIFICATION.md` as proof that functionality has already been implemented.
 
 ## Runtime Verification
 
-For UI or cross-module changes, static inspection is not sufficient.
+For cross-module changes, static inspection is not sufficient. There is no runnable application
+until the Phase 4 web UI exists, so execute the changed code path directly: run the relevant tests
+and, where useful, a short script or REPL call that exercises the changed behaviour end to end
+(e.g. through `bootstrap()`'s `BootstrapContext`, with a temp config/log dir).
 
-Launch the application using the project's normal startup path:
-
-    python main.py
-
-Then manually exercise the functionality affected by the milestone.
-
-For GUI changes, verify the actual visible behavior rather than only confirming that imports succeed.
+Verify the actual behaviour rather than only confirming that imports succeed.
 
 ## Integration Verification
 
-Check that the new functionality is reachable through the application's existing architecture.
+Check that the new functionality is reachable through the existing `uadas_core` architecture.
 
 Examples:
 
-- A new reader is registered and appears in the relevant file-selection path.
-- A new chart is registered/usable through the visualization flow.
+- A new reader is registered in `_BUILTIN_READERS` and its extensions are in `assets/ui-contract/file-picker-filters.json`.
+- A new chart is registered in `chart_registry` and buildable through it.
 - A new service is available through dependency injection rather than being constructed ad hoc.
 - A new configuration value is represented in defaults, schema validation, and the configuration model.
-- A new UI component is actually connected to the relevant window/dock/workspace flow.
 
 ## Completion Rule
 
@@ -83,7 +76,7 @@ When automated coverage is unavailable, explicitly distinguish:
 
 - static verification
 - automated test evidence
-- manual runtime verification
+- direct execution of the changed code path (script/REPL)
 
 Do not substitute one for another.
 
@@ -96,5 +89,4 @@ It is particularly important before:
 - committing milestone work
 - writing a completion summary
 - claiming tests passed
-- claiming a GUI feature works
 - claiming integration is complete

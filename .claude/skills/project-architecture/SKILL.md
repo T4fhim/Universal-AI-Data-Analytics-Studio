@@ -14,20 +14,21 @@ Use this skill when modifying the architecture or adding a new extension point.
 
 A new reader requires all relevant integration points to be updated:
 
-1. Create the reader under `src/readers/`.
+1. Create the reader under `uadas_core/readers/`.
 2. Subclass the project's `BaseReader`.
 3. Register the reader in:
 
-   `src/readers/reader_registry.py`
+   `uadas_core/readers/reader_registry.py` (the `_BUILTIN_READERS` tuple)
 
-4. Update the dataset file-dialog filter in:
+4. Update the file-picker filter groups in:
 
-   `src/ui/main_window.py`
+   `assets/ui-contract/file-picker-filters.json`
 
-The file-dialog filter is manually maintained and does not automatically derive
-from the registered reader extensions.
+The file-picker filter is manually maintained and does not automatically derive
+from the registered reader extensions (`tests/assets/` fails if the two
+extension sets differ).
 
-Therefore, adding a reader to the registry without updating the UI filter
+Therefore, adding a reader to the registry without updating the filter
 creates an incomplete integration.
 
 ## Adding a Configuration Key
@@ -37,8 +38,8 @@ schema and dataclass.
 
 Check:
 
-- `_default_config_dict()` in `src/core/config.py`
-- `_TOP_LEVEL_SCHEMA` / `_NESTED_SCHEMA` in `src/core/config.py`
+- `_default_config_dict()` in `uadas_core/core/config.py`
+- `_TOP_LEVEL_SCHEMA` / `_NESTED_SCHEMA` in `uadas_core/core/config.py`
 - `AppConfig.from_dict()` and the corresponding dataclass field
 
 Do not add a configuration field to only one of these locations.
@@ -47,12 +48,12 @@ Do not add a configuration field to only one of these locations.
 
 Services shared across the application should be registered through the
 dependency container during application bootstrap rather than constructed
-ad hoc inside UI components.
+ad hoc inside consuming code.
 
 Relevant locations:
 
-- `src/core/bootstrap.py`
-- `src/core/container.py`
+- `uadas_core/bootstrap.py`
+- `uadas_core/core/dependency_container.py`
 
 Follow the existing registration pattern and preserve required initialization
 ordering.
@@ -93,7 +94,7 @@ points from being missed.
 
 Before completing architectural changes:
 
-1. Identify every registry/factory/schema/UI integration point.
+1. Identify every registry/factory/schema/file-picker-filter integration point.
 2. Confirm each required location was updated.
 3. Run the project's applicable verification commands.
 4. For milestone-level changes, invoke `milestone-verification`.

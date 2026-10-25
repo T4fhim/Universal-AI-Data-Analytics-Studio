@@ -23,7 +23,7 @@ from plotly.subplots import make_subplots
 
 from uadas_core.core.exceptions import ServiceError
 from uadas_core.core.logger import get_logger
-from uadas_core.services.workspace_service import Dashboard
+from uadas_core.models import Dashboard
 
 _logger = get_logger(__name__)
 

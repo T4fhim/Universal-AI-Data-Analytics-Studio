@@ -6,7 +6,7 @@ so this class's own logic is identical regardless of which provider is
 active.
 
 The one rule enforced here, not in the tool registry: a tool that
-returns a new :class:`~uadas_core.services.workspace_service.Dataset` (every
+returns a new :class:`~uadas_core.models.Dataset` (every
 cleaning tool) is added to
 :class:`~uadas_core.services.workspace_service.WorkspaceService` as a new
 dataset — it never silently replaces the active dataset.
@@ -30,11 +30,8 @@ from uadas_core.ai.tool_registry import get_anthropic_tool_schemas, get_tool_by_
 from uadas_core.core.exceptions import ApplicationError, ServiceError
 from uadas_core.core.expertise_level import EXPERTISE_LEVEL_GUIDANCE, ExpertiseLevel
 from uadas_core.core.logger import get_logger
-from uadas_core.services.workspace_service import (
-    Dataset,
-    Visualization,
-    WorkspaceService,
-)
+from uadas_core.models import Dataset, Visualization
+from uadas_core.services.workspace_service import WorkspaceService
 
 _logger = get_logger(__name__)
 
@@ -117,8 +114,8 @@ class AssistantTurnResult:
             JSON-friendly ``dict`` objects :meth:`_execute_tool`
             already serializes into the model's own tool-result text
             — captured here too, unmodified, so
-            :class:`~src.ui.widgets.chat_panel.ChatPanel` can hand
-            each one to :class:`~src.ui.results.result_card.ResultCard`
+            ``ChatPanel`` can hand
+            each one to ``ResultCard``
             via :func:`~uadas_core.results.result_renderer_registry.
             get_renderer` — the *same* rendering path a stage page
             uses, not a second one built for the chat panel. Per
@@ -242,7 +239,7 @@ class AssistantService:
         """The expertise level currently guiding the system prompt and (via milestone 21's chat
         panel) tool-result rendering — exposed as a read-only property, mirroring
         :attr:`active_provider_name`, so a caller (a test, or
-        :class:`~src.ui.controllers.assistant_controller.AssistantController` rendering a
+        ``AssistantController`` rendering a
         tool-call's result at the level the conversation is actually running at) can read the
         live value :meth:`set_expertise_level` last wrote without reaching into ``_expertise_level``
         directly.

@@ -5,7 +5,7 @@ Backs milestone 20's acceptance criterion 4 ("closing and reopening a project pr
 analysis log") at the service layer, independent of any UI wiring -- a real ``tmp_path`` file on
 disk, no mocks. See ``tests/ui/controllers/test_pipeline_controller.py`` for the controller-level
 version of the same round trip, which additionally exercises
-:class:`~src.ui.controllers.pipeline_controller.PipelineController`'s persist/restore methods.
+``PipelineController``'s persist/restore methods.
 """
 
 from __future__ import annotations

@@ -3,7 +3,7 @@
 
 :class:`BaseReader` defines the contract this package's readers all
 follow: given a file path, produce a
-:class:`~uadas_core.services.workspace_service.Dataset`, or raise a
+:class:`~uadas_core.models.Dataset`, or raise a
 :class:`~uadas_core.core.exceptions.ReaderError` with a message specific
 enough that the UI layer can show the user something more useful than
 "failed to read file."
@@ -57,7 +57,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from uadas_core.services.workspace_service import Dataset
+    from uadas_core.models import Dataset
 
 
 class BaseReader(ABC):
@@ -140,7 +140,7 @@ class BaseReader(ABC):
     @classmethod
     @abstractmethod
     def read(cls, path: Path, table_name: str | None = None) -> Dataset:
-        """Read ``path`` and return a populated :class:`~uadas_core.services.workspace_service.Dataset`.
+        """Read ``path`` and return a populated :class:`~uadas_core.models.Dataset`.
 
         Callers are expected to have already established that this
         reader is appropriate for ``path`` (typically via

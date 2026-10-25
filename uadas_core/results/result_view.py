@@ -11,7 +11,7 @@ than copy-pasted per renderer file -- a p-value or a percentage should read the 
 it came from a t-test or a chi-square test. Kept dependency-free (standard library only) so it
 can sit on the Qt-free side of the renderer/widget boundary :mod:`~uadas_core.results.
 base_result_renderer` documents, alongside those renderers rather than alongside
-:class:`~src.ui.results.result_card.ResultCard`.
+``ResultCard``.
 """
 
 from __future__ import annotations

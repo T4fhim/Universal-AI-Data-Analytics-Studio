@@ -1,5 +1,5 @@
 # File: tests/core/test_bootstrap.py
-"""Tests for uadas_core.core.bootstrap.bootstrap().
+"""Tests for uadas_core.bootstrap.bootstrap().
 
 Verifies the fixed startup sequence documented in bootstrap.py's own
 module docstring: config load, logging configuration, and registration
@@ -15,8 +15,8 @@ from pathlib import Path
 
 import yaml
 
+from uadas_core.bootstrap import BootstrapContext, bootstrap
 from uadas_core.core.application_state import ApplicationState
-from uadas_core.core.bootstrap import BootstrapContext, bootstrap
 from uadas_core.core.config import AppConfig, load_config
 from uadas_core.jobs import get_default_job_runner
 from uadas_core.jobs.job_runner import JobRunner

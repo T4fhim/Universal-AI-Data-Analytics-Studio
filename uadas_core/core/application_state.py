@@ -28,7 +28,7 @@ risk regardless of which direction they point.
 
 An instance of this class is intended to be registered into the
 :class:`~uadas_core.core.dependency_container.DependencyContainer` as a
-singleton (see :mod:`uadas_core.core.bootstrap`), rather than held as a
+singleton (see :mod:`uadas_core.bootstrap`), rather than held as a
 module-level global — this keeps session state explicit and
 resolvable through the same mechanism as every other service, and
 avoids a global mutable object that any module could import and
@@ -46,8 +46,7 @@ if TYPE_CHECKING:
     # Real imports guarded by TYPE_CHECKING: these classes exist as of
     # milestone 1b-i, but core.application_state must not import
     # uadas_core.services at runtime (see module docstring above for why).
-    from uadas_core.services.project_service import Project
-    from uadas_core.services.workspace_service import Dataset, Visualization
+    from uadas_core.models import Dataset, Project, Visualization
 
 _logger = get_logger(__name__)
 

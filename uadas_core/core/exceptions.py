@@ -84,7 +84,7 @@ class BootstrapError(ApplicationError):
     """Raised when application startup fails before it can run.
 
     This is reserved for failures in the bootstrap sequence itself
-    (see :mod:`uadas_core.core.bootstrap`) that are not already covered by a
+    (see :mod:`uadas_core.bootstrap`) that are not already covered by a
     more specific exception above — for instance, a startup step
     completing but returning a value in a shape a later step cannot
     use. Prefer raising the more specific exception (``ConfigError``,

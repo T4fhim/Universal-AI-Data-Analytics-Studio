@@ -35,7 +35,7 @@ _logger = get_logger(__name__)
 _REGISTRY: dict[str, type[BaseOperation]] = {}
 
 # Web-transition 1.3: the built-ins are populated by
-# :func:`uadas_core.core.bootstrap.bootstrap` rather than as a side effect of
+# :func:`uadas_core.bootstrap.bootstrap` rather than as a side effect of
 # importing this module, so importing it has no global-state effect (Phase-3 /
 # multi-instance readiness -- see plans/phase-1-3-startup-graph.md §9). This flag
 # makes :func:`_register_builtins` a no-op after its first successful call:
@@ -104,7 +104,7 @@ def list_operations() -> dict[str, type[BaseOperation]]:
 def _register_builtins() -> None:
     """Populate the registry with every built-in cleaning operation.
 
-    Called from :func:`uadas_core.core.bootstrap.bootstrap` (web-transition 1.3
+    Called from :func:`uadas_core.bootstrap.bootstrap` (web-transition 1.3
     moved this off module import so importing this module has no global-state
     side effect). Idempotent via the module-level ``_builtins_registered`` guard,
     so the repeated ``bootstrap()`` calls in the test suite and the module-level

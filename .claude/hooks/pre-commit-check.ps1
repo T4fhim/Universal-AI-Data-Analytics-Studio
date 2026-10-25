@@ -34,34 +34,27 @@ if (-not $stagedPy) {
 }
 
 Write-Host "Running pytest..."
-# NOT a bare `python -m pytest`: verified directly (2026-09-01) that this exact bare
-# invocation can report a fully clean pytest summary (e.g. "1384 passed, 103 skipped,
-# 0 failed") and STILL exit non-zero -- a real Windows CPython/Qt interpreter-shutdown
-# crash occurring after pytest's own result is already known, previously believed to be
-# CI-only (see .github/workflows/ci.yml's own comment) but reproduced locally here too.
-# scripts/run_tests_and_exit_cleanly.py (os._exit() once pytest's real result is known)
-# is CI's actual fix for this and CLAUDE.md's documented command -- this hook had never
-# been updated to match, so it could spuriously block a commit with all tests passing.
-# Same two-invocation split as CI: tests/ui/test_worker_runner.py first (real-QThreadPool
-# tests proved flaky once event-loop backpressure builds up later in a long run).
-& $py "scripts\run_tests_and_exit_cleanly.py" "tests\ui\test_worker_runner.py" -q
+# Plain pytest. Until Phase 2.5 this gate ran scripts/run_tests_and_exit_cleanly.py and then
+# judged the run by its summary line, because a Windows/Qt interpreter-shutdown crash
+# (0xC0000005, after pytest had already printed a clean summary) made a fully green suite exit
+# non-zero. Qt is gone with the desktop shell; verified 2026-10-04 that a bare run exits 0
+# (868 passed). If a non-zero exit with a clean summary ever returns, investigate it rather than
+# forgive it -- that is a real regression, not the old crash.
+& $py -m pytest tests -q -p no:cacheprovider
 $testExit1 = $LASTEXITCODE
-& $py "scripts\run_tests_and_exit_cleanly.py" "tests" -q -m "not uia_integration" --ignore="tests\ui\test_worker_runner.py"
-$testExit2 = $LASTEXITCODE
 
-if ($testExit1 -ne 0 -or $testExit2 -ne 0) {
-    Write-Error "Tests failed (exit $testExit1 / $testExit2). Commit blocked."
+if ($testExit1 -ne 0) {
+    Write-Error "Tests failed (exit $testExit1). Commit blocked."
     exit 2
 }
 
 Write-Host "Running Bandit..."
-# -b .bandit-baseline.json: `bandit -r src -q` has a known, accepted baseline of
-# low-severity findings (asserts, the deliberate parametrised-SQL construction in
-# src/database, empty-string password *defaults* on a profile dataclass that
-# holds no real password). Added in Phase 0.6 of the web-transition plan, same
-# invocation the CI `lint` job runs. Phase 1.8's security pass removes baseline
-# entries as it fixes them; anything NOT in the baseline fails the commit.
-& $py -m bandit -r src uadas_core -q --skip B101,B107,B608
+# Same invocation as the CI `lint` job. `bandit -r uadas_core` has a known, accepted set of findings
+# (asserts; the deliberate parametrised-SQL construction in uadas_core/database; empty-string password
+# *defaults* on a profile dataclass that holds no real password), skipped by code (B101, B107, B608)
+# rather than by a path-keyed baseline file, which breaks between Windows and Linux. See ci.yml's
+# bandit step for the per-code rationale. Anything outside that skip set fails the commit.
+& $py -m bandit -r uadas_core -q --skip B101,B107,B608
 $banditExit = $LASTEXITCODE
 
 if ($banditExit -ne 0) {

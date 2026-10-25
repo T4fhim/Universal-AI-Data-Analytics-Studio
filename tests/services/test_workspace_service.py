@@ -29,13 +29,8 @@ import plotly.graph_objects as go
 import pytest
 
 from uadas_core.core.exceptions import ServiceError
-from uadas_core.services.workspace_service import (
-    Dashboard,
-    DashboardTile,
-    Dataset,
-    Visualization,
-    WorkspaceService,
-)
+from uadas_core.models import Dashboard, DashboardTile, Dataset, Visualization
+from uadas_core.services.workspace_service import WorkspaceService
 
 
 def _make_dataset(name: str = "root", parent_dataset_id: str | None = None) -> Dataset:
