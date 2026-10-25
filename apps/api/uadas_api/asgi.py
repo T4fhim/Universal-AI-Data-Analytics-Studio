@@ -1,0 +1,17 @@
+# File: apps/api/uadas_api/asgi.py
+"""ASGI entry point (uvicorn / daphne) -- needed from 3.7 for SSE streaming.
+
+Why it defaults to the *prod* settings: same fail-closed reasoning as
+:mod:`uadas_api.wsgi`.
+"""
+
+from __future__ import annotations
+
+import os
+
+from django.core.asgi import get_asgi_application
+from django.core.handlers.asgi import ASGIHandler
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "uadas_api.settings.prod")
+
+application: ASGIHandler = get_asgi_application()

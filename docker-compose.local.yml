@@ -1,0 +1,114 @@
+# ##########################################################################################
+#  LOCAL TRIAL ONLY -- NOT FOR PRODUCTION. NEVER DEPLOY THIS FILE.
+# ##########################################################################################
+#
+# An override of docker-compose.yml that runs the stack on http://localhost with throwaway
+# credentials, so a clean clone can reach a working API with no .env and no TLS:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
+#   python scripts/compose_smoke.py            # the verification line (signup -> CSV -> preview -> bad PDF)
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml down      # (-v also wipes the data)
+#
+# What it deliberately relaxes, and why each is unavoidable over plain HTTP on localhost
+# (docker-compose.yml itself is not weakened by any of it):
+#
+# * `uadas_api.settings.dev` instead of `.prod`: prod refuses http:// (Secure cookies would
+#   never come back over http, https-only URLs, mandatory email verification that needs a real
+#   SMTP relay). dev means DEBUG on (verbose 500 pages), optional email verification (the mail is
+#   printed to the api's log), no HSTS/redirect. The sandbox, quota and job limits are unchanged.
+# * Every credential below is a publicly known throwaway. Anyone who can reach the published
+#   port can use the stack: the api binds to 127.0.0.1 only, and there is no TLS.
+# * A bundled plain-http MinIO (the one docker-compose.dev.yml uses, pinned by digest) with its
+#   default root credentials, reachable only on the internal `backend` network (no published port).
+# * Nothing is published except the api on 127.0.0.1:8000. In particular NOT 5432/6379/9000/9001,
+#   so this runs beside the docker-compose.dev.yml services (project `uadas-dev`) without a clash.
+#
+# `env_file` is reset on every service: the base file's required `.env` is not needed here.
+
+x-local-env: &local-env
+  DJANGO_SETTINGS_MODULE: uadas_api.settings.dev
+  DJANGO_SECRET_KEY: local-only-throwaway-not-a-secret-local-only-throwaway-key
+  DATABASE_URL: postgres://uadas:uadas-local-only@postgres:5432/uadas
+  REDIS_URL: redis://:uadas-local-only@redis:6379/0
+  FRONTEND_BASE_URL: http://localhost:5173
+  CORS_ALLOWED_ORIGINS: http://localhost:5173
+  CSRF_TRUSTED_ORIGINS: http://localhost:5173
+  STORAGE_BUCKET: uadas-uploads
+  STORAGE_ENDPOINT_URL: http://minio:9000
+  STORAGE_ACCESS_KEY_ID: minioadmin
+  STORAGE_SECRET_ACCESS_KEY: minioadmin
+  STORAGE_ADDRESSING: path
+  # Prod demands a stated limit for every quota or an acknowledgement; dev would not ask, but the
+  # trial keeps the same answer so quotas behave like the real stack (unmetered).
+  QUOTA_UNLIMITED_ACKNOWLEDGED: "true"
+
+services:
+  postgres:
+    env_file: !reset []
+    environment:
+      POSTGRES_USER: uadas
+      POSTGRES_PASSWORD: uadas-local-only
+      POSTGRES_DB: uadas
+
+  redis:
+    env_file: !reset []
+    environment:
+      REDIS_PASSWORD: uadas-local-only
+
+  minio:
+    # MinIO stopped publishing to Docker Hub; Chainguard's build, pinned by digest (the same one
+    # docker-compose.dev.yml and CI use). It runs as uid 65532, which cannot write a fresh
+    # root-owned named volume: throwaway data, so run as root rather than chown the volume.
+    image: cgr.dev/chainguard/minio@sha256:dc455cdd4db6e390b1b26514f15ff37681a777bf8dab41aac445a0259f751e56
+    user: "0:0"
+    command: ["server", "/data", "--console-address", ":9001"]
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - miniodata:/data
+    networks: [backend]
+
+  # One-shot: wait for MinIO, create the bucket the app expects, exit 0. The api and worker wait
+  # for it, so the first upload cannot race a missing bucket.
+  minio-init:
+    image: cgr.dev/chainguard/minio-client@sha256:799f7e86017c3ee8d00f6372e1ee28dd73453f271d5b306a47af8e8a408a777a
+    restart: "no"
+    depends_on:
+      - minio
+    networks: [backend]
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        until mc alias set local http://minio:9000 minioadmin minioadmin; do
+          echo 'waiting for minio...'; sleep 2;
+        done &&
+        mc mb --ignore-existing local/uadas-uploads &&
+        echo 'minio bucket ready'
+
+  migrate:
+    env_file: !reset []
+    environment: *local-env
+
+  api:
+    env_file: !reset []
+    environment: *local-env
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+
+  worker:
+    env_file: !reset []
+    environment: *local-env
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+
+  beat:
+    env_file: !reset []
+    environment: *local-env
+
+volumes:
+  miniodata:

@@ -24,6 +24,7 @@ import pytest
 
 import uadas_core.core.logger as logger_module
 from uadas_core.cleaning import operation_registry
+from uadas_core.core.process_mode import reset_process_mode_for_tests
 from uadas_core.results import result_renderer_registry
 from uadas_core.visualization import chart_registry
 
@@ -84,6 +85,18 @@ def reset_logging_state():
         for handler in list(root_logger.handlers):
             root_logger.removeHandler(handler)
             handler.close()
+        # Server mode attaches its handler to the ``uadas_core`` logger (not the root)
+        # and stops propagation; undo that too, or one server-mode test would leave
+        # every later test's core log lines invisible to caplog.
+        core_logger = logger_module.logging.getLogger("uadas_core")
+        for handler in list(core_logger.handlers):
+            core_logger.removeHandler(handler)
+            handler.close()
+        core_logger.propagate = True
+        core_logger.setLevel(logger_module.logging.NOTSET)
+        # The process-mode latch (desktop XOR server) is one-way in production; the
+        # suite bootstraps in both modes, so each test starts with it open.
+        reset_process_mode_for_tests()
 
     _reset()
     yield

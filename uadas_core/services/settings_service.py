@@ -20,6 +20,7 @@ it persisted" is supposed to look from the outside.
 
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 from typing import Any
 
@@ -47,13 +48,18 @@ class SettingsService:
             was at load time.
         config_path: Location ``config.yaml`` should be written to and
             reloaded from. Defaults to the project's standard config
-            location; overridable primarily for tests.
+            location; overridable primarily for tests. ``None`` makes the
+            service purely **in-memory** (server mode): :meth:`save`
+            validates but writes nothing, and :meth:`reload` restores the
+            snapshot the service was built from rather than reading disk.
+            ``config.yaml`` is one file shared by every user of a
+            process, so a multi-tenant server must never touch it.
     """
 
     def __init__(
         self,
         initial_config: AppConfig,
-        config_path: Path = CONFIG_FILE_PATH,
+        config_path: Path | None = CONFIG_FILE_PATH,
     ) -> None:
         self._config_path = config_path
         # to_dict() returns a fully independent (deep-copied) working
@@ -61,6 +67,9 @@ class SettingsService:
         # copy would be unsafe given how set() below mutates nested
         # dicts in place.
         self._data: dict[str, Any] = initial_config.to_dict()
+        # The in-memory service's "disk": what reload() restores when there is
+        # no path. A second deep copy is cheap (settings are a few dozen keys).
+        self._initial: dict[str, Any] = initial_config.to_dict()
 
     def get(self, *key_path: str, default: Any = None) -> Any:
         """Return a nested settings value.
@@ -112,7 +121,9 @@ class SettingsService:
             current = current[key]
 
         current[key_path[-1]] = value
-        _logger.debug("Setting updated: %s = %r", ".".join(key_path), value)
+        # The key path only, NEVER the value: settings can hold secrets (an API key set at
+        # runtime) and this line lands in the log shared by every session of a server.
+        _logger.debug("Setting updated: %s", ".".join(key_path))
 
     def save(self) -> None:
         """Validate and write the current in-memory settings to disk.
@@ -129,6 +140,10 @@ class SettingsService:
                 reason.
         """
         validate_config_structure(self._data)
+
+        if self._config_path is None:
+            _logger.debug("Settings validated; in-memory service, nothing persisted.")
+            return
 
         try:
             self._config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -155,5 +170,10 @@ class SettingsService:
             ConfigError: If the on-disk file cannot be loaded — see
                 :func:`~uadas_core.core.config.load_config`.
         """
+        if self._config_path is None:
+            self._data = copy.deepcopy(self._initial)
+            _logger.info("Settings reset to the in-memory snapshot.")
+            return
+
         self._data = load_config(self._config_path)
         _logger.info("Settings reloaded from %s.", self._config_path)

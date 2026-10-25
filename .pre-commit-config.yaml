@@ -39,6 +39,9 @@ repos:
         # to the committed baseline without that counting as a failure on the
         # first run.
       - id: check-yaml
+        # Compose overrides use Compose-only tags (`!reset`, `!override`) that a plain
+        # YAML loader cannot construct; `docker compose config` is their real validator.
+        exclude: ^docker-compose.*\.ya?ml$
       - id: check-added-large-files
         # Default is 500 KB. uv.lock (Phase 0.7) is ~800 KB — a fully
         # resolved + hashed graph of ~200 packages, legitimately large and
@@ -48,19 +51,19 @@ repos:
       - id: check-merge-conflict
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.3  # pinned to match requirements.txt's ruff==0.16.3
+    rev: v0.16.3  # pinned to match requirements-dev.txt's ruff==0.16.3
     hooks:
       - id: ruff-check
         args: [--fix]
         # No ruff-format hook here -- see the comment above exclude:.
 
   - repo: https://github.com/psf/black
-    rev: 26.5.1  # pinned to match requirements.txt's black==26.5.1 -- the actual CI-gating formatter
+    rev: 26.5.1  # pinned to match requirements-dev.txt's black==26.5.1 -- the actual CI-gating formatter
     hooks:
       - id: black
 
   - repo: https://github.com/PyCQA/isort
-    rev: 8.0.1  # pinned to match requirements.txt's isort==8.0.1
+    rev: 8.0.1  # pinned to match requirements-dev.txt's isort==8.0.1
     hooks:
       - id: isort
         # isort remains the tool of record for import order (see pyproject.toml's

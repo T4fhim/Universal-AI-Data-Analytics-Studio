@@ -34,6 +34,27 @@ _logger = get_logger(__name__)
 _INVALID_SHEET_TITLE_CHARS = "[]:*?/\\"
 
 
+# A cell whose text begins with one of these is read by a spreadsheet as a formula (or by CSV
+# tooling downstream), so a report title or summary line chosen by a user could run
+# ``=HYPERLINK(...)`` when the file is opened. openpyxl stores a string starting with "=" as a
+# formula; every string this exporter writes is therefore forced to the explicit string type.
+_FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _append_text_safe(sheet, values: list) -> None:
+    """``sheet.append(values)`` with every string cell pinned to the string data type.
+
+    The text is kept exactly as given (no visible apostrophe); only its *type* changes, so Excel
+    and LibreOffice show it and never evaluate it. Numbers and dates keep their types.
+    """
+    sheet.append(values)
+    if not values:
+        return
+    for cell in sheet[sheet.max_row]:
+        if isinstance(cell.value, str) and cell.value.startswith(_FORMULA_TRIGGERS):
+            cell.data_type = "s"
+
+
 class ExcelReportExporter(BaseReportExporter):
     """Renders a :class:`ReportContent` as a static Excel workbook."""
 
@@ -60,14 +81,16 @@ class ExcelReportExporter(BaseReportExporter):
     ) -> None:
         sheet = workbook.active
         sheet.title = "Summary"
-        sheet.append(["Report", report_content.title])
-        sheet.append(["Dataset", report_content.dataset_name])
-        sheet.append(["Generated", report_content.generated_at])
-        sheet.append(["Expertise level", report_content.expertise_level.value])
+        _append_text_safe(sheet, ["Report", report_content.title])
+        _append_text_safe(sheet, ["Dataset", report_content.dataset_name])
+        _append_text_safe(sheet, ["Generated", report_content.generated_at])
+        _append_text_safe(
+            sheet, ["Expertise level", report_content.expertise_level.value]
+        )
         sheet.append([])
         sheet.append(["Dataset Summary"])
         for key, value in report_content.dataset_summary.items():
-            sheet.append([key, value])
+            _append_text_safe(sheet, [key, value])
         sheet.column_dimensions[get_column_letter(1)].width = 24
         sheet.column_dimensions[get_column_letter(2)].width = 60
 
@@ -78,16 +101,16 @@ class ExcelReportExporter(BaseReportExporter):
         )
         sheet = workbook.create_sheet(title=f"{index}_{cleaned_label}"[:31])
 
-        sheet.append([section.stage_label])
+        _append_text_safe(sheet, [section.stage_label])
         if section.tool_name:
-            sheet.append(["Tool", section.tool_name])
-        sheet.append(["Timestamp", section.timestamp])
+            _append_text_safe(sheet, ["Tool", section.tool_name])
+        _append_text_safe(sheet, ["Timestamp", section.timestamp])
         sheet.append([])
         for line in section.summary_lines:
-            sheet.append([line])
+            _append_text_safe(sheet, [line])
         if section.explanation_text:
             sheet.append([])
-            sheet.append(["Explanation", section.explanation_text])
+            _append_text_safe(sheet, ["Explanation", section.explanation_text])
         sheet.column_dimensions[get_column_letter(1)].width = 60
 
         if section.figure is not None:

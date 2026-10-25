@@ -33,16 +33,20 @@ into [assets/ui-contract/](assets/ui-contract/) (start with `ui-behaviour-rules.
 ## Commands
 
 There is no build step (pure Python). Environment: Python 3.13, dependencies in
-[requirements.txt](requirements.txt) (runtime and pinned dev-tool versions in one file — there is no
-separate `requirements-dev.txt`), a `.venv` already present at the repo root. Tool configuration
+[requirements.txt](requirements.txt) (runtime only: it is what the server image installs) and
+[requirements-dev.txt](requirements-dev.txt) (`-r requirements.txt` plus the pinned dev tools), a `.venv`
+already present at the repo root. Tool configuration
 (`black`, `isort`, `mypy`, `ruff`, `bandit`, `pytest`) lives in `pyproject.toml`.
 
 ```powershell
 # activate the existing venv (PowerShell)
 .venv\Scripts\Activate.ps1
 
-# install/sync dependencies
-pip install -r requirements.txt
+# install/sync dependencies (runtime + dev tools)
+pip install -r requirements-dev.txt
+
+# the whole web stack in containers (Docker): see apps/api/README.md "Run the whole stack"
+docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
 
 ```
 
@@ -68,7 +72,7 @@ requests. Reproduce a CI failure on the exact dependency set with a clean virtua
 
 ### Formatting, linting, types, security
 
-Versions are pinned in `requirements.txt` (`black==26.5.1`, `isort==8.0.1`, `mypy==2.1.0`,
+Versions are pinned in `requirements-dev.txt` (`black==26.5.1`, `isort==8.0.1`, `mypy==2.1.0`,
 `ruff==0.16.3`, `bandit==1.9.4`) and enforced in CI (`.github/workflows/ci.yml`), not left to
 whatever the tool defaults to:
 
@@ -76,7 +80,7 @@ whatever the tool defaults to:
 black --check uadas_core/ tests/ scripts/
 isort --check-only uadas_core/ tests/ scripts/
 bandit -r uadas_core -q --skip B101,B107,B608   # same skips as CI (rationale in ci.yml's bandit step)
-lint-imports                                      # the 3 .importlinter contracts
+PYTHONPATH=apps/api lint-imports                  # the 7 .importlinter contracts (PYTHONPATH finds uadas_api)
 ```
 
 `mypy` is **not** run repo-wide — it's scoped to an explicit, curated list of packages/modules that
@@ -132,14 +136,25 @@ constraints that must be preserved whenever this code is touched, not the explan
 
 `config.py` deliberately does not import the project logger (it's a dependency of the logger, not a
 consumer of it) — it uses a bare `logging.getLogger` for its own bootstrap-time messages instead. Don't
-"fix" this into a `get_logger` call. See
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#application-startup-sequence) for the full startup sequence
-and why its order can't be changed.
+"fix" this into a `get_logger` call. Startup is split in two (Phase 3 session seam):
+`bootstrap_process(server_mode=..., config=...)` builds the process-wide, tenant-free world once and
+`build_session(process)` builds the stateful per-user services into a child container; the legacy
+`bootstrap()` composes them and returns the same `BootstrapContext`. **`server_mode=True` must stay
+impossible to turn into desktop behaviour**: no plugin loading (the plugin package is not even
+imported), no YAML read/write, no log files (and never the host's root logger), no
+`set_default_job_runner` bridge — don't add a code path in `bootstrap_process` that does any of those.
+The mode is a one-way latch (`core/process_mode.py`): desktop and server bootstraps in one process raise.
+Never log `%r` of a dataset/project/setting value (tenant data and secrets share one server log). See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#application-startup-sequence) and
+[plans/phase-3-session-seam.md](plans/phase-3-session-seam.md) for the sequence and why its order can't be changed.
 
 ### Dependency container
 
-Register new session-wide services in `bootstrap.py` alongside the existing ones rather than constructing
-them ad hoc inside other services, so every consumer resolves the same instance. See
+`DependencyContainer(parent=...)`: a child resolves its own registrations first, then falls back to its
+parent, and nothing registered in a child leaks to the parent or siblings. Register a new **process-wide,
+stateless** service in `bootstrap_process()` and a new **per-user, stateful** one in `build_session()`
+(never on the process container — that would share it across tenants), rather than constructing them ad
+hoc inside other services, so every consumer resolves the same instance. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#dependency-container) for how the container itself works.
 
 ### The `Base*` extension-point pattern
@@ -191,6 +206,41 @@ swap. Garbage-collecting earlier means a failure in between leaves the *previous
 pointing at frames that are already gone. Don't reorder it; `tests/persistence/test_persistence_atomicity.py`
 injects each failure.
 
+**The same property now also holds over object storage (Phase 3.4)**, in
+`apps/api/uadas_api/storage/workspace.py` (`StorageBackedPersistence`; the core's `PersistenceService`
+is unchanged and runs against a per-call temp dir): every object of a save is written under a *new,
+never-reused* key (a PUT overwrites in place, so a key the current head references is never
+rewritten), the one-row compare-and-swap of `WorkspaceHead` is the swap (it also rejects a second
+concurrent writer), and the objects the old manifest alone referenced are queued for deletion *in
+the swap's transaction* and deleted only **after** commit, tolerating failure. Don't write a frame
+or the database to an existing key, don't delete before the swap, and don't touch the bucket except
+through `uadas_api.storage.store.get_store()`; `apps/api/tests/test_storage_workspace.py` injects
+each failure (and runs on a real MinIO in CI).
+
+### Parsers run only in the sandbox child (Phase 3.5)
+
+`uadas_core/readers/` feeds untrusted PDF/Office/XML/zip/image bytes to camelot, PyMuPDF, pdfplumber, python-docx,
+openpyxl, lxml, OpenCV and Tesseract, so **no web or worker process may import a reader**: parsing happens only in
+`python -I -m uadas_api.sandbox.child` (rlimits, socket block, stripped environment, wall-clock kill), launched by
+`uadas_api/sandbox/runner.py`. `.importlinter` contract `readers-only-in-the-sandbox-child` forbids `uadas_api` from
+importing `uadas_core.readers` or a parsing library anywhere but that child, and `apps/api/tests/test_sandbox_boundary.py`
+proves it in a fresh interpreter -- never "just read one file" in API code; add an `ingest`-style job instead. The
+child reports a closed set of error codes (never exception text or paths) and nothing it returns is trusted unchecked.
+Do not write "isolated" about a protection the code does not establish: a child of the worker's own uid reads the worker's
+files and other jobs' inputs (`0700` and a stripped environment separate nothing), the in-process socket shim is
+bypassable and is **never** counted as enforcement, and the zip budget reads declared sizes. Real separation is a dedicated
+child uid or a container, a network namespace the child verified, and the rlimits; production settings demand an explicit
+statement of the first two (`SANDBOX_CHILD_UID`/`SANDBOX_ISOLATION_ACKNOWLEDGED`, `SANDBOX_NETWORK_ISOLATION`).
+Long work is a `Job` row (`uadas_api/jobs/`): enqueue through `jobs.queue.enqueue`, never import Celery outside
+`jobs/{celery_app,tasks,queue}.py`; a task message carries only a job id and the worker re-checks ownership. **Every
+worker-side write to a job is fenced by the attempt number the worker was claimed with** (`services._running`): add a new
+one the same way, or a superseded worker can overwrite its successor. Production requires Linux (the limits cannot be
+enforced elsewhere). See [plans/phase-3-5-jobs.md](plans/phase-3-5-jobs.md).
+
+### Streaming (SSE, Phase 3.7)
+
+SSE routes (`web/{job_events,assistant}.py`, async views under ASGI) send only closed event fields -- **never a data row, `params`, `result` or provider/exception text** -- build every frame with `web/sse.py`, hold a `web/streams.py` cap lease released on every exit path, and the assistant only *proposes* tool calls (never import `AssistantService`/`get_tool_by_name` there). **Never hold a DB connection or transaction across a sleep**: each poll ends in `release_connections()`; new stream routes get a `test_web_streaming`-style real-ASGI test. See [plans/phase-3-7-streaming.md](plans/phase-3-7-streaming.md).
+
 ### Configuration
 
 Adding a new config key means updating `_default_config_dict`, `_TOP_LEVEL_SCHEMA`/`_NESTED_SCHEMA`, and
@@ -227,8 +277,15 @@ and the product rules with their rejected alternatives (`ui-behaviour-rules.md`)
 
 Adding a reader requires updating both `reader_registry.py`'s `_BUILTIN_READERS` tuple *and* the file-picker
 filter groups in `assets/ui-contract/file-picker-filters.json` — the second does not derive from the first
-automatically, but `tests/assets/` now fails if their extension sets differ. Watch for the same class of gap (a registry plus a separately-hardcoded consumer)
+automatically, but `tests/assets/` now fails if their extension sets differ. It also needs a content rule in
+`apps/api/uadas_api/sandbox/admission.py`'s `_RULES` (and a `SourceFormat` choice if it stamps a new format);
+`apps/api/tests/test_sandbox_admission.py` fails if that table and the registry disagree in either direction. Watch for the same class of gap (a registry plus a separately-hardcoded consumer)
 when extending charts, cleaning operations, or plugin categories.
+
+Adding an API route (`apps/api`): call `member(request, org_id, <role>)` first, resolve every id with `project_of`/`in_project`
+(`for_organization` + the path's project), give it an `operation_id` and `responses(...)`, then regenerate the contract with
+`cd apps/api && python -m uadas_api.web.openapi` -- the IDOR walk (`tests/test_web_idor.py`) covers it automatically (and fails
+until its body is classified) and the OpenAPI drift check fails CI if `openapi.json` is stale. A new core tool/stage needs an entry in `uadas_api/stages/catalog.py`.
 
 ## Conventions to follow
 

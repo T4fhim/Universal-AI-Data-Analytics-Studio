@@ -46,7 +46,13 @@ services:
       retries: 12
 
   minio:
-    image: minio/minio:latest
+    # MinIO stopped publishing images to Docker Hub and Quay (minio/minio no longer
+    # exists there), so this is Chainguard's build, pinned by digest so CI and local
+    # dev run the exact same server (RELEASE.2026-09-22T19-25-18Z when pinned).
+    image: cgr.dev/chainguard/minio@sha256:dc455cdd4db6e390b1b26514f15ff37681a777bf8dab41aac445a0259f751e56
+    # The image runs as uid 65532, which cannot write a fresh root-owned named volume;
+    # throwaway local dev data, so run as root rather than chown the volume.
+    user: "0:0"
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -59,7 +65,8 @@ services:
 
   # One-shot: wait for MinIO, create the buckets the app expects, then exit 0.
   minio-init:
-    image: minio/mc:latest
+    # The -dev variant ships a shell (the plain image is shell-less and the script below needs one).
+    image: cgr.dev/chainguard/minio-client@sha256:799f7e86017c3ee8d00f6372e1ee28dd73453f271d5b306a47af8e8a408a777a
     depends_on:
       - minio
     restart: "no"
@@ -75,7 +82,42 @@ services:
         mc mb --ignore-existing local/uadas-exports &&
         echo 'minio buckets ready'
 
+  # --- FUTURE: the network-less parser sandbox service (Phase 3.5 / plans/phase-3-5-jobs.md) ------
+  #
+  # Today the sandbox child runs inside the worker's container: it has rlimits, a stripped
+  # environment, a network namespace where the kernel allows one (Docker's default seccomp profile
+  # does not), a Python-level socket block (bypassable: it is not counted as enforcement) and a
+  # wall-clock kill, but the container still has a network (the worker needs Redis, PostgreSQL and
+  # the object store), and neither a Python-level block nor a missing namespace stops C code or a
+  # helper such as Tesseract from opening a socket. TRUE network isolation
+  # is a *separate container with no network at all*: it can still read a request directory and
+  # write a result directory on a shared volume (no network needed), and the worker, which has the
+  # network, only exchanges files with it. This is the shape that service takes; it is commented
+  # out because the request/response transport over the shared volume is not built yet (the child
+  # is spawned directly today). Everything below is what the hardening must look like:
+  #
+  # sandbox:
+  #   image: uadas-api:dev                  # the same image as the worker (a Dockerfile is Phase 6)
+  #   user: "10001:10001"                   # a dedicated unprivileged uid: RLIMIT_NPROC is not
+  #                                         # enforced for root and is counted per uid
+  #   network_mode: none                    # no egress, no ingress, no DNS: the real isolation
+  #   read_only: true                       # immutable root filesystem
+  #   cap_drop: [ALL]                       # no capabilities
+  #   security_opt: ["no-new-privileges:true"]   # (add a seccomp profile denying socket/ptrace/mount)
+  #   pids_limit: 128                       # the hard bound on forks, whatever the uid's other tasks
+  #   mem_limit: 5g                         # above SANDBOX_MEMORY_MB: the rlimit trips first
+  #   memswap_limit: 5g                     # no swap
+  #   cpus: 2
+  #   tmpfs:
+  #     - /tmp:size=1g,mode=1777,noexec,nosuid
+  #   volumes:
+  #     - sandbox-jobs:/jobs                # request / result directories, written by the worker
+  #   environment:
+  #     SANDBOX_TMP_ROOT: /tmp
+  #   command: ["python", "-I", "-m", "uadas_api.sandbox.service", "--jobs-dir", "/jobs"]  # not built yet
+
 volumes:
   pgdata:
   redisdata:
   miniodata:
+  # sandbox-jobs:                          # for the future sandbox service above

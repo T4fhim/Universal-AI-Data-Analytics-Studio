@@ -585,6 +585,18 @@ class AppConfig:
         )
 
     @classmethod
+    def defaults(cls) -> AppConfig:
+        """Return the in-code default configuration, touching no file.
+
+        The server-mode entry point (:func:`uadas_core.bootstrap.bootstrap_process`
+        with no explicit config): :meth:`load` would read -- and, when missing,
+        *write* -- ``config.yaml``, which a multi-tenant process must never do.
+        Built from the same :func:`_default_config_dict` single source of truth, so
+        a freshly generated desktop ``config.yaml`` and this agree by construction.
+        """
+        return cls.from_dict(_default_config_dict())
+
+    @classmethod
     def load(cls, path: Path = CONFIG_FILE_PATH) -> AppConfig:
         """Load configuration from ``path`` and return a typed view.
 

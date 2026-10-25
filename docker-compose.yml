@@ -1,0 +1,217 @@
+# The production-shaped stack: Django API + Celery worker/beat + PostgreSQL + Redis, from one
+# image (apps/api/Dockerfile). Phase 3's verification line (plans/web-transition-glass-box-studio.md):
+# `docker compose up` from a clean clone gives a WORKING stack -- proven by scripts/compose_smoke.py.
+#
+#   cp .env.example .env     # then fill in every value (nothing here ships a secret)
+#   docker compose up --build -d
+#
+# To try the stack on http://localhost with throwaway credentials and a bundled MinIO, use the
+# NOT-FOR-PRODUCTION override instead (it needs no .env):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
+#
+# What "production-shaped" means here, concretely:
+#
+# * Settings are `uadas_api.settings.prod`: it REFUSES TO START without a strong secret key, an
+#   allowed-host list, https URLs, an https object store with real-looking credentials, SMTP, a
+#   Redis cache, a broker on another Redis database, and an explicit statement of the parser
+#   sandbox's isolation and of every quota (or "unlimited, acknowledged"). Every value comes
+#   from `.env`; a missing `.env` stops compose before anything starts (env_file is required).
+# * The object store is NOT in this file: prod requires an https endpoint and non-placeholder
+#   credentials (an in-stack plain-http MinIO is refused at start-up), so point STORAGE_* at S3,
+#   R2 or a TLS-terminated MinIO. The local override bundles a plain-http MinIO instead.
+# * TLS is NOT in this file either: the api listens on 127.0.0.1:8000 (plain HTTP, WSGI/gunicorn)
+#   and expects a TLS-terminating reverse proxy on the host in front of it, which must set
+#   X-Forwarded-Proto, strip it from clients, and cap request bodies (see .env.example,
+#   "Reverse proxy"). Django's own caps (1 MiB JSON, the sandbox input cap for an upload) act
+#   as bodies stream in under WSGI; the proxy cap is defence in depth and slow-client protection.
+# * No datastore publishes a port. PostgreSQL and Redis live on `backend`, a network with no
+#   route to the outside (`internal: true`).
+#
+# Parser sandbox isolation -- what is and is not claimed (plans/phase-3-5-jobs.md):
+#
+# * A *separate network-less sandbox container* (the commented sketch in docker-compose.dev.yml:
+#   `network_mode: none`, a request/result transport over a shared volume) is the strongest shape
+#   and is NOT built: the transport does not exist yet, the parser child is spawned directly by
+#   the worker. And `network_mode: none` on the worker itself cannot work -- it must reach Redis,
+#   PostgreSQL and the object store.
+# * So this file uses what IS built and VERIFIABLE BY THE CODE: SANDBOX_NETWORK_ISOLATION=unshare.
+#   Each parser child unshares its own network namespace (loopback only, verified by the child
+#   and reported back); the worker REFUSES the parse (`sandbox_unavailable`) if the child could not
+#   isolate, and `manage.py check --deploy` refuses to start if the host cannot (E007). It is not an
+#   operator's unverified statement ("container") and not the bypassable socket shim
+#   ("none-acknowledged"). The cost: Docker's default seccomp profile forbids the
+#   unprivileged user namespace that needs, so the WORKER container runs with
+#   `seccomp=unconfined` (still non-root, all capabilities dropped, no-new-privileges). If your
+#   host forbids user namespaces altogether, parses fail closed; the choices are then a custom
+#   seccomp profile, or SANDBOX_NETWORK_ISOLATION=container with a worker whose network egress you
+#   restrict yourself (set it in .env; the default below is `unshare`).
+# * The parser child is separated from the worker by the container (SANDBOX_ISOLATION_ACKNOWLEDGED=
+#   container, non-root uid 10001): concurrent children of one worker still share that uid and can
+#   read each other's job directories -- the documented residual risk, bounded by rlimits and
+#   `pids_limit` here, not removed.
+
+name: uadas
+
+x-uadas-image: &uadas-image
+  image: uadas-api:${UADAS_IMAGE_TAG:-local}
+  build:
+    context: .
+    dockerfile: apps/api/Dockerfile
+
+# Hardening every app container shares: not root (the image's uid 10001), no capabilities, no
+# privilege gain, a read-only root filesystem (writable scratch is an explicit tmpfs).
+x-uadas-app: &uadas-app
+  <<: *uadas-image
+  env_file: .env
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  init: true
+  tmpfs:
+    # Python needs a writable temp dir even to import the app (matplotlib's config dir, tempfile).
+    # Services that need more (api, worker, beat) override this with their own sizes.
+    - /tmp:size=64m,mode=1777,noexec,nosuid
+  environment:
+    DJANGO_SETTINGS_MODULE: uadas_api.settings.prod
+    # Prod requires an explicit answer to "what separates the parser child from the worker" and
+    # "what cuts the child's network"; see the sandbox section in the header. Overridable from .env.
+    SANDBOX_ISOLATION_ACKNOWLEDGED: container
+    SANDBOX_NETWORK_ISOLATION: ${SANDBOX_NETWORK_ISOLATION:-unshare}
+    SANDBOX_TMP_ROOT: /sandbox-tmp
+
+services:
+  postgres:
+    image: postgres:17
+    env_file: .env # POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    env_file: .env # REDIS_PASSWORD
+    restart: unless-stopped
+    # Both the cache (database 0) and the job queue (database 1) live here; AOF keeps queued
+    # jobs across a restart. The password comes from the environment, not the command line, so
+    # it is not in `docker inspect` args.
+    command:
+      - sh
+      - -c
+      - exec redis-server --appendonly yes --save 60 1 --loglevel warning --requirepass "$$REDIS_PASSWORD"
+    volumes:
+      - redisdata:/data
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # One-shot: apply migrations, then exit 0. api, worker and beat wait for it to complete, so
+  # a fresh database is migrated before anything serves or consumes. Idempotent on every `up`.
+  migrate:
+    <<: *uadas-app
+    command: ["python", "manage.py", "migrate", "--noinput"]
+    restart: "no"
+    healthcheck:
+      disable: true
+    networks: [backend]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  api:
+    <<: *uadas-app
+    # The image's CMD: gunicorn (WSGI, gthread) on :8000.
+    ports:
+      - "127.0.0.1:8000:8000"
+    tmpfs:
+      # Upload spool (the capped temporary-file handler) and gunicorn's worker heartbeat files.
+      - /tmp:size=256m,mode=1777,noexec,nosuid
+    networks: [backend, egress] # egress: SMTP relay, the https object store, the LLM provider
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *uadas-app
+    command:
+      - celery
+      - -A
+      - uadas_api.jobs.celery_app
+      - worker
+      - --queues
+      - ${JOBS_QUEUE:-uadas-jobs}
+      - --concurrency
+      - "2"
+      - --loglevel
+      - INFO
+    # Parsing needs Linux rlimits, a netns and PDEATHSIG; production settings refuse any other
+    # platform. `seccomp=unconfined` is what the verified network isolation costs (header).
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=unconfined
+    # Cgroup bounds the parser child cannot lift (RLIMIT_NPROC does not stop a setsid()
+    # grandchild; the pids limit does). mem_limit sits above SANDBOX_MEMORY_MB (4096) x concurrency.
+    pids_limit: 512
+    mem_limit: 10g
+    memswap_limit: 10g
+    tmpfs:
+      # Each parse's private job directory (original in, Parquet out). Sized above the sandbox
+      # input + output caps; it is memory-backed, so it counts against mem_limit.
+      - /sandbox-tmp:size=2g,mode=0700,uid=10001,gid=10001,noexec,nosuid
+      - /tmp:size=256m,mode=1777,noexec,nosuid
+    networks: [backend, egress] # egress: the https object store
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A uadas_api.jobs.celery_app inspect ping -d celery@$$HOSTNAME -t 10"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Exactly ONE of these (it schedules `uadas.jobs.sweep` every minute: requeues lost messages,
+  # fails the jobs of dead workers). Never scale it.
+  beat:
+    <<: *uadas-app
+    command:
+      - celery
+      - -A
+      - uadas_api.jobs.celery_app
+      - beat
+      - --loglevel
+      - INFO
+      - --schedule
+      - /tmp/celerybeat-schedule
+      - --pidfile=
+    tmpfs:
+      - /tmp:size=16m,mode=1777,noexec,nosuid
+    healthcheck:
+      disable: true
+    networks: [backend]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+networks:
+  # No route out: only containers attached to it can talk to each other, which is all that
+  # PostgreSQL and Redis ever need.
+  backend:
+    internal: true
+  egress: {}
+
+volumes:
+  pgdata:
+  redisdata:

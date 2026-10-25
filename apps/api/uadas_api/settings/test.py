@@ -1,0 +1,62 @@
+# File: apps/api/uadas_api/settings/test.py
+"""Test settings: hermetic secret, fast password hashing, in-memory SQLite.
+
+Why: the suite must run anywhere with nothing configured, and quickly. The secret key
+is a fixed throwaway (never read from the environment, so a developer's real key can
+not leak into test output) and the MD5 hasher keeps ``create_user`` from dominating
+test time from 3.3 on. The database is in-memory SQLite *unless* ``DATABASE_URL`` is
+set -- CI's ``api-test`` job points it at its Postgres 17 service container so the same
+tests exercise the production engine. pytest-django always creates a separate
+``test_``-prefixed database, so a stray ``DATABASE_URL`` never touches real data.
+
+Auth: email verification is off (``none``) so most tests can sign up and log straight in;
+the tests of the verification flow switch it to ``mandatory`` with the ``settings``
+fixture. Mail goes to the in-memory outbox, and the cache is always the per-process
+default (a developer's ``REDIS_URL`` must not make a test run touch a real server).
+"""
+
+from __future__ import annotations
+
+import dj_database_url
+
+from . import _assistant, _auth, _jobs, _quota, _storage
+from .base import *  # noqa: F403 - the settings split is a star-import by design
+
+DEBUG = False
+SECRET_KEY = "test-only-secret-key-not-used-anywhere-else"  # nosec B105
+ALLOWED_HOSTS = ["testserver", "localhost"]
+
+DATABASES = {"default": dj_database_url.config(default="sqlite://:memory:")}
+
+PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+CACHES = _auth.cache_settings({})
+ACCOUNT_EMAIL_VERIFICATION = "none"
+EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+DEFAULT_FROM_EMAIL = "UADAS test <no-reply@example.test>"
+
+FRONTEND_BASE_URL = "http://localhost:5173"
+HEADLESS_FRONTEND_URLS = _auth.frontend_urls(FRONTEND_BASE_URL)
+
+# Object storage is an in-memory fake (uadas_api.storage.memory): no network, no credentials,
+# and -- like the secret key -- never read from the environment, so a developer's STORAGE_*
+# can neither reach a real bucket from the suite nor change its outcome.
+UADAS_STORAGE = _storage.memory_storage()
+STORAGES = _storage.django_storages(UADAS_STORAGE)
+
+# Jobs run eagerly (inline, in the test's own thread) against an in-memory broker, and the
+# sandbox uses its built-in defaults: none of it is read from the environment, so a developer's
+# CELERY_BROKER_URL / SANDBOX_* can neither reach a real Redis from the suite nor change a
+# test's outcome. The real worker is exercised by the opt-in integration test.
+UADAS_JOBS = _jobs.hermetic_jobs()
+UADAS_SANDBOX = _jobs.parse_sandbox({})
+globals().update(_jobs.celery_settings(UADAS_JOBS))
+
+# The assistant is unconfigured in the suite (a developer's ASSISTANT_* cannot reach a real provider
+# from a test); tests that need one set `settings.UADAS_ASSISTANT` and patch the provider factory.
+UADAS_ASSISTANT = _assistant.parse_assistant({})
+
+# Quotas are unlimited in the suite and never read from the environment (a developer's QUOTA_*
+# cannot change a test's outcome); tests that exercise a limit set `settings.UADAS_QUOTA` or give
+# the organization an `OrganizationQuota` row.
+UADAS_QUOTA = _quota.parse_quota({})
