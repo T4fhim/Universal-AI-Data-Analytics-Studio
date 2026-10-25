@@ -92,7 +92,7 @@ def url(world: World, *, other: bool = False) -> str:
 
 
 def use(monkeypatch: pytest.MonkeyPatch, provider: FakeProvider) -> FakeProvider:
-    monkeypatch.setattr(assistant, "make_provider", lambda: provider)
+    monkeypatch.setattr(assistant, "make_provider", lambda *a, **k: provider)
     return provider
 
 
@@ -163,7 +163,9 @@ def test_the_key_used_is_the_deployments_and_a_request_cannot_supply_one(
 ) -> None:
     captured: list[tuple[Any, ...]] = []
 
-    def fake_create(name: str, key: str, model: str | None = None) -> FakeProvider:
+    def fake_create(
+        name: str, key: str, model: str | None = None, timeout: float | None = None
+    ) -> FakeProvider:
         captured.append((name, key, model))
         return FakeProvider()
 
@@ -461,10 +463,25 @@ def test_concurrent_turns_are_capped_and_a_disconnect_abandons_the_turn_and_free
             await second.body()
         ).replace(b" ", b"")
         await first.disconnect()  # the client left while the provider was still thinking
-        gate.set()
+        await asyncio.sleep(0.2)
+        # the provider thread cannot be interrupted, so the slot is still held (the cap is the
+        # bound on abandoned threads: freeing it here would let one user pile them up)
+        held = await Conn.open("POST", url(world), api=api, body={"message": "held"})
+        assert held.status == 429
+        gate.set()  # the provider call ends ...
         use(monkeypatch, FakeProvider())
-        third = await Conn.open("POST", url(world), api=api, body={"message": "three"})
-        assert third.status == 200 and b"event: done" in await third.body()
+        for _ in range(80):  # ... and only then is the slot free again (the twin)
+            third = await Conn.open(
+                "POST", url(world), api=api, body={"message": "three"}
+            )
+            if third.status == 200:
+                assert b"event: done" in await third.body()
+                return
+            await third.body()
+            await asyncio.sleep(0.1)
+        raise AssertionError(
+            "the slot was never released after the provider call ended"
+        )
 
     try:
         asyncio.run(asyncio.wait_for(scenario(), 30))

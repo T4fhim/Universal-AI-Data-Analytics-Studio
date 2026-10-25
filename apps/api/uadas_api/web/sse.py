@@ -88,7 +88,7 @@ class SseResponse(StreamingHttpResponse):
         self, chunks: AsyncIterator[bytes], *, on_close: Callable[[], None]
     ) -> None:
         super().__init__(chunks, content_type=f"{MEDIA_TYPE}; charset=utf-8")
-        self["Cache-Control"] = "no-cache, no-transform"
+        self["Cache-Control"] = "no-cache, no-transform, private"
         self["X-Accel-Buffering"] = "no"  # nginx: do not buffer this response
         self._on_close = on_close
 

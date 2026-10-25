@@ -96,7 +96,7 @@ def test_events_arrive_while_the_stream_is_open_and_it_closes_after_the_terminal
         conn = await Conn.open("GET", events_url(world, job), api=world.api("viewer"))
         assert conn.status == 200
         assert conn.headers["content-type"] == "text/event-stream; charset=utf-8"
-        assert conn.headers["cache-control"] == "no-cache, no-transform"
+        assert conn.headers["cache-control"] == "no-cache, no-transform, private"
         assert conn.headers["x-accel-buffering"] == "no"
 
         first = await conn.until(b"event: job")  # retry hint, then the current state
@@ -430,7 +430,10 @@ def test_open_streams_hold_no_database_connection_while_they_sleep(
             pytest.fail(
                 "the connection-leak test needs PostgreSQL (DATABASE_URL) in CI"
             )
-        pytest.skip("counting server-side connections needs PostgreSQL")
+        pytest.skip(
+            "local SQLite run: the server-side connection count needs PostgreSQL "
+            "(export DATABASE_URL=postgres://...); CI runs it and fails if it cannot"
+        )
     settings.UADAS_API = {
         **FAST,
         "sse_poll_seconds": 0.5,

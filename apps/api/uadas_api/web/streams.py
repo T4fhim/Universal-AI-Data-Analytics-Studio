@@ -39,10 +39,14 @@ _PREFIX = "uadas:streams"
 def _bump(key: str, ttl: int) -> int:
     cache.add(key, 0, timeout=ttl)  # no-op while the counter exists
     try:
-        return int(cache.incr(key))
+        used = int(cache.incr(key))
     except ValueError:  # expired between add and incr: start over
         cache.add(key, 1, timeout=ttl)
         return 1
+    # ``add`` never extends a live counter, so without this the counter would expire ``ttl`` seconds
+    # after its creation even while streams are open, and later releases would corrupt a new one.
+    cache.touch(key, ttl)
+    return used
 
 
 @dataclass

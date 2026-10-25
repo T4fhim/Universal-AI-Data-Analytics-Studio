@@ -219,8 +219,9 @@ jobs:
         # suites are parametrized over an in-memory fake and a real MinIO, so they count
         # twice) and 1913 at 3.6 (the API surface: resources, stage routers, upload, the IDOR walk,
         # the OpenAPI contract, Schemathesis -- 34 fuzzed read operations plus a real-id smoke) and
-        # 1999 at 3.7 streaming (+86: SSE framing, stream caps, the job-event loop on a fake clock,
-        # the real-ASGI stream tests and the assistant endpoint with a fake provider).
+        # 2010 at 3.7 streaming (+97: SSE framing, stream caps, the job-event loop on a fake clock,
+        # the real-ASGI stream tests, the assistant endpoint with a fake provider, and the review-fix
+        # hardening tests: slot leaks, abandoned provider threads, counter expiry, event sizes).
         # The count includes four Postgres-only tests that skip on SQLite (three race tests and 3.7's
         # server-side connection-count test, which must run in this job: it is the leak proof) and
         # the MinIO-parametrized tests, which this job runs against the container above.
@@ -234,7 +235,7 @@ jobs:
           count="$(echo "$out" | grep -oE '^[0-9]+ tests? collected' | grep -oE '^[0-9]+')"
           test -n "$count" || { echo "::error::could not read a collected-test count"; exit 1; }
           echo "collected: $count"
-          test "$count" -ge 1997 || { echo "::error::collected $count tests, expected at least 1997"; exit 1; }
+          test "$count" -ge 2008 || { echo "::error::collected $count tests, expected at least 2008"; exit 1; }
 
       - name: pytest (apps/api)
         # DJANGO_SETTINGS_MODULE comes from apps/api/pyproject.toml, not the

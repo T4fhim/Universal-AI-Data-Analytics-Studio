@@ -126,7 +126,7 @@ def test_the_response_is_an_uncached_unbuffered_event_stream_that_runs_its_close
 
     response = SseResponse(chunks(), on_close=lambda: closed.append(1))
     assert response["Content-Type"] == "text/event-stream; charset=utf-8"
-    assert response["Cache-Control"] == "no-cache, no-transform"
+    assert response["Cache-Control"] == "no-cache, no-transform, private"
     assert response["X-Accel-Buffering"] == "no"
     assert not closed
     response.close()  # runs whether or not the body was ever iterated

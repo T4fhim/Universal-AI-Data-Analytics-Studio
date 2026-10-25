@@ -29,7 +29,8 @@ DEFAULT_THROTTLES: dict[str, str] = {
     # Preview pages and column summaries each copy and hash the whole Parquet object from the
     # store: generous for a scrolling grid (2 a second), bounded for a loop.
     "preview": "120/60",
-    "assistant": "60/3600",  # 60 assistant turns per hour (3.7)
+    "assistant": "60/3600",  # 60 assistant turns per hour per user+organization (3.7)
+    "assistant_user": "120/3600",  # ... and 120 per user across all their organizations
 }
 
 
@@ -74,6 +75,10 @@ class ApiConfig:
     assistant_max_history: int = 20
     assistant_max_history_chars: int = 32_000
     assistant_turn_seconds: float = 90.0
+    # One provider call's own time limit (SDK timeout, no SDK retries), and the process-wide number of
+    # provider calls that may be in flight (each holds a thread until the call really ends).
+    assistant_provider_seconds: float = 60.0
+    assistant_max_inflight: int = 8
     assistant_max_event_bytes: int = 64 * 1024
     assistant_user_cap: int = 2
     assistant_org_cap: int = 10

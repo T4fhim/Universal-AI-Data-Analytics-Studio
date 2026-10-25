@@ -80,3 +80,43 @@ def test_create_provider_error_message_lists_the_three_valid_identifiers() -> No
     assert "anthropic" in message
     assert "gemini" in message
     assert "groq" in message
+
+
+# --- the bounded-call options the web server passes (Phase 3.7) --------------------------------
+# A server must not let one provider call hold a worker thread for the SDKs' default (about ten
+# minutes, with retries on top): ``timeout`` caps the call and turns the SDK's own retries off.
+# Without ``timeout`` every provider keeps its desktop defaults (the twins below).
+
+
+def test_anthropic_timeout_bounds_the_call_and_disables_sdk_retries() -> None:
+    bounded = create_provider("anthropic", _FAKE_ANTHROPIC_KEY, timeout=30)
+    assert bounded._client.timeout == 30 and bounded._client.max_retries == 0
+    default = create_provider("anthropic", _FAKE_ANTHROPIC_KEY)
+    assert default._client.max_retries == 2 and default._client.timeout != 30
+
+
+def test_groq_timeout_bounds_the_call_and_disables_sdk_retries() -> None:
+    bounded = create_provider("groq", _FAKE_GROQ_KEY, timeout=30)
+    assert bounded._client.timeout == 30 and bounded._client.max_retries == 0
+    default = create_provider("groq", _FAKE_GROQ_KEY)
+    assert default._client.max_retries == 1 and default._client.timeout != 30
+
+
+def test_gemini_timeout_is_passed_in_milliseconds_with_a_single_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from google import genai
+
+    seen: list[dict] = []
+
+    def fake_client(**kwargs: object) -> object:
+        seen.append(kwargs)
+        return object()
+
+    monkeypatch.setattr(genai, "Client", fake_client)
+    create_provider("gemini", _FAKE_GEMINI_KEY, timeout=30)
+    create_provider("gemini", _FAKE_GEMINI_KEY)
+    bounded, default = seen
+    assert bounded["http_options"].timeout == 30_000
+    assert bounded["http_options"].retry_options.attempts == 1
+    assert "http_options" not in default  # the twin: the desktop default is untouched

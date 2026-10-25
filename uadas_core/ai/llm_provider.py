@@ -142,10 +142,20 @@ class BaseLLMProvider(ABC):
 class AnthropicProvider(BaseLLMProvider):
     """Wraps the Anthropic SDK, translating to/from the shared LLMTurn format."""
 
-    def __init__(self, api_key: str, model: str = "claude-sonnet-4-6") -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "claude-sonnet-4-6",
+        timeout: float | None = None,
+    ) -> None:
         import anthropic
 
-        self._client = anthropic.Anthropic(api_key=api_key)
+        # ``timeout`` (a server's bound on one call) also switches the SDK's own retries off:
+        # without it a call can run for the SDK default (~10 minutes) and then be retried.
+        bounded: dict[str, Any] = (
+            {"timeout": timeout, "max_retries": 0} if timeout is not None else {}
+        )
+        self._client = anthropic.Anthropic(api_key=api_key, **bounded)
         self._model = model
         self._max_tokens = 4096
         self._anthropic = anthropic
@@ -203,14 +213,29 @@ class GeminiProvider(BaseLLMProvider):
     sent back via ``types.Part.from_function_response``.
     """
 
-    def __init__(self, api_key: str, model: str = "gemini-2.0-flash") -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "gemini-2.0-flash",
+        timeout: float | None = None,
+    ) -> None:
         from google import genai
-
-        self._client = genai.Client(api_key=api_key)
-        self._model = model
-        self._genai = genai
         from google.genai import types
 
+        # ``timeout`` (seconds; the SDK takes milliseconds) bounds one call, with a single attempt.
+        options: dict[str, Any] = (
+            {
+                "http_options": types.HttpOptions(
+                    timeout=int(timeout * 1000),
+                    retry_options=types.HttpRetryOptions(attempts=1),
+                )
+            }
+            if timeout is not None
+            else {}
+        )
+        self._client = genai.Client(api_key=api_key, **options)
+        self._model = model
+        self._genai = genai
         self._types = types
 
     def _build_tool_config(self, tool_schemas: list[dict[str, Any]]):
@@ -305,11 +330,22 @@ class GroqProvider(BaseLLMProvider):
     ``content=...``.
     """
 
-    def __init__(self, api_key: str, model: str = "openai/gpt-oss-120b") -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "openai/gpt-oss-120b",
+        timeout: float | None = None,
+    ) -> None:
         import openai
 
+        # ``timeout`` (a server's bound on one call) also turns the one SDK retry off.
+        bounded: dict[str, Any] = (
+            {"timeout": timeout, "max_retries": 0}
+            if timeout is not None
+            else {"max_retries": 1}
+        )
         self._client = openai.OpenAI(
-            api_key=api_key, base_url="https://api.groq.com/openai/v1", max_retries=1
+            api_key=api_key, base_url="https://api.groq.com/openai/v1", **bounded
         )
         self._model = model
         self._openai = openai
@@ -427,6 +463,7 @@ class OllamaProvider(BaseLLMProvider):
         api_key: str | None = None,
         model: str = "llama3.1",
         base_url: str = "http://localhost:11434",
+        timeout: float | None = None,
     ) -> None:
         # api_key accepted (and ignored) only so create_provider() can
         # construct every provider through one uniform call signature
@@ -538,7 +575,10 @@ class OllamaProvider(BaseLLMProvider):
 
 
 def create_provider(
-    provider_name: str, api_key: str, model: str | None = None
+    provider_name: str,
+    api_key: str,
+    model: str | None = None,
+    timeout: float | None = None,
 ) -> BaseLLMProvider:
     """Construct a provider by name.
 
@@ -550,6 +590,10 @@ def create_provider(
         model: Optional model override, passed through to the
             provider's constructor. ``None`` uses that provider
             class's own default (see each class's ``__init__``).
+        timeout: Optional bound, in seconds, on one provider call. A web
+            server passes it so a stuck call cannot hold a worker thread
+            for an SDK's default (about ten minutes); it also turns the SDK's
+            own retries off. ``None`` keeps each provider's desktop defaults.
 
     Raises:
         ServiceError: If ``provider_name`` is not recognized.
@@ -557,6 +601,8 @@ def create_provider(
     kwargs: dict[str, Any] = {"api_key": api_key}
     if model is not None:
         kwargs["model"] = model
+    if timeout is not None:
+        kwargs["timeout"] = timeout
 
     if provider_name == "anthropic":
         return AnthropicProvider(**kwargs)

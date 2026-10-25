@@ -31,12 +31,18 @@ def _parse(rate: str) -> tuple[int, int]:
     return int(count), int(window)
 
 
-def _key(scope: str, user_id: uuid.UUID | str, org_id: uuid.UUID | str) -> str:
-    return f"{_PREFIX}:{scope}:{user_id}:{org_id}"
+def _key(scope: str, user_id: uuid.UUID | str, org_id: uuid.UUID | str | None) -> str:
+    return f"{_PREFIX}:{scope}:{user_id}:{org_id or 'all'}"
 
 
-def enforce(scope: str, user_id: uuid.UUID | str, org_id: uuid.UUID | str) -> None:
-    """Count one call of ``scope`` for this user in this organization; ``429`` past the rate."""
+def enforce(
+    scope: str, user_id: uuid.UUID | str, org_id: uuid.UUID | str | None = None
+) -> None:
+    """Count one call of ``scope`` for this user in this organization; ``429`` past the rate.
+
+    ``org_id=None`` counts the user across *all* their organizations (a user can belong to many, so a
+    per-organization budget alone multiplies by that number).
+    """
     limit, window = _parse(api_config().rate_for(scope))
     key = _key(scope, user_id, org_id)
     cache.add(key, 0, timeout=window)  # no-op while the window is open

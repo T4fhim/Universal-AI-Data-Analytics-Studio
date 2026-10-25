@@ -51,6 +51,7 @@ class Conn:
         api: Api | None = None,
         body: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        wait_head: bool = True,
     ) -> Conn:
         conn = cls()
         raw = json.dumps(body).encode() if body is not None else b""
@@ -88,6 +89,8 @@ class Conn:
         conn._task = asyncio.ensure_future(
             application()(scope, conn._incoming.get, conn._outgoing.put)  # type: ignore[arg-type]
         )
+        if not wait_head:  # the caller will disconnect before the response head exists
+            return conn
         start = await conn._next()
         assert start["type"] == "http.response.start", start
         conn.status = start["status"]

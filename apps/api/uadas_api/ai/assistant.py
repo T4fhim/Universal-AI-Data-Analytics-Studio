@@ -29,8 +29,9 @@ Other rules:
 
 from __future__ import annotations
 
+import json
 import logging
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -77,12 +78,56 @@ def is_configured() -> bool:
     return bool(settings.UADAS_ASSISTANT.get("provider"))
 
 
-def make_provider() -> BaseLLMProvider:
-    """A fresh provider for one turn, built from the deployment's settings. The test seam."""
+def make_provider(timeout: float | None = None) -> BaseLLMProvider:
+    """A fresh provider for one turn, built from the deployment's settings. The test seam.
+
+    ``timeout`` bounds the SDK call (and switches its retries off): the call runs in a thread that
+    nothing can interrupt, so the bound must live in the SDK.
+    """
     config = settings.UADAS_ASSISTANT
     return create_provider(
-        config["provider"], config["api_key"], config["model"] or None
+        config["provider"], config["api_key"], config["model"] or None, timeout=timeout
     )
+
+
+def to_jsonable(value: Any, depth: int = 0) -> Any:
+    """``value`` as plain JSON types: SDK containers (protobuf maps/lists) become dicts/lists.
+
+    Gemini hands back nested arguments as protobuf composites that are neither ``dict`` nor ``list``;
+    without this a perfectly good proposal fails to serialise and is silently dropped. Anything that
+    is not a container or a JSON scalar becomes its ``str`` (bounded), and nesting is capped.
+    """
+    if depth > 12:
+        return None
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, Mapping):
+        return {str(k): to_jsonable(v, depth + 1) for k, v in value.items()}
+    if isinstance(value, Iterable) and not isinstance(value, (bytes, bytearray)):
+        return [to_jsonable(v, depth + 1) for v in value]
+    return str(value)[:200]
+
+
+def split_message(text: str, max_event_bytes: int) -> list[str]:
+    """Split ``text`` into parts whose *encoded* event stays under ``max_event_bytes``.
+
+    Frames use ``ensure_ascii`` JSON, so a character costs 1 byte (plain ASCII), 6 (``\\uXXXX``) or 12
+    (a non-BMP character such as an emoji is a surrogate pair): 8,000 emoji are ~96 KB. Splitting by
+    character count alone therefore overflowed the event cap; this counts what is really sent
+    (leaving 512 bytes for the frame's own fields) and never exceeds :data:`MESSAGE_PART_CHARS`.
+    """
+    budget = max(64, max_event_bytes - 512)
+    parts: list[str] = []
+    start = used = 0
+    for index, char in enumerate(text):
+        cost = len(json.dumps(char)) - 2
+        if used + cost > budget or index - start >= MESSAGE_PART_CHARS:
+            parts.append(text[start:index])
+            start, used = index, 0
+        used += cost
+    if start < len(text):
+        parts.append(text[start:])
+    return parts
 
 
 def build_user_content(message: str, history: Sequence[tuple[str, str]]) -> str:
@@ -108,9 +153,9 @@ def propose(provider: BaseLLMProvider, content: str) -> Proposal:
     turn: LLMTurn
     turn, _raw = provider.send(history, SYSTEM_PROMPT, schemas)
     calls = [
-        ProposedCall(call.call_id[:128], call.name, dict(call.arguments))
+        ProposedCall(str(call.call_id)[:128], call.name, to_jsonable(call.arguments))
         for call in turn.tool_calls
-        if call.name in known and isinstance(call.arguments, dict)
+        if call.name in known and isinstance(call.arguments, Mapping)
     ]
     return Proposal(turn.text, calls, dropped=len(turn.tool_calls) - len(calls))
 

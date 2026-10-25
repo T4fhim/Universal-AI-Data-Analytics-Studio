@@ -79,11 +79,15 @@ _OPENAPI["parameters"] = [
 
 def _open(
     request: HttpRequest, org_id: uuid.UUID, project_id: uuid.UUID, job_id: uuid.UUID
-) -> tuple[events.JobSnapshot, uuid.UUID, StreamLease | None]:
+) -> tuple[uuid.UUID, bool]:
     """Everything that needs the database before the stream starts, then the connection is closed.
 
-    Returns the first snapshot, the caller's user id and (unless the client already holds the
-    terminal event) a stream-cap lease. Raises ``401``/``404``/``429`` through the usual envelope.
+    Returns the caller's user id and whether the client already holds the job's terminal event
+    (``Last-Event-ID``): then there is nothing to stream. Raises ``401``/``404`` through the usual
+    envelope. It takes **no stream-cap lease**: this runs in a worker thread, and a handler that
+    Django cancels (the client left) drops the thread's result, so a lease taken here would never be
+    released. The lease is taken in the async body, with no ``await`` between taking it and handing it
+    to the response.
     """
     try:
         membership = member(request, org_id, Role.VIEWER)
@@ -97,17 +101,8 @@ def _open(
             and _LAST_EVENT_ID.fullmatch(last)
             and int(last) >= snapshot.event_id
         ):
-            return snapshot, membership.user_id, None
-        config = api_config()
-        lease = acquire(
-            "job",
-            membership.user_id,
-            membership.organization_id,
-            user_cap=config.stream_user_cap,
-            org_cap=config.stream_org_cap,
-            max_seconds=config.sse_max_seconds,
-        )
-        return snapshot, membership.user_id, lease
+            return membership.user_id, True
+        return membership.user_id, False
     finally:
         release_connections()
 
@@ -155,12 +150,22 @@ async def _member(user_id: uuid.UUID, organization_id: uuid.UUID) -> bool:
 async def jobs_events(
     request: HttpRequest, org_id: uuid.UUID, project_id: uuid.UUID, job_id: uuid.UUID
 ) -> HttpResponseBase:
-    _first, user_id, lease = await sync_to_async(_open)(
+    user_id, already_done = await sync_to_async(_open)(
         request, org_id, project_id, job_id
     )
-    if lease is None:
+    if already_done:
         return HttpResponse(status=204)
     config = api_config()
+    # No ``await`` from here to the return: the lease is owned by the response (its generator's
+    # ``finally`` and ``on_close``) the moment it exists, so a cancelled handler cannot leak it.
+    lease = acquire(
+        "job",
+        user_id,
+        org_id,
+        user_cap=config.stream_user_cap,
+        org_cap=config.stream_org_cap,
+        max_seconds=config.sse_max_seconds,
+    )
     stream = events.job_event_stream(
         read=partial(_read, org_id, project_id, job_id),
         still_member=partial(_member, user_id, org_id),
