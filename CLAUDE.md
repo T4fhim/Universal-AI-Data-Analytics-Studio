@@ -76,7 +76,7 @@ whatever the tool defaults to:
 black --check uadas_core/ tests/ scripts/
 isort --check-only uadas_core/ tests/ scripts/
 bandit -r uadas_core -q --skip B101,B107,B608   # same skips as CI (rationale in ci.yml's bandit step)
-PYTHONPATH=apps/api lint-imports                  # the 6 .importlinter contracts (PYTHONPATH finds uadas_api)
+PYTHONPATH=apps/api lint-imports                  # the 7 .importlinter contracts (PYTHONPATH finds uadas_api)
 ```
 
 `mypy` is **not** run repo-wide — it's scoped to an explicit, curated list of packages/modules that

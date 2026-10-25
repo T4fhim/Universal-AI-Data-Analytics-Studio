@@ -173,3 +173,27 @@ ignore_imports =
     uadas_core.bootstrap -> uadas_core.jobs.job_runner
     uadas_core.bootstrap -> uadas_core.jobs.thread_pool_executor_job_runner
     uadas_core.bootstrap -> uadas_core.plugins.plugin_manager
+
+# Phase 3.8 (the raw-SQL capability is deliberately NOT exposed): `uadas_core.database` holds the
+# external-database connectors, whose `execute_query` runs caller-supplied SQL against a database
+# the *user* names (gated in the core by `allow_arbitrary_queries`, False by default). Nothing in the
+# web API calls it today, and this contract is the gate that keeps it that way: an API route, task
+# or assistant tool that wants to run SQL must first change this contract, which puts the change in
+# a reviewer's path. Building the capability later needs, at minimum, a read-only database role, a
+# statement_timeout, and a directed manual security review (CI's bandit skips B608, so SQL
+# construction has no automated gate) -- see docs/PROJECT_STATUS_2026-10-23.md section 3.B.
+#
+# `allow_indirect_imports = True` on purpose (as in `readers-only-in-the-sandbox-child`): the
+# composition root `uadas_api.core_bridge` legitimately reaches `uadas_core.database` *through* the
+# core's bootstrap (`DatabaseConnectionService` is a session service), so a transitive chain is
+# expected and harmless; what the contract forbids is API code importing the connectors directly.
+# The runtime-independent twin in tests/test_sql_capability_boundary.py also catches the forms a
+# static import graph cannot see (`importlib.import_module("uadas_core.database...")`).
+[importlinter:contract:api-avoids-raw-sql-connectors]
+name = uadas_api must not import uadas_core.database (raw-SQL execute_query is not exposed)
+type = forbidden
+source_modules =
+    uadas_api
+forbidden_modules =
+    uadas_core.database
+allow_indirect_imports = True

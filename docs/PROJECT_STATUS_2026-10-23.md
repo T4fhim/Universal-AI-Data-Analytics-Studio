@@ -61,6 +61,7 @@ Deferred and documented in [plans/phase-3-7-streaming.md](../plans/phase-3-7-str
 ### B. The rest of 3.8 (security)
 - **Per-tenant quotas**: rows, storage bytes, job minutes, LLM tokens. Model a `Quota`/usage counter per organization, check in upload, job enqueue and assistant; return a closed `quota_exceeded` code; test with a positive twin.
 - **Raw-SQL `execute_query` capability**: only behind an explicit capability flag, against a **read-only DB role**, with statement timeouts; add a directed manual security review (CI bandit skips B608, so SQL construction has no automated gate).
+  - **3.8 SQL capability — decided, nothing built.** The capability is deliberately *not exposed*: no API route, task or assistant tool reaches `uadas_core.database` (`allow_arbitrary_queries` stays `False`). The gate is the `.importlinter` contract `api-avoids-raw-sql-connectors` (direct imports), with `apps/api/tests/test_sql_capability_boundary.py` running it against the real tree and a synthetic tree, plus a source scan for string-path / by-name use (each with a positive twin). Building it later requires, at minimum, a read-only DB role, a `statement_timeout` and a manual security review — and an explicit change to that contract.
 - **Stateful Schemathesis** (currently a GET smoke): authenticated, org-scoped, small and non-flaky.
 - Already done from 3.8: plugin loader off in server mode, secrets env-only, parser sandbox, size caps.
 
@@ -86,7 +87,7 @@ Follow plan lines ~290–301: **4.1** generate the TS client from `apps/api/open
 Phase 5 features F1–F10 (provenance graph, replayable recipes, time-travel, expertise-adaptive UI, assumption sentinel, AI-proposes-never-mutates, living reports, semantic typing, graph-anchored collaboration, in-browser privacy mode) — each needs written acceptance criteria first; F10 is the riskiest, prototype before committing. Phase 6: Docker self-host, hosted instance, Sentry, OpenTelemetry, security policy, CONTRIBUTING.
 
 ## 4. Rules that must keep holding
-- No Qt anywhere; `uadas_core` never imports Django or `uadas_api` (import-linter, 6 contracts: `PYTHONPATH=apps/api lint-imports`).
+- No Qt anywhere; `uadas_core` never imports Django or `uadas_api` (import-linter, 7 contracts: `PYTHONPATH=apps/api lint-imports`).
 - Never import a reader/parsing library in web or worker code — parsing happens only in `python -I -m uadas_api.sandbox.child`.
 - Every route: `member(request, org_id, role)` first, resolve ids with `for_organization` + the path's project, give it an `operation_id`, regenerate `openapi.json` (`cd apps/api && python -m uadas_api.web.openapi`); the IDOR walk covers it automatically.
 - Object storage only through `uadas_api.storage.store.get_store()`; never write to an existing key; delete only after the swap commits.
