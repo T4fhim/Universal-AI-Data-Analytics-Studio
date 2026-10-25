@@ -1,0 +1,30 @@
+# Build context for apps/api/Dockerfile (the context is the repository root).
+#
+# An ALLOW-list, not a deny-list: everything is excluded first and only what the image
+# installs is let back in, so a new top-level directory (a dataset, an export, a graph,
+# an agent worktree, a stray .env) can never reach the image or the Docker daemon by
+# accident. In particular none of these can get in: .git, .venv, node_modules, .claude,
+# graphify-out, logs/, projects/, exports/, tests and their data, *.sqlite3,
+# config/config.yaml, and any .env* / *.pem / *.key file.
+*
+
+# Runtime dependency list + the two distributions the image installs (non-editable, into
+# site-packages: the sandbox child runs `python -I`, which ignores PYTHONPATH).
+!requirements.txt
+!pyproject.toml
+!README.md
+!uadas_core/
+!apps/api/pyproject.toml
+!apps/api/manage.py
+!apps/api/uadas_api/
+
+# Re-excluded inside the allowed directories.
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
+**/*.sqlite3
+**/*.sqlite3-journal
+**/.env
+**/.env.*
+**/*.pem
+**/*.key

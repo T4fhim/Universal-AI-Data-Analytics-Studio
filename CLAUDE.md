@@ -33,16 +33,20 @@ into [assets/ui-contract/](assets/ui-contract/) (start with `ui-behaviour-rules.
 ## Commands
 
 There is no build step (pure Python). Environment: Python 3.13, dependencies in
-[requirements.txt](requirements.txt) (runtime and pinned dev-tool versions in one file — there is no
-separate `requirements-dev.txt`), a `.venv` already present at the repo root. Tool configuration
+[requirements.txt](requirements.txt) (runtime only: it is what the server image installs) and
+[requirements-dev.txt](requirements-dev.txt) (`-r requirements.txt` plus the pinned dev tools), a `.venv`
+already present at the repo root. Tool configuration
 (`black`, `isort`, `mypy`, `ruff`, `bandit`, `pytest`) lives in `pyproject.toml`.
 
 ```powershell
 # activate the existing venv (PowerShell)
 .venv\Scripts\Activate.ps1
 
-# install/sync dependencies
-pip install -r requirements.txt
+# install/sync dependencies (runtime + dev tools)
+pip install -r requirements-dev.txt
+
+# the whole web stack in containers (Docker): see apps/api/README.md "Run the whole stack"
+docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
 
 ```
 
@@ -68,7 +72,7 @@ requests. Reproduce a CI failure on the exact dependency set with a clean virtua
 
 ### Formatting, linting, types, security
 
-Versions are pinned in `requirements.txt` (`black==26.5.1`, `isort==8.0.1`, `mypy==2.1.0`,
+Versions are pinned in `requirements-dev.txt` (`black==26.5.1`, `isort==8.0.1`, `mypy==2.1.0`,
 `ruff==0.16.3`, `bandit==1.9.4`) and enforced in CI (`.github/workflows/ci.yml`), not left to
 whatever the tool defaults to:
 

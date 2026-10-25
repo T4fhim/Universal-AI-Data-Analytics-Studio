@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 # acquires a web-framework dependency -- see plans/phase-3-readiness.md ruling 1. It
 # depends on the root distribution (install both: `pip install -e . -e apps/api`).
 # There is deliberately no uv workspace yet: the root distribution's dependencies are
-# `requirements.txt`, which still mixes runtime and dev tools.
+# `requirements.txt` (runtime only; the dev tools are in `requirements-dev.txt`).
 [project]
 name = "uadas-api"
 version = "0.0.0"
@@ -56,6 +56,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The production WSGI server (apps/api/Dockerfile installs `apps/api[server]`). WSGI, not ASGI:
+# under ASGI Django spools a whole request body before any handler runs, so the upload and
+# JSON body caps (README, "Resource routes") could not act first. gunicorn is POSIX-only.
+server = [
+    "gunicorn>=23,<27",
+]
 dev = [
     "pytest-django",
     "pytest-cov",

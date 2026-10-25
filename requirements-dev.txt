@@ -1,0 +1,28 @@
+# Developer and CI tooling: the runtime set (requirements.txt) plus the pinned tools that
+# test, format, lint, type-check and security-scan it. Split out of requirements.txt in the
+# Phase 3 close-out so a server image (apps/api/Dockerfile) installs runtime dependencies
+# only -- no pytest, linters, type checkers or pre-commit in a container that parses hostile files.
+#
+#   pip install -r requirements-dev.txt
+#
+# The API's own test tools (pytest-django, django-stubs, schemathesis) stay in the `dev`
+# extra of apps/api/pyproject.toml: `pip install -e . -e "apps/api[dev]"`.
+-r requirements.txt
+
+pytest
+black==26.5.1
+isort==8.0.1
+mypy==2.1.0
+ruff==0.16.3
+# The standalone git pre-commit hook framework (see .pre-commit-config.yaml). Added
+# 2026-09-01 -- distinct from .claude/hooks/*.ps1, which only
+# fire inside a Claude Code session; this is the tool-agnostic enforcement layer for
+# commits made from a plain terminal, another editor, or another machine.
+pre-commit==4.6.2
+
+bandit==1.9.4
+# Desktop->web transition Phase 1: enforces the `.importlinter` contract that the
+# Qt-free carve-out packages (the future `uadas_core`) never import PySide6/PyQt
+# or Django. Pinned like the other lint tools above; run via `lint-imports`, and
+# wired into CI's `lint` job in the same commit as Phase 1.1's `git mv`.
+import-linter==2.15

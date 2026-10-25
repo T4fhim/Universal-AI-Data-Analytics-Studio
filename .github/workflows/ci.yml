@@ -37,12 +37,16 @@ jobs:
         with:
           python-version: "3.13"
           cache: "pip"
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
 
       - name: OS deps for pyodbc / python-magic
         run: sudo apt-get update && sudo apt-get install -y unixodbc-dev libmagic1
 
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+        # requirements-dev.txt = requirements.txt (runtime) + the pinned dev tools (pytest, mypy ...).
+        run: python -m pip install -r requirements-dev.txt
 
       - name: Assert no Qt binding or Django is importable
         # Now the primary runtime proof that the core is Qt-free, alongside the
@@ -139,6 +143,7 @@ jobs:
           cache: "pip"
           cache-dependency-path: |
             requirements.txt
+            requirements-dev.txt
             apps/api/pyproject.toml
 
       - name: OS deps for pyodbc / python-magic and the sandboxed parser
@@ -165,8 +170,9 @@ jobs:
 
       - name: Install dependencies
         # The root distribution (uadas_core) plus the API in editable mode, with its
-        # `dev` extra (pytest-django, pytest-cov, django-stubs).
-        run: python -m pip install -r requirements.txt -e . -e "apps/api[dev]"
+        # `dev` extra (pytest-django, pytest-cov, django-stubs). requirements-dev.txt carries the
+        # runtime set plus the pinned dev tools (mypy and bandit run in this job).
+        run: python -m pip install -r requirements-dev.txt -e . -e "apps/api[dev]"
 
       - name: Start MinIO (a real S3-compatible store for the storage tests)
         # Phase 3.4: `test_storage_*` run against an in-memory fake by default, and against
@@ -349,7 +355,7 @@ jobs:
           cache: "pip"
 
       - name: Install lint tools
-        # Versions kept in sync with requirements.txt (and therefore with
+        # Versions kept in sync with requirements-dev.txt (and therefore with
         # .pre-commit-config.yaml and the local hooks). If a pin changes there,
         # change it here too. import-linter provides `lint-imports`; grimp analyses
         # uadas_core statically, so none of its runtime deps need installing here.

@@ -52,7 +52,7 @@ Python 3.13. A `.venv` is expected at the repo root.
 ```bash
 python -m venv .venv
 .venv/Scripts/Activate.ps1        # PowerShell;  source .venv/bin/activate on POSIX
-pip install -r requirements.txt   # or: uv sync   (uv.lock is committed)
+pip install -r requirements-dev.txt   # runtime + dev tools (requirements.txt is runtime only); or: uv sync   (uv.lock is committed)
 pip install -e .                  # editable install of the `uadas_core` package
 
 pre-commit install                # activates the tool-agnostic commit hooks

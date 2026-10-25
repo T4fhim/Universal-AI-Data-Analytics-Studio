@@ -25,8 +25,10 @@ database-free. `AUTH_USER_MODEL = "accounts.User"`. Decisions and limits:
 From the repository root, in a Python 3.13 virtualenv:
 
 ```bash
-pip install -r requirements.txt -e . -e apps/api
-# development tools (pytest-django, coverage, django-stubs):
+pip install -r requirements.txt -e . -e apps/api       # runtime only (what the server image installs)
+# development tools: the pinned linters/type checker/pytest (requirements-dev.txt = requirements.txt
+# + dev tools), then the API's test tools (pytest-django, coverage, django-stubs, schemathesis):
+pip install -r requirements-dev.txt
 pip install -e "apps/api[dev]"
 ```
 
@@ -45,6 +47,46 @@ a container that forgot to choose settings fails closed.
 
 Settings modules: `base` (shared; no insecure defaults), `dev`, `test`, `prod`. Choose one
 with `DJANGO_SETTINGS_MODULE`.
+
+## Run the whole stack (Docker)
+
+The Phase 3 verification line: `docker compose up` gives a working stack, proven by a scripted smoke.
+Everything runs from one image, built from the repository root with [`apps/api/Dockerfile`](Dockerfile)
+(python:3.13-slim, runtime requirements only, non-root uid 10001, a `/api/health` `HEALTHCHECK`, gunicorn
+WSGI because the body caps cannot act first under ASGI).
+
+**Try it locally** (Docker only; no `.env`, no TLS; throwaway credentials; **not for production**):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml up --build -d
+python scripts/compose_smoke.py          # stdlib only; exits non-zero on the first failing step
+docker compose -f docker-compose.yml -f docker-compose.local.yml down        # keep the data (-v wipes it)
+```
+
+The API is then on `http://127.0.0.1:8000` (`/api/health`). Nothing else is published: PostgreSQL, Redis
+and the bundled MinIO live on an internal network, so this runs beside `docker-compose.dev.yml` without
+a port clash. The override runs `uadas_api.settings.dev` (prod refuses plain http); the sandbox, job and
+quota limits are the production ones. Services: `postgres`, `redis`, `minio` + `minio-init` (creates the
+bucket), `migrate` (one-shot, runs on every `up`), `api`, `worker`, `beat` (exactly one).
+
+**First user, by hand** (what the smoke does): `GET /api/auth/browser/v1/config` (sets the `csrftoken`
+cookie), then `POST /api/auth/browser/v1/auth/signup` with `{"email", "password"}` and an `X-CSRFToken`
+header. The signup creates a personal organization (`GET /api/me`); upload with `POST
+/api/organizations/{org}/projects/{project}/datasets/upload`, poll `.../jobs/{job_id}`, then
+`.../datasets/{id}/preview`. The verification mail is printed to the api's log
+(`docker compose logs api`), and sign-in does not wait for it in this mode.
+
+**Production-shaped** (`docker-compose.yml` alone): `cp .env.example .env`, fill in every value (the file lists
+every variable the stack reads and has no usable secret), then `docker compose up --build -d`. Settings are
+`uadas_api.settings.prod`, so an unedited or weak `.env` fails closed at start-up. Not in the file, on
+purpose: **TLS** (put a reverse proxy on the host in front of `127.0.0.1:8000`; it must set and strip
+`X-Forwarded-Proto`, cap the body and not buffer `text/event-stream`) and **the object store** (prod
+requires an `https://` endpoint and real credentials, so point `STORAGE_*` at S3, R2 or a TLS MinIO). Sandbox
+isolation is `SANDBOX_NETWORK_ISOLATION=unshare` (the child's own network namespace, verified by the code,
+parse refused if it fails) plus `SANDBOX_ISOLATION_ACKNOWLEDGED=container`; the worker therefore runs with
+`seccomp=unconfined` (still non-root, no capabilities). The separate network-less sandbox container
+sketched in `docker-compose.dev.yml` is still not built. Report downloads use presigned URLs that point at
+`STORAGE_ENDPOINT_URL`: with the bundled in-network MinIO a browser cannot reach them.
 
 ## Environment variables
 

@@ -1,3 +1,9 @@
+# RUNTIME dependencies only -- this is what the server image (apps/api/Dockerfile) and the
+# root distribution's `dependencies` (pyproject.toml) install. Developer tooling (pytest,
+# black, isort, mypy, ruff, bandit, import-linter, pre-commit) lives in requirements-dev.txt,
+# which includes this file. Keep this file free of `-r` includes and inline `#` comments:
+# setuptools reads it as the distribution's dependency list.
+#
 # Capped below 3 on purpose. Until Phase 2.5 the project resolved pandas 2.3.x only because
 # ydata-profiling / numba / dask (all since dropped) capped it; removing them let a fresh
 # install resolve pandas 3.0 (and numpy 2.5, scipy 1.18), a major version with breaking
@@ -78,20 +84,3 @@ rich
 # markdown_it. It has been importable in this venv only as rich's own
 # dependency, which is fragile -- a future rich upgrade could drop it.
 markdown-it-py
-pytest
-black==26.5.1
-isort==8.0.1
-mypy==2.1.0
-ruff==0.16.3
-# The standalone git pre-commit hook framework (see .pre-commit-config.yaml). Added
-# 2026-09-01 -- distinct from .claude/hooks/*.ps1, which only
-# fire inside a Claude Code session; this is the tool-agnostic enforcement layer for
-# commits made from a plain terminal, another editor, or another machine.
-pre-commit==4.6.2
-
-bandit==1.9.4
-# Desktop->web transition Phase 1: enforces the `.importlinter` contract that the
-# Qt-free carve-out packages (the future `uadas_core`) never import PySide6/PyQt
-# or Django. Pinned like the other lint tools above; run via `lint-imports`, and
-# wired into CI's `lint` job in the same commit as Phase 1.1's `git mv`.
-import-linter==2.15
