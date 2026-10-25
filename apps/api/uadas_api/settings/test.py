@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import dj_database_url
 
-from . import _assistant, _auth, _jobs, _storage
+from . import _assistant, _auth, _jobs, _quota, _storage
 from .base import *  # noqa: F403 - the settings split is a star-import by design
 
 DEBUG = False
@@ -55,3 +55,8 @@ globals().update(_jobs.celery_settings(UADAS_JOBS))
 # The assistant is unconfigured in the suite (a developer's ASSISTANT_* cannot reach a real provider
 # from a test); tests that need one set `settings.UADAS_ASSISTANT` and patch the provider factory.
 UADAS_ASSISTANT = _assistant.parse_assistant({})
+
+# Quotas are unlimited in the suite and never read from the environment (a developer's QUOTA_*
+# cannot change a test's outcome); tests that exercise a limit set `settings.UADAS_QUOTA` or give
+# the organization an `OrganizationQuota` row.
+UADAS_QUOTA = _quota.parse_quota({})

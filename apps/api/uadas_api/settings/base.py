@@ -26,7 +26,7 @@ from typing import Any
 import dj_database_url
 from corsheaders.defaults import default_headers
 
-from . import _assistant, _auth, _jobs, _storage
+from . import _assistant, _auth, _jobs, _quota, _storage
 from ._env import get_bool, get_choice, get_list, get_str
 
 # apps/api/ -- the directory holding manage.py. Anchored on this file, never on the
@@ -81,6 +81,8 @@ INSTALLED_APPS: list[str] = [
     # sandbox (`uadas_api.sandbox`) is deliberately NOT an app: it has no models and must
     # stay importable without Django (the child process never loads it).
     "uadas_api.jobs",
+    # 3.8: per-organization quotas (limit overrides, the usage ledger and its counters).
+    "uadas_api.quotas",
 ]
 
 MIDDLEWARE: list[str] = [
@@ -266,3 +268,11 @@ CORS_ALLOW_HEADERS: tuple[str, ...] = (*default_headers, "last-event-id")
 # The AI assistant's provider, from the deployment environment only (see settings/_assistant.py).
 # Unconfigured = the endpoint answers 503. The key never appears in a request, a row or a log.
 UADAS_ASSISTANT: dict[str, Any] = _assistant.parse_assistant(os.environ)
+
+# --- per-tenant quotas (3.8) ----------------------------------------------------------
+
+# The deployment-wide default limit on each resource an organization consumes (rows, stored bytes,
+# job seconds per month, LLM tokens per month); ``None`` is unlimited. A ``quotas.OrganizationQuota``
+# row overrides it for one organization. `dev` / `test` leave it unlimited, `prod` refuses to start
+# unless every limit is stated or unlimited is acknowledged (see settings/_quota.py).
+UADAS_QUOTA: dict[str, Any] = _quota.parse_quota(os.environ)

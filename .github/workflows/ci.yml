@@ -321,6 +321,9 @@ jobs:
           # these are the operator's statements a real deployment would make for its container).
           SANDBOX_ISOLATION_ACKNOWLEDGED: container
           SANDBOX_NETWORK_ISOLATION: container
+          # Required since 3.8: production states a limit for every quota or says unlimited is
+          # intended (the CI instance is a throwaway, so it says so).
+          QUOTA_UNLIMITED_ACKNOWLEDGED: "true"
           STORAGE_BUCKET: uadas-ci-data
           STORAGE_ENDPOINT_URL: https://objects.example.com
           STORAGE_ACCESS_KEY_ID: ci-key-4f7q2m9xj3kd8tlp

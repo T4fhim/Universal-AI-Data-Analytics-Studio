@@ -18,6 +18,7 @@ same organization. :meth:`ModelFactory.create` is ``build`` plus ``save``.
 
 from __future__ import annotations
 
+import datetime
 import itertools
 import uuid
 from collections.abc import Callable
@@ -28,6 +29,8 @@ from uadas_api.accounts.models import AuditEvent, Organization, User
 from uadas_api.exports.models import Report
 from uadas_api.jobs.models import Job
 from uadas_api.pipeline.models import PipelineEdge, PipelineNode, Recipe
+from uadas_api.quotas.choices import UsageKind
+from uadas_api.quotas.models import OrganizationQuota, UsageCounter, UsageLedger
 from uadas_api.storage.models import OrphanedObject, WorkspaceHead
 from uadas_api.tenancy import TenantOwnedModel
 from uadas_api.workspaces.models import ChartSpec, Dashboard, DatasetRecord, Project
@@ -226,3 +229,31 @@ def _report(organization: Organization, **kw: Any) -> Report:
     kw.setdefault("status", "pending")
     kw.setdefault("config", {})
     return Report(organization=organization, project=project, **kw)
+
+
+@register(OrganizationQuota)
+def _organization_quota(organization: Organization, **kw: Any) -> OrganizationQuota:
+    # Consecutive rows get different kinds (the table is unique per organization and kind).
+    kw.setdefault("kind", UsageKind.values[next(_counter) % len(UsageKind.values)])
+    kw.setdefault("limit", 1000)
+    return OrganizationQuota(organization=organization, **kw)
+
+
+@register(UsageCounter)
+def _usage_counter(organization: Organization, **kw: Any) -> UsageCounter:
+    kw.setdefault("kind", "rows")
+    # A distinct month per row, so two counters of one organization never collide by default.
+    kw.setdefault(
+        "period_start",
+        datetime.date(2000, 1, 1) + datetime.timedelta(days=next(_counter)),
+    )
+    return UsageCounter(organization=organization, **kw)
+
+
+@register(UsageLedger)
+def _usage_ledger(organization: Organization, **kw: Any) -> UsageLedger:
+    kw.setdefault("kind", "rows")
+    kw.setdefault("source_key", f"test:{uuid.uuid4()}")
+    kw.setdefault("amount", 1)
+    kw.setdefault("period_start", datetime.date(1970, 1, 1))
+    return UsageLedger(organization=organization, **kw)

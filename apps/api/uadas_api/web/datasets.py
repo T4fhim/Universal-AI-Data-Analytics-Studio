@@ -55,6 +55,7 @@ from uadas_api.web.errors import ApiError, not_found, responses
 from uadas_api.web.idempotency import IdempotencyKeyHeader
 from uadas_api.web.pagination import Page, PageParams, paginate
 from uadas_api.web.scope import in_project, member, project_of, scoped, user_of
+from uadas_api.web.uploads import UploadHold, take_hold
 from uadas_api.workspaces.models import DatasetRecord, Project
 from uadas_core.data_table.column_formatters import format_value
 
@@ -342,7 +343,11 @@ def datasets_upload(
     actor = user_of(membership)
     # The upload throttle is counted by the upload handler *before* the body is parsed
     # (uadas_api/web/uploads.py), so a refused or throttled request never costs a temp file.
-    return _accept_upload(project, actor, file, idempotency_key)
+    # The stored-bytes hold the upload handler placed before the body was spooled: committed
+    # below when the upload becomes a dataset, released by the request's close otherwise.
+    return _accept_upload(
+        project, actor, file, idempotency_key, hold=take_hold(request)
+    )
 
 
 def _replayed_upload(
@@ -373,6 +378,7 @@ def _accept_upload(
     actor: Any,
     upload: UploadedFile,
     idempotency_key: str | None = None,
+    hold: UploadHold | None = None,
 ) -> Status[UploadAcceptedOut]:
     name = (upload.name or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
     if not name or not upload.size:
@@ -442,6 +448,8 @@ def _accept_upload(
     except Exception:
         _retire(project.organization_id, store, original_key)
         raise
+    if hold is not None:
+        hold.commit(dataset_id)  # the bytes now belong to the dataset's ledger key
     return Status(
         202,
         UploadAcceptedOut(

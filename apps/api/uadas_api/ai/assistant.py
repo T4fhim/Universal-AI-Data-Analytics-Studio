@@ -22,6 +22,14 @@ Other rules:
 * **Provider errors are sanitised**: the SDK wrappers put ``str(exc)`` (which can hold a key
   fragment, a URL or a prompt) in their messages, so :func:`classify` maps every failure to a closed
   code and nothing of the exception text leaves.
+* **Metered per organization (3.8).** The request is refused up front once the organization has
+  used up its monthly LLM-token quota (:mod:`uadas_api.web.assistant`), and what a turn really
+  cost -- the provider's own count (:class:`~uadas_core.ai.llm_provider.LLMUsage`), or a
+  characters-over-four estimate if a provider reports none, so an unreporting provider cannot be
+  an unmetered road -- is charged after the call by :func:`charge_turn`. Output size is not known
+  until the model has answered, so a quota is **overshot by at most the turns in flight when it
+  is crossed** (each at most the prompt bound plus the provider's output cap, and at most the
+  organization's stream cap of them at once); the next request sees the charge and is refused.
 * **Providers do not stream tokens** (``BaseLLMProvider.send`` returns a whole turn), so the stream
   carries whole turns as ``message`` parts. Token-level streaming needs the provider layer to grow a
   streaming method and is deferred rather than faked.
@@ -31,12 +39,17 @@ from __future__ import annotations
 
 import json
 import logging
+import math
+import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from django.conf import settings
 
+from uadas_api.quotas import service as quotas
+from uadas_api.quotas.choices import UsageKind
+from uadas_api.tenancy import OrganizationRef
 from uadas_core.ai.llm_provider import BaseLLMProvider, LLMTurn, create_provider
 from uadas_core.ai.tool_registry import get_anthropic_tool_schemas
 
@@ -71,6 +84,9 @@ class Proposal:
     text: str
     calls: list[ProposedCall] = field(default_factory=list)
     dropped: int = 0  # proposals naming a tool that does not exist
+    tokens: int = (
+        0  # what the turn cost (provider-reported, else estimated); 0 only if free
+    )
 
 
 def is_configured() -> bool:
@@ -157,7 +173,40 @@ def propose(provider: BaseLLMProvider, content: str) -> Proposal:
         for call in turn.tool_calls
         if call.name in known and isinstance(call.arguments, Mapping)
     ]
-    return Proposal(turn.text, calls, dropped=len(turn.tool_calls) - len(calls))
+    return Proposal(
+        turn.text,
+        calls,
+        dropped=len(turn.tool_calls) - len(calls),
+        tokens=turn_tokens(turn, content),
+    )
+
+
+def turn_tokens(turn: LLMTurn, content: str) -> int:
+    """What ``turn`` cost: the provider's own count, else about one token per four characters.
+
+    The fallback is an estimate of the prompt (the user content; the system prompt and tool
+    schemas are a fixed few thousand more) plus the reply. It exists so that a provider that
+    reports no usage cannot be used to spend tokens without being metered; it is deliberately
+    not clever.
+    """
+    if turn.usage is not None:
+        return turn.usage.total
+    return math.ceil((len(content) + len(turn.text)) / 4)
+
+
+def charge_turn(organization_id: OrganizationRef, tokens: int) -> None:
+    """Charge ``tokens`` to the organization's monthly quota (idempotent per turn, never refused).
+
+    Charged, not reserved: the call has already happened. Each turn has its own ledger key, so a
+    retried request is a second turn and is charged as one (it did call the provider again).
+    """
+    if tokens > 0:
+        quotas.charge(
+            organization_id,
+            UsageKind.LLM_TOKENS,
+            tokens,
+            f"assistant:{uuid.uuid4()}",
+        )
 
 
 def classify(error: BaseException) -> AssistantErrorCode:

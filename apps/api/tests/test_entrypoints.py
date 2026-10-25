@@ -33,6 +33,7 @@ VALID_PROD_ENV = {
     "STORAGE_SSE": "aes256",
     "SANDBOX_ISOLATION_ACKNOWLEDGED": "container",
     "SANDBOX_NETWORK_ISOLATION": "container",
+    "QUOTA_UNLIMITED_ACKNOWLEDGED": "true",  # 3.8: production states its quotas or says unlimited is intended
     "STORAGE_BUCKET": "uadas-tenant-data",
     "STORAGE_ENDPOINT_URL": "https://objects.example.com",
     "STORAGE_ACCESS_KEY_ID": "ci-key-4f7q2m9xj3kd8tlp",

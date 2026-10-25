@@ -100,6 +100,12 @@ SETTINGS_ENV_VARS: tuple[str, ...] = (
     "ASSISTANT_PROVIDER",
     "ASSISTANT_API_KEY",
     "ASSISTANT_MODEL",
+    # 3.8: per-tenant quotas.
+    "QUOTA_MAX_ROWS",
+    "QUOTA_MAX_STORAGE_MB",
+    "QUOTA_MAX_JOB_MINUTES",
+    "QUOTA_MAX_LLM_TOKENS",
+    "QUOTA_UNLIMITED_ACKNOWLEDGED",
 )
 
 _SETTINGS_PACKAGE = "uadas_api.settings"

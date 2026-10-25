@@ -125,6 +125,22 @@ def ask(world: World, who: str = "editor", body: dict[str, Any] | None = None) -
             {"ASSISTANT_PROVIDER": "gemini", "ASSISTANT_API_KEY": "k"},
             {"provider": "gemini", "api_key": "k", "model": ""},
         ),
+        (  # OpenRouter model ids carry a vendor prefix and an optional ``:free`` style suffix
+            {
+                "ASSISTANT_PROVIDER": " OpenRouter ",
+                "ASSISTANT_API_KEY": "k",
+                "ASSISTANT_MODEL": "nvidia/nemotron-3-ultra-550b-a55b:free",
+            },
+            {
+                "provider": "openrouter",
+                "api_key": "k",
+                "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+            },
+        ),
+        (
+            {"ASSISTANT_PROVIDER": "openrouter", "ASSISTANT_API_KEY": "k"},
+            {"provider": "openrouter", "api_key": "k", "model": ""},
+        ),
     ],
 )
 def test_the_provider_settings_parse_strictly(
@@ -142,6 +158,9 @@ def test_the_provider_settings_parse_strictly(
             "ASSISTANT_API_KEY": SECRET,
         },  # a local server is not offered
         {"ASSISTANT_PROVIDER": "openai", "ASSISTANT_API_KEY": SECRET},
+        {
+            "ASSISTANT_PROVIDER": "openrouter"
+        },  # accepted with a key (above), refused without
         {"ASSISTANT_API_KEY": SECRET},  # a key with no provider
         {
             "ASSISTANT_PROVIDER": "groq",

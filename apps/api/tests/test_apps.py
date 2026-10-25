@@ -13,7 +13,16 @@ import importlib
 import pytest
 from django.apps import apps
 
-APP_LABELS = ("accounts", "workspaces", "pipeline", "ai", "exports", "storage", "jobs")
+APP_LABELS = (
+    "accounts",
+    "workspaces",
+    "pipeline",
+    "ai",
+    "exports",
+    "storage",
+    "jobs",
+    "quotas",
+)
 
 
 @pytest.mark.parametrize("label", APP_LABELS)

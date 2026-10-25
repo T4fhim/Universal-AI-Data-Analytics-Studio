@@ -16,12 +16,14 @@ import pytest
 from apihelpers import Api
 from web_support import World, error_code, make_world
 
+from uadas_api.quotas.choices import REFUSAL, UsageKind
 from uadas_api.web.errors import (
     CODE_FOR_STATUS,
     ERROR_RESPONSES,
     ApiError,
     ErrorCode,
     error_body,
+    quota_exceeded,
 )
 
 pytestmark = pytest.mark.django_db
@@ -104,3 +106,44 @@ def test_an_oversized_json_body_is_refused_before_the_handler(world: World) -> N
     assert (
         client.post(projects, {"name": "x" * 150}).status_code == 201
     )  # the twin: a normal body
+
+
+# ------------------------------------------------------------------ 3.8: quota_exceeded
+
+
+def test_quota_exceeded_is_a_closed_code_that_shares_the_429_status() -> None:
+    assert ErrorCode.QUOTA_EXCEEDED.value == "quota_exceeded"
+    # 429 keeps meaning "rate limited" unless a refusal names the quota code explicitly ...
+    assert error_body(429, "Slow down.")["error"]["code"] == "rate_limited"
+    assert (
+        error_body(429, "Used up.", code=ErrorCode.QUOTA_EXCEEDED)["error"]["code"]
+        == "quota_exceeded"
+    )
+    refusal = quota_exceeded(UsageKind.ROWS.value)
+    assert (refusal.status_code, refusal.envelope_code) == (
+        429,
+        ErrorCode.QUOTA_EXCEEDED,
+    )
+    assert str(refusal) == REFUSAL[UsageKind.ROWS.value]
+
+
+def test_the_quota_code_is_only_for_429() -> None:
+    with pytest.raises(ValueError):
+        ApiError(403, "No.", code=ErrorCode.QUOTA_EXCEEDED)
+    with pytest.raises(ValueError):
+        error_body(409, "No.", code=ErrorCode.QUOTA_EXCEEDED)
+    assert ApiError(429, "Used up.", code=ErrorCode.QUOTA_EXCEEDED).status_code == 429
+
+
+def test_the_handler_sends_the_code_the_error_carries() -> None:
+    from types import SimpleNamespace
+
+    from uadas_api.web.errors import _http_error
+
+    api = SimpleNamespace(
+        create_response=lambda request, body, status: (status, body["error"]["code"])
+    )
+    quota = quota_exceeded(UsageKind.LLM_TOKENS.value)
+    assert _http_error(None, quota, api) == (429, "quota_exceeded")  # type: ignore[arg-type]
+    plain = ApiError(429, "Too many requests; please slow down.")
+    assert _http_error(None, plain, api) == (429, "rate_limited")  # type: ignore[arg-type]

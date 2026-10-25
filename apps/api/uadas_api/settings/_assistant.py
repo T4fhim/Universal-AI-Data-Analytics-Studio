@@ -7,7 +7,7 @@ else -- never a request body, never a database row, never a log line (per-user k
 feature that needs encrypted storage). Unconfigured (no provider) is a valid state: the assistant
 endpoint then answers ``503 unavailable`` and the rest of the API is unaffected.
 
-* ``ASSISTANT_PROVIDER`` -- ``anthropic``, ``gemini`` or ``groq``. ``ollama`` (the desktop's local
+* ``ASSISTANT_PROVIDER`` -- ``anthropic``, ``gemini``, ``groq`` or ``openrouter``. ``ollama`` (the desktop's local
   server) is deliberately not offered: on a server it would be a request-driven connection to
   whatever ``localhost`` is.
 * a provider without a key, an unknown provider, or an odd-looking model name stops start-up
@@ -24,7 +24,7 @@ from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
-PROVIDERS = ("anthropic", "gemini", "groq")
+PROVIDERS = ("anthropic", "gemini", "groq", "openrouter")
 _MODEL = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._:/-]{0,99}\Z")
 
 

@@ -17,6 +17,16 @@ Design rules, in the order a job meets them:
   the same project and parameters returns the existing job (``created=False``) -- a retried
   upload request does not start a second ingest; the same key with *different* parameters is an
   :class:`IdempotencyConflictError`, never a silent reuse.
+* **Quota.** A new job is refused (:class:`~uadas_api.quotas.errors.QuotaExceededError`) once the
+  organization has used up its job time for the month; a *replay* of an existing job is not (it
+  adds no work). Time is billed when an attempt ends -- :func:`finish_succeeded`,
+  :func:`finish_failed`, :func:`finish_cancelled`, :func:`requeue_for_retry` -- **after** the
+  attempt-fenced update has won, so a superseded worker bills nothing, and under the ledger key
+  ``job:<id>:<attempt>``, so a redelivered finish bills once. Time is measured from the job's
+  ``started_at``: the run of a worker the sweeper declared lost is not billed (nobody saw it
+  end, and the job starts over), while a job taken over in place is billed from its first
+  start. Because job time is only known at the end, the limit can be overshot by the jobs
+  running when it is crossed -- never by more: the next creation sees the charge.
 * **Enqueue after commit.** The message is sent from ``transaction.on_commit``: a worker must not
   be told about a row that is not yet visible, or that rolls back. If sending fails, the row stays
   ``queued`` with no ``enqueued_at`` and :func:`sweep_stale` sends it again.
@@ -35,6 +45,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -66,6 +77,8 @@ from uadas_api.jobs.models import (
     validate_idempotency_key,
 )
 from uadas_api.jobs.registry import get_handler
+from uadas_api.quotas import service as quotas
+from uadas_api.quotas.choices import UsageKind
 from uadas_api.sandbox.runner import reap_workspaces
 from uadas_api.tenancy import OrganizationRef
 from uadas_api.workspaces.models import Project
@@ -175,6 +188,8 @@ def create_job(
         if not _same_request(existing, project, normalised):
             raise IdempotencyConflictError
         return JobCreation(existing, created=False)
+    # New work only: refused once the month's job time is used up (a replay above adds none).
+    quotas.assert_available(project.organization_id, UsageKind.JOB_SECONDS)
     try:
         with transaction.atomic():
             job = Job.objects.create(
@@ -298,6 +313,35 @@ def _running(job_id: uuid.UUID | str, attempt: int) -> QuerySet[Job]:
     return Job.objects.filter(pk=job_id, status=JobStatus.RUNNING, attempts=attempt)
 
 
+def _bill_attempt(job_id: uuid.UUID | str, attempt: int, now: datetime) -> None:
+    """Charge the wall-clock time of the attempt that just ended (call only after winning the fence).
+
+    Seconds from the attempt's claim to ``now``, rounded up, at least one, under the ledger key
+    ``job:<id>:<attempt>`` -- so the same attempt ending twice (a redelivery racing the finish) bills
+    once, and the next attempt of a retried job bills its own run. Billing is bookkeeping: a failure
+    here is logged by class and never changes the job's outcome (a lost charge, not a lost job).
+    """
+    try:
+        row = (
+            Job.objects.filter(pk=job_id)
+            .values_list("organization_id", "started_at")
+            .first()
+        )
+        if row is None:
+            return
+        organization_id, started_at = row
+        elapsed = (now - started_at).total_seconds() if started_at else 0.0
+        quotas.charge(
+            organization_id,
+            UsageKind.JOB_SECONDS,
+            max(1, math.ceil(elapsed)),
+            quotas.job_key(job_id, attempt),
+            now=now,
+        )
+    except Exception as error:  # noqa: BLE001
+        _logger.error("a job time charge failed (%s)", type(error).__name__)
+
+
 def finish_succeeded(
     job_id: uuid.UUID | str,
     *,
@@ -321,6 +365,8 @@ def finish_succeeded(
             finished_at=now,
             heartbeat_at=now,
         )
+    if updated == 1:
+        _bill_attempt(job_id, attempt, now)
     return updated == 1
 
 
@@ -340,6 +386,8 @@ def finish_failed(
             message="Failed",
             finished_at=now,
         )
+    if updated == 1:
+        _bill_attempt(job_id, attempt, now)
     return updated == 1
 
 
@@ -349,6 +397,8 @@ def finish_cancelled(job_id: uuid.UUID | str, *, attempt: int, now: datetime) ->
         updated = _running(job_id, attempt).update(
             status=JobStatus.CANCELLED, message="Cancelled", finished_at=now
         )
+    if updated == 1:
+        _bill_attempt(job_id, attempt, now)
     return updated == 1
 
 
@@ -369,6 +419,8 @@ def requeue_for_retry(
             not_before=now + timedelta(seconds=delay),
             message="Waiting to retry",
         )
+    if updated == 1:
+        _bill_attempt(job_id, attempt, now)
     return updated == 1
 
 

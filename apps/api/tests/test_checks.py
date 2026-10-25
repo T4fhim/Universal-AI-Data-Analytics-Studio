@@ -54,6 +54,7 @@ PROD_CHECK_ENV = {
     # 3.5: production must say what separates the parser child and what isolates its network.
     "SANDBOX_ISOLATION_ACKNOWLEDGED": "container",
     "SANDBOX_NETWORK_ISOLATION": "container",
+    "QUOTA_UNLIMITED_ACKNOWLEDGED": "true",  # 3.8: production states its quotas or says unlimited is intended
     "STORAGE_BUCKET": "uadas-tenant-data",
     "STORAGE_ENDPOINT_URL": "https://objects.example.com",
     "STORAGE_ACCESS_KEY_ID": "ci-key-4f7q2m9xj3kd8tlp",
@@ -97,6 +98,7 @@ def test_check_deploy_passes_with_valid_prod_environment(
         # Required since 3.5: what separates the parser child, and what isolates its network.
         SANDBOX_ISOLATION_ACKNOWLEDGED="container",
         SANDBOX_NETWORK_ISOLATION="container",
+        QUOTA_UNLIMITED_ACKNOWLEDGED="true",
         STORAGE_BUCKET="uadas-tenant-data",
         STORAGE_ENDPOINT_URL="https://objects.example.com",
         STORAGE_ACCESS_KEY_ID="ci-key-4f7q2m9xj3kd8tlp",

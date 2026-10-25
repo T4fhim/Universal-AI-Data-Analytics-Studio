@@ -104,8 +104,13 @@ Configuration is 12-factor: environment variables only. Do not commit `.env` fil
 | `SANDBOX_NETWORK_ISOLATION` | base, prod | unset (the child still *tries* a network namespace and reports the outcome) | `unshare`: refuse a parse whose child could not unshare a network namespace (`E007` if the host cannot); `container`: the worker has no route out (stated, not measured); `none-acknowledged`: accept the bypassable in-process socket guard alone. **Prod requires one of the three.** |
 | `SANDBOX_REQUIRE_NETNS` | tests only | unset | `1` makes the network-isolation test *demand* a namespace instead of asserting the honest "not isolated" report; set it where the kernel is known to allow `unshare` (CI sets it only if `unshare --user --net true` works on the runner). |
 | `JOBS_INTEGRATION` | tests only | unset | `1` (with a broker, a **PostgreSQL** `DATABASE_URL` and the `STORAGE_*` variables) also runs `test_jobs_integration.py`: a real `celery worker` process. |
-| `ASSISTANT_PROVIDER` | base | unset (assistant off: `503`) | `anthropic`, `gemini` or `groq` (`ollama` is refused on a server). Requires `ASSISTANT_API_KEY`; a key without a provider fails start-up. |
+| `ASSISTANT_PROVIDER` | base | unset (assistant off: `503`) | `anthropic`, `gemini`, `groq` or `openrouter` (`ollama` is refused on a server). Requires `ASSISTANT_API_KEY`; a key without a provider fails start-up. |
 | `ASSISTANT_API_KEY`, `ASSISTANT_MODEL` | base | none / the provider's default | The deployment's LLM credential (never a request field, never stored or logged) and an optional model name. |
+| `QUOTA_MAX_ROWS` | base, prod | unset (unlimited) | 1 or more. Rows an organization may hold across its datasets (a standing total: a deleted dataset gives its rows back). A `quotas.OrganizationQuota` row overrides it per organization. |
+| `QUOTA_MAX_STORAGE_MB` | base, prod | unset (unlimited) | Megabytes of uploaded originals an organization may hold (standing total; reserved before the upload is spooled, released if it fails or the dataset is deleted). |
+| `QUOTA_MAX_JOB_MINUTES` | base, prod | unset (unlimited) | Wall-clock minutes of background-job runs per organization per UTC calendar month. New jobs are refused once it is used up; a run that is already going is charged in full when it ends. |
+| `QUOTA_MAX_LLM_TOKENS` | base, prod | unset (unlimited) | Assistant tokens (input plus output, as the provider reports them) per organization per UTC calendar month. A turn is refused up front once it is used up; the turn that crosses the limit is the last one allowed. |
+| `QUOTA_UNLIMITED_ACKNOWLEDGED` | base, prod | unset | `true`: the operator states that an unset quota above means unlimited on purpose. **Prod requires all four limits, or this.** Over a limit the API answers `429` with the closed code `quota_exceeded`. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | base | none | Enable "sign in with GitHub". Both or neither: one alone fails start-up. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | base | none | Enable "sign in with Google". Both or neither. |
 
@@ -352,6 +357,24 @@ Run it under **ASGI** (`uvicorn uadas_api.asgi:application`); under WSGI a strea
 Behind a proxy, do not buffer or compress `text/event-stream` (`X-Accel-Buffering: no` is sent) and keep
 the read timeout above 15 s. Caps: 5 job streams per user and 50 per organization, 2 assistant turns per
 user and 10 per organization (`429`); a client that leaves releases its slot immediately.
+
+## Quotas (3.8)
+
+Four per-organization limits (`QUOTA_*` above; a `quotas.OrganizationQuota` row overrides one for one
+organization). Over a limit the API answers **`429` with the closed code `quota_exceeded`** (the throttle's
+`429` stays `rate_limited`).
+
+| Resource | Window | Checked | Charged |
+| --- | --- | --- | --- |
+| stored bytes | standing | reserved by the upload handler before the body is spooled (strict, one conditional `UPDATE`) | the declared body length, kept under the dataset's ledger key; released if the request fails, the ingest fails, or the dataset is deleted |
+| rows | standing | a new upload is refused once used up | by the ingest job when the dataset is committed (can overshoot by one file); released when the dataset is deleted |
+| job time | calendar month (UTC) | a new job is refused once used up (a replay of an existing job is not) | seconds per attempt, when the attempt ends and wins the attempt fence; once per attempt |
+| LLM tokens | calendar month (UTC) | an assistant turn is refused once used up | what the provider reported (an estimate if it reports none), by the provider thread when the call ends |
+
+Every charge has a unique ledger key per organization, so a retry cannot bill twice. Known limits: charge-after
+resources (job time, tokens, rows) overshoot by what was in flight when the limit was crossed, never by more; a
+process killed mid-upload leaves its byte hold charged until released by hand (no reconcile job yet); an
+idempotent replay of an upload needs room for its own hold; limits are not exposed by an endpoint.
 
 ## Test
 

@@ -3,9 +3,12 @@
 
 Roles and gates, in order: signed in and CSRF-checked (the default auth), an **editor** of the
 organization (a viewer cannot spend the organization's provider quota), a configured provider (else
-``503``), the per-user/organization throttle (``assistant``, 60/hour; ``assistant_user``, 120/hour
-across all of a user's organizations) and the concurrent-stream cap (2 per user, 10 per
-organization; ``429``). Only then is the provider called.
+``503``), the organization's monthly LLM-token quota (``429 quota_exceeded`` once it is used up),
+the per-user/organization throttle (``assistant``, 60/hour) and the concurrent-stream cap (2 per
+user, 10 per organization; ``429``). Only then is the provider called. What the turn cost is
+charged to the quota by the provider thread when the call ends -- so a client that leaves mid-turn
+still pays for it (the provider was called); see :mod:`uadas_api.ai.assistant` for the bound on how
+far one turn can overshoot the limit.
 
 The stream's events (all JSON, none carry a dataset's rows): ``message`` (a part of the reply
 text), ``tool_call`` (a **proposed** call: name and arguments -- nothing is executed here, see
@@ -21,6 +24,7 @@ the standard SSE ones. There is no resume: a turn is one request, and the client
 from __future__ import annotations
 
 import asyncio
+import logging
 import threading
 import uuid
 from collections.abc import AsyncIterator
@@ -28,6 +32,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Any, Literal
 
 from asgiref.sync import sync_to_async
+from django.db import connections
 from django.http import HttpRequest
 from django.http.response import HttpResponseBase
 from ninja import Router, Schema
@@ -35,6 +40,8 @@ from pydantic import Field
 
 from uadas_api.accounts.models import Role
 from uadas_api.ai import assistant
+from uadas_api.quotas import service as quotas
+from uadas_api.quotas.choices import UsageKind
 from uadas_api.web import throttle
 from uadas_api.web.config import ApiConfig, api_config
 from uadas_api.web.errors import ApiError, responses
@@ -49,6 +56,7 @@ from uadas_api.web.sse import (
 from uadas_api.web.streams import StreamLease, acquire, release_connections
 
 router = Router(tags=["assistant"])
+_logger = logging.getLogger(__name__)
 
 _DEFAULTS = ApiConfig()
 
@@ -143,6 +151,9 @@ def _open(
             raise ApiError(422, "The request was not valid.")
         if not assistant.is_configured():
             raise ApiError(503, "The assistant is not configured.")
+        # Refused here, before the throttles count the attempt and before any provider call:
+        # a read of the month's usage (see assistant.charge_turn for the overshoot bound).
+        quotas.assert_available(membership.organization_id, UsageKind.LLM_TOKENS)
         throttle.enforce("assistant", membership.user_id, membership.organization_id)
         throttle.enforce(
             "assistant_user", membership.user_id
@@ -204,8 +215,10 @@ class Turn:
             raise ApiError(503, "The assistant is busy; retry shortly.")
         return cls(lease, slots, pool)
 
-    def start(self, content: str, timeout: float) -> Future[assistant.Proposal]:
-        """Run the provider call; the thread frees the turn when it ends."""
+    def start(
+        self, content: str, timeout: float, organization_id: uuid.UUID
+    ) -> Future[assistant.Proposal]:
+        """Run the provider call and bill it; the thread frees the turn when it ends."""
         with self._lock:
             if self._state != "held":
                 raise RuntimeError("a turn is started once")
@@ -213,7 +226,9 @@ class Turn:
 
         def work() -> assistant.Proposal:
             try:
-                return assistant.propose(assistant.make_provider(timeout), content)
+                proposal = assistant.propose(assistant.make_provider(timeout), content)
+                _bill(organization_id, proposal)
+                return proposal
             finally:
                 self._finish()
 
@@ -239,13 +254,30 @@ class Turn:
         self._slots.release()
 
 
+def _bill(organization_id: uuid.UUID, proposal: assistant.Proposal) -> None:
+    """Charge the turn to the organization from the provider thread (logged by class, never raised).
+
+    Runs in the thread that made the call, so it happens whether or not the client is still there.
+    The thread owns a database connection of its own, closed here: a pooled thread that kept it
+    would hold one connection per worker for the life of the process.
+    """
+    try:
+        assistant.charge_turn(organization_id, proposal.tokens)
+    except Exception as error:  # noqa: BLE001 - never fail an answered turn
+        _logger.error("an assistant token charge failed (%s)", type(error).__name__)
+    finally:
+        connections.close_all()
+
+
 def _error(code: assistant.AssistantErrorCode) -> bytes:
     return encode_event(
         {"code": code, "message": _MESSAGES[code]}, event="error", max_bytes=1024
     )
 
 
-async def _turn(content: str, turn: Turn, config: ApiConfig) -> AsyncIterator[bytes]:
+async def _turn(
+    content: str, turn: Turn, config: ApiConfig, organization_id: uuid.UUID
+) -> AsyncIterator[bytes]:
     loop = asyncio.get_running_loop()
     task: asyncio.Future[assistant.Proposal] | None = None
     try:
@@ -255,7 +287,7 @@ async def _turn(content: str, turn: Turn, config: ApiConfig) -> AsyncIterator[by
         # From here the provider thread owns the turn's lease and slot (it frees them when the
         # call ends); the stream only waits on it and may leave at any time.
         task = asyncio.wrap_future(
-            turn.start(content, config.assistant_provider_seconds)
+            turn.start(content, config.assistant_provider_seconds, organization_id)
         )
         deadline = loop.time() + config.assistant_turn_seconds
         while not task.done():
@@ -337,4 +369,4 @@ async def assistant_messages(
         max_seconds=config.assistant_turn_seconds,
     )
     turn = Turn.admit(lease, config)
-    return SseResponse(_turn(content, turn, config), on_close=turn.abandon)
+    return SseResponse(_turn(content, turn, config, org_id), on_close=turn.abandon)

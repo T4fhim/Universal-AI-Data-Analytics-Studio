@@ -42,6 +42,7 @@ PROD_ENV = {
     "STORAGE_SSE": "aes256",
     "SANDBOX_ISOLATION_ACKNOWLEDGED": "container",
     "SANDBOX_NETWORK_ISOLATION": "container",
+    "QUOTA_UNLIMITED_ACKNOWLEDGED": "true",  # 3.8: production states its quotas or says unlimited is intended
 }
 # What production must state about isolation (see ``validate_for_production``).
 ISOLATED = {

@@ -36,7 +36,7 @@ from django.core.validators import validate_email
 
 from uadas_api.sandbox import limits as _sandbox_limits
 
-from . import _jobs, _storage
+from . import _jobs, _quota, _storage
 from ._env import get_bool, get_int, get_str
 from .base import *  # noqa: F403 - the settings split is a star-import by design
 from .base import (
@@ -46,6 +46,7 @@ from .base import (
     SECRET_KEY,
     UADAS_CORE_LOG_LEVEL,
     UADAS_JOBS,
+    UADAS_QUOTA,
     UADAS_SANDBOX,
     UADAS_STORAGE,
 )
@@ -115,6 +116,9 @@ _jobs.validate_for_production(
     enforceable=_sandbox_limits.limits_enforceable(),
     cache_url=get_str("REDIS_URL"),
 )
+
+# Per-tenant quotas (3.8): every limit stated, or unlimited acknowledged -- never unmetered by omission.
+_quota.validate_for_production(UADAS_QUOTA)
 
 DEBUG = False
 

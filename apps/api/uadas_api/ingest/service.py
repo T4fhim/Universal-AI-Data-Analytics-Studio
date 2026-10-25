@@ -57,6 +57,8 @@ from uadas_api.jobs.errors import JobError, JobErrorCode
 from uadas_api.jobs.models import Job
 from uadas_api.jobs.registry import Completion, JobContext, JobHandler
 from uadas_api.jobs.services import JobCreation, create_job
+from uadas_api.quotas import service as quotas
+from uadas_api.quotas.choices import UsageKind
 from uadas_api.sandbox.admission import check_content, check_extension
 from uadas_api.sandbox.errors import SandboxError, SandboxErrorCode
 from uadas_api.sandbox.limits import SandboxLimits
@@ -292,6 +294,13 @@ def ingest_dataset(ctx: JobContext) -> Completion:
             )
         except IntegrityError:
             raise JobError(JobErrorCode.CONFLICT) from None
+        # The rows now held, charged in this transaction under the dataset's own key (deleting
+        # the dataset gives them back). Charged, not reserved: the count is only known after
+        # the parse, so a file that crosses the row limit is kept and the *next* upload is
+        # refused (the upload route checks) -- an overshoot of at most one file.
+        quotas.charge(
+            org, UsageKind.ROWS, result.row_count, quotas.rows_key(dataset_id)
+        )
         if attempt > 1:  # frames an earlier, crashed attempt may have left behind
             earlier = [
                 (
@@ -340,6 +349,10 @@ def abandon_ingest(job: Job) -> None:
     prefix = f"{org}/datasets/{params['dataset_id']}"
     with transaction.atomic():
         lifecycle.queue_deletions(org, [(prefix, True)], reason="ingest_failed")
+        # The original it queued for deletion no longer counts against the stored-bytes quota.
+        quotas.release(
+            org, UsageKind.STORAGE_BYTES, quotas.upload_key(params["dataset_id"])
+        )
 
 
 HANDLER = JobHandler(

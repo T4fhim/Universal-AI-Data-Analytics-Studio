@@ -558,7 +558,8 @@
               "payload_too_large",
               "unsupported_media_type",
               "rate_limited",
-              "unavailable"
+              "unavailable",
+              "quota_exceeded"
             ],
             "title": "Code",
             "type": "string"

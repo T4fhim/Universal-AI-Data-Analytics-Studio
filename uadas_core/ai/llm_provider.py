@@ -53,6 +53,41 @@ class PendingToolCall:
     arguments: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class LLMUsage:
+    """Tokens one model call consumed, in provider-neutral form.
+
+    Why it exists: a server that serves several tenants from one provider key must meter what each
+    one spends, and each SDK reports usage in its own place (Anthropic ``usage.input_tokens`` /
+    ``output_tokens``, Gemini ``usage_metadata``, the OpenAI-compatible APIs ``usage.prompt_tokens`` /
+    ``completion_tokens``, Ollama ``prompt_eval_count`` / ``eval_count``). Every provider translates
+    its own into this one shape, exactly as it translates tool calls.
+
+    Attributes:
+        input_tokens: Tokens the prompt (system prompt, history, tool schemas) cost.
+        output_tokens: Tokens the reply cost, including any hidden reasoning the provider bills.
+    """
+
+    input_tokens: int
+    output_tokens: int
+
+    @property
+    def total(self) -> int:
+        """Input plus output: what a token quota is charged."""
+        return self.input_tokens + self.output_tokens
+
+
+def _count(value: Any) -> int:
+    """A reported token count as a non-negative int; anything else (missing, junk) counts as 0.
+
+    A provider's number is untrusted input to a quota: a negative or non-integer count must not be
+    able to *reduce* an organization's usage, so only a plain non-negative ``int`` is believed.
+    """
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return 0
+    return value
+
+
 @dataclass
 class LLMTurn:
     """One model response, in provider-neutral form.
@@ -64,10 +99,14 @@ class LLMTurn:
         tool_calls: Tool calls the model is requesting, if any. Empty
             list if the model produced a final answer with no further
             tool calls needed.
+        usage: Tokens this call consumed, as the provider reported them;
+            ``None`` if it reported nothing (the caller decides what that
+            costs -- it is never silently zero).
     """
 
     text: str
     tool_calls: list[PendingToolCall]
+    usage: LLMUsage | None = None
 
 
 class BaseLLMProvider(ABC):
@@ -183,7 +222,16 @@ class AnthropicProvider(BaseLLMProvider):
             for b in response.content
             if b.type == "tool_use"
         ]
-        return LLMTurn(text=text, tool_calls=tool_calls), response
+        reported = getattr(response, "usage", None)
+        usage = (
+            LLMUsage(
+                _count(getattr(reported, "input_tokens", None)),
+                _count(getattr(reported, "output_tokens", None)),
+            )
+            if reported is not None
+            else None
+        )
+        return LLMTurn(text=text, tool_calls=tool_calls, usage=usage), response
 
     def append_user_message(self, history: list[Any], text: str) -> list[Any]:
         return history + [{"role": "user", "content": text}]
@@ -283,7 +331,27 @@ class GeminiProvider(BaseLLMProvider):
             for p in parts
             if p.function_call is not None
         ]
-        return LLMTurn(text=text, tool_calls=tool_calls), response
+        return (
+            LLMTurn(
+                text=text,
+                tool_calls=tool_calls,
+                usage=self._usage(getattr(response, "usage_metadata", None)),
+            ),
+            response,
+        )
+
+    @staticmethod
+    def _usage(metadata: Any) -> LLMUsage | None:
+        """Gemini bills hidden reasoning as output but reports it apart: the total covers it."""
+        if metadata is None:
+            return None
+        prompt = _count(getattr(metadata, "prompt_token_count", None))
+        total = getattr(metadata, "total_token_count", None)
+        if isinstance(total, int) and not isinstance(total, bool) and total >= prompt:
+            return LLMUsage(prompt, total - prompt)
+        return LLMUsage(
+            prompt, _count(getattr(metadata, "candidates_token_count", None))
+        )
 
     def append_user_message(self, history: list[Any], text: str) -> list[Any]:
         return history + [
@@ -330,6 +398,11 @@ class GroqProvider(BaseLLMProvider):
     ``content=...``.
     """
 
+    # Class attributes so an OpenAI-compatible sibling (OpenRouter) reuses the whole
+    # wire translation and overrides only where it points and what it calls itself.
+    _BASE_URL = "https://api.groq.com/openai/v1"
+    _LABEL = "Groq"
+
     def __init__(
         self,
         api_key: str,
@@ -345,7 +418,7 @@ class GroqProvider(BaseLLMProvider):
             else {"max_retries": 1}
         )
         self._client = openai.OpenAI(
-            api_key=api_key, base_url="https://api.groq.com/openai/v1", **bounded
+            api_key=api_key, base_url=self._BASE_URL, **bounded
         )
         self._model = model
         self._openai = openai
@@ -379,7 +452,7 @@ class GroqProvider(BaseLLMProvider):
                 tools=self._build_tool_schemas(tool_schemas) if tool_schemas else None,
             )
         except self._openai.OpenAIError as exc:
-            raise ServiceError(f"Groq API call failed: {exc}") from exc
+            raise ServiceError(f"{self._LABEL} API call failed: {exc}") from exc
 
         message = response.choices[0].message
         text = message.content or ""
@@ -393,7 +466,7 @@ class GroqProvider(BaseLLMProvider):
                     arguments = json.loads(tc.function.arguments)
                 except json.JSONDecodeError as exc:
                     raise ServiceError(
-                        f"Groq returned malformed tool arguments for "
+                        f"{self._LABEL} returned malformed tool arguments for "
                         f"'{tc.function.name}': {exc}"
                     ) from exc
                 tool_calls.append(
@@ -402,7 +475,16 @@ class GroqProvider(BaseLLMProvider):
                     )
                 )
 
-        return LLMTurn(text=text, tool_calls=tool_calls), response
+        reported = getattr(response, "usage", None)
+        usage = (
+            LLMUsage(
+                _count(getattr(reported, "prompt_tokens", None)),
+                _count(getattr(reported, "completion_tokens", None)),
+            )
+            if reported is not None
+            else None
+        )
+        return LLMTurn(text=text, tool_calls=tool_calls, usage=usage), response
 
     def append_user_message(self, history: list[Any], text: str) -> list[Any]:
         return history + [{"role": "user", "content": text}]
@@ -432,6 +514,27 @@ class GroqProvider(BaseLLMProvider):
             for call, result_text in results
         ]
         return history + tool_messages
+
+
+class OpenRouterProvider(GroqProvider):
+    """OpenRouter's OpenAI-compatible chat completions API.
+
+    OpenRouter speaks the same wire format as Groq (``/api/v1/chat/completions``,
+    ``tools``/``tool_calls``, ``role="tool"`` results), so this subclass changes only
+    the base URL, the error label and the default model rather than re-implementing the
+    translation. The default is the free-tier NVIDIA Nemotron 3 Ultra route.
+    """
+
+    _BASE_URL = "https://openrouter.ai/api/v1"
+    _LABEL = "OpenRouter"
+
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "nvidia/nemotron-3-ultra-550b-a55b:free",
+        timeout: float | None = None,
+    ) -> None:
+        super().__init__(api_key=api_key, model=model, timeout=timeout)
 
 
 class OllamaProvider(BaseLLMProvider):
@@ -550,7 +653,15 @@ class OllamaProvider(BaseLLMProvider):
                 )
             )
 
-        return LLMTurn(text=text, tool_calls=tool_calls), payload
+        usage = (
+            LLMUsage(
+                _count(payload.get("prompt_eval_count")),
+                _count(payload.get("eval_count")),
+            )
+            if "prompt_eval_count" in payload or "eval_count" in payload
+            else None
+        )
+        return LLMTurn(text=text, tool_calls=tool_calls, usage=usage), payload
 
     def append_user_message(self, history: list[Any], text: str) -> list[Any]:
         return history + [{"role": "user", "content": text}]
@@ -610,9 +721,11 @@ def create_provider(
         return GeminiProvider(**kwargs)
     if provider_name == "groq":
         return GroqProvider(**kwargs)
+    if provider_name == "openrouter":
+        return OpenRouterProvider(**kwargs)
     if provider_name == "ollama":
         return OllamaProvider(**kwargs)
     raise ServiceError(
         f"Unknown provider: {provider_name!r}. Must be 'anthropic', 'gemini', "
-        f"'groq', or 'ollama'."
+        f"'groq', 'openrouter', or 'ollama'."
     )
