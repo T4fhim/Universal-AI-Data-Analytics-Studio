@@ -1,0 +1,857 @@
+{
+  "$generated": "scripts/build_design_tokens.py",
+  "tokens": {
+    "surface.canvas": "#0e0e0e",
+    "surface.chrome": "#252525",
+    "surface.pane": "#151618",
+    "surface.region-base": "#131416",
+    "surface.well": "#111111",
+    "surface.well-frame": "#262626",
+    "surface.table-header": "#303030",
+    "surface.zebra": "#202325",
+    "surface.status-separator": "#2c2c30",
+    "border.default": "#212026",
+    "border.focused": "#424146",
+    "border.control": "#5073a0",
+    "scrollbar.track": "#0e0e0e",
+    "scrollbar.thumb": "#707073",
+    "text.primary": "#e5e6e7",
+    "text.secondary": "#d4d5d7",
+    "text.muted": "#8f9296",
+    "text.on-accent": "#ffffff",
+    "text.syntax-literal": "#39993e",
+    "text.syntax-lineno": "#2f9ea3",
+    "text.syntax-keyword": "#4a90d9",
+    "blue.tab-focused": "#2e6aac",
+    "blue.tab-unfocused": "#22416c",
+    "blue.tab-inactive": "#101824",
+    "blue.field": "#243854",
+    "blue.field-button": "#2e527e",
+    "blue.button": "#264a72",
+    "blue.button-disabled": "#1c3050",
+    "blue.radio-on": "#3d97f8",
+    "blue.plot-line": "#4d6fa9",
+    "blue.preview": "#4e5a92",
+    "blue.accent-hover": "#265a96",
+    "semantic.ok": "#3bd65a",
+    "semantic.warn": "#c3bd27",
+    "semantic.danger": "#ff5a4d",
+    "semantic.info": "#3d97f8",
+    "semantic.editable": "#ff9f27",
+    "semantic.editable-text": "#030303",
+    "semantic.alert-bar": "#a50f27",
+    "semantic.alert-text": "#ffffff",
+    "focus.ring": "#8cc4ff",
+    "focus.width": "2px",
+    "focus.offset": "1px",
+    "mark.blue": "#2f86c6",
+    "mark.green": "#279f27",
+    "mark.purple": "#9963c3",
+    "mark.orange": "#ef8220",
+    "mark.grey": "#838280",
+    "size.font": "0.6875rem",
+    "size.row": "1rem",
+    "size.row-dense": "0.75rem",
+    "size.chrome": "2.25rem",
+    "size.tab": "0.875rem",
+    "size.status": "1.0625rem",
+    "size.gutter": "0.1875rem",
+    "size.scrollbar": "0.5625rem",
+    "size.tab-radius": "0.1875rem",
+    "size.hit-target-min": "1.5rem",
+    "font.mono": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+    "layout.col-1": "43.6%",
+    "layout.col-2": "24.7%",
+    "layout.col-3": "31.1%",
+    "layout.row-top": "69%",
+    "layout.row-bottom": "31%",
+    "layout.right-split": "50%"
+  },
+  "sources": {
+    "surface.canvas": "proposal",
+    "surface.chrome": "measured",
+    "surface.pane": "measured",
+    "surface.region-base": "measured",
+    "surface.well": "measured",
+    "surface.well-frame": "measured",
+    "surface.table-header": "measured",
+    "surface.zebra": "measured",
+    "surface.status-separator": "measured",
+    "border.default": "measured",
+    "border.focused": "measured",
+    "border.control": "derived",
+    "scrollbar.track": "measured",
+    "scrollbar.thumb": "proposal",
+    "text.primary": "measured",
+    "text.secondary": "measured",
+    "text.muted": "proposal",
+    "text.on-accent": "proposal",
+    "text.syntax-literal": "measured",
+    "text.syntax-lineno": "proposal",
+    "text.syntax-keyword": "proposal",
+    "blue.tab-focused": "measured",
+    "blue.tab-unfocused": "measured",
+    "blue.tab-inactive": "measured",
+    "blue.field": "measured",
+    "blue.field-button": "measured",
+    "blue.button": "measured",
+    "blue.button-disabled": "measured",
+    "blue.radio-on": "measured",
+    "blue.plot-line": "measured",
+    "blue.preview": "measured",
+    "blue.accent-hover": "proposal",
+    "semantic.ok": "proposal",
+    "semantic.warn": "derived",
+    "semantic.danger": "proposal",
+    "semantic.info": "measured",
+    "semantic.editable": "measured",
+    "semantic.editable-text": "measured",
+    "semantic.alert-bar": "measured",
+    "semantic.alert-text": "proposal",
+    "focus.ring": "proposal",
+    "focus.width": "proposal",
+    "focus.offset": "proposal",
+    "mark.blue": "derived",
+    "mark.green": "derived",
+    "mark.purple": "derived",
+    "mark.orange": "derived",
+    "mark.grey": "derived",
+    "size.font": "measured",
+    "size.row": "measured",
+    "size.row-dense": "measured",
+    "size.chrome": "measured",
+    "size.tab": "measured",
+    "size.status": "measured",
+    "size.gutter": "measured",
+    "size.scrollbar": "measured",
+    "size.tab-radius": "measured",
+    "size.hit-target-min": "proposal",
+    "font.mono": "proposal",
+    "layout.col-1": "measured",
+    "layout.col-2": "measured",
+    "layout.col-3": "measured",
+    "layout.row-top": "measured",
+    "layout.row-bottom": "measured",
+    "layout.right-split": "measured"
+  },
+  "region": {
+    "red": {
+      "key": "#d52d21",
+      "fill": "#74201c"
+    },
+    "green": {
+      "key": "#279f27",
+      "fill": "#1d5a1e"
+    },
+    "purple": {
+      "key": "#9963c3",
+      "fill": "#563c6c"
+    },
+    "pink": {
+      "key": "#e775c3",
+      "fill": "#7d446c"
+    },
+    "yellow": {
+      "key": "#c3bd27",
+      "fill": "#6b681e"
+    },
+    "blue": {
+      "key": "#2376b0",
+      "fill": "#1b4563"
+    },
+    "teal": {
+      "key": "#23bec8",
+      "fill": "#1b696f"
+    },
+    "orange": {
+      "key": "#ef8220",
+      "fill": "#814b1b"
+    },
+    "grey": {
+      "key": "#838280",
+      "fill": "#4b4b4b"
+    },
+    "brown": {
+      "key": "#8f5e50",
+      "fill": "#513933"
+    }
+  },
+  "series_order": [
+    "blue",
+    "orange",
+    "teal",
+    "pink",
+    "yellow",
+    "purple",
+    "green",
+    "red",
+    "brown",
+    "grey"
+  ],
+  "checks": [
+    {
+      "pair": "text.primary on surface.pane",
+      "fg": "#e5e6e7",
+      "bg": "#151618",
+      "min": 4.5,
+      "ratio": 14.49,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on surface.chrome",
+      "fg": "#e5e6e7",
+      "bg": "#252525",
+      "min": 4.5,
+      "ratio": 12.27,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on surface.well",
+      "fg": "#e5e6e7",
+      "bg": "#111111",
+      "min": 4.5,
+      "ratio": 15.11,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on surface.table-header",
+      "fg": "#e5e6e7",
+      "bg": "#303030",
+      "min": 4.5,
+      "ratio": 10.56,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on surface.zebra",
+      "fg": "#e5e6e7",
+      "bg": "#202325",
+      "min": 4.5,
+      "ratio": 12.65,
+      "pass": true
+    },
+    {
+      "pair": "text.secondary on surface.pane",
+      "fg": "#d4d5d7",
+      "bg": "#151618",
+      "min": 4.5,
+      "ratio": 12.33,
+      "pass": true
+    },
+    {
+      "pair": "text.secondary on surface.zebra",
+      "fg": "#d4d5d7",
+      "bg": "#202325",
+      "min": 4.5,
+      "ratio": 10.76,
+      "pass": true
+    },
+    {
+      "pair": "text.muted on surface.pane",
+      "fg": "#8f9296",
+      "bg": "#151618",
+      "min": 4.5,
+      "ratio": 5.79,
+      "pass": true
+    },
+    {
+      "pair": "text.muted on surface.zebra",
+      "fg": "#8f9296",
+      "bg": "#202325",
+      "min": 4.5,
+      "ratio": 5.06,
+      "pass": true
+    },
+    {
+      "pair": "text.muted on surface.well",
+      "fg": "#8f9296",
+      "bg": "#111111",
+      "min": 4.5,
+      "ratio": 6.04,
+      "pass": true
+    },
+    {
+      "pair": "text.on-accent on blue.tab-focused",
+      "fg": "#ffffff",
+      "bg": "#2e6aac",
+      "min": 4.5,
+      "ratio": 5.57,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on blue.tab-unfocused",
+      "fg": "#e5e6e7",
+      "bg": "#22416c",
+      "min": 4.5,
+      "ratio": 8.23,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on blue.tab-inactive",
+      "fg": "#e5e6e7",
+      "bg": "#101824",
+      "min": 4.5,
+      "ratio": 14.26,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on blue.field",
+      "fg": "#e5e6e7",
+      "bg": "#243854",
+      "min": 4.5,
+      "ratio": 9.5,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on blue.button",
+      "fg": "#e5e6e7",
+      "bg": "#264a72",
+      "min": 4.5,
+      "ratio": 7.29,
+      "pass": true
+    },
+    {
+      "pair": "semantic.editable-text on semantic.editable",
+      "fg": "#030303",
+      "bg": "#ff9f27",
+      "min": 4.5,
+      "ratio": 10.06,
+      "pass": true
+    },
+    {
+      "pair": "semantic.alert-text on semantic.alert-bar",
+      "fg": "#ffffff",
+      "bg": "#a50f27",
+      "min": 4.5,
+      "ratio": 7.79,
+      "pass": true
+    },
+    {
+      "pair": "semantic.ok on surface.pane",
+      "fg": "#3bd65a",
+      "bg": "#151618",
+      "min": 4.5,
+      "ratio": 9.44,
+      "pass": true
+    },
+    {
+      "pair": "semantic.warn on surface.pane",
+      "fg": "#c3bd27",
+      "bg": "#151618",
+      "min": 4.5,
+      "ratio": 9.16,
+      "pass": true
+    },
+    {
+      "pair": "semantic.danger on surface.pane",
+      "fg": "#ff5a4d",
+      "bg": "#151618",
+      "min": 4.5,
+      "ratio": 5.88,
+      "pass": true
+    },
+    {
+      "pair": "semantic.info on surface.pane",
+      "fg": "#3d97f8",
+      "bg": "#151618",
+      "min": 4.5,
+      "ratio": 6.02,
+      "pass": true
+    },
+    {
+      "pair": "semantic.editable on surface.pane",
+      "fg": "#ff9f27",
+      "bg": "#151618",
+      "min": 4.5,
+      "ratio": 8.83,
+      "pass": true
+    },
+    {
+      "pair": "text.syntax-literal on surface.well",
+      "fg": "#39993e",
+      "bg": "#111111",
+      "min": 4.5,
+      "ratio": 5.22,
+      "pass": true
+    },
+    {
+      "pair": "text.syntax-lineno on surface.well",
+      "fg": "#2f9ea3",
+      "bg": "#111111",
+      "min": 4.5,
+      "ratio": 5.88,
+      "pass": true
+    },
+    {
+      "pair": "text.syntax-keyword on surface.well",
+      "fg": "#4a90d9",
+      "bg": "#111111",
+      "min": 4.5,
+      "ratio": 5.65,
+      "pass": true
+    },
+    {
+      "pair": "blue.radio-on on surface.pane",
+      "fg": "#3d97f8",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 6.02,
+      "pass": true
+    },
+    {
+      "pair": "blue.plot-line on surface.well",
+      "fg": "#4d6fa9",
+      "bg": "#111111",
+      "min": 3.0,
+      "ratio": 3.74,
+      "pass": true
+    },
+    {
+      "pair": "scrollbar.thumb on scrollbar.track",
+      "fg": "#707073",
+      "bg": "#0e0e0e",
+      "min": 3.0,
+      "ratio": 3.91,
+      "pass": true
+    },
+    {
+      "pair": "focus.ring on surface.pane",
+      "fg": "#8cc4ff",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 9.88,
+      "pass": true
+    },
+    {
+      "pair": "focus.ring on surface.chrome",
+      "fg": "#8cc4ff",
+      "bg": "#252525",
+      "min": 3.0,
+      "ratio": 8.36,
+      "pass": true
+    },
+    {
+      "pair": "focus.ring on surface.well",
+      "fg": "#8cc4ff",
+      "bg": "#111111",
+      "min": 3.0,
+      "ratio": 10.3,
+      "pass": true
+    },
+    {
+      "pair": "focus.ring on surface.table-header",
+      "fg": "#8cc4ff",
+      "bg": "#303030",
+      "min": 3.0,
+      "ratio": 7.2,
+      "pass": true
+    },
+    {
+      "pair": "focus.ring on blue.tab-focused",
+      "fg": "#8cc4ff",
+      "bg": "#2e6aac",
+      "min": 3.0,
+      "ratio": 3.04,
+      "pass": true
+    },
+    {
+      "pair": "focus.ring on surface.canvas",
+      "fg": "#8cc4ff",
+      "bg": "#0e0e0e",
+      "min": 3.0,
+      "ratio": 10.53,
+      "pass": true
+    },
+    {
+      "pair": "focus.ring on blue.tab-unfocused",
+      "fg": "#8cc4ff",
+      "bg": "#22416c",
+      "min": 3.0,
+      "ratio": 5.61,
+      "pass": true
+    },
+    {
+      "pair": "focus.ring on blue.tab-inactive",
+      "fg": "#8cc4ff",
+      "bg": "#101824",
+      "min": 3.0,
+      "ratio": 9.72,
+      "pass": true
+    },
+    {
+      "pair": "focus.ring on blue.field",
+      "fg": "#8cc4ff",
+      "bg": "#243854",
+      "min": 3.0,
+      "ratio": 6.48,
+      "pass": true
+    },
+    {
+      "pair": "border.control on surface.pane",
+      "fg": "#5073a0",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 3.71,
+      "pass": true
+    },
+    {
+      "pair": "border.control on surface.chrome",
+      "fg": "#5073a0",
+      "bg": "#252525",
+      "min": 3.0,
+      "ratio": 3.14,
+      "pass": true
+    },
+    {
+      "pair": "border.control on surface.canvas",
+      "fg": "#5073a0",
+      "bg": "#0e0e0e",
+      "min": 3.0,
+      "ratio": 3.95,
+      "pass": true
+    },
+    {
+      "pair": "border.control on surface.zebra",
+      "fg": "#5073a0",
+      "bg": "#202325",
+      "min": 3.0,
+      "ratio": 3.24,
+      "pass": true
+    },
+    {
+      "pair": "mark.blue on surface.table-header",
+      "fg": "#2f86c6",
+      "bg": "#303030",
+      "min": 3.0,
+      "ratio": 3.36,
+      "pass": true
+    },
+    {
+      "pair": "mark.blue on surface.pane",
+      "fg": "#2f86c6",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 4.61,
+      "pass": true
+    },
+    {
+      "pair": "mark.green on surface.table-header",
+      "fg": "#279f27",
+      "bg": "#303030",
+      "min": 3.0,
+      "ratio": 3.82,
+      "pass": true
+    },
+    {
+      "pair": "mark.green on surface.pane",
+      "fg": "#279f27",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 5.24,
+      "pass": true
+    },
+    {
+      "pair": "mark.purple on surface.table-header",
+      "fg": "#9963c3",
+      "bg": "#303030",
+      "min": 3.0,
+      "ratio": 3.1,
+      "pass": true
+    },
+    {
+      "pair": "mark.purple on surface.pane",
+      "fg": "#9963c3",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 4.25,
+      "pass": true
+    },
+    {
+      "pair": "mark.orange on surface.table-header",
+      "fg": "#ef8220",
+      "bg": "#303030",
+      "min": 3.0,
+      "ratio": 4.95,
+      "pass": true
+    },
+    {
+      "pair": "mark.orange on surface.pane",
+      "fg": "#ef8220",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 6.8,
+      "pass": true
+    },
+    {
+      "pair": "mark.grey on surface.table-header",
+      "fg": "#838280",
+      "bg": "#303030",
+      "min": 3.0,
+      "ratio": 3.44,
+      "pass": true
+    },
+    {
+      "pair": "mark.grey on surface.pane",
+      "fg": "#838280",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 4.72,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on region.red fill",
+      "fg": "#e5e6e7",
+      "bg": "#74201c",
+      "min": 4.5,
+      "ratio": 8.55,
+      "pass": true
+    },
+    {
+      "pair": "region.red key on surface.pane",
+      "fg": "#d52d21",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 3.64,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on region.green fill",
+      "fg": "#e5e6e7",
+      "bg": "#1d5a1e",
+      "min": 4.5,
+      "ratio": 6.63,
+      "pass": true
+    },
+    {
+      "pair": "region.green key on surface.pane",
+      "fg": "#279f27",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 5.24,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on region.purple fill",
+      "fg": "#e5e6e7",
+      "bg": "#563c6c",
+      "min": 4.5,
+      "ratio": 7.44,
+      "pass": true
+    },
+    {
+      "pair": "region.purple key on surface.pane",
+      "fg": "#9963c3",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 4.25,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on region.pink fill",
+      "fg": "#e5e6e7",
+      "bg": "#7d446c",
+      "min": 4.5,
+      "ratio": 5.76,
+      "pass": true
+    },
+    {
+      "pair": "region.pink key on surface.pane",
+      "fg": "#e775c3",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 6.66,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on region.yellow fill",
+      "fg": "#e5e6e7",
+      "bg": "#6b681e",
+      "min": 4.5,
+      "ratio": 4.64,
+      "pass": true
+    },
+    {
+      "pair": "region.yellow key on surface.pane",
+      "fg": "#c3bd27",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 9.16,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on region.blue fill",
+      "fg": "#e5e6e7",
+      "bg": "#1b4563",
+      "min": 4.5,
+      "ratio": 8.09,
+      "pass": true
+    },
+    {
+      "pair": "region.blue key on surface.pane",
+      "fg": "#2376b0",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 3.7,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on region.teal fill",
+      "fg": "#e5e6e7",
+      "bg": "#1b696f",
+      "min": 4.5,
+      "ratio": 5.1,
+      "pass": true
+    },
+    {
+      "pair": "region.teal key on surface.pane",
+      "fg": "#23bec8",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 7.99,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on region.orange fill",
+      "fg": "#e5e6e7",
+      "bg": "#814b1b",
+      "min": 4.5,
+      "ratio": 5.69,
+      "pass": true
+    },
+    {
+      "pair": "region.orange key on surface.pane",
+      "fg": "#ef8220",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 6.8,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on region.grey fill",
+      "fg": "#e5e6e7",
+      "bg": "#4b4b4b",
+      "min": 4.5,
+      "ratio": 6.98,
+      "pass": true
+    },
+    {
+      "pair": "region.grey key on surface.pane",
+      "fg": "#838280",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 4.72,
+      "pass": true
+    },
+    {
+      "pair": "text.primary on region.brown fill",
+      "fg": "#e5e6e7",
+      "bg": "#513933",
+      "min": 4.5,
+      "ratio": 8.47,
+      "pass": true
+    },
+    {
+      "pair": "region.brown key on surface.pane",
+      "fg": "#8f5e50",
+      "bg": "#151618",
+      "min": 3.0,
+      "ratio": 3.35,
+      "pass": true
+    },
+    {
+      "pair": "series blue on surface.well",
+      "fg": "#2376b0",
+      "bg": "#111111",
+      "min": 3.0,
+      "ratio": 3.86,
+      "pass": true
+    },
+    {
+      "pair": "series orange on surface.well",
+      "fg": "#ef8220",
+      "bg": "#111111",
+      "min": 3.0,
+      "ratio": 7.09,
+      "pass": true
+    },
+    {
+      "pair": "series teal on surface.well",
+      "fg": "#23bec8",
+      "bg": "#111111",
+      "min": 3.0,
+      "ratio": 8.34,
+      "pass": true
+    },
+    {
+      "pair": "series pink on surface.well",
+      "fg": "#e775c3",
+      "bg": "#111111",
+      "min": 3.0,
+      "ratio": 6.95,
+      "pass": true
+    },
+    {
+      "pair": "series yellow on surface.well",
+      "fg": "#c3bd27",
+      "bg": "#111111",
+      "min": 3.0,
+      "ratio": 9.56,
+      "pass": true
+    },
+    {
+      "pair": "series purple on surface.well",
+      "fg": "#9963c3",
+      "bg": "#111111",
+      "min": 3.0,
+      "ratio": 4.43,
+      "pass": true
+    },
+    {
+      "pair": "series green on surface.well",
+      "fg": "#279f27",
+      "bg": "#111111",
+      "min": 3.0,
+      "ratio": 5.46,
+      "pass": true
+    },
+    {
+      "pair": "series red on surface.well",
+      "fg": "#d52d21",
+      "bg": "#111111",
+      "min": 3.0,
+      "ratio": 3.8,
+      "pass": true
+    },
+    {
+      "pair": "series brown on surface.well",
+      "fg": "#8f5e50",
+      "bg": "#111111",
+      "min": 3.0,
+      "ratio": 3.49,
+      "pass": true
+    },
+    {
+      "pair": "series grey on surface.well",
+      "fg": "#838280",
+      "bg": "#111111",
+      "min": 3.0,
+      "ratio": 4.92,
+      "pass": true
+    }
+  ],
+  "known_weak": [
+    {
+      "fg": "#424146",
+      "bg": "#151618",
+      "pair": "border.focused on surface.pane",
+      "ratio": 1.79,
+      "why": "decorative; the focus ring carries focus"
+    },
+    {
+      "fg": "#212026",
+      "bg": "#151618",
+      "pair": "border.default on surface.pane",
+      "ratio": 1.12,
+      "why": "decorative"
+    }
+  ]
+}

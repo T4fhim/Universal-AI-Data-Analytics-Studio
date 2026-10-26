@@ -1,0 +1,151 @@
+/* The cell grid (C6 K11): flat, 16 px rows, zebra, a sticky header and row-number gutter.
+   Colours come from the generated tokens only; a column's type colour is a 2 px underline on its
+   header and, for the selected column, a 50 % region fill on its cells. */
+
+.grid {
+  position: relative;
+  height: 100%;
+  overflow: auto;
+  background: var(--surface-pane);
+  font-variant-numeric: tabular-nums;
+  /* scrollIntoView must leave room for the sticky header and gutter. */
+  scroll-padding-top: var(--size-row);
+  scroll-padding-left: var(--grid-gutter);
+  outline: none;
+}
+
+.grid-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  width: var(--grid-width);
+}
+
+.grid-body {
+  position: relative;
+  width: var(--grid-width);
+}
+
+.grid-row {
+  display: grid;
+  grid-template-columns: var(--grid-cols);
+  width: var(--grid-width);
+  height: var(--size-row);
+  line-height: var(--size-row);
+  background: var(--surface-pane);
+  white-space: nowrap;
+}
+
+.grid-body .grid-row {
+  position: absolute;
+  left: 0;
+}
+
+.grid-body .grid-row[data-odd] {
+  background: var(--surface-zebra);
+}
+
+.grid-head .grid-row {
+  background: var(--surface-table-header);
+}
+
+.grid-cell {
+  overflow: hidden;
+  padding: 0 1ch;
+  text-overflow: ellipsis;
+}
+
+.grid-cell[data-align="end"] {
+  text-align: end;
+}
+
+/* The row-number gutter stays in view while the columns scroll sideways. */
+.grid-corner {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  overflow: hidden;
+  padding: 0 1ch;
+  background: inherit;
+  color: var(--text-muted);
+  text-align: end;
+}
+
+.grid-head .grid-corner {
+  z-index: 3;
+  color: var(--text-primary);
+}
+
+.grid-head-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: default;
+  user-select: none;
+}
+
+.grid-head-cell[data-align="end"] {
+  justify-content: flex-end;
+}
+
+.grid-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grid-sort {
+  display: inline-grid;
+  flex: none;
+  visibility: hidden;
+}
+
+.grid-sort[data-direction] {
+  visibility: visible;
+}
+
+.grid-sort[data-direction="ascending"] {
+  transform: rotate(180deg);
+}
+
+/* The type region: a 2 px mark under the header (the --mark-* tokens, checked at 3:1 on the header
+   band), a fill on the selected column. */
+.grid-head-cell[data-region="blue"] { box-shadow: inset 0 -2px 0 var(--mark-blue); }
+.grid-head-cell[data-region="green"] { box-shadow: inset 0 -2px 0 var(--mark-green); }
+.grid-head-cell[data-region="purple"] { box-shadow: inset 0 -2px 0 var(--mark-purple); }
+.grid-head-cell[data-region="orange"] { box-shadow: inset 0 -2px 0 var(--mark-orange); }
+.grid-head-cell[data-region="grey"] { box-shadow: inset 0 -2px 0 var(--mark-grey); }
+
+.grid-body .grid-cell[data-selcol][data-region="blue"] { background: var(--region-blue-fill); }
+.grid-body .grid-cell[data-selcol][data-region="green"] { background: var(--region-green-fill); }
+.grid-body .grid-cell[data-selcol][data-region="purple"] { background: var(--region-purple-fill); }
+.grid-body .grid-cell[data-selcol][data-region="orange"] { background: var(--region-orange-fill); }
+.grid-body .grid-cell[data-selcol][data-region="grey"] { background: var(--region-grey-fill); }
+
+/* The active cell: a 1 px ring in the focus colour at all times (a mouse user needs to see it too),
+   the full 2 px ring when the grid has keyboard focus. */
+.grid-cell[data-active] {
+  outline: 1px solid var(--focus-ring);
+  outline-offset: -1px;
+}
+
+.grid:focus-visible .grid-cell[data-active] {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: calc(var(--focus-width) * -1);
+}
+
+/* Rows whose page is still loading show an empty zebra row, not a spinner per row. */
+.grid-row[data-pending] .grid-cell {
+  color: transparent;
+}
+
+@media (forced-colors: active) {
+  .grid-cell[data-active] {
+    outline: 2px solid Highlight;
+  }
+
+  .grid-head-cell[data-region] {
+    border-bottom: 2px solid CanvasText;
+    box-shadow: none;
+  }
+}

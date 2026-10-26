@@ -28,8 +28,8 @@ preview (paged) → clean → profile/analyze → chart → export an HTML/PDF r
 ## Schedule
 **D1 (Sun 10-25) — unblock.** Commit 3.7 WIP only if green (else `git stash`, revisit later). Delete stray `main.py`, `src/`. One PR: Phase 2 + 3 → `main`, merge. Split `requirements.txt` runtime/dev.
 **D2 — backend runs from one command.** `apps/api/Dockerfile`, `docker-compose.yml` (api, worker, postgres, redis, minio, sandbox worker `network_mode: none`). Script: signup → CSV upload → job → preview passes on compose.
-**D3 — frontend foundation.** `openapi-typescript` client, TanStack Router/Query, Tailwind + shadcn, tokens from `theme/tokens.css`. Auth screens (signup, verify, login), org/project list.
-**D4 — app shell.** Layout, project page, nav for the 5 areas, error/empty states from `assets/ui-contract/ui-copy.json`.
+**D3 — frontend foundation.** `openapi-typescript` client, TanStack Router/Query, **headless primitives with our own flat CSS (no shadcn/Tailwind defaults: rounded cards fight the theme)**, tokens from the Instrument design system (`assets/design-tokens/instrument.json` → `apps/web/src/theme/tokens.css`; spec in `plans/phase-4-design-reference.md`). Auth screens (signup, verify, login), org/project list.
+**D4 — app shell.** The C6-style workbench: chrome band, tab strips, panes with resizable gutters, collapse/maximise and tab groups (fixed arrangement, no free docking at launch); the 5 areas are views opened from the View menu and `1`–`5` shortcuts (no separate nav control); error/empty states from `assets/ui-contract/ui-copy.json`.
 **D5 — upload.** File picker (filters from `file-picker-filters.json`), upload, job polling, failure messages (closed error codes).
 **D6 — preview.** TanStack Table + Virtual over server paging; column types/profile header.
 **D7 — generic stage runner.** Catalog-driven form + run + result viewer. Wire Clean ops end to end.

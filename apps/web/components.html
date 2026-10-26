@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Instrument components</title>
+    <style>
+      /* Dev gallery layout only; every colour and size is a generated token. */
+      .g-page { display: grid; gap: var(--size-gutter); max-width: 64rem; margin: 0 auto; padding: 1rem; }
+      .g-h1 { margin: 0; padding: 0 0.5rem; background: var(--surface-chrome); font-size: var(--size-font); font-weight: 400; line-height: var(--size-chrome); }
+      .g-box { border: 1px solid var(--border-default); background: var(--surface-pane); }
+      .g-title { margin: 0; padding: 0 0.5rem; background: var(--surface-chrome); font-size: var(--size-font); font-weight: 400; line-height: var(--size-tab); }
+      .g-body { display: grid; gap: 0.5rem; padding: 0.5rem; }
+      .g-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.5rem; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/components/gallery.tsx"></script>
+  </body>
+</html>

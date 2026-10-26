@@ -1,0 +1,135 @@
+{
+  "$provenance": "Instrument design tokens, Phase 4. Values come from plans/phase-4-design-reference.md Part T (measured on the C6 hex-editor screenshot and the B4 spec-sheet screenshot, +-3 per channel). Each token is [value, source, note]; source is 'measured' (read from an image), 'derived' (computed from measured values) or 'proposal' (my choice, not in the image). Edit this file, then run: python scripts/build_design_tokens.py",
+  "schema_version": 1,
+  "color_scheme": "dark",
+  "surface": {
+    "canvas": ["#0e0e0e", "proposal", "behind the panes (gutters, dock background); equals the measured scrollbar track"],
+    "chrome": ["#252525", "measured", "menu bar, toolbar, tab strip, title bars"],
+    "pane": ["#151618", "measured", "default panel content"],
+    "region-base": ["#131416", "measured", "pane colour under the hex grid; the 50 % rule was verified over this value"],
+    "well": ["#111111", "measured", "code editor and plot wells"],
+    "well-frame": ["#262626", "measured", "frame around a well"],
+    "table-header": ["#303030", "measured", "table header row"],
+    "zebra": ["#202325", "measured", "alternate table row over the pane colour"],
+    "status-separator": ["#2c2c30", "measured", "line above the status strip"]
+  },
+  "border": {
+    "default": ["#212026", "measured", "unfocused pane border; decorative only (1.12:1)"],
+    "focused": ["#424146", "measured", "focused pane border; decorative only (1.79:1), use the focus ring for focus"],
+    "control": ["#5073a0", "derived", "1 px edge drawn outside fields, selects and buttons so they have a 3:1 boundary (WCAG 1.4.11); 3.14:1 on chrome, a lighter step of the blue.field-button hue so it reads as a bevel, not an outline"]
+  },
+  "mark": {
+    "blue": ["#2f86c6", "derived", "2 px type mark under a grid header; region.blue lightened because region.blue is only 2.70:1 on the table header (this is 3.36:1)"],
+    "green": ["#279f27", "derived", "same as region.green (3.82:1 on the table header)"],
+    "purple": ["#9963c3", "derived", "same as region.purple (3.10:1 on the table header)"],
+    "orange": ["#ef8220", "derived", "same as region.orange (4.95:1 on the table header)"],
+    "grey": ["#838280", "derived", "same as region.grey (3.44:1 on the table header)"]
+  },
+  "scrollbar": {
+    "track": ["#0e0e0e", "measured", ""],
+    "thumb": ["#707073", "proposal", "measured thumb was #4f4f50 (2.36:1 on the track); raised to pass 3:1"]
+  },
+  "text": {
+    "primary": ["#e5e6e7", "measured", "values"],
+    "secondary": ["#d4d5d7", "measured", "row labels"],
+    "muted": ["#8f9296", "proposal", "hints and disabled-looking text that must still pass 4.5:1"],
+    "on-accent": ["#ffffff", "proposal", "text on the focused-tab blue"],
+    "syntax-literal": ["#39993e", "measured", "hex literals in the code well"],
+    "syntax-lineno": ["#2f9ea3", "proposal", "line numbers (teal, eyeballed in the image)"],
+    "syntax-keyword": ["#4a90d9", "proposal", "keywords (blue, eyeballed in the image)"]
+  },
+  "blue": {
+    "tab-focused": ["#2e6aac", "measured", "active tab of the focused pane; also the primary accent"],
+    "tab-unfocused": ["#22416c", "measured", "active tab of an unfocused pane"],
+    "tab-inactive": ["#101824", "measured", "inactive tab"],
+    "field": ["#243854", "measured", "combo box and field fill"],
+    "field-button": ["#2e527e", "measured", "arrow button on a field"],
+    "button": ["#264a72", "measured", "enabled button"],
+    "button-disabled": ["#1c3050", "measured", "disabled button and unselected radio"],
+    "radio-on": ["#3d97f8", "measured", "selected radio dot"],
+    "plot-line": ["#4d6fa9", "measured", "data line in the plot well (3.74:1: graphics only)"],
+    "preview": ["#4e5a92", "measured", "colour-preview well"],
+    "accent-hover": ["#265a96", "proposal", "hover state of the accent"]
+  },
+  "semantic": {
+    "ok": ["#3bd65a", "proposal", "success text"],
+    "warn": ["#c3bd27", "derived", "the region yellow; amber is reserved for editable cells (decision 2)"],
+    "danger": ["#ff5a4d", "proposal", "error text on the pane"],
+    "info": ["#3d97f8", "measured", "same as radio-on"],
+    "editable": ["#ff9f27", "measured", "B4 amber: the one editable value in a sheet"],
+    "editable-text": ["#030303", "measured", "black text on the editable fill"],
+    "alert-bar": ["#a50f27", "measured", "B4 crimson: one full-width alert bar per window"],
+    "alert-text": ["#ffffff", "proposal", "text on the alert bar"]
+  },
+  "focus": {
+    "ring": ["#8cc4ff", "proposal", "visible focus indicator; C6's own border is only 1.79:1"],
+    "width": ["2px", "proposal", ""],
+    "offset": ["1px", "proposal", ""]
+  },
+  "region": {
+    "fill_opacity": 0.5,
+    "fill_over": "surface.region-base",
+    "keys": {
+      "red": ["#d52d21", "measured", ""],
+      "green": ["#279f27", "measured", ""],
+      "purple": ["#9963c3", "measured", ""],
+      "pink": ["#e775c3", "measured", ""],
+      "yellow": ["#c3bd27", "measured", ""],
+      "blue": ["#2376b0", "derived", "recovered as 2*fill - pane from the measured fill #1b4563"],
+      "teal": ["#23bec8", "derived", "recovered from the measured fill #1b696f"],
+      "orange": ["#ef8220", "derived", "recovered from the measured fill #814b1b"],
+      "grey": ["#838280", "derived", "recovered from the measured fill #4b4b4b"],
+      "brown": ["#8f5e50", "derived", "recovered from the measured fill #513933"]
+    },
+    "series_order": ["blue", "orange", "teal", "pink", "yellow", "purple", "green", "red", "brown", "grey"]
+  },
+  "size": {
+    "font": ["0.6875rem", "measured", "11 px monospace (decision 8)"],
+    "row": ["1rem", "measured", "16 px table row (decision 8): the single row-height variable"],
+    "row-dense": ["0.75rem", "measured", "12 px hex/cell-grid row"],
+    "chrome": ["2.25rem", "measured", "36 px menu + toolbar band"],
+    "tab": ["0.875rem", "measured", "14 px tab"],
+    "status": ["1.0625rem", "measured", "17 px status strip"],
+    "gutter": ["0.1875rem", "measured", "3 px between panes"],
+    "scrollbar": ["0.5625rem", "measured", "9 px"],
+    "tab-radius": ["0.1875rem", "measured", "3 px top corners of a tab"],
+    "hit-target-min": ["1.5rem", "proposal", "24 px invisible hit area for small controls (WCAG 2.2 SC 2.5.8)"]
+  },
+  "font": {
+    "mono": ["\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace", "proposal", "candidate stack; no font file is bundled yet"]
+  },
+  "layout": {
+    "col-1": ["43.6%", "measured", "hex editor column"],
+    "col-2": ["24.7%", "measured", "inspector column"],
+    "col-3": ["31.1%", "measured", "right dock column"],
+    "row-top": ["69%", "measured", "top panes of the two left columns"],
+    "row-bottom": ["31%", "measured", "full-width bottom pane"],
+    "right-split": ["50%", "measured", "right dock: editor over plot"]
+  },
+  "checks": [
+    ["text.primary", "surface.pane", 4.5], ["text.primary", "surface.chrome", 4.5], ["text.primary", "surface.well", 4.5],
+    ["text.primary", "surface.table-header", 4.5], ["text.primary", "surface.zebra", 4.5],
+    ["text.secondary", "surface.pane", 4.5], ["text.secondary", "surface.zebra", 4.5],
+    ["text.muted", "surface.pane", 4.5], ["text.muted", "surface.zebra", 4.5], ["text.muted", "surface.well", 4.5],
+    ["text.on-accent", "blue.tab-focused", 4.5], ["text.primary", "blue.tab-unfocused", 4.5], ["text.primary", "blue.tab-inactive", 4.5],
+    ["text.primary", "blue.field", 4.5], ["text.primary", "blue.button", 4.5],
+    ["semantic.editable-text", "semantic.editable", 4.5], ["semantic.alert-text", "semantic.alert-bar", 4.5],
+    ["semantic.ok", "surface.pane", 4.5], ["semantic.warn", "surface.pane", 4.5], ["semantic.danger", "surface.pane", 4.5], ["semantic.info", "surface.pane", 4.5],
+    ["semantic.editable", "surface.pane", 4.5],
+    ["text.syntax-literal", "surface.well", 4.5], ["text.syntax-lineno", "surface.well", 4.5], ["text.syntax-keyword", "surface.well", 4.5],
+    ["blue.radio-on", "surface.pane", 3.0], ["blue.plot-line", "surface.well", 3.0], ["scrollbar.thumb", "scrollbar.track", 3.0],
+    ["focus.ring", "surface.pane", 3.0], ["focus.ring", "surface.chrome", 3.0], ["focus.ring", "surface.well", 3.0],
+    ["focus.ring", "surface.table-header", 3.0], ["focus.ring", "blue.tab-focused", 3.0],
+    ["focus.ring", "surface.canvas", 3.0], ["focus.ring", "blue.tab-unfocused", 3.0], ["focus.ring", "blue.tab-inactive", 3.0], ["focus.ring", "blue.field", 3.0],
+    ["border.control", "surface.pane", 3.0], ["border.control", "surface.chrome", 3.0], ["border.control", "surface.canvas", 3.0], ["border.control", "surface.zebra", 3.0],
+    ["mark.blue", "surface.table-header", 3.0], ["mark.blue", "surface.pane", 3.0],
+    ["mark.green", "surface.table-header", 3.0], ["mark.green", "surface.pane", 3.0],
+    ["mark.purple", "surface.table-header", 3.0], ["mark.purple", "surface.pane", 3.0],
+    ["mark.orange", "surface.table-header", 3.0], ["mark.orange", "surface.pane", 3.0],
+    ["mark.grey", "surface.table-header", 3.0], ["mark.grey", "surface.pane", 3.0]
+  ],
+  "known_weak": [
+    ["border.focused", "surface.pane", "decorative; the focus ring carries focus"],
+    ["border.default", "surface.pane", "decorative"]
+  ]
+}

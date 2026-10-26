@@ -1,0 +1,207 @@
+/* Pane views: sign-in, first-run, the Data pane frame, the profile plot well. Tokens only. */
+
+.pane-body > .empty {
+  padding: 0.25rem 0.5rem;
+}
+
+.view {
+  overflow: auto;
+}
+
+/* A view that fills its pane body (the body is the positioned box). */
+.pane-body > .view {
+  position: absolute;
+  inset: 0;
+}
+
+.view-center {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+}
+
+.view-title {
+  margin: 0 0 0.25rem;
+  color: var(--text-primary);
+  font-size: inherit;
+  font-weight: 400;
+}
+
+.sign-in,
+.first-run {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(100%, 24rem);
+}
+
+.first-run p {
+  margin: 0;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 6rem 1fr;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-row .field {
+  width: 100%;
+  min-width: 0;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.meter {
+  width: 100%;
+  height: var(--size-row);
+  accent-color: var(--blue-radio-on);
+}
+
+/* ---- the Data pane ------------------------------------------------------------------------ */
+
+.dropzone {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.dropzone[data-dragging] {
+  outline: 2px dashed var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.drop-hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(14 14 14 / 0.85);
+  color: var(--text-primary);
+  pointer-events: none;
+}
+
+.banner {
+  flex: none;
+  margin: 0;
+  padding: 0 0.5rem;
+  background: var(--blue-tab-unfocused);
+  color: var(--text-primary);
+}
+
+.dataset-view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.dataset-view > .grid {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+/* One-line readout under the grid (K11): what is in view and what is selected. */
+.readout {
+  display: flex;
+  flex: none;
+  gap: 1.5rem;
+  height: var(--size-row);
+  padding: 0 0.5rem;
+  overflow: hidden;
+  border-top: 1px solid var(--border-default);
+  background: var(--surface-pane);
+  line-height: var(--size-row);
+  white-space: nowrap;
+}
+
+/* ---- inspector ---------------------------------------------------------------------------- */
+
+.cell-value {
+  margin: 0.25rem 0.5rem;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* ---- profile plot well (K13) -------------------------------------------------------------- */
+
+.plot-frame {
+  margin: 0.25rem;
+  padding: 0.25rem;
+  background: var(--surface-well-frame);
+}
+
+.plot-well {
+  padding: 0.25rem 0.5rem;
+  background: var(--surface-well);
+}
+
+.plot-title {
+  margin: 0 0 0.25rem;
+  color: var(--text-primary);
+  font-size: inherit;
+  font-weight: 400;
+}
+
+.bars {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(6ch, 12ch) 1fr 8ch;
+  gap: 0.5rem;
+  height: var(--size-row);
+  line-height: var(--size-row);
+}
+
+.bar-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  align-self: center;
+  height: 0.5rem;
+  background: var(--surface-canvas);
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+}
+
+.bar-value {
+  text-align: end;
+}
+
+.bar-row[data-selected] {
+  box-shadow: -0.25rem 0 0 var(--focus-ring);
+}
+
+.readout-line {
+  margin: 0.25rem 0.5rem;
+}
+
+@media (forced-colors: active) {
+  .bar-track {
+    border: 1px solid CanvasText;
+  }
+
+  .bar-fill {
+    background: Highlight !important;
+  }
+}

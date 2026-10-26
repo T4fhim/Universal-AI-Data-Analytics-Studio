@@ -1,0 +1,161 @@
+@import "./tokens.css";
+
+/* Dev-only token gallery: uses only the generated tokens. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--size-font);
+  line-height: var(--size-row);
+}
+
+#token-page {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 1rem;
+  display: grid;
+  gap: var(--size-gutter);
+}
+
+.tp-h1 {
+  margin: 0;
+  padding: 0 0.5rem;
+  background: var(--surface-chrome);
+  font-size: var(--size-font);
+  font-weight: 400;
+  line-height: var(--size-chrome);
+}
+
+.tp-section {
+  background: var(--surface-pane);
+  padding: 0.5rem;
+}
+
+.tp-title {
+  margin: 0;
+  font-size: var(--size-font);
+  font-weight: 400;
+  color: var(--text-primary);
+}
+
+.tp-note {
+  margin: 0 0 0.5rem;
+  color: var(--text-muted);
+}
+
+.tp-swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+}
+
+.tp-swatch {
+  display: grid;
+  grid-template-columns: 2.25rem 1fr;
+  grid-template-rows: var(--size-row) var(--size-row);
+  column-gap: 0.5rem;
+  align-items: center;
+  padding: 0.125rem 0;
+}
+
+.tp-swatch .tp-chip {
+  grid-row: 1 / 3;
+  height: 2rem;
+}
+
+.tp-chip {
+  display: inline-block;
+  width: 2.25rem;
+  height: var(--size-row);
+  border: 1px solid var(--border-focused);
+}
+
+.tp-dim {
+  color: var(--text-muted);
+}
+
+.tp-region-row {
+  display: grid;
+  grid-template-columns: 2.25rem 5rem 15rem 16rem 6rem;
+  column-gap: 0.5rem;
+  align-items: center;
+  height: var(--size-row);
+  margin-bottom: 2px;
+}
+
+.tp-cells {
+  padding: 0 0.5rem;
+  letter-spacing: 0.05em;
+}
+
+.tp-series {
+  display: flex;
+  height: 1.5rem;
+}
+
+.tp-bar {
+  flex: 1;
+  margin-right: 1px;
+}
+
+.tp-pane {
+  width: 24rem;
+  border: 1px solid var(--border-focused);
+  background: var(--surface-pane);
+}
+
+.tp-tabs {
+  display: flex;
+  background: var(--surface-chrome);
+  height: var(--size-tab);
+}
+
+.tp-tab {
+  padding: 0 0.8rem;
+  line-height: var(--size-tab);
+  border-radius: var(--size-tab-radius) var(--size-tab-radius) 0 0;
+}
+
+.tp-tab-focused {
+  background: var(--blue-tab-focused);
+  color: var(--text-on-accent);
+}
+
+.tp-tab-unfocused {
+  background: var(--blue-tab-unfocused);
+}
+
+.tp-tab-inactive {
+  background: var(--blue-tab-inactive);
+}
+
+.tp-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: var(--size-row);
+  padding: 0 0.5rem;
+}
+
+.tp-row:nth-child(even) {
+  background: var(--surface-zebra);
+}
+
+.tp-crow {
+  display: grid;
+  grid-template-columns: 1fr 5rem 6rem;
+  height: var(--size-row);
+}
+
+.tp-crow:nth-child(even) {
+  background: var(--surface-zebra);
+}
+
+.tp-fail {
+  color: var(--semantic-danger);
+}

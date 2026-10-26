@@ -1,0 +1,385 @@
+/*
+ * Instrument workbench: the C6 layout (plans/phase-4-design-reference.md T2/T5).
+ * Flat panes, hairline gutters, no shadows, no margins around anything. Colours and component
+ * sizes come from the generated tokens; the few spacing literals are padding and hit areas.
+ */
+
+.workbench {
+  display: grid;
+  grid-template-rows: var(--size-chrome) minmax(0, 1fr) calc(var(--size-status) + 2px);
+  height: 100vh;
+  height: 100dvh;
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+  font: var(--size-font) / var(--size-row) var(--font-mono);
+}
+
+/* ---- chrome band: menu row + toolbar row, one flat colour -------------------------------- */
+
+.chrome {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  background: var(--surface-chrome);
+}
+
+.menubar {
+  display: flex;
+}
+
+.menu-trigger {
+  position: relative;
+  padding: 0 0.75rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+
+.menu-trigger[data-highlighted],
+.menu-trigger[data-state="open"] {
+  background: var(--blue-field);
+}
+
+/* 24 px invisible hit area on 18 px / 14 px controls (decision 8 mitigation). */
+.menu-trigger::after,
+.tab::after,
+.icon-button::after {
+  content: "";
+  position: absolute;
+  inset: calc((100% - var(--size-hit-target-min)) / 2) 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.25rem;
+}
+
+.toolbar-user {
+  margin-left: auto;
+  color: var(--text-primary);
+}
+
+.field {
+  box-shadow: 0 0 0 1px var(--border-control);
+  height: var(--size-row);
+  min-width: 12rem;
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: 0;
+  background: var(--blue-field);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.field:disabled {
+  color: var(--text-muted);
+}
+
+/* ---- menu popup -------------------------------------------------------------------------- */
+
+.menu {
+  z-index: 10;
+  min-width: 12rem;
+  border: 1px solid var(--border-focused);
+  background: var(--surface-chrome);
+  color: var(--text-primary);
+  font: var(--size-font) / var(--size-row) var(--font-mono);
+}
+
+.menu-item,
+.menu-label {
+  display: flex;
+  align-items: center;
+  height: var(--size-hit-target-min);
+  padding-right: 0.5rem;
+}
+
+.menu-label {
+  padding-left: 0.5rem;
+  color: var(--text-muted);
+}
+
+.menu-item {
+  gap: 0.25rem;
+  cursor: default;
+}
+
+.menu-item:focus-visible {
+  outline-offset: -2px;
+}
+
+.menu-item[data-highlighted] {
+  background: var(--blue-field);
+}
+
+.menu-item[data-disabled] {
+  color: var(--text-muted);
+}
+
+.menu-indicator {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--size-row);
+}
+
+.menu-shortcut {
+  margin-left: auto;
+  padding-left: 1.5rem;
+  color: var(--text-secondary);
+}
+
+.menu-separator {
+  height: 1px;
+  background: var(--border-focused);
+}
+
+/* ---- dock: panes and gutters -------------------------------------------------------------- */
+
+.dock {
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface-canvas);
+}
+
+.fill {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.sep {
+  position: relative;
+  flex: none;
+  background: var(--surface-canvas);
+}
+
+.sep[aria-orientation="vertical"] {
+  width: var(--size-gutter);
+  cursor: col-resize;
+}
+
+.sep[aria-orientation="horizontal"] {
+  height: var(--size-gutter);
+  cursor: row-resize;
+}
+
+/* The gutter is 3 px wide; widen what the pointer can grab (19 px) without widening what is
+   drawn. It cannot reach 24 px without covering the neighbouring pane's controls. */
+.sep::after {
+  content: "";
+  position: absolute;
+  inset: -0.5rem;
+}
+
+.sep[data-separator="hover"],
+.sep[data-separator="active"] {
+  background: var(--border-focused);
+}
+
+.sep[data-separator="focus"] {
+  background: var(--focus-ring);
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--border-default);
+  background: var(--surface-pane);
+}
+
+.pane[data-focused] {
+  border-color: var(--border-focused);
+}
+
+.pane:focus-visible {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.pane-root {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pane-strip {
+  display: flex;
+  flex: none;
+  min-height: var(--size-tab);
+  background: var(--surface-chrome);
+}
+
+.pane-tablist {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.tab {
+  position: relative;
+  padding: 0 0.8rem;
+  border: 0;
+  border-radius: var(--size-tab-radius) var(--size-tab-radius) 0 0;
+  background: var(--blue-tab-inactive);
+  color: var(--text-primary);
+  font: inherit;
+  min-width: 0;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.tab-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab[data-state="active"] {
+  background: var(--blue-tab-unfocused);
+}
+
+.pane[data-focused] .tab[data-state="active"] {
+  background: var(--blue-tab-focused);
+  color: var(--text-on-accent);
+}
+
+.pane-actions {
+  display: flex;
+  flex: none;
+}
+
+.icon-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--size-hit-target-min);
+  height: var(--size-tab);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--blue-field);
+}
+
+.icon-button:disabled {
+  color: var(--text-muted);
+}
+
+.tab:focus-visible,
+.icon-button:focus-visible,
+.collapsed-button:focus-visible,
+.menu-trigger:focus-visible {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.pane-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.empty {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.pane-collapsed {
+  background: var(--surface-chrome);
+}
+
+.collapsed-button {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  height: 100%;
+  padding: 0 0.25rem;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: default;
+}
+
+.pane-collapsed[data-collapses="width"] .collapsed-button {
+  padding: 0.25rem 0;
+  writing-mode: vertical-rl;
+}
+
+/* ---- status strip ------------------------------------------------------------------------- */
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 0.5rem;
+  border-top: 2px solid var(--surface-status-separator);
+  background: var(--surface-pane);
+}
+
+.status-clock {
+  margin-left: auto;
+}
+
+.dim {
+  color: var(--text-muted);
+}
+
+/* ---- maximised pane: the same element, laid over the dock ------------------------------- */
+
+.pane[data-maximised] {
+  position: fixed;
+  top: var(--size-chrome);
+  right: 0;
+  bottom: calc(var(--size-status) + 2px);
+  left: 0;
+  z-index: 5;
+  width: auto;
+  height: auto;
+}
+
+/* The gutters behind a maximised pane must not be reachable by Tab or pointer. */
+.dock[data-has-maximised] [data-separator] {
+  visibility: hidden;
+}
+
+/* Windows high-contrast: background-only states disappear, so mark them with text decoration
+   and system colours. */
+@media (forced-colors: active) {
+  .tab[data-state="active"],
+  .menu-trigger[data-state="open"] {
+    text-decoration: underline;
+  }
+
+  .pane[data-focused] {
+    border-color: Highlight;
+  }
+
+  .menu-item[data-highlighted] {
+    outline: 1px solid Highlight;
+  }
+}
+
+@media (forced-colors: active) {
+  .field {
+    border: 1px solid ButtonText;
+  }
+}

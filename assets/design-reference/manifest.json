@@ -1,0 +1,786 @@
+{
+  "$provenance": "Written 2026-10-26 from the analysis in plans/phase-4-design-reference.md (Part T and section 2). The 29 reference images are third-party screenshots and stay OUT of the repository (decision 7); each entry carries a sha256 so a local copy can be matched to its entry. Palette values are measured from the images (+-3 per channel, JPEG noise). Regenerate only by editing this file.",
+  "schema_version": 1,
+  "decided": "2026-10-26",
+  "roles": {
+    "base": "Defines the theme and layout (the two images chosen into the theme/ folder).",
+    "stepping-stone": "Source of new graphs/visualisations and components, re-skinned in the base language.",
+    "skin": "Optional post-launch skin (Phosphor or Editorial)."
+  },
+  "entries": [
+    {
+      "id": "A1",
+      "file": "7057570b873785d3eaa650fbc54983b1.jpg",
+      "label": "Churn prediction SaaS dashboard",
+      "family": "A",
+      "role": "stepping-stone",
+      "palette": {
+        "page": "#161616",
+        "card": "#1a1a1a",
+        "accent": "#f2621e",
+        "success": "#4eaf68",
+        "amber": "#f3aa32"
+      },
+      "notes": "Area line with end dot, donut with legend rows, value-labelled histogram, KPI cards; AI-generated, text partly garbled.",
+      "plan_ref": "2/A1",
+      "sha256": "7c311d6106529070947cbb88aa0c95dbef978f25d1b46892c39a3cbea7674b65",
+      "size": [
+        1200,
+        2133
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V01",
+        "V02",
+        "V16",
+        "V17",
+        "V25",
+        "V54"
+      ]
+    },
+    {
+      "id": "A2",
+      "file": "8de19ce83334e96f8e2f8f2bef67d1c6.jpg",
+      "label": "Vaultify DeFi overview",
+      "family": "A",
+      "role": "stepping-stone",
+      "palette": {
+        "card": "#121212",
+        "orange": "#d88552",
+        "purple": "#6f69cb",
+        "amber": "#fbcd72",
+        "green": "#22ab6c"
+      },
+      "notes": "Line with dashed trendline and crosshair tooltip, KPI mini-charts, status chips, segment pill bars.",
+      "plan_ref": "2/A2",
+      "sha256": "0e769a6d8c25f9455804a2e04b01aa52b184bd0e2443ff2323106ef0546ae46f",
+      "size": [
+        1200,
+        900
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V01",
+        "V02",
+        "V10",
+        "V21"
+      ]
+    },
+    {
+      "id": "A3",
+      "file": "3a22871c6ae50692e421a8662e2d117b.jpg",
+      "label": "ORION hex-map analytics",
+      "family": "A",
+      "role": "stepping-stone",
+      "palette": {
+        "bg": "#14142c",
+        "blue": "#233299",
+        "electric": "#063afe",
+        "red": "#c7273e"
+      },
+      "notes": "Hexagon-bin heat map, 270-degree gauge, six-cell KPI strip.",
+      "plan_ref": "2/A3",
+      "sha256": "839f0a89ae0529d5ebe8ea91f6693c7b411cdf8785dd82e453dbbae380d26557",
+      "size": [
+        736,
+        414
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V16",
+        "V21",
+        "V27",
+        "V32"
+      ]
+    },
+    {
+      "id": "A4",
+      "file": "4c00b80226221a4ec228457b2c103590.jpg",
+      "label": "E-TechInvest deliverability ops",
+      "family": "A",
+      "role": "stepping-stone",
+      "palette": {
+        "bg": "#040404",
+        "orange": "#fa460a",
+        "hot": "#e63606",
+        "green": "#72be48"
+      },
+      "notes": "5x5 matrix heat map with numbers, semicircular gauge, level-coloured log pane, alert callouts; AI-generated.",
+      "plan_ref": "2/A4",
+      "sha256": "22a0fa04b957426d42c10841c46e6b1752d7e7ae63b24622e3c7e7b38048a2f1",
+      "size": [
+        941,
+        1672
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V02",
+        "V27",
+        "V29",
+        "V52"
+      ]
+    },
+    {
+      "id": "A5",
+      "file": "fd58bb3831ee0e7d0ec898140e6d4c5e.jpg",
+      "label": "mount climbing metrics and terrain",
+      "family": "A",
+      "role": "stepping-stone",
+      "palette": {
+        "bezel": "#0a0a0a",
+        "lime": "#d6ee8a",
+        "pale_blue": "#a6cad2",
+        "backdrop": "#6f8890"
+      },
+      "notes": "Shared-axis small multiples, capsule range bars, strip plot, isometric terrain contour with route.",
+      "plan_ref": "2/A5",
+      "sha256": "0795a5f8be6c45c1d8f2e70d12bd720a59fb130b46aad8b43e615f84ca3825a7",
+      "size": [
+        1200,
+        900
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V01",
+        "V19",
+        "V42"
+      ]
+    },
+    {
+      "id": "A6",
+      "file": "Screenshot_26-10-2026_153040_openrouter.ai.jpeg",
+      "label": "OpenRouter model rankings (16k px)",
+      "family": "A",
+      "role": "stepping-stone",
+      "palette": {
+        "page": "#020a0a",
+        "card": "#0e1216",
+        "lime": "#c6fe02",
+        "pink": "#fe6ab2",
+        "teal": "#02c6a2",
+        "blue": "#028afe",
+        "orange": "#fe8242",
+        "vermilion": "#fe4602",
+        "green": "#3eb272",
+        "steel": "#4682b6",
+        "orchid": "#da72d6",
+        "cyan": "#3ee2d2",
+        "amber": "#feba2a",
+        "yellow_green": "#9ace32",
+        "salmon": "#f27e82",
+        "violet": "#7a6aee"
+      },
+      "notes": "The chart reference (decision 9): stacked and 100% stacked columns with Absolute/Percentage and Linear/Log chips, treemap, dumbbell, Pareto scatter, ranked lists.",
+      "privacy": "Footer shows part of a signed-in email address; never commit the image.",
+      "plan_ref": "2/A6",
+      "sha256": "7228f3fb845d0c62381d12dd73db36e6fa4f9c1a7e4834885c10a6cb1d685178",
+      "size": [
+        1763,
+        16101
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V11",
+        "V12",
+        "V20",
+        "V24",
+        "V34",
+        "V54"
+      ]
+    },
+    {
+      "id": "A7",
+      "file": "860170b9d079ffc539ea04edd7b538ba.jpg",
+      "label": "SUI monochrome mobile app",
+      "family": "A",
+      "role": "stepping-stone",
+      "palette": {
+        "backdrop": "#c9d1d3",
+        "screen": "#141517",
+        "mint": "#4ec9a0"
+      },
+      "notes": "Hatch/stipple pattern fills instead of colour, waffle chart, barcode distribution bar, monochrome heat map.",
+      "plan_ref": "2/A7",
+      "sha256": "604b45dc0556f16b64e81f379b29eede2a7293ee24e9dfe5117b37ea5539e019",
+      "size": [
+        736,
+        1308
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V04",
+        "V10",
+        "V14",
+        "V21",
+        "V22",
+        "V23",
+        "V31"
+      ]
+    },
+    {
+      "id": "A8",
+      "file": "3d1352728aa43472c4545cec39b9c31a.jpg",
+      "label": "Habits calendar heat map (photographed)",
+      "family": "A",
+      "role": "stepping-stone",
+      "palette": {
+        "empty_cell": "#4a4e7a"
+      },
+      "notes": "Contribution-style calendar heat map, one hue per series; photo, so colours are skewed.",
+      "plan_ref": "2/A8",
+      "sha256": "5296dc55a37f46c0837e1c452dcbe17dcf7e9b74f0f1a34873bcc5510eb80402",
+      "size": [
+        736,
+        981
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V30"
+      ]
+    },
+    {
+      "id": "A9",
+      "file": "19557e6f37e3581637be10d43f2ebffe.jpg",
+      "label": "Resource Overview, bracket UI",
+      "family": "A",
+      "role": "stepping-stone",
+      "palette": {
+        "bg": "#040404",
+        "red": "#bd3024",
+        "orange": "#e17848",
+        "amber": "#efbd64",
+        "text": "#f1f0c8"
+      },
+      "notes": "Bracket tags [ label: value ], narrow thermal stacked columns.",
+      "plan_ref": "2/A9",
+      "sha256": "07cf5ba5f63bf6d83f3e83015eddc20742b204fed70c02448a9a9a1f98f71d86",
+      "size": [
+        735,
+        851
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V11",
+        "V13"
+      ]
+    },
+    {
+      "id": "A10",
+      "file": "6a621ee0df080680053844.png",
+      "label": "HydraDB pixel-tree poster",
+      "family": "A",
+      "role": "stepping-stone",
+      "palette": {
+        "bg": "#040404",
+        "orange": "#fe561a"
+      },
+      "notes": "Pixel-square branching scatter in heat colours with annotation boxes.",
+      "plan_ref": "2/A10",
+      "sha256": "42e115262ccb37f0a9be2ec89946f16562c53f95cad8ab03920f7acdacb86b27",
+      "size": [
+        1600,
+        1200
+      ],
+      "format": "PNG",
+      "viz": [
+        "V50"
+      ]
+    },
+    {
+      "id": "B1",
+      "file": "3145431813015105b2c0b6d28d829be3.jpg",
+      "label": "Terminal-style 4-pane",
+      "family": "B",
+      "role": "stepping-stone",
+      "palette": {
+        "title_bar": "#454545",
+        "plot": "#15151b",
+        "area_fill": "#09213f",
+        "amber": "#ff9f27",
+        "crimson": "#870f1b",
+        "tile_red": "#990f2d",
+        "tile_red_mild": "#6f0921",
+        "tile_green": "#03570f",
+        "tile_green_mild": "#032d09",
+        "tile_grey": "#4b4b4b"
+      },
+      "notes": "Area chart with legend-as-readout, tile heat grid, chord diagram, table with two-segment sparklines. Was in the base set earlier.",
+      "plan_ref": "2/B1",
+      "sha256": "e845b2a8deeac1f4e46404221e40c4a6306a3e07c5091b990f3c07a03eeab604",
+      "size": [
+        648,
+        400
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V01",
+        "V10",
+        "V33",
+        "V38"
+      ]
+    },
+    {
+      "id": "B2",
+      "file": "62a18fd6a37d2131209723e8b0d8a3d9.jpg",
+      "label": "Terminal ALLINONE charts, MOST table, IMAP treemap",
+      "family": "B",
+      "role": "stepping-stone",
+      "palette": {
+        "fill_brick": "#5f2922"
+      },
+      "notes": "Three stacked normalised series with end-of-line price flags, in-cell data bars, sector treemap.",
+      "plan_ref": "2/B2",
+      "sha256": "bd3bac75810999c4381b248dc3b1b715647788394bb837dabed35d3a23c48d7f",
+      "size": [
+        1199,
+        1587
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V08",
+        "V16",
+        "V24",
+        "V56"
+      ]
+    },
+    {
+      "id": "B3",
+      "file": "dfa73688cefe46f51caae263cc12aace.jpg",
+      "label": "Terminal default-risk screen",
+      "family": "B",
+      "role": "stepping-stone",
+      "palette": {
+        "amber": "#e89b1c"
+      },
+      "notes": "Dual-axis line, category-coloured histogram, dot-range comparison rows, editable input cells.",
+      "plan_ref": "2/B3",
+      "sha256": "a952677971f75993199dcb899094d5e7dccbf075371d8c7d9fb5403a42e37cb3",
+      "size": [
+        735,
+        627
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V01",
+        "V09",
+        "V17",
+        "V20",
+        "V55"
+      ]
+    },
+    {
+      "id": "B4",
+      "file": "da814a0f815892d4ddefceba561b5640.jpg",
+      "label": "Security-description spec sheet",
+      "family": "B",
+      "role": "base",
+      "authority": "second core: components and information idioms",
+      "palette": {
+        "amber": "#ff9f27",
+        "crimson": "#a50f27",
+        "section_bar": "#333333",
+        "selected_tab": "#2d4b69",
+        "unselected_tab": "#272121",
+        "value_text": "#dddddd"
+      },
+      "notes": "Key/value sheet, two-row quote strip, numbered tabs and sections, three-column layout (30/33/33%), editable cell. Downsampled; ratios only.",
+      "plan_ref": "2/B4, T",
+      "sha256": "e8945797ade276e237ff3bf3cb1c3fa40ee38e2785c08072844bfa0b34760415",
+      "size": [
+        736,
+        522
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V02",
+        "V55"
+      ]
+    },
+    {
+      "id": "B5",
+      "file": "91a00b1e3e6b459479c0f7f34576fbe2.jpg",
+      "label": "Terminal tablet app",
+      "family": "B",
+      "role": "stepping-stone",
+      "palette": {},
+      "notes": "Overlay chips with series colour and close mark, percent-change comparison chart with Bollinger band.",
+      "plan_ref": "2/B5",
+      "sha256": "93e1bf5f4401a9132c2141f8df124046c815fd0b0528b73f0f8a5ee9c40e567f",
+      "size": [
+        768,
+        1024
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V01",
+        "V06",
+        "V08",
+        "V56"
+      ]
+    },
+    {
+      "id": "B6",
+      "file": "fb4eea1b7ce97101527b8b09e7485ab2.jpg",
+      "label": "Brokerage workstation mosaic",
+      "family": "B",
+      "role": "stepping-stone",
+      "palette": {
+        "title_bar_blue": "#0c2d78"
+      },
+      "notes": "Candles with volume, watch-list with solid green/red change cells and status dots.",
+      "plan_ref": "2/B6",
+      "sha256": "4b7ac71411db3dab837beef5ffd869e02898a165bfe8044a2629eab196bd3e69",
+      "size": [
+        910,
+        510
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V04",
+        "V33"
+      ]
+    },
+    {
+      "id": "B7",
+      "file": "1303961e6bb963ebe3d0735cc50692f3.jpg",
+      "label": "Crypto chart with Fibonacci, Gann, MACD, RSI, KDJ",
+      "family": "B",
+      "role": "stepping-stone",
+      "palette": {
+        "bg": "#040404"
+      },
+      "notes": "Indicator panes on a shared time axis, price axes on both sides, annotations.",
+      "plan_ref": "2/B7",
+      "sha256": "d433c3c8f08e28925b3636586f7d5b85d5e137aad78f4c25aab06f151d8ec66b",
+      "size": [
+        1200,
+        1200
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V04",
+        "V05",
+        "V06",
+        "V07",
+        "V09"
+      ]
+    },
+    {
+      "id": "B8",
+      "file": "657fbc46fd1326703ce5d4465338e702.jpg",
+      "label": "Hourly trading screen with signal matrix",
+      "family": "B",
+      "role": "stepping-stone",
+      "palette": {
+        "chart_bg": "#1b150f",
+        "tan_label": "#d5b787",
+        "cell": "#2d211b",
+        "blue": "#2169e1",
+        "yellow": "#e7cf03",
+        "purple": "#6333f9",
+        "red_chip": "#ff0303",
+        "orange_chip": "#ff6921",
+        "candle_up": "#50c35c",
+        "candle_down": "#b12834",
+        "hist_pos": "#303db5",
+        "hist_neg": "#7d1dc8"
+      },
+      "notes": "Signal matrix and status chips (kept for the data-quality grid); garish header and low visual quality. Was in the base set earlier.",
+      "plan_ref": "2/B8",
+      "sha256": "a72f3d7f0719fe9541002e6c6c5f1524af1b6ceb5abaca1af1e391e6cf362021",
+      "size": [
+        1200,
+        720
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V04",
+        "V05",
+        "V06",
+        "V07",
+        "V53"
+      ]
+    },
+    {
+      "id": "B9",
+      "file": "732aef722da83c6eb2edb554fadd341d.jpg",
+      "label": "S&P 500 sector heat map",
+      "family": "B",
+      "role": "stepping-stone",
+      "palette": {
+        "page": "#262a32",
+        "red": "#f6363a",
+        "neutral": "#424656"
+      },
+      "notes": "Sector > industry > ticker treemap, label size scales with tile area, diverging colour.",
+      "plan_ref": "2/B9",
+      "sha256": "4a76a8cf3c2aa571833187f9441aba68b58af494c9c70be08c0fd42011f54b47",
+      "size": [
+        1200,
+        1198
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V24"
+      ]
+    },
+    {
+      "id": "C1",
+      "file": "5b16ad71cae7ce674fc5191d0b2f0443.gif",
+      "label": "1977 CRT mesh plot (animated)",
+      "family": "C",
+      "role": "skin",
+      "skin": "phosphor",
+      "palette": {
+        "dots": "#e8c24a",
+        "bloom": "#752021"
+      },
+      "notes": "Dotted yellow vector plot with red phosphor bloom and a built-in caption block; 68 frames.",
+      "plan_ref": "2/C1",
+      "sha256": "579f7756583b72ef90dbc1f7ac04c127570d415dc02ce06c6d2bcafecf0f6a6e",
+      "size": [
+        450,
+        338
+      ],
+      "format": "GIF",
+      "frames": 68,
+      "viz": [
+        "V46"
+      ]
+    },
+    {
+      "id": "C2",
+      "file": "097565d60df291add1cbc2cc4cf1c5d4.gif",
+      "label": "Terminal UI widget demo (animated)",
+      "family": "C",
+      "role": "skin",
+      "skin": "phosphor",
+      "palette": {
+        "green": "#16a61a",
+        "cyan": "#34b0ba",
+        "red": "#8c0f11"
+      },
+      "notes": "Title-in-border boxes, braille and dot line charts, block sparklines, text gauge; 12 frames.",
+      "plan_ref": "2/C2",
+      "sha256": "9c96d8c1e3de1d504b4af31fc6f2c37b0e1d3e02240133965e3304b2c1ce82f7",
+      "size": [
+        543,
+        374
+      ],
+      "format": "GIF",
+      "frames": 12,
+      "viz": [
+        "V47"
+      ]
+    },
+    {
+      "id": "C3",
+      "file": "c969317372793f18c43d20c03233a975.jpg",
+      "label": "ASCII game quadrants",
+      "family": "C",
+      "role": "skin",
+      "skin": "phosphor",
+      "palette": {
+        "divider": "#6b0f10"
+      },
+      "notes": "Glyph-cell heat maps; a text-mode grid renderer.",
+      "plan_ref": "2/C3",
+      "sha256": "a56e4fd07ad7605a30a998bb8a0d0d079f71e0d1a72d1013a7e27873b4e7c09f",
+      "size": [
+        550,
+        400
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V48"
+      ]
+    },
+    {
+      "id": "C4",
+      "file": "573db33f30923d109d63ed9376fab60d.jpg",
+      "label": "IPv4 Hilbert-curve census map",
+      "family": "C",
+      "role": "skin",
+      "skin": "phosphor",
+      "palette": {
+        "bg": "#040404"
+      },
+      "notes": "Space-filling-curve map with a rainbow 0-100% legend and prefix-size legend; kept on the roadmap (decision 6).",
+      "plan_ref": "2/C4",
+      "sha256": "7a036c07b363096feeab8bc346ddf93349c49c5df183fc14d4500362f67e7cbb",
+      "size": [
+        600,
+        480
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V44"
+      ]
+    },
+    {
+      "id": "C5",
+      "file": "ff3680c7fc3bbfef1f2c933f09668863.jpg",
+      "label": "Weather sounding (skew-T, hodograph)",
+      "family": "C",
+      "role": "skin",
+      "skin": "phosphor",
+      "palette": {
+        "bg": "#040404"
+      },
+      "notes": "Skew-T log-P, hodograph, wind barbs, parameter table; kept on the roadmap (decision 6).",
+      "plan_ref": "2/C5",
+      "sha256": "455bc7d023374a9139b53ba55e2cba824c2cca0c1a70d6135f4511ea6f74923e",
+      "size": [
+        1011,
+        867
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V45"
+      ]
+    },
+    {
+      "id": "C6",
+      "file": "81d355ee6cd8c9bf13eefe2273200379.jpg",
+      "label": "Hex editor (Dear ImGui tool)",
+      "family": "C",
+      "role": "base",
+      "authority": "final layout and theme",
+      "palette": {
+        "chrome": "#252525",
+        "pane": "#151618",
+        "well": "#111111",
+        "well_frame": "#262626",
+        "table_header": "#303030",
+        "zebra": "#202325",
+        "border_focused": "#424146",
+        "border": "#212026",
+        "tab_focused": "#2e6aac",
+        "tab_unfocused": "#22416c",
+        "tab_inactive": "#101824",
+        "field": "#243854",
+        "radio_on": "#3d97f8",
+        "plot_line": "#4d6fa9",
+        "text": "#e5e6e7",
+        "swatch_red": "#d52d21",
+        "swatch_green": "#279f27",
+        "swatch_purple": "#9963c3",
+        "swatch_pink": "#e775c3",
+        "swatch_yellow": "#c3bd27"
+      },
+      "notes": "Docked panes 43.6/24.7/31.1% wide, 16 px rows, 11 px monospace, character-cell grid; every region fill is its swatch at 50% opacity over the pane. Close to native size.",
+      "plan_ref": "2/C6, T",
+      "sha256": "04586dff6f70e7ac49b1aa4eee3e0cd8fd6d7ee33ad5c8420a7025127bbedb95",
+      "size": [
+        1199,
+        702
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V49"
+      ]
+    },
+    {
+      "id": "D1",
+      "file": "7d90ae22e3667a53a804e8357d217603.jpg",
+      "label": "Four-column annual communication report",
+      "family": "D",
+      "role": "skin",
+      "skin": "editorial",
+      "palette": {
+        "slate": "#363a4a"
+      },
+      "notes": "Mirrored step chart with stippled fill, big light mono numerals, aligned module rows across columns.",
+      "plan_ref": "2/D1",
+      "sha256": "25cc6f5e62c3a0b0a8add704e105aff5d821dbdb589b46e7cba01c944f6c58f6",
+      "size": [
+        1200,
+        960
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V03",
+        "V16"
+      ]
+    },
+    {
+      "id": "D2",
+      "file": "32ad1d8cfe39c7ec4ed2ae5d55107ac3.jpg",
+      "label": "Visitor fact boards (red/grey)",
+      "family": "D",
+      "role": "skin",
+      "skin": "editorial",
+      "palette": {
+        "bg": "#040404",
+        "red": "#fe1a1a"
+      },
+      "notes": "Pie grid, paired bars, bundled stream lines, figure-ground map, event timeline.",
+      "plan_ref": "2/D2",
+      "sha256": "e9d489f0544f1231043e800682d985326f9db03ec672c10dbcd9b6052269feda",
+      "size": [
+        1200,
+        2396
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V15",
+        "V18",
+        "V26",
+        "V39",
+        "V40",
+        "V41",
+        "V43"
+      ]
+    },
+    {
+      "id": "D3",
+      "file": "ca6f5fa17a8e8929180710658892c3f0.jpg",
+      "label": "Brand-attachment infographic (8k px)",
+      "family": "D",
+      "role": "skin",
+      "skin": "editorial",
+      "palette": {
+        "bg": "#040404"
+      },
+      "notes": "Heart-unit rating rows, radar, ribbon-vs-dotted line chart, 2x2 perceptual map.",
+      "plan_ref": "2/D3",
+      "sha256": "558fc3def6306d9c175f38fa691b859210024f1424ef7ad3a260ae76f9b2d271",
+      "size": [
+        1200,
+        8176
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V18",
+        "V35",
+        "V36",
+        "V37",
+        "V51"
+      ]
+    },
+    {
+      "id": "D4",
+      "file": "92bc03ae7ea5a66987626853ab4d6afe.jpg",
+      "label": "Nobel nominees mosaic (light)",
+      "family": "D",
+      "role": "skin",
+      "skin": "editorial",
+      "palette": {
+        "page": "#fcfcfc",
+        "teal": "#1bb3af",
+        "highlight": "#fefe3e"
+      },
+      "notes": "Stacked mosaic with a code in every cell, tooltip card with portrait; the only light reference.",
+      "plan_ref": "2/D4",
+      "sha256": "9c5dd11d93ee93dbf7c7b41312f1e7540726fb52d3495b238767a28750d7a357",
+      "size": [
+        1200,
+        667
+      ],
+      "format": "JPEG",
+      "viz": [
+        "V28"
+      ]
+    }
+  ]
+}

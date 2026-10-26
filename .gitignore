@@ -59,6 +59,14 @@ dist/
 # graphify knowledge-graph output (rebuilt on demand via `graphify update .`)
 graphify-out/
 
+# Phase 4 design references: third-party screenshots stay local, only manifest.json is tracked
+assets/design-reference/*.png
+assets/design-reference/*.jpg
+assets/design-reference/*.jpeg
+assets/design-reference/*.gif
+assets/design-reference/*.webp
+assets/design-reference/*.bmp
+
 # --- Django backend (apps/api/) ---
 db.sqlite3
 db.sqlite3-journal

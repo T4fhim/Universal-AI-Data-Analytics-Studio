@@ -1,0 +1,402 @@
+/*
+ * Instrument components: controls, tables, sheet (plans/phase-4-design-reference.md T5).
+ * Flat, 16 px rows, blue-grey fills, no shadows. Colours and sizes come from the generated tokens.
+ */
+
+/* ---- buttons, select, radio ------------------------------------------------------------- */
+
+.button {
+  position: relative;
+  /* A 1 px edge outside the box (no layout shift) gives the flat fill a 3:1 boundary. */
+  box-shadow: 0 0 0 1px var(--border-control);
+  height: var(--size-row);
+  padding: 0 0.75rem;
+  border: 0;
+  border-radius: 0;
+  background: var(--blue-button);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: default;
+}
+
+.button:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--blue-tab-focused);
+  color: var(--text-on-accent);
+}
+
+.button:disabled,
+.button[aria-disabled="true"] {
+  background: var(--blue-button-disabled);
+  box-shadow: none; /* inactive controls are exempt from 1.4.11 */
+  color: var(--text-muted);
+}
+
+/* 24 px invisible hit area on a 16 px control (decision 8 mitigation). */
+.button::after,
+.sort-button::after {
+  content: "";
+  position: absolute;
+  inset: calc((100% - var(--size-hit-target-min)) / 2) 0;
+}
+
+.field-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.field-label {
+  color: var(--text-secondary);
+}
+
+.select {
+  position: relative;
+  display: inline-flex;
+  box-shadow: 0 0 0 1px var(--border-control);
+}
+
+.select select {
+  min-width: 10rem;
+  height: var(--size-row);
+  padding: 0 calc(var(--size-row) + 0.5rem) 0 0.5rem;
+  border: 0;
+  border-radius: 0;
+  appearance: none;
+  background: var(--blue-field);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.select select:disabled {
+  color: var(--text-muted);
+}
+
+.select-arrow {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  place-items: center;
+  width: var(--size-row);
+  background: var(--blue-field-button);
+  color: var(--text-primary);
+  pointer-events: none;
+}
+
+.radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--size-hit-target-min);
+  cursor: default;
+}
+
+.radio input {
+  width: 0.75rem;
+  height: 0.75rem;
+  margin: 0;
+  border-radius: 50%;
+  appearance: none;
+  background: var(--blue-button-disabled);
+}
+
+.radio input:checked {
+  background: radial-gradient(circle, var(--blue-radio-on) 0 45%, var(--blue-button-disabled) 50%);
+}
+
+.alert-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: var(--size-row);
+  padding: 0 0.5rem;
+  background: var(--semantic-alert-bar);
+  color: var(--semantic-alert-text);
+}
+
+/* In a narrow pane the sentence wraps; the action beside it must not. */
+.alert-bar > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.alert-bar .button {
+  flex: none;
+  white-space: nowrap;
+  /* On the crimson bar the control edge is the bar's own text colour (7.8:1). */
+  box-shadow: 0 0 0 1px var(--semantic-alert-text);
+}
+
+/* ---- data table (K8, K10) ---------------------------------------------------------------- */
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface-pane);
+}
+
+.table th,
+.table td {
+  height: var(--size-row);
+  padding: 0 0.5rem;
+  font-weight: 400;
+  text-align: start;
+  white-space: nowrap;
+}
+
+/* Only cells clip: a header's sort button needs its 24 px hit area to spill out of the cell. */
+.table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table tbody th {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table thead th {
+  background: var(--surface-table-header);
+}
+
+.table tbody tr:nth-child(even) {
+  background: var(--surface-zebra);
+}
+
+.table [data-align="end"],
+.tree-cell[data-align="end"] {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.sort-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+
+th[data-align="end"] .sort-button {
+  justify-content: flex-end;
+}
+
+.sort-icon {
+  display: inline-grid;
+  visibility: hidden;
+}
+
+.sort-icon[data-direction] {
+  visibility: visible;
+}
+
+.sort-icon[data-direction="ascending"] {
+  transform: rotate(180deg);
+}
+
+.table,
+.treegrid {
+  --swatch-col: 4rem;
+}
+
+.swatch-col {
+  width: var(--swatch-col);
+}
+
+.swatch {
+  display: inline-block;
+  width: 2rem;
+  height: 0.625rem;
+  vertical-align: middle;
+}
+
+/* ---- tree-table (K9) --------------------------------------------------------------------- */
+
+.treegrid {
+  background: var(--surface-pane);
+}
+
+.tree-row {
+  display: grid;
+  grid-template-columns: var(--cols);
+  align-items: center;
+  min-height: var(--size-row);
+}
+
+.tree-head {
+  background: var(--surface-table-header);
+}
+
+.tree-row:nth-child(even):not(.tree-head) {
+  background: var(--surface-zebra);
+}
+
+.tree-row:focus-visible {
+  outline-offset: -2px;
+}
+
+.tree-cell {
+  padding: 0 0.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: var(--size-row);
+  height: var(--size-row);
+  vertical-align: top;
+}
+
+/* ---- sheet (K15-K18) --------------------------------------------------------------------- */
+
+.sheet-columns {
+  display: grid;
+  grid-template-columns: 30fr 33fr 33fr;
+  gap: var(--size-gutter);
+  background: var(--surface-canvas);
+}
+
+.sheet-section {
+  background: var(--surface-pane);
+  border: 1px solid var(--border-default);
+}
+
+.sheet-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: var(--size-row);
+  margin: 0;
+  padding: 0 0.5rem;
+  background: var(--surface-table-header);
+  font: inherit;
+  font-weight: 400;
+}
+
+.kv {
+  display: grid;
+  margin: 0;
+}
+
+.kv-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 1rem;
+  min-height: var(--size-row);
+  padding: 0 0.5rem;
+}
+
+.kv dt {
+  color: var(--text-secondary);
+}
+
+.kv dd {
+  margin: 0;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.quote {
+  display: grid;
+  margin: 0;
+  padding: 0 0.5rem;
+  background: var(--surface-pane);
+}
+
+.quote-row {
+  display: flex;
+  margin: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 1.5rem;
+  min-height: var(--size-row);
+}
+
+.quote-item {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
+.quote dt {
+  color: var(--text-muted);
+}
+
+.quote dd {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.quote-up dd {
+  color: var(--semantic-ok);
+}
+
+.quote-down dd {
+  color: var(--semantic-danger);
+}
+
+.quote-arrow-up {
+  display: inline-grid;
+  transform: rotate(180deg);
+}
+
+.quote-arrow-down {
+  display: inline-grid;
+}
+
+.editable-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.editable {
+  width: 7rem;
+  height: var(--size-row);
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: 0;
+  background: var(--semantic-editable);
+  color: var(--semantic-editable-text);
+  font: inherit;
+  text-align: end;
+}
+
+.dim {
+  color: var(--text-muted);
+}
+
+@media (forced-colors: active) {
+  .button,
+  .select select,
+  .editable {
+    border: 1px solid ButtonText;
+  }
+
+  .button[aria-disabled="true"],
+  .button:disabled {
+    border-color: GrayText;
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "layout": {
+    "font": {
+      "family": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+      "size": 11,
+      "color": "#e5e6e7"
+    },
+    "paper_bgcolor": "#262626",
+    "plot_bgcolor": "#111111",
+    "colorway": [
+      "#2376b0",
+      "#ef8220",
+      "#23bec8",
+      "#e775c3",
+      "#c3bd27",
+      "#9963c3",
+      "#279f27",
+      "#d52d21",
+      "#8f5e50",
+      "#838280"
+    ],
+    "margin": {
+      "l": 56,
+      "r": 16,
+      "t": 32,
+      "b": 40
+    },
+    "xaxis": {
+      "gridcolor": "#262626",
+      "griddash": "dot",
+      "gridwidth": 1,
+      "zeroline": false,
+      "linecolor": "#707073",
+      "ticks": "outside",
+      "tickcolor": "#707073",
+      "tickfont": {
+        "family": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+        "size": 11,
+        "color": "#d4d5d7"
+      },
+      "automargin": true
+    },
+    "yaxis": {
+      "gridcolor": "#262626",
+      "griddash": "dot",
+      "gridwidth": 1,
+      "zeroline": false,
+      "linecolor": "#707073",
+      "ticks": "outside",
+      "tickcolor": "#707073",
+      "tickfont": {
+        "family": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+        "size": 11,
+        "color": "#d4d5d7"
+      },
+      "automargin": true
+    },
+    "legend": {
+      "bgcolor": "rgba(0,0,0,0)",
+      "font": {
+        "family": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+        "size": 11,
+        "color": "#d4d5d7"
+      },
+      "orientation": "h"
+    },
+    "hoverlabel": {
+      "bgcolor": "#252525",
+      "bordercolor": "#424146",
+      "font": {
+        "family": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+        "size": 11,
+        "color": "#e5e6e7"
+      }
+    },
+    "title": {
+      "x": 0,
+      "font": {
+        "family": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+        "size": 11,
+        "color": "#e5e6e7"
+      }
+    }
+  },
+  "data": {
+    "bar": [
+      {
+        "marker": {
+          "line": {
+            "width": 0
+          }
+        }
+      }
+    ],
+    "scatter": [
+      {
+        "line": {
+          "width": 1
+        }
+      }
+    ]
+  }
+}
