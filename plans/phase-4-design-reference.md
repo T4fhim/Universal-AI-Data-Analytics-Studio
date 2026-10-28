@@ -986,8 +986,17 @@ A fifth archetype, the **multi-pane synchronised stack** (B7), is used inside th
   bucket is partial and marking a finished last bucket would be a false statement. The value must be a bucket as shown on the axis (an exact match, not a date
   cutoff). It is a value, not a column, so `ChartRegistration` gained `literal_fields` (kept out of `optional_fields`, which a column picker reads); the API's
   `_check_spec` and the persistence `**kwargs` fallback accept both. Gallery variants `bar_stacked` and `bar_stacked_incomplete` give 17 golden baselines.
+  **7.3 area with end dot (V02) done.** Not a new chart type: `LineChart.build` takes `variant="area"` (a value, so `line` gained `literal_fields=("variant",)`; a string and
+  not a bool because the API's `chart_out` only returns str/list spec values). One trace: `fill="tozeroy"`, `mode="lines+markers"` and a marker-size list that is 0 except on
+  the last row that has a value (8 px), so the dot takes its line's colour without the core knowing the palette; plotly-resampler slices the list with the data and keeps the
+  last point (tested above 5,000 rows). `cliponaxis=False`, because the last x is the end of the axis range and a clipped dot lost half its disc; zoomed past the last
+  value no dot is drawn (checked in a browser). Skin: a filled scatter trace gets its colour at 22 % alpha, flat, no gradient or glow (T9); Plotly's default 50 % hid the
+  1 px line. Gallery variant `line_area` gives 18 golden baselines. **Verified:** `tests/visualization/test_area_line.py` (7), full suite **1044 passed / 0 failed**, API chart
+  tests 3 passed, goldens 18 of 18 with the other 17 untouched, `tsc -b`, oxlint, black, isort, bandit clean. **Harness weakness found:** Playwright's per-pixel `threshold`
+  (default 0.2) let the 50 % to 22 % fill change pass the compare against the old baseline (both dark blues), so `--update-snapshots` did not rewrite it; it was rewritten
+  with `--update-snapshots=all`. A lower `threshold` in `playwright.config.ts` would make dark-fill changes visible; not changed here.
   **Judgment call still open:** V13 thermal narrow bars (a sequential series palette) is not done.
-  **Left for step 7:** the other Tier-1 charts (area with end dot, candlestick + volume, dual-axis lines, hatched grouped bars, paired horizontal bars, donut with
+  **Left for step 7:** the other Tier-1 charts (candlestick + volume, dual-axis lines, hatched grouped bars, paired horizontal bars, donut with
   centre total, pie grid, numeric matrix heatmap, monochrome square-grid heatmap, scatter with pin and Pareto frontier, KPI mini charts, log pane, ranked
   leaderboard), each added with its golden test. Most are options of an existing chart, as stacking was, not new registry types.
 - **Decision 3 refinement (WCAG 2.1.4):** bare digit keys are a character-key shortcut, so View > "Single-key shortcuts (1-5)" turns them

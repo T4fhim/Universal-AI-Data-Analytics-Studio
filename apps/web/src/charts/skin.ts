@@ -4,12 +4,14 @@
 // unstyled figures (the same JSON the API's `charts_render` returns), so every consumer gets the
 // same data and the look stays in one place, generated from the design tokens
 // (assets/design-tokens/plotly-template.json). The template carries the colours, mono type,
-// dotted quarter grid, flat marks and per-chart-type defaults; the three things done here are
+// dotted quarter grid, flat marks and per-chart-type defaults; the four things done here are
 // the ones a template cannot express:
 //  * hover labels are hidden (`hoverinfo: 'none'` still fires hover events) because the point
 //    under the cursor is read out on one line under the chart instead of in a floating box;
 //  * a trace named "Incomplete" is drawn hatched, the OpenRouter idiom for a bucket that is not
 //    finished yet (a bar that looks complete would mislead);
+//  * a filled area (a line drawn to the baseline) is filled with its series colour at a low alpha,
+//    flat and with no gradient, so the 1 px line above it still reads;
 //  * the Absolute|Percentage and Linear|Log chips: `barnorm` and the y axis type.
 import template from '../../../../assets/design-tokens/plotly-template.json'
 
@@ -39,6 +41,20 @@ const CARTESIAN = new Set(['bar', 'scatter', 'box', 'histogram'])
 const INCOMPLETE = /incomplete/i
 // The axis line colour (a neutral grey) is the hatch colour.
 const HATCH = (template.layout.xaxis as { linecolor: string }).linecolor
+// Plotly's own fill is the line colour at 50 %, which swallows a 1 px line of the same hue.
+const AREA_ALPHA = 0.22
+
+// The fill of a filled scatter trace: its line colour (set on the trace, else the colorway entry
+// Plotly gives a trace at that position) at AREA_ALPHA. Nothing when the colour is not a #rrggbb.
+function areaFill(trace: Record<string, unknown>, index: number): string | undefined {
+  const own = (trace.line as { color?: unknown } | undefined)?.color
+  const colorway = template.layout.colorway as string[]
+  const colour = typeof own === 'string' ? own : colorway[index % colorway.length]
+  const hex = /^#([0-9a-f]{6})$/i.exec(colour)
+  if (!hex) return undefined
+  const rgb = parseInt(hex[1], 16)
+  return `rgba(${rgb >> 16}, ${(rgb >> 8) & 255}, ${rgb & 255}, ${AREA_ALPHA})`
+}
 
 export interface FigureFacts {
   // Two or more bar traces can be stacked, so can be shown as a percentage of the stack.
@@ -82,8 +98,11 @@ export function skinned(figure: Figure, view: View = DEFAULT_VIEW): Frame {
   const { data, layout = {} } = cloned(figure)
   delete layout.width
   delete layout.height
-  const traces = data.map((trace) => {
+  const traces = data.map((trace, index) => {
     const next: Record<string, unknown> = { ...trace, hoverinfo: 'none' }
+    if ((trace.type ?? 'scatter') === 'scatter' && trace.fill && trace.fill !== 'none' && trace.fillcolor === undefined) {
+      next.fillcolor = areaFill(trace, index)
+    }
     // The heatmap builder names a Plotly colour scale itself, which a template cannot override:
     // a scale centred on a value (a correlation, centred on 0) is diverging, any other sequential.
     if (trace.type === 'heatmap') {

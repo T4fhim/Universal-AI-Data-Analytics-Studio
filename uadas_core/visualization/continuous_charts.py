@@ -56,6 +56,28 @@ def _maybe_resample(fig: go.Figure, row_count: int) -> go.Figure:
     return FigureResampler(fig, default_n_shown_samples=_RESAMPLED_POINT_COUNT)
 
 
+# The looks a line chart can take besides a plain line. "area" fills the line down to the baseline
+# and marks the last value with a dot (the Tier-1 V02 idiom: a series whose latest value matters).
+_LINE_VARIANTS = ("area",)
+
+# Diameter in pixels of the dot on the latest value of an "area" line.
+_END_DOT_SIZE = 8
+
+
+def _end_dot_sizes(values: pd.Series) -> list[int]:
+    """Marker sizes that are zero everywhere except on the last value that exists.
+
+    A size per point (rather than a second one-point trace) keeps the dot the colour of its line
+    without the core having to know the palette, and ``FigureResampler`` slices a size list
+    along with the data and always keeps the last point, so the dot survives downsampling.
+    """
+    sizes = [0] * len(values)
+    last = values.reset_index(drop=True).last_valid_index()
+    if last is not None:
+        sizes[int(last)] = _END_DOT_SIZE
+    return sizes
+
+
 class LineChart(BaseChart):
     """A line chart of one numeric column against another (or against the row index)."""
 
@@ -66,6 +88,7 @@ class LineChart(BaseChart):
         y_column: str,
         x_column: str | None = None,
         title: str | None = None,
+        variant: str | None = None,
     ) -> go.Figure:
         """Build a line chart.
 
@@ -77,18 +100,39 @@ class LineChart(BaseChart):
                 already-ordered data (a time series read in
                 chronological order, for instance).
             title: Chart title.
+            variant: ``"area"`` fills the line down to the baseline and puts a
+                dot on the last value (the last row that has one, as the line is
+                drawn in row order). ``None`` (the default) is a plain line. A
+                value, not a column, so the registry lists it under
+                ``literal_fields``.
 
         Raises:
-            ServiceError: If a named column does not exist, or
-                ``y_column`` is not numeric.
+            ServiceError: If a named column does not exist,
+                ``y_column`` is not numeric, or ``variant`` is not one of
+                :data:`_LINE_VARIANTS`.
         """
         columns_to_check = [y_column] + ([x_column] if x_column else [])
         validate_columns(dataframe, *columns_to_check)
         _require_numeric(dataframe, y_column)
+        if variant is not None and variant not in _LINE_VARIANTS:
+            raise ServiceError(
+                f"variant {variant!r} is not one of {list(_LINE_VARIANTS)}."
+            )
 
         x_values = dataframe[x_column] if x_column else dataframe.index
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=x_values, y=dataframe[y_column], mode="lines"))
+        trace = go.Scatter(x=x_values, y=dataframe[y_column], mode="lines")
+        if variant == "area":
+            # cliponaxis=False: the last point is the end of the axis range, so a clipped dot
+            # would lose half its disc at the plot edge; Plotly still hides a point whose x is
+            # outside the range, so zooming past the last value leaves no stray dot.
+            trace.update(
+                fill="tozeroy",
+                mode="lines+markers",
+                marker={"size": _end_dot_sizes(dataframe[y_column])},
+                cliponaxis=False,
+            )
+        fig.add_trace(trace)
         fig.update_layout(
             title=title or f"{y_column} over {x_column or 'index'}",
             xaxis_title=x_column or "Index",

@@ -70,7 +70,7 @@ class ChartRegistration:
             only single-column fields.
         literal_fields: Optional string parameters whose value is *not* a column
             name (e.g. ``BarChart``'s ``incomplete_from``, a value of the category
-            column). Kept apart from :attr:`optional_fields` so a column picker
+            column, or ``LineChart``'s ``variant``, a look). Kept apart from :attr:`optional_fields` so a column picker
             never offers them as columns; the API's chart-spec check accepts both.
             Empty by default.
     """
@@ -200,7 +200,12 @@ def _register_builtins() -> None:
     register_chart(
         "pie", ChartRegistration(PieChart, ("category_column",), ("value_column",))
     )
-    register_chart("line", ChartRegistration(LineChart, ("y_column",), ("x_column",)))
+    register_chart(
+        "line",
+        ChartRegistration(
+            LineChart, ("y_column",), ("x_column",), literal_fields=("variant",)
+        ),
+    )
     register_chart(
         "scatter",
         ChartRegistration(ScatterChart, ("x_column", "y_column"), ("color_column",)),

@@ -148,6 +148,11 @@ SPECS: dict[str, tuple[str, dict[str, Any]]] = {
 # keyword arguments). Every registered chart still needs its base entry in SPECS above; a variant
 # is one more figure from the same class, so the golden screenshot tests pin the option as well.
 VARIANTS: dict[str, tuple[str, str, dict[str, Any]]] = {
+    "line_area": (
+        "line",
+        "monthly",
+        {"y_column": "revenue", "x_column": "month", "variant": "area"},
+    ),
     "bar_stacked": (
         "bar",
         "channel_months",
