@@ -1028,8 +1028,18 @@ A fifth archetype, the **multi-pane synchronised stack** (B7), is used inside th
   (8), full suite **1074 passed / 0 failed**, API parity, OpenAPI, resources and stages tests 86 passed, goldens 22 of 22, `tsc -b` and oxlint clean. `docs/manual/charts/bar.md`
   had never been updated for 7.2's `series_column` and `incomplete_from`; it now covers all three. **Not done:** a pattern legend beyond Plotly's own swatches, patterns for
   stacked bars, more than eight distinct patterns (the ninth series repeats the first with its own colour).
+  **7.7 paired horizontal bars (V15) done.** Not a new chart type: `BarChart(variant="paired")`, the second value of the `variant` literal `bar` got in 7.6 (the AI tool schema's
+  enum is `["area", "grouped", "paired"]`). It is the grouped chart for **exactly two series** (anything else is a `ServiceError`, as is `incomplete_from`), drawn as horizontal
+  bars: the first series by label is the base, solid, the second the comparison, hatched (the reference's grey-vs-red becomes solid-vs-hatched, the colour-independent channel
+  again); the categories run down the y axis from the top in the column's own order (`yaxis.autorange: reversed`), the axis titles are swapped, and every bar carries its
+  value at the end (whole numbers, or two decimals when any value is fractional, one format per chart so a pair reads in the same units). `cliponaxis=False` because the
+  longest bar's label was cut at the plot edge; with every bar zoomed out of range no label is drawn (checked in a browser). Skin: `figureFacts.cartesian` is false for
+  horizontal bars, so no Linear|Log chip (it would put a log type on the category axis). Gallery variant `bar_paired` (a `pairs` table, region x year): 23 golden baselines.
+  **Verified:** `tests/visualization/test_paired_bar.py` (9), root suite **1083 passed / 0 failed**, the **whole** `apps/api` suite 2124 passed / 163 skipped (the MinIO and Redis
+  tests CI runs) / 0 failed, goldens 23 of 23, `tsc -b` and oxlint clean. **Not done:** ranking the categories by the base value (they keep the column's own order),
+  a log axis on horizontal bars, a figure height that grows with the number of categories, choosing which series is the base (it is the first by label).
   **Judgment call still open:** V13 thermal narrow bars (a sequential series palette) is not done.
-  **Left for step 7:** the other Tier-1 charts (paired horizontal bars, donut with
+  **Left for step 7:** the other Tier-1 charts (donut with
   centre total, pie grid, numeric matrix heatmap, monochrome square-grid heatmap, scatter with pin and Pareto frontier, KPI mini charts, log pane, ranked
   leaderboard), each added with its golden test. Most are options of an existing chart, as stacking was, not new registry types.
 - **Decision 3 refinement (WCAG 2.1.4):** bare digit keys are a character-key shortcut, so View > "Single-key shortcuts (1-5)" turns them

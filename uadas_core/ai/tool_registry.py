@@ -905,11 +905,12 @@ TOOLS: list[ToolDefinition] = [
                 },
                 "variant": {
                     "type": "string",
-                    "enum": ["area", "grouped"],
+                    "enum": ["area", "grouped", "paired"],
                     "description": (
                         "Optional look. Line chart: 'area' fills the line to the baseline and marks the "
                         "last value with a dot. Bar chart with series_column: 'grouped' puts the series "
-                        "side by side (each with its own fill pattern) instead of stacked."
+                        "side by side (each with its own fill pattern) instead of stacked; 'paired' is for "
+                        "exactly two series (a base and a comparison), as labelled horizontal bars."
                     ),
                 },
                 "y_column": {

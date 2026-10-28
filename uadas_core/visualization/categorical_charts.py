@@ -46,8 +46,9 @@ def _prepare_category_counts(series: pd.Series) -> pd.Series:
 _MISSING = "(missing)"
 
 # The looks a bar chart with series can take besides stacked columns. "grouped" puts the series
-# side by side (the Tier-1 V14 idiom).
-_BAR_VARIANTS = ("grouped",)
+# side by side (the Tier-1 V14 idiom); "paired" is grouped for exactly two series, drawn as
+# horizontal bars with their values written at the ends (V15, a comparison against a base).
+_BAR_VARIANTS = ("grouped", "paired")
 
 # Fill patterns of a grouped chart's series, in series order: solid first, then the named patterns
 # (hatch, stipple, ...). The pattern is a second channel beside colour, so two series stay apart in
@@ -74,13 +75,16 @@ def _stacked_bars(
     value_column: str | None,
     title: str | None,
     incomplete_from: str | None = None,
-    grouped: bool = False,
+    variant: str | None = None,
 ) -> go.Figure:
     """Stacked columns: one bar per category value, one segment (trace) per series value.
 
-    With ``grouped`` the same traces sit side by side instead (the name stayed because everything
-    else -- the series ordering and cap, the totals -- is shared), each series with its own fill
-    pattern from :data:`_GROUP_PATTERNS`.
+    With ``variant="grouped"`` the same traces sit side by side instead (the name stayed because
+    everything else -- the series ordering and cap, the totals -- is shared), each series with its
+    own fill pattern from :data:`_GROUP_PATTERNS`. ``"paired"`` is that for exactly two series
+    (the first, by label, is the base), drawn as horizontal bars: the categories run down the y
+    axis from the top, and each bar carries its value at the end, since a comparison is read off
+    the numbers.
 
     Why the categories are *not* capped at ``_MAX_CATEGORIES`` here: the axis is usually time
     buckets (two years of months is 24), and folding the oldest months into "Other" would destroy
@@ -133,6 +137,13 @@ def _stacked_bars(
     names = sorted(name for name in table.columns if name != "Other")
     if "Other" in table.columns:
         names.append("Other")
+    grouped = variant in ("grouped", "paired")
+    paired = variant == "paired"
+    if paired and len(names) != 2:
+        raise ServiceError(
+            f"variant 'paired' compares exactly two series; '{series_column}' has "
+            f"{len(names)}."
+        )
 
     incomplete: pd.Series | None = None
     if incomplete_from is not None:
@@ -147,9 +158,26 @@ def _stacked_bars(
         table.iloc[start:] = 0
 
     y_title = value_column or "Count"
+    # One format for every label of the chart, so a pair reads off in the same units: whole numbers
+    # when every value is whole, else two decimals.
+    whole = bool((table.to_numpy() == table.to_numpy().round()).all())
     traces = []
     for index, name in enumerate(names):
-        bar = go.Bar(name=name, x=categories, y=table[name].to_numpy())
+        heights = table[name].to_numpy()
+        if paired:
+            bar = go.Bar(
+                name=name,
+                x=heights,
+                y=categories,
+                orientation="h",
+                text=[f"{v:,.0f}" if whole else f"{v:,.2f}" for v in heights],
+                textposition="outside",
+                # The longest bar ends at the edge of the axis range, so its label would be cut
+                # off at the plot edge.
+                cliponaxis=False,
+            )
+        else:
+            bar = go.Bar(name=name, x=categories, y=heights)
         if grouped:
             shape = _GROUP_PATTERNS[index % len(_GROUP_PATTERNS)]
             bar.update(marker={"pattern": {"shape": shape}})
@@ -160,9 +188,14 @@ def _stacked_bars(
     fig.update_layout(
         barmode="group" if grouped else "stack",
         title=title or f"{y_title} by {category_column} and {series_column}",
-        xaxis_title=category_column,
-        yaxis_title=y_title,
     )
+    if paired:
+        # Horizontal bars start at the bottom of the axis; reading order is from the top.
+        fig.update_layout(
+            xaxis_title=y_title, yaxis_title=category_column, yaxis_autorange="reversed"
+        )
+    else:
+        fig.update_layout(xaxis_title=category_column, yaxis_title=y_title)
     return fig
 
 
@@ -200,7 +233,10 @@ class BarChart(BaseChart):
             variant: ``"grouped"`` puts the series side by side instead of
                 stacked, each with its own fill pattern (solid, hatch, stipple,
                 ...) so the series differ by more than colour. Needs
-                ``series_column``; ``None`` (the default) is stacked. A value,
+                ``series_column``; ``None`` (the default) is stacked.
+                ``"paired"`` is for exactly two series: horizontal bars, the
+                first series (by label) the base in solid and the second the
+                comparison hatched, each bar labelled with its value. A value,
                 not a column, so the registry lists it under ``literal_fields``.
 
         Raises:
@@ -210,7 +246,8 @@ class BarChart(BaseChart):
                 ``incomplete_from`` is not a bucket value or is given without
                 ``series_column``, or ``variant`` is not one of
                 :data:`_BAR_VARIANTS`, is given without ``series_column`` or
-                together with ``incomplete_from``.
+                together with ``incomplete_from``, or is ``"paired"`` and
+                ``series_column`` does not have exactly two values.
         """
         if variant is not None and variant not in _BAR_VARIANTS:
             raise ServiceError(
@@ -250,7 +287,7 @@ class BarChart(BaseChart):
                 value_column,
                 title,
                 incomplete_from,
-                grouped=variant == "grouped",
+                variant=variant,
             )
         if value_column:
             validate_columns(dataframe, category_column, value_column)

@@ -124,6 +124,18 @@ def sample_tables() -> dict[str, pd.DataFrame]:
             ),
         }
     )
+    # And again last: a base year and the year compared against it, per region.
+    rows = []
+    for region, start in zip(REGIONS, (820, 640, 710, 560)):
+        rows.append({"region": region, "year": "2024", "revenue": float(start)})
+        rows.append(
+            {
+                "region": region,
+                "year": "2025",
+                "revenue": round(start * rng.uniform(0.85, 1.3), 1),
+            }
+        )
+    pairs = pd.DataFrame(rows)
     return {
         "sales": sales,
         "monthly": monthly,
@@ -133,6 +145,7 @@ def sample_tables() -> dict[str, pd.DataFrame]:
         "channel_months": channel_months,
         "prices": prices,
         "dual": dual,
+        "pairs": pairs,
     }
 
 
@@ -196,6 +209,16 @@ VARIANTS: dict[str, tuple[str, str, dict[str, Any]]] = {
             "high_column": "high",
             "low_column": "low",
             "close_column": "close",
+        },
+    ),
+    "bar_paired": (
+        "bar",
+        "pairs",
+        {
+            "category_column": "region",
+            "series_column": "year",
+            "value_column": "revenue",
+            "variant": "paired",
         },
     ),
     "bar_grouped": (

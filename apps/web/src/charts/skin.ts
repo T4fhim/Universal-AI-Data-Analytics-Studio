@@ -74,7 +74,12 @@ export function figureFacts(figure: Figure): FigureFacts {
   const kinds = [...new Set(types)].join(', ')
   return {
     stacked: bars >= 2 && figure.layout?.barmode !== 'group',
-    cartesian: types.length > 0 && types.every((type) => CARTESIAN.has(type)),
+    // Horizontal bars carry their values on x, and the chip's log type goes on the y axis (a
+    // category axis there): no chip for them.
+    cartesian:
+      types.length > 0 &&
+      types.every((type) => CARTESIAN.has(type)) &&
+      !figure.data.some((trace) => trace.orientation === 'h'),
     summary: `${kinds} chart with ${types.length} ${types.length === 1 ? 'trace' : 'traces'}`,
   }
 }
