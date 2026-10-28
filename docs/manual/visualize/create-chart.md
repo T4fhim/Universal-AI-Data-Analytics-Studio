@@ -13,7 +13,7 @@ Builds a Plotly figure from the active dataset and a handful of column choices, 
 `uadas_core.visualization.chart_registry` -- every chart type is a stateless `BaseChart` subclass
 whose `build(dataframe, **kwargs)` returns a `go.Figure` directly embedded in the workspace.
 
-## The twelve chart types
+## The thirteen chart types
 
 | Chart | Required fields | Notes |
 |---|---|---|
@@ -29,6 +29,7 @@ whose `build(dataframe, **kwargs)` returns a `go.Figure` directly embedded in th
 | [Radar](../charts/radar.md) | category column, 3+ value columns | One trace per row. |
 | [Waterfall](../charts/waterfall.md) | category, value columns | Row order is the sequence shown. |
 | [Funnel](../charts/funnel.md) | stage, value columns | Value must be non-negative. |
+| [Candlestick](../charts/candlestick.md) | x, open, high, low, close columns | Optional volume column adds a bar pane. |
 
 ## Getting a recommendation
 

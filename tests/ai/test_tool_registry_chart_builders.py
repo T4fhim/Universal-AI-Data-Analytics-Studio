@@ -53,6 +53,30 @@ def test_plugin_chart_reaches_the_build_chart_tool_enum(probe_chart: str) -> Non
     assert probe_chart in enum
 
 
+def test_every_builtin_chart_field_is_described_to_the_assistant() -> None:
+    """``build_chart``'s properties are listed by hand, so a field a chart gains (or a whole new
+    chart's columns) is invisible to the assistant until it is added there: this fails first.
+    """
+    from uadas_core.visualization.chart_registry import _register_builtins, list_charts
+
+    _register_builtins()
+    build_chart = next(
+        s for s in get_anthropic_tool_schemas() if s["name"] == "build_chart"
+    )
+    described = set(build_chart["input_schema"]["properties"])
+    for name, registration in list_charts().items():
+        if not registration.chart_class.__module__.startswith(
+            "uadas_core.visualization."
+        ):
+            continue  # a plugin's own chart is not this module's to describe
+        fields = (
+            set(registration.required_fields)
+            | set(registration.optional_fields)
+            | set(registration.literal_fields)
+        )
+        assert fields <= described, f"{name}: {sorted(fields - described)}"
+
+
 def test_get_anthropic_tool_schemas_does_not_mutate_the_shared_tools_entry(
     probe_chart: str,
 ) -> None:

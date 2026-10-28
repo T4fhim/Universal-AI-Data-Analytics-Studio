@@ -1,6 +1,6 @@
 // Dev-only gallery of the Instrument chart skin, served at /charts.html.
 //
-// Why: the phase-4 plan's step 6 output is "the 12 charts before/after". Every chart type the core
+// Why: the phase-4 plan's step 6 output was "the 12 charts before/after" (13 with the candlestick of step 7.4). Every chart type the core
 // registers is drawn twice from the same figure JSON, which scripts/build_chart_gallery.py
 // builds with the real chart classes: untouched on the left (what the API returns), in the skin
 // on the right. A multi-series stacked column (the OpenRouter-style reference the skin is tuned

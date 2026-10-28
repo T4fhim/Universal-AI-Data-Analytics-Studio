@@ -154,7 +154,7 @@ coverage — see git history for the milestone-by-milestone test additions.
 [SPECIFICATION.md](../SPECIFICATION.md) describes a larger eventual feature set beyond even
 milestone 14 — additional file formats (SPSS, Stata, SAS, MATLAB, NetCDF, DICOM, CAD, HDF5 via a
 third-party plugin), association-rule mining, and further chart types (sunburst, parallel
-coordinates, candlestick, geographic maps, 3D scatter/surface, animated charts) among them. This
+coordinates, geographic maps, 3D scatter/surface, animated charts) among them. This
 is recorded here only as SPECIFICATION.md's own stated scope — it is explicitly a superset of
 what exists in `uadas_core/` today (per CLAUDE.md's own
 instruction not to assume something described there already exists), and nothing in this

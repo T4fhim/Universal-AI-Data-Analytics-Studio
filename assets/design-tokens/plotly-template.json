@@ -319,6 +319,24 @@
           }
         }
       }
+    ],
+    "candlestick": [
+      {
+        "increasing": {
+          "line": {
+            "color": "#279f27",
+            "width": 1
+          },
+          "fillcolor": "rgba(0,0,0,0)"
+        },
+        "decreasing": {
+          "line": {
+            "color": "#d52d21",
+            "width": 1
+          },
+          "fillcolor": "#d52d21"
+        }
+      }
     ]
   }
 }

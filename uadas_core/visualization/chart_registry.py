@@ -24,6 +24,7 @@ from uadas_core.core.exceptions import ServiceError
 from uadas_core.core.logger import get_logger
 from uadas_core.visualization.advanced_charts import (
     BubbleChart,
+    CandlestickChart,
     FunnelChart,
     HeatmapChart,
     RadarChart,
@@ -244,5 +245,19 @@ def _register_builtins() -> None:
     )
     register_chart(
         "funnel", ChartRegistration(FunnelChart, ("stage_column", "value_column"))
+    )
+    register_chart(
+        "candlestick",
+        ChartRegistration(
+            CandlestickChart,
+            (
+                "x_column",
+                "open_column",
+                "high_column",
+                "low_column",
+                "close_column",
+            ),
+            ("volume_column",),
+        ),
     )
     _builtins_registered = True

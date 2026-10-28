@@ -361,6 +361,21 @@ def render_template(
                     "connector": {"line": {"color": edge, "width": 1}},
                 }
             ],
+            # Up is a hollow candle in the green region, down a solid one in the red: the body's
+            # fill says which way the price moved as well as its colour, so direction survives
+            # colour-blindness and a greyscale print (the waterfall does the same with height).
+            "candlestick": [
+                {
+                    "increasing": {
+                        "line": {"color": fills["green"]["key"], "width": 1},
+                        "fillcolor": "rgba(0,0,0,0)",
+                    },
+                    "decreasing": {
+                        "line": {"color": fills["red"]["key"], "width": 1},
+                        "fillcolor": fills["red"]["key"],
+                    },
+                }
+            ],
         },
     }
     return json.dumps(template, indent=2) + "\n"

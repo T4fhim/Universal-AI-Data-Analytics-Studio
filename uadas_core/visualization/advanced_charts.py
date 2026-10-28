@@ -1,11 +1,11 @@
 # File: uadas_core/visualization/advanced_charts.py
-"""Chart types beyond milestone 5a's original six: Heatmap, Bubble, Treemap, Radar, Waterfall, Funnel.
+"""Chart types beyond milestone 5a's original six: Heatmap, Bubble, Treemap, Radar, Waterfall, Funnel, Candlestick.
 
 Same ``BaseChart`` shape as :mod:`~uadas_core.visualization.categorical_charts`/
 :mod:`~uadas_core.visualization.continuous_charts`/
 :mod:`~uadas_core.visualization.distribution_charts` — stateless classmethod,
 validated inputs, a ``go.Figure`` returned directly. Grouped into one
-module rather than one file per chart type since each of these six is
+module rather than one file per chart type since each of these seven is
 short and none shares enough machinery with any *existing* chart
 module to justify extending one of those instead (unlike, say,
 :mod:`~uadas_core.analysis.chi_square` genuinely reusing
@@ -383,4 +383,82 @@ class FunnelChart(BaseChart):
             )
         )
         fig.update_layout(title=title or f"{value_column} by {stage_column}")
+        return fig
+
+
+class CandlestickChart(BaseChart):
+    """Price candles (open, high, low, close at each x), with an optional volume pane beneath."""
+
+    @classmethod
+    def build(
+        cls,
+        dataframe: pd.DataFrame,
+        x_column: str,
+        open_column: str,
+        high_column: str,
+        low_column: str,
+        close_column: str,
+        volume_column: str | None = None,
+        title: str | None = None,
+    ) -> go.Figure:
+        """Build a candlestick chart.
+
+        Args:
+            dataframe: The data to chart, one row per period (a day, an hour).
+            x_column: Column giving each candle's period — typically dates.
+            open_column: Numeric column: the price at the start of the period.
+            high_column: Numeric column: the highest price in the period.
+            low_column: Numeric column: the lowest price in the period.
+            close_column: Numeric column: the price at the end of the period.
+            volume_column: Optional numeric column. If given, a bar pane
+                titled "Volume" is drawn under the candles on the same x axis.
+            title: Chart title.
+
+        Raises:
+            ServiceError: If a named column does not exist, or any of the
+                price columns or ``volume_column`` is not numeric.
+        """
+        price_columns = [open_column, high_column, low_column, close_column]
+        numeric_columns = price_columns + ([volume_column] if volume_column else [])
+        validate_columns(dataframe, x_column, *numeric_columns)
+        for column in numeric_columns:
+            _require_numeric(dataframe, column)
+
+        candles = go.Candlestick(
+            x=dataframe[x_column],
+            open=dataframe[open_column],
+            high=dataframe[high_column],
+            low=dataframe[low_column],
+            close=dataframe[close_column],
+            name="Price",
+        )
+        if volume_column:
+            # The candles get three quarters of the height; the x axes are tied together so one
+            # zoom or pan moves both panes.
+            fig = go.Figure()
+            fig.set_subplots(
+                rows=2,
+                cols=1,
+                shared_xaxes=True,
+                row_heights=[0.75, 0.25],
+                vertical_spacing=0.03,
+            )
+            fig.add_trace(candles, row=1, col=1)
+            fig.add_trace(
+                go.Bar(
+                    x=dataframe[x_column], y=dataframe[volume_column], name="Volume"
+                ),
+                row=2,
+                col=1,
+            )
+            fig.update_xaxes(title_text=x_column, row=2, col=1)
+            fig.update_yaxes(title_text="Price", row=1, col=1)
+            fig.update_yaxes(title_text=volume_column, row=2, col=1)
+        else:
+            fig = go.Figure(candles)
+            fig.update_layout(xaxis_title=x_column, yaxis_title="Price")
+        # Plotly puts a range slider under every candlestick by default; it would take a third
+        # of the plot, and the mode bar already zooms and pans.
+        fig.update_xaxes(rangeslider_visible=False)
+        fig.update_layout(title=title or f"{close_column} over {x_column}")
         return fig

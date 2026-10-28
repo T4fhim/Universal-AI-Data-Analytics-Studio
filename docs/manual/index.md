@@ -40,7 +40,7 @@ see the Understand page's own manual entry for how that suggestion is computed.
 - **Readers** -- every file and database format the application can import: see the
   [readers index](readers/csv.md) (linked from [Open Dataset](data/open-dataset.md)) for the
   full list of sixteen.
-- **Charts** -- the twelve chart types available from the Visualize stage: see
+- **Charts** -- the thirteen chart types available from the Visualize stage: see
   [Create a Chart](visualize/create-chart.md) for the full list.
 - **Statistics** -- the twelve statistical/profiling methods available from Understand,
   Explore, and Analyze: aggregation, ANOVA, chi-square, clustering, per-column profiling,

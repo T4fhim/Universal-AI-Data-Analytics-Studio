@@ -865,7 +865,44 @@ TOOLS: list[ToolDefinition] = [
                 },
                 "x_column": {
                     "type": "string",
-                    "description": "Line/Scatter/Bubble charts.",
+                    "description": "Line/Scatter/Bubble charts; Candlestick (each candle's period, usually a date).",
+                },
+                "open_column": {
+                    "type": "string",
+                    "description": "Candlestick chart — numeric column, the price at the start of each period.",
+                },
+                "high_column": {
+                    "type": "string",
+                    "description": "Candlestick chart — numeric column, the highest price in each period.",
+                },
+                "low_column": {
+                    "type": "string",
+                    "description": "Candlestick chart — numeric column, the lowest price in each period.",
+                },
+                "close_column": {
+                    "type": "string",
+                    "description": "Candlestick chart — numeric column, the price at the end of each period.",
+                },
+                "volume_column": {
+                    "type": "string",
+                    "description": "Candlestick chart (optional) — numeric volume column; adds a bar pane under the candles.",
+                },
+                "series_column": {
+                    "type": "string",
+                    "description": "Bar chart (optional) — stacks each bar by this column's values.",
+                },
+                "incomplete_from": {
+                    "type": "string",
+                    "description": (
+                        "Bar chart with series_column (optional) — the category value, as shown on "
+                        "the axis, from which buckets are still filling; drawn as one hatched "
+                        "'Incomplete' total per bucket. Only set it when the user says the data is partial."
+                    ),
+                },
+                "variant": {
+                    "type": "string",
+                    "enum": ["area"],
+                    "description": "Line chart (optional) — 'area' fills the line to the baseline and marks the last value with a dot.",
                 },
                 "y_column": {
                     "type": "string",

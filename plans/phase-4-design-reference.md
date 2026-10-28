@@ -702,7 +702,7 @@ Wireframes of the archetypes to build are in §6.
 Tier 1 = fits the Plotly-only path in the ship plan (D9). Tier 2 = needs a custom client component or heavy Plotly
 shaping. Tier 3 = niche, post-launch. The core already registers these chart types in
 `uadas_core/visualization/chart_registry.py`: bar, pie, line, scatter, histogram, box_plot, heatmap, bubble, treemap,
-radar, waterfall, funnel ("Reg" below). Plotly-route names are trace types/features to confirm at implementation.
+radar, waterfall, funnel, and since step 7.4 candlestick ("Reg" below). Plotly-route names are trace types/features to confirm at implementation.
 
 | # | Visualisation | Seen in | Build route | Tier |
 |---|---|---|---|---|
@@ -995,8 +995,21 @@ A fifth archetype, the **multi-pane synchronised stack** (B7), is used inside th
   tests 3 passed, goldens 18 of 18 with the other 17 untouched, `tsc -b`, oxlint, black, isort, bandit clean. **Harness weakness found:** Playwright's per-pixel `threshold`
   (default 0.2) let the 50 % to 22 % fill change pass the compare against the old baseline (both dark blues), so `--update-snapshots` did not rewrite it; it was rewritten
   with `--update-snapshots=all`. A lower `threshold` in `playwright.config.ts` would make dark-fill changes visible; not changed here.
+  **7.4 candlestick + volume (V04) done.** The first step that adds a registry type (the 13th), because a candle needs four price columns no existing chart takes:
+  `CandlestickChart` in `advanced_charts.py`, `x_column` + `open/high/low/close_column` required, `volume_column` optional. With volume it is two panes (candles 75 %, a bar
+  trace named "Volume" 25 %, the x axes tied, built with `Figure.set_subplots`); the range slider Plotly adds by default is off. Integration points touched: the registry,
+  `ChartType.CANDLESTICK` and migration `0003_chart_type_candlestick` (`makemigrations --check` clean; `openapi.json` lists no chart names, so unchanged), the token
+  generator's `data.candlestick` default (**hollow green = up, solid red = down**, so direction is the fill as well as the colour; no new contrast pair, both are region keys
+  already checked), the skin (`candlestick` is cartesian, the readout shows open/high/low/close, a "Volume" bar beside candles is the neutral axis grey so the next series
+  colour does not collide with the direction colours; the Linear|Log chip acts on the price axis only), the gallery (`prices` table drawn last, `candlestick` and
+  `candlestick_price_only`: 20 golden baselines), `docs/manual/charts/candlestick.md` and the counts ("thirteen"). **A review found a gap this checklist did not:**
+  `ai/tool_registry.py`'s `build_chart` schema lists its properties by hand, so the assistant could not have been told the candlestick columns, nor 7.2's `series_column` and
+  `incomplete_from` or 7.3's `variant`; all are now described, and `test_every_builtin_chart_field_is_described_to_the_assistant` fails the next time a chart field is
+  missing there. **Verified:** `tests/visualization/test_candlestick.py` (13), full suite **1057 passed / 0 failed** (then 2 tests added, their files 18 passed), API parity, models,
+  OpenAPI, stages and IDOR tests 150 passed, goldens 20 of 20, `tsc -b` and oxlint clean. **Not done:** weekend `rangebreaks` (the chart draws the dates it is given),
+  downsampling of large candle tables (the web render reads the first 5,000 rows), overlays and indicator panes (V05, V06: Tier 2), duplicate-x handling.
   **Judgment call still open:** V13 thermal narrow bars (a sequential series palette) is not done.
-  **Left for step 7:** the other Tier-1 charts (candlestick + volume, dual-axis lines, hatched grouped bars, paired horizontal bars, donut with
+  **Left for step 7:** the other Tier-1 charts (dual-axis lines, hatched grouped bars, paired horizontal bars, donut with
   centre total, pie grid, numeric matrix heatmap, monochrome square-grid heatmap, scatter with pin and Pareto frontier, KPI mini charts, log pane, ranked
   leaderboard), each added with its golden test. Most are options of an existing chart, as stacking was, not new registry types.
 - **Decision 3 refinement (WCAG 2.1.4):** bare digit keys are a character-key shortcut, so View > "Single-key shortcuts (1-5)" turns them

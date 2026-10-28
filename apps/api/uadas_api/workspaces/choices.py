@@ -54,3 +54,4 @@ class ChartType(models.TextChoices):
     RADAR = "radar", "Radar"
     WATERFALL = "waterfall", "Waterfall"
     FUNNEL = "funnel", "Funnel"
+    CANDLESTICK = "candlestick", "Candlestick"

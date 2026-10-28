@@ -4,7 +4,7 @@
 // unstyled figures (the same JSON the API's `charts_render` returns), so every consumer gets the
 // same data and the look stays in one place, generated from the design tokens
 // (assets/design-tokens/plotly-template.json). The template carries the colours, mono type,
-// dotted quarter grid, flat marks and per-chart-type defaults; the four things done here are
+// dotted quarter grid, flat marks and per-chart-type defaults; the five things done here are
 // the ones a template cannot express:
 //  * hover labels are hidden (`hoverinfo: 'none'` still fires hover events) because the point
 //    under the cursor is read out on one line under the chart instead of in a floating box;
@@ -12,6 +12,8 @@
 //    finished yet (a bar that looks complete would mislead);
 //  * a filled area (a line drawn to the baseline) is filled with its series colour at a low alpha,
 //    flat and with no gradient, so the 1 px line above it still reads;
+//  * a bar trace named "Volume" (under a candlestick) is drawn in the neutral axis grey: the
+//    colours of the candles mean direction, so the volume must not take the next series colour;
 //  * the Absolute|Percentage and Linear|Log chips: `barnorm` and the y axis type.
 import template from '../../../../assets/design-tokens/plotly-template.json'
 
@@ -37,8 +39,9 @@ const CONFIG = {
   toImageButtonOptions: { format: 'png', scale: 2 },
 }
 
-const CARTESIAN = new Set(['bar', 'scatter', 'box', 'histogram'])
+const CARTESIAN = new Set(['bar', 'scatter', 'box', 'histogram', 'candlestick'])
 const INCOMPLETE = /incomplete/i
+const VOLUME = /^volume$/i
 // The axis line colour (a neutral grey) is the hatch colour.
 const HATCH = (template.layout.xaxis as { linecolor: string }).linecolor
 // Plotly's own fill is the line colour at 50 %, which swallows a 1 px line of the same hue.
@@ -98,6 +101,9 @@ export function skinned(figure: Figure, view: View = DEFAULT_VIEW): Frame {
   const { data, layout = {} } = cloned(figure)
   delete layout.width
   delete layout.height
+  // A bar named "Volume" is a candlestick's volume pane only when candles are drawn with it: a bar
+  // chart whose series happens to be called "Volume" keeps its series colour.
+  const hasCandles = data.some((trace) => trace.type === 'candlestick')
   const traces = data.map((trace, index) => {
     const next: Record<string, unknown> = { ...trace, hoverinfo: 'none' }
     if ((trace.type ?? 'scatter') === 'scatter' && trace.fill && trace.fill !== 'none' && trace.fillcolor === undefined) {
@@ -113,6 +119,9 @@ export function skinned(figure: Figure, view: View = DEFAULT_VIEW): Frame {
       const marker = (trace.marker ?? {}) as Record<string, unknown>
       next.marker = { ...marker, pattern: { shape: '/', size: 6, solidity: 0.35, fgcolor: HATCH, bgcolor: 'rgba(0,0,0,0)' } }
     }
+    if (hasCandles && trace.type === 'bar' && VOLUME.test(String(trace.name ?? ''))) {
+      next.marker = { ...((trace.marker ?? {}) as Record<string, unknown>), color: HATCH }
+    }
     return next
   })
   const skin: Record<string, unknown> = { ...layout, template, autosize: true }
@@ -121,6 +130,8 @@ export function skinned(figure: Figure, view: View = DEFAULT_VIEW): Frame {
     skin.barnorm = 'percent'
     skin.yaxis = { ...(layout.yaxis as object), ticksuffix: ' %' }
   }
+  // The first y axis only: under a candlestick that is the price (a log price axis is meaningful),
+  // while the volume pane's axis stays linear.
   if (view.log) skin.yaxis = { ...(skin.yaxis as object), type: 'log' }
   return { data: traces, layout: skin, config: CONFIG }
 }
@@ -142,6 +153,10 @@ export function describePoint(point: Record<string, unknown> | undefined): strin
     ...(has('label') && !has('x') ? ['label'] : []),
     'x',
     'y',
+    'open',
+    'high',
+    'low',
+    'close',
     'z',
     'theta',
     'r',

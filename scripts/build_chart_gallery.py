@@ -98,6 +98,21 @@ def sample_tables() -> dict[str, pd.DataFrame]:
             )
         ]
     )
+    # Drawn after channel_months for the same reason. Consecutive days, not business days, so the
+    # date axis shows no weekend gaps: the core draws the dates it is given and nothing else.
+    days = 40
+    close = (100 + np.cumsum(rng.normal(0.3, 2.0, days))).round(2)
+    open_ = (np.concatenate([[100.0], close[:-1]]) + rng.normal(0, 0.6, days)).round(2)
+    prices = pd.DataFrame(
+        {
+            "day": pd.date_range("2025-01-02", periods=days, freq="D"),
+            "open": open_,
+            "high": (np.maximum(open_, close) + rng.uniform(0.3, 2.0, days)).round(2),
+            "low": (np.minimum(open_, close) - rng.uniform(0.3, 2.0, days)).round(2),
+            "close": close,
+            "volume": rng.integers(8_000, 40_000, days),
+        }
+    )
     return {
         "sales": sales,
         "monthly": monthly,
@@ -105,6 +120,7 @@ def sample_tables() -> dict[str, pd.DataFrame]:
         "funnel": funnel,
         "teams": teams,
         "channel_months": channel_months,
+        "prices": prices,
     }
 
 
@@ -142,12 +158,34 @@ SPECS: dict[str, tuple[str, dict[str, Any]]] = {
     ),
     "waterfall": ("steps", {"category_column": "step", "value_column": "delta"}),
     "funnel": ("funnel", {"stage_column": "stage", "value_column": "count"}),
+    "candlestick": (
+        "prices",
+        {
+            "x_column": "day",
+            "open_column": "open",
+            "high_column": "high",
+            "low_column": "low",
+            "close_column": "close",
+            "volume_column": "volume",
+        },
+    ),
 }
 
 # An option of a registered chart that changes how it looks: gallery id -> (chart name, table,
 # keyword arguments). Every registered chart still needs its base entry in SPECS above; a variant
 # is one more figure from the same class, so the golden screenshot tests pin the option as well.
 VARIANTS: dict[str, tuple[str, str, dict[str, Any]]] = {
+    "candlestick_price_only": (
+        "candlestick",
+        "prices",
+        {
+            "x_column": "day",
+            "open_column": "open",
+            "high_column": "high",
+            "low_column": "low",
+            "close_column": "close",
+        },
+    ),
     "line_area": (
         "line",
         "monthly",
