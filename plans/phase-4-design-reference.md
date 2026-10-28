@@ -1086,7 +1086,7 @@ A fifth archetype, the **multi-pane synchronised stack** (B7), is used inside th
   tests CI runs) **/ 0 failed**; goldens **34 of 34** (32 charts, 2 components); `tsc -b`, oxlint, black, isort, bandit clean. The first full runs were stopped by the system for low memory (run in
   parallel); the second, run one after the other, completed. **Not verified: axe was not run** (loading it from a CDN was refused), so the components were checked by their accessibility tree
   only (a named list of "1 North 36,705 orders" items; a named region around a table with the level as text).
-  **Judgment call still open:** V13 thermal narrow bars (a sequential series palette) is not done. **Step 7's Tier-1 list is otherwise complete.** **Next, planned not built (2026-10-28):** automatic per-dataset chart selection and render-stack choice, `plans/phase-4-chart-intelligence.md` (CI.0–CI.9); it changes no chart's look.
+  **Judgment call still open:** V13 thermal narrow bars (a sequential series palette) is not done. **Step 7's Tier-1 list is otherwise complete.** **Step 8 started (2026-10-28; CI.0 part 1 done, `plans/phase-4-ci0-findings.md`):** automatic per-dataset chart selection and render-stack choice, `plans/phase-4-chart-intelligence.md` (CI.0–CI.10); no chart's look changes without your sign-off. The design-language skill is now step 9.
 - **Decision 3 refinement (WCAG 2.1.4):** bare digit keys are a character-key shortcut, so View > "Single-key shortcuts (1-5)" turns them
   off (stored in `localStorage`); the menu items carry `aria-keyshortcuts`. F6 and Escape are not character keys.
 - **Not done, on purpose or deferred:** no automated web accessibility test yet (the ship plan's D12 Playwright + axe pass is the place; the repo's
@@ -1118,7 +1118,10 @@ A fifth archetype, the **multi-pane synchronised stack** (B7), is used inside th
    palette, flat bars, one-line readout. Restyle the 12 registered charts. *Output: the 12 charts before/after.*
 7. **Tier 1 charts before launch** (decision 4), each with a golden screenshot test; **Tier 2 and Tier 3 after launch**, including
    the four niche charts kept by decision 6 (skew-T/hodograph, Hilbert map, chord, 3-D terrain).
-8. **Design-language skill** — `PRODUCT.md` + `DESIGN.md` written via `/impeccable init` and `document`, a project skill
+8. **Chart intelligence** — automatic per-dataset chart selection and render-stack choice; ECharts core, Plotly second, D3
+   third. Design, sequence CI.0–CI.10 and decisions: `plans/phase-4-chart-intelligence.md` (the master plan lists it as
+   4.9). *Output: upload a dataset → ranked, explained chart suggestions → accept → the chart renders.*
+9. **Design-language skill** — `PRODUCT.md` + `DESIGN.md` written via `/impeccable init` and `document`, a project skill
    (`uadas-design-language`) holding tokens, pins (T8), chart rules and the manifest, with Impeccable's `critique`/`audit`/`polish`
    as reviewers.
 

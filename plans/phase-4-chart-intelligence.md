@@ -1,8 +1,9 @@
 # Phase 4 — Chart intelligence: automatic, per-dataset visualization selection
 
-**Status: DRAFT, all four §6 decisions answered (2026-10-28); awaiting your go to start CI.0. Revised the same day: renderer order is ECharts (core), Plotly (second),
+**Status: DRAFT, all four §6 decisions answered (2026-10-28); CI.0 part 1 done (`plans/phase-4-ci0-findings.md`), part 2 pending. Revised the same day: renderer order is ECharts (core), Plotly (second),
 D3 (third), as the user decided.** Nothing in this plan is built. It extends Phase 4 step 7 (the Tier-1
 chart catalogue, complete) and is referenced from `plans/web-transition-glass-box-studio.md` as Phase 4.9.
+It is step 8 of `plans/phase-4-design-reference.md` §7; the design-language skill moved to step 9.
 Branch of record: `phase-4/instrument-design-system`.
 
 ## 0. Intent, constraints, non-goals
@@ -148,7 +149,7 @@ the terms, never written separately:
 | `diversity` | maximal-marginal-relevance against charts already chosen, so the top five are not five scatters |
 
 Weights live in versioned config and are **tuned against the gold set (§4), not by feel**. `ChartSuggestion` keeps its
-current shape (`chart_type`, `columns`, `reason`, `score`) and gains `variant`, `terms`, `intent`, so `GuidanceService`
+current shape (`chart_type`, `columns`, `reason`, `score`) and gains `params` (field → column: a bare `columns` list cannot name a builder parameter, CI.0 finding 1), `variant`, `terms`, `intent`, so `GuidanceService`
 and its tests are untouched.
 
 ### 3.5 Use-case map: what each chart is for, and what it needs
