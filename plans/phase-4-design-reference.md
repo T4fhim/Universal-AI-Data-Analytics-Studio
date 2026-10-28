@@ -1008,8 +1008,28 @@ A fifth archetype, the **multi-pane synchronised stack** (B7), is used inside th
   missing there. **Verified:** `tests/visualization/test_candlestick.py` (13), full suite **1057 passed / 0 failed** (then 2 tests added, their files 18 passed), API parity, models,
   OpenAPI, stages and IDOR tests 150 passed, goldens 20 of 20, `tsc -b` and oxlint clean. **Not done:** weekend `rangebreaks` (the chart draws the dates it is given),
   downsampling of large candle tables (the web render reads the first 5,000 rows), overlays and indicator panes (V05, V06: Tier 2), duplicate-x handling.
+  **7.5 dual-axis lines (V09) done.** Not a new chart type: `LineChart.build` takes `y2_column` (a column, so `line`'s `optional_fields` is `("x_column", "y2_column")`; the
+  AI tool schema describes it, which `test_every_builtin_chart_field_is_described_to_the_assistant` now requires). A second trace named after its column on `yaxis2`
+  (`overlaying: y`, `side: right`), each axis titled with its column, a grid on the left axis only (two grids on different scales would not line up); the default title is
+  "a and b over x". Refused with a `ServiceError`: a missing or non-numeric second column, the same column twice, and `variant` together with `y2_column` (an area under two
+  lines on two scales reads as one stacked quantity). Both lines are downsampled together above 5,000 rows and the second stays on `y2` (tested). Skin: nothing new; the
+  Linear|Log chip acts on the left axis only, as under a candlestick. The axis titles and ticks are **not** coloured to match their line: the first series colour (blue) is
+  3.86 : 1 on the well, under the 4.5 : 1 text minimum (orange passes at 7.09), and colouring only the right axis would be lopsided, so the legend and the axis titles carry
+  which line is which. Gallery variant `line_dual_axis` (a `dual` table drawn last, revenue against a conversion rate): 21 golden baselines. **Verified:**
+  `tests/visualization/test_dual_axis_line.py` (7), full suite **1066 passed / 0 failed**, API parity, OpenAPI, resources and stages tests 86 passed, goldens 21 of 21,
+  `tsc -b` and oxlint clean. **Not done:** a second axis for any other chart, more than two axes.
+  **7.6 grouped bars, hatched vs solid (V14) done.** Not a new chart type: `BarChart.build` takes `variant="grouped"` (a look, so `bar`'s `literal_fields` is now
+  `("incomplete_from", "variant")`; the AI tool schema's `variant` enum is `["area", "grouped"]`). The same traces as the stacked chart (same series order, same 14 + "Other" cap)
+  with `barmode: group`, and each series gets a fill pattern from a fixed cycle of eight: solid, `/`, `.`, `x`, `\`, `-`, `|`, `+`. The pattern is the colour-independent
+  channel the reference keeps (T9, a11y second channel): it is set in the core because it needs no colour (Plotly draws a pattern in its bar's colour), so the plain figure
+  carries it too and the skin needed nothing, only that `figureFacts.stacked` is false for `barmode: group` (there is no stack to be a percentage of, so no Percentage chip).
+  Refused with a `ServiceError`: an unknown variant, `variant` without `series_column`, and `variant` together with `incomplete_from` (a single "Incomplete" total beside grouped
+  bars would be meaningless). Gallery variant `bar_grouped` (region x channel from the sales table): 22 golden baselines. **Verified:** `tests/visualization/test_grouped_bar.py`
+  (8), full suite **1074 passed / 0 failed**, API parity, OpenAPI, resources and stages tests 86 passed, goldens 22 of 22, `tsc -b` and oxlint clean. `docs/manual/charts/bar.md`
+  had never been updated for 7.2's `series_column` and `incomplete_from`; it now covers all three. **Not done:** a pattern legend beyond Plotly's own swatches, patterns for
+  stacked bars, more than eight distinct patterns (the ninth series repeats the first with its own colour).
   **Judgment call still open:** V13 thermal narrow bars (a sequential series palette) is not done.
-  **Left for step 7:** the other Tier-1 charts (dual-axis lines, hatched grouped bars, paired horizontal bars, donut with
+  **Left for step 7:** the other Tier-1 charts (paired horizontal bars, donut with
   centre total, pie grid, numeric matrix heatmap, monochrome square-grid heatmap, scatter with pin and Pareto frontier, KPI mini charts, log pane, ranked
   leaderboard), each added with its golden test. Most are options of an existing chart, as stacking was, not new registry types.
 - **Decision 3 refinement (WCAG 2.1.4):** bare digit keys are a character-key shortcut, so View > "Single-key shortcuts (1-5)" turns them

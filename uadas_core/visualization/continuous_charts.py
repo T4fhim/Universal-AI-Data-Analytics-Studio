@@ -89,6 +89,7 @@ class LineChart(BaseChart):
         x_column: str | None = None,
         title: str | None = None,
         variant: str | None = None,
+        y2_column: str | None = None,
     ) -> go.Figure:
         """Build a line chart.
 
@@ -105,19 +106,39 @@ class LineChart(BaseChart):
                 drawn in row order). ``None`` (the default) is a plain line. A
                 value, not a column, so the registry lists it under
                 ``literal_fields``.
+            y2_column: A second numeric column, drawn as a second line against
+                its own axis on the right (two series whose units or scales differ
+                too much to share one axis). The lines are named after their
+                columns and each axis is titled with its column.
 
         Raises:
             ServiceError: If a named column does not exist,
-                ``y_column`` is not numeric, or ``variant`` is not one of
-                :data:`_LINE_VARIANTS`.
+                ``y_column`` or ``y2_column`` is not numeric, ``y2_column`` is
+                ``y_column``, ``variant`` is not one of :data:`_LINE_VARIANTS`,
+                or ``variant`` is combined with ``y2_column`` (an area under two
+                lines on two scales would read as one stacked quantity).
         """
-        columns_to_check = [y_column] + ([x_column] if x_column else [])
+        columns_to_check = (
+            [y_column]
+            + ([x_column] if x_column else [])
+            + ([y2_column] if y2_column else [])
+        )
         validate_columns(dataframe, *columns_to_check)
         _require_numeric(dataframe, y_column)
         if variant is not None and variant not in _LINE_VARIANTS:
             raise ServiceError(
                 f"variant {variant!r} is not one of {list(_LINE_VARIANTS)}."
             )
+        if y2_column:
+            _require_numeric(dataframe, y2_column)
+            if y2_column == y_column:
+                raise ServiceError(
+                    f"y2_column must differ from y_column; both are '{y_column}'."
+                )
+            if variant is not None:
+                raise ServiceError(
+                    f"variant {variant!r} cannot be combined with y2_column."
+                )
 
         x_values = dataframe[x_column] if x_column else dataframe.index
         fig = go.Figure()
@@ -132,12 +153,38 @@ class LineChart(BaseChart):
                 marker={"size": _end_dot_sizes(dataframe[y_column])},
                 cliponaxis=False,
             )
+        if y2_column:
+            # Named lines, so a legend can tell them apart (a lone line needs no name).
+            trace.update(name=y_column)
         fig.add_trace(trace)
+        default_title = f"{y_column} over {x_column or 'index'}"
+        if y2_column:
+            fig.add_trace(
+                go.Scatter(
+                    x=x_values,
+                    y=dataframe[y2_column],
+                    mode="lines",
+                    name=y2_column,
+                    yaxis="y2",
+                )
+            )
+            default_title = f"{y_column} and {y2_column} over {x_column or 'index'}"
         fig.update_layout(
-            title=title or f"{y_column} over {x_column or 'index'}",
+            title=title or default_title,
             xaxis_title=x_column or "Index",
             yaxis_title=y_column,
         )
+        if y2_column:
+            # No grid on the right axis: two grids on different scales would not line up, so the
+            # left axis keeps the only one.
+            fig.update_layout(
+                yaxis2={
+                    "title": {"text": y2_column},
+                    "overlaying": "y",
+                    "side": "right",
+                    "showgrid": False,
+                }
+            )
         return _maybe_resample(fig, len(dataframe))
 
 

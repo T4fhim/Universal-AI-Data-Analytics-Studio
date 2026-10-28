@@ -113,6 +113,17 @@ def sample_tables() -> dict[str, pd.DataFrame]:
             "volume": rng.integers(8_000, 40_000, days),
         }
     )
+    # And again last: two series whose scales differ by three orders of magnitude, the case a
+    # second axis exists for.
+    dual = pd.DataFrame(
+        {
+            "month": pd.date_range("2025-01-01", periods=24, freq="MS"),
+            "revenue": (1000 + np.arange(24) * 35 + rng.normal(0, 60, 24)).round(1),
+            "conversion": (2.2 + np.arange(24) * 0.03 + rng.normal(0, 0.15, 24)).round(
+                2
+            ),
+        }
+    )
     return {
         "sales": sales,
         "monthly": monthly,
@@ -121,6 +132,7 @@ def sample_tables() -> dict[str, pd.DataFrame]:
         "teams": teams,
         "channel_months": channel_months,
         "prices": prices,
+        "dual": dual,
     }
 
 
@@ -185,6 +197,21 @@ VARIANTS: dict[str, tuple[str, str, dict[str, Any]]] = {
             "low_column": "low",
             "close_column": "close",
         },
+    ),
+    "bar_grouped": (
+        "bar",
+        "sales",
+        {
+            "category_column": "region",
+            "series_column": "channel",
+            "value_column": "revenue",
+            "variant": "grouped",
+        },
+    ),
+    "line_dual_axis": (
+        "line",
+        "dual",
+        {"y_column": "revenue", "y2_column": "conversion", "x_column": "month"},
     ),
     "line_area": (
         "line",

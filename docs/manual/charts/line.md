@@ -12,6 +12,12 @@ column): the line is filled down to the baseline and the last value (the last ro
 since the line is drawn in row order) gets a dot. Meant for a series whose latest value matters;
 the fill is flat, with no gradient.
 
+A second numeric column, `y2_column`, draws a second line against its own axis on the right, for
+two series whose scales differ too much to share one (revenue and a conversion rate, say). Both
+lines are named after their columns and each axis is titled with its column; only the left axis
+has a grid, since two grids on different scales would not line up. It cannot be combined with
+`variant`, and it must be a different column from the first.
+
 Above 5,000 rows, the line is downsampled to about 1,000 points for a responsive chart --
 confirmed by direct testing to genuinely reduce point count in the static HTML export this
 application embeds, not merely in an interactive live-server view. Below that threshold, every

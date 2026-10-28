@@ -867,6 +867,10 @@ TOOLS: list[ToolDefinition] = [
                     "type": "string",
                     "description": "Line/Scatter/Bubble charts; Candlestick (each candle's period, usually a date).",
                 },
+                "y2_column": {
+                    "type": "string",
+                    "description": "Line chart (optional) — a second numeric column, drawn against its own axis on the right.",
+                },
                 "open_column": {
                     "type": "string",
                     "description": "Candlestick chart — numeric column, the price at the start of each period.",
@@ -901,8 +905,12 @@ TOOLS: list[ToolDefinition] = [
                 },
                 "variant": {
                     "type": "string",
-                    "enum": ["area"],
-                    "description": "Line chart (optional) — 'area' fills the line to the baseline and marks the last value with a dot.",
+                    "enum": ["area", "grouped"],
+                    "description": (
+                        "Optional look. Line chart: 'area' fills the line to the baseline and marks the "
+                        "last value with a dot. Bar chart with series_column: 'grouped' puts the series "
+                        "side by side (each with its own fill pattern) instead of stacked."
+                    ),
                 },
                 "y_column": {
                     "type": "string",

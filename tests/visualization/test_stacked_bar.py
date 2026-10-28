@@ -139,5 +139,5 @@ def test_the_registry_keeps_columns_and_literals_apart() -> None:
     _register_builtins()
     registration = get_chart("bar")
     assert "series_column" in registration.optional_fields
-    assert registration.literal_fields == ("incomplete_from",)
+    assert registration.literal_fields == ("incomplete_from", "variant")
     assert "incomplete_from" not in registration.optional_fields

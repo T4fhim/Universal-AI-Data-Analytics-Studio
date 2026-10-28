@@ -45,6 +45,16 @@ def _prepare_category_counts(series: pd.Series) -> pd.Series:
 
 _MISSING = "(missing)"
 
+# The looks a bar chart with series can take besides stacked columns. "grouped" puts the series
+# side by side (the Tier-1 V14 idiom).
+_BAR_VARIANTS = ("grouped",)
+
+# Fill patterns of a grouped chart's series, in series order: solid first, then the named patterns
+# (hatch, stipple, ...). The pattern is a second channel beside colour, so two series stay apart in
+# greyscale or for a reader who cannot tell the colours apart. Plotly's own names; none needs a
+# colour (a pattern is drawn in its bar's colour), so the core needs no palette.
+_GROUP_PATTERNS = ("", "/", ".", "x", "\\", "-", "|", "+")
+
 
 def _bucket_labels(column: pd.Series) -> pd.Series:
     """Text labels for a category column; dates as dates, a missing value as its own label."""
@@ -64,8 +74,13 @@ def _stacked_bars(
     value_column: str | None,
     title: str | None,
     incomplete_from: str | None = None,
+    grouped: bool = False,
 ) -> go.Figure:
     """Stacked columns: one bar per category value, one segment (trace) per series value.
+
+    With ``grouped`` the same traces sit side by side instead (the name stayed because everything
+    else -- the series ordering and cap, the totals -- is shared), each series with its own fill
+    pattern from :data:`_GROUP_PATTERNS`.
 
     Why the categories are *not* capped at ``_MAX_CATEGORIES`` here: the axis is usually time
     buckets (two years of months is 24), and folding the oldest months into "Other" would destroy
@@ -132,14 +147,18 @@ def _stacked_bars(
         table.iloc[start:] = 0
 
     y_title = value_column or "Count"
-    traces = [
-        go.Bar(name=name, x=categories, y=table[name].to_numpy()) for name in names
-    ]
+    traces = []
+    for index, name in enumerate(names):
+        bar = go.Bar(name=name, x=categories, y=table[name].to_numpy())
+        if grouped:
+            shape = _GROUP_PATTERNS[index % len(_GROUP_PATTERNS)]
+            bar.update(marker={"pattern": {"shape": shape}})
+        traces.append(bar)
     if incomplete is not None:
         traces.append(go.Bar(name="Incomplete", x=categories, y=incomplete.to_numpy()))
     fig = go.Figure(data=traces)
     fig.update_layout(
-        barmode="stack",
+        barmode="group" if grouped else "stack",
         title=title or f"{y_title} by {category_column} and {series_column}",
         xaxis_title=category_column,
         yaxis_title=y_title,
@@ -159,6 +178,7 @@ class BarChart(BaseChart):
         title: str | None = None,
         series_column: str | None = None,
         incomplete_from: str | None = None,
+        variant: str | None = None,
     ) -> go.Figure:
         """Build a bar chart.
 
@@ -177,17 +197,37 @@ class BarChart(BaseChart):
                 the axis, e.g. ``"2025-12-01"``): that bucket and every later
                 one is drawn as a single "Incomplete" total. Needs
                 ``series_column``; off by default.
+            variant: ``"grouped"`` puts the series side by side instead of
+                stacked, each with its own fill pattern (solid, hatch, stipple,
+                ...) so the series differ by more than colour. Needs
+                ``series_column``; ``None`` (the default) is stacked. A value,
+                not a column, so the registry lists it under ``literal_fields``.
 
         Raises:
             ServiceError: If a named column does not exist, or
                 ``value_column`` is given but is not numeric, or
                 ``series_column`` is given and there are no rows, or
                 ``incomplete_from`` is not a bucket value or is given without
-                ``series_column``.
+                ``series_column``, or ``variant`` is not one of
+                :data:`_BAR_VARIANTS`, is given without ``series_column`` or
+                together with ``incomplete_from``.
         """
+        if variant is not None and variant not in _BAR_VARIANTS:
+            raise ServiceError(
+                f"variant {variant!r} is not one of {list(_BAR_VARIANTS)}."
+            )
+        if variant is not None and not series_column:
+            raise ServiceError(
+                f"variant {variant!r} applies to bars with series; give series_column too."
+            )
         if incomplete_from is not None and not series_column:
             raise ServiceError(
                 "incomplete_from applies to stacked bars only; give series_column too."
+            )
+        if incomplete_from is not None and variant is not None:
+            raise ServiceError(
+                f"incomplete_from applies to stacked bars only; it cannot be combined "
+                f"with variant {variant!r}."
             )
         if series_column:
             validate_columns(
@@ -210,6 +250,7 @@ class BarChart(BaseChart):
                 value_column,
                 title,
                 incomplete_from,
+                grouped=variant == "grouped",
             )
         if value_column:
             validate_columns(dataframe, category_column, value_column)

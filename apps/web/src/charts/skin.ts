@@ -60,7 +60,8 @@ function areaFill(trace: Record<string, unknown>, index: number): string | undef
 }
 
 export interface FigureFacts {
-  // Two or more bar traces can be stacked, so can be shown as a percentage of the stack.
+  // Two or more bar traces are stacked, so can be shown as a percentage of the stack (bars side by
+  // side, `barmode: group`, have no stack to be a share of).
   stacked: boolean
   // Every trace has a numeric y axis, so a log axis makes sense.
   cartesian: boolean
@@ -72,7 +73,7 @@ export function figureFacts(figure: Figure): FigureFacts {
   const bars = types.filter((type) => type === 'bar').length
   const kinds = [...new Set(types)].join(', ')
   return {
-    stacked: bars >= 2,
+    stacked: bars >= 2 && figure.layout?.barmode !== 'group',
     cartesian: types.length > 0 && types.every((type) => CARTESIAN.has(type)),
     summary: `${kinds} chart with ${types.length} ${types.length === 1 ? 'trace' : 'traces'}`,
   }
@@ -131,7 +132,7 @@ export function skinned(figure: Figure, view: View = DEFAULT_VIEW): Frame {
     skin.yaxis = { ...(layout.yaxis as object), ticksuffix: ' %' }
   }
   // The first y axis only: under a candlestick that is the price (a log price axis is meaningful),
-  // while the volume pane's axis stays linear.
+  // while the volume pane's axis stays linear; on a dual-axis line it is the left-hand series.
   if (view.log) skin.yaxis = { ...(skin.yaxis as object), type: 'log' }
   return { data: traces, layout: skin, config: CONFIG }
 }

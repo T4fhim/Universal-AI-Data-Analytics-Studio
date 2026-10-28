@@ -195,7 +195,7 @@ def _register_builtins() -> None:
             BarChart,
             ("category_column",),
             ("value_column", "series_column"),
-            literal_fields=("incomplete_from",),
+            literal_fields=("incomplete_from", "variant"),
         ),
     )
     register_chart(
@@ -204,7 +204,10 @@ def _register_builtins() -> None:
     register_chart(
         "line",
         ChartRegistration(
-            LineChart, ("y_column",), ("x_column",), literal_fields=("variant",)
+            LineChart,
+            ("y_column",),
+            ("x_column", "y2_column"),
+            literal_fields=("variant",),
         ),
     )
     register_chart(
