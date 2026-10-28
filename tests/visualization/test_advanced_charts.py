@@ -56,6 +56,27 @@ def test_treemap_chart_builds_figure() -> None:
     assert isinstance(fig, go.Figure)
 
 
+def test_treemap_one_level_sums_each_leaf_once() -> None:
+    trace = TreemapChart.build(_dataframe(), ["cat"], "z").data[0]
+    assert list(trace.ids) == ["a", "b"]
+    assert list(trace.values) == [90.0, 60.0]
+    assert list(trace.parents) == ["", ""]
+
+
+def test_treemap_two_levels_make_every_parent_a_node() -> None:
+    # Plotly draws nothing when a parent is not itself a node, or a label repeats without an id.
+    frame = _dataframe().assign(grp=["u", "u", "v", "v", "u"])
+    trace = TreemapChart.build(frame, ["grp", "cat"], "z").data[0]
+    ids = list(trace.ids)
+    assert len(set(ids)) == len(ids)
+    assert set(ids) == {"u", "v", "u/a", "u/b", "v/a", "v/b"}
+    assert all(parent == "" or parent in ids for parent in trace.parents)
+    assert sorted(trace.labels).count("a") == 2  # the same label under two parents
+    assert (
+        sum(trace.values) == frame["z"].sum()
+    )  # parents carry 0: nothing counted twice
+
+
 def test_treemap_chart_empty_path_columns_raises() -> None:
     with pytest.raises(ServiceError, match="at least one"):
         TreemapChart.build(_dataframe(), [], "z")

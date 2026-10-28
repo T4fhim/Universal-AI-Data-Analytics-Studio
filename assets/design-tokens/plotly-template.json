@@ -22,7 +22,7 @@
     "margin": {
       "l": 56,
       "r": 16,
-      "t": 32,
+      "t": 52,
       "b": 40
     },
     "xaxis": {
@@ -62,7 +62,11 @@
         "size": 11,
         "color": "#d4d5d7"
       },
-      "orientation": "h"
+      "orientation": "h",
+      "x": 0,
+      "xanchor": "left",
+      "y": 1,
+      "yanchor": "bottom"
     },
     "hoverlabel": {
       "bgcolor": "#252525",
@@ -75,11 +79,127 @@
     },
     "title": {
       "x": 0,
+      "y": 1,
+      "yref": "container",
+      "yanchor": "top",
+      "pad": {
+        "t": 8
+      },
       "font": {
         "family": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
         "size": 11,
         "color": "#e5e6e7"
       }
+    },
+    "piecolorway": [
+      "#2376b0",
+      "#ef8220",
+      "#23bec8",
+      "#e775c3",
+      "#c3bd27",
+      "#9963c3",
+      "#279f27",
+      "#d52d21",
+      "#8f5e50",
+      "#838280"
+    ],
+    "treemapcolorway": [
+      "#1b4563",
+      "#814b1b",
+      "#1b696f",
+      "#7d446c",
+      "#6b681e",
+      "#563c6c",
+      "#1d5a1e",
+      "#74201c",
+      "#513933",
+      "#4b4b4b"
+    ],
+    "funnelareacolorway": [
+      "#2376b0",
+      "#ef8220",
+      "#23bec8",
+      "#e775c3",
+      "#c3bd27",
+      "#9963c3",
+      "#279f27",
+      "#d52d21",
+      "#8f5e50",
+      "#838280"
+    ],
+    "colorscale": {
+      "sequential": [
+        [
+          0,
+          "#1b4563"
+        ],
+        [
+          1,
+          "#2376b0"
+        ]
+      ],
+      "sequentialminus": [
+        [
+          0,
+          "#1b4563"
+        ],
+        [
+          1,
+          "#2376b0"
+        ]
+      ],
+      "diverging": [
+        [
+          0,
+          "#1b4563"
+        ],
+        [
+          0.5,
+          "#262626"
+        ],
+        [
+          1,
+          "#814b1b"
+        ]
+      ]
+    },
+    "polar": {
+      "bgcolor": "#111111",
+      "domain": {
+        "y": [
+          0,
+          0.86
+        ]
+      },
+      "radialaxis": {
+        "gridcolor": "#262626",
+        "griddash": "dot",
+        "linecolor": "#707073",
+        "tickfont": {
+          "family": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+          "size": 11,
+          "color": "#d4d5d7"
+        },
+        "angle": 45,
+        "tickangle": 0,
+        "nticks": 4,
+        "showline": false
+      },
+      "angularaxis": {
+        "gridcolor": "#262626",
+        "griddash": "dot",
+        "linecolor": "#707073",
+        "tickfont": {
+          "family": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+          "size": 11,
+          "color": "#d4d5d7"
+        }
+      }
+    },
+    "modebar": {
+      "bgcolor": "rgba(0,0,0,0)",
+      "color": "#d4d5d7",
+      "activecolor": "#e5e6e7"
     }
   },
   "data": {
@@ -92,10 +212,111 @@
         }
       }
     ],
+    "histogram": [
+      {
+        "marker": {
+          "line": {
+            "width": 0
+          }
+        }
+      }
+    ],
     "scatter": [
       {
         "line": {
           "width": 1
+        },
+        "marker": {
+          "size": 5
+        }
+      }
+    ],
+    "scatterpolar": [
+      {
+        "line": {
+          "width": 1
+        }
+      }
+    ],
+    "box": [
+      {
+        "line": {
+          "width": 1
+        }
+      }
+    ],
+    "funnel": [
+      {
+        "marker": {
+          "line": {
+            "width": 0
+          }
+        }
+      }
+    ],
+    "pie": [
+      {
+        "marker": {
+          "line": {
+            "color": "#111111",
+            "width": 2
+          }
+        },
+        "textposition": "outside",
+        "automargin": true,
+        "textfont": {
+          "color": "#e5e6e7"
+        }
+      }
+    ],
+    "treemap": [
+      {
+        "marker": {
+          "line": {
+            "color": "#111111",
+            "width": 1
+          }
+        },
+        "textfont": {
+          "color": "#e5e6e7"
+        }
+      }
+    ],
+    "heatmap": [
+      {
+        "colorbar": {
+          "outlinewidth": 0,
+          "thickness": 8,
+          "tickfont": {
+            "family": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+            "size": 11,
+            "color": "#d4d5d7"
+          }
+        }
+      }
+    ],
+    "waterfall": [
+      {
+        "increasing": {
+          "marker": {
+            "color": "#279f27"
+          }
+        },
+        "decreasing": {
+          "marker": {
+            "color": "#d52d21"
+          }
+        },
+        "totals": {
+          "marker": {
+            "color": "#2376b0"
+          }
+        },
+        "connector": {
+          "line": {
+            "color": "#707073",
+            "width": 1
+          }
         }
       }
     ]

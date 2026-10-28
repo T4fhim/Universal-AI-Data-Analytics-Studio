@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Playwright output; only the Linux golden baselines are committed (see playwright.config.ts)
+test-results
+playwright-report
+e2e/__golden__/**/*-win32.png
+e2e/__golden__/**/*-darwin.png
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

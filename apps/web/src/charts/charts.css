@@ -1,0 +1,57 @@
+/* A chart in the Instrument skin: the K13 "plot well" (a #111 well inside a #262626 frame, the
+   frame colour comes from the Plotly template's paper) with a one-line readout beneath it. */
+
+.chart {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  background: var(--surface-well-frame);
+}
+
+.chart-host {
+  min-width: 0;
+  background: var(--surface-well-frame);
+}
+
+.chart-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* One line, always the same height, so hovering never moves the page. */
+.chart-readout {
+  height: var(--size-row);
+  margin: 0;
+  padding: 0 0.5rem;
+  overflow: hidden;
+  background: var(--surface-well);
+  color: var(--text-primary);
+  line-height: var(--size-row);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-readout[data-idle] {
+  color: var(--text-muted);
+}
+
+/* ---- the gallery layout (dev page only) -------------------------------------------------- */
+
+.chart-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 0.5rem;
+}
+
+.chart-side {
+  display: grid;
+  gap: 0.25rem;
+  align-content: start;
+}
+
+.chart-caption {
+  margin: 0;
+  color: var(--text-muted);
+}

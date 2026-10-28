@@ -43,6 +43,110 @@ def _prepare_category_counts(series: pd.Series) -> pd.Series:
     return pd.concat([top, pd.Series({"Other": other_total})])
 
 
+_MISSING = "(missing)"
+
+
+def _bucket_labels(column: pd.Series) -> pd.Series:
+    """Text labels for a category column; dates as dates, a missing value as its own label."""
+    if pd.api.types.is_datetime64_any_dtype(column):
+        known = column.dropna()
+        has_time = bool((known != known.dt.normalize()).any())
+        text = column.dt.strftime("%Y-%m-%d %H:%M" if has_time else "%Y-%m-%d")
+    else:
+        text = column.astype("object")
+    return text.where(column.notna(), _MISSING).astype(str)
+
+
+def _stacked_bars(
+    dataframe: pd.DataFrame,
+    category_column: str,
+    series_column: str,
+    value_column: str | None,
+    title: str | None,
+    incomplete_from: str | None = None,
+) -> go.Figure:
+    """Stacked columns: one bar per category value, one segment (trace) per series value.
+
+    Why the categories are *not* capped at ``_MAX_CATEGORIES`` here: the axis is usually time
+    buckets (two years of months is 24), and folding the oldest months into "Other" would destroy
+    the very thing the chart shows. They keep the column's own order (dates in date order). The
+    **series** are the high-cardinality side, so they get the shared cutoff: the largest
+    ``_MAX_CATEGORIES - 1`` stay and the rest are summed into "Other". Series are ordered by label
+    (not by size) so the same data always gets the same colours; "Other" goes last.
+
+    ``incomplete_from`` marks buckets that are still filling (an export taken mid-month). From
+    that bucket onward each bar is one total in a trace named "Incomplete" -- the web skin draws
+    that name hatched -- with no series split, since a partial bucket's split would read as final.
+    It is opt-in and never inferred: nothing in the data says which bucket is partial, and
+    labelling a finished last bucket as incomplete would be a false statement about the data.
+    """
+    if dataframe.empty:
+        raise ServiceError("There are no rows to chart.")
+    values = (
+        dataframe[value_column] if value_column else pd.Series(1, index=dataframe.index)
+    )
+    labels = _bucket_labels(dataframe[category_column])
+    ordered = pd.DataFrame({"label": labels, "key": dataframe[category_column]})
+    ordered = ordered.drop_duplicates("label")
+    try:
+        ordered = ordered.sort_values("key", na_position="last", kind="stable")
+    except TypeError:  # mixed types have no natural order; fall back to the text
+        ordered = ordered.sort_values("label", kind="stable")
+    categories = list(ordered["label"])
+
+    table = pd.DataFrame(
+        {
+            "category": labels,
+            "series": _bucket_labels(dataframe[series_column]),
+            "value": values,
+        }
+    ).pivot_table(
+        index="category",
+        columns="series",
+        values="value",
+        aggfunc="sum",
+        fill_value=0,
+    )
+    table = table.reindex(categories, fill_value=0)
+
+    if table.shape[1] > _MAX_CATEGORIES:
+        biggest = table.sum().sort_values(ascending=False)
+        keep = list(biggest.index[: _MAX_CATEGORIES - 1])
+        rest = table.drop(columns=keep).sum(axis=1)
+        table = table[keep]
+        table["Other"] = table["Other"] + rest if "Other" in table else rest
+    names = sorted(name for name in table.columns if name != "Other")
+    if "Other" in table.columns:
+        names.append("Other")
+
+    incomplete: pd.Series | None = None
+    if incomplete_from is not None:
+        if incomplete_from not in categories:
+            raise ServiceError(
+                f"incomplete_from '{incomplete_from}' is not one of the values of "
+                f"'{category_column}'."
+            )
+        start = categories.index(incomplete_from)
+        incomplete = pd.Series(0.0, index=table.index)
+        incomplete.iloc[start:] = table.iloc[start:].sum(axis=1).to_numpy()
+        table.iloc[start:] = 0
+
+    y_title = value_column or "Count"
+    traces = [
+        go.Bar(name=name, x=categories, y=table[name].to_numpy()) for name in names
+    ]
+    if incomplete is not None:
+        traces.append(go.Bar(name="Incomplete", x=categories, y=incomplete.to_numpy()))
+    fig = go.Figure(data=traces)
+    fig.update_layout(
+        barmode="stack",
+        title=title or f"{y_title} by {category_column} and {series_column}",
+        xaxis_title=category_column,
+        yaxis_title=y_title,
+    )
+    return fig
+
+
 class BarChart(BaseChart):
     """A bar chart of value counts for a categorical column, or of a numeric column by category."""
 
@@ -53,6 +157,8 @@ class BarChart(BaseChart):
         category_column: str,
         value_column: str | None = None,
         title: str | None = None,
+        series_column: str | None = None,
+        incomplete_from: str | None = None,
     ) -> go.Figure:
         """Build a bar chart.
 
@@ -64,11 +170,47 @@ class BarChart(BaseChart):
                 are the count of rows per category.
             title: Chart title. Defaults to a description derived from
                 the column(s) used.
+            series_column: If given, each bar is stacked from one segment
+                per distinct value of this column (see :func:`_stacked_bars`
+                for how categories and series are ordered and capped).
+            incomplete_from: A value of ``category_column`` (as it is shown on
+                the axis, e.g. ``"2025-12-01"``): that bucket and every later
+                one is drawn as a single "Incomplete" total. Needs
+                ``series_column``; off by default.
 
         Raises:
             ServiceError: If a named column does not exist, or
-                ``value_column`` is given but is not numeric.
+                ``value_column`` is given but is not numeric, or
+                ``series_column`` is given and there are no rows, or
+                ``incomplete_from`` is not a bucket value or is given without
+                ``series_column``.
         """
+        if incomplete_from is not None and not series_column:
+            raise ServiceError(
+                "incomplete_from applies to stacked bars only; give series_column too."
+            )
+        if series_column:
+            validate_columns(
+                dataframe,
+                category_column,
+                series_column,
+                *([value_column] if value_column else []),
+            )
+            if value_column and not pd.api.types.is_numeric_dtype(
+                dataframe[value_column]
+            ):
+                raise ServiceError(
+                    f"value_column '{value_column}' must be numeric; "
+                    f"has dtype {dataframe[value_column].dtype}."
+                )
+            return _stacked_bars(
+                dataframe,
+                category_column,
+                series_column,
+                value_column,
+                title,
+                incomplete_from,
+            )
         if value_column:
             validate_columns(dataframe, category_column, value_column)
             if not pd.api.types.is_numeric_dtype(dataframe[value_column]):

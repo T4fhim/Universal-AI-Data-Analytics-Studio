@@ -19,6 +19,10 @@ What is **real** in here today (design: `plans/phase-4-design-reference.md`):
 - **Components** (`src/components/`): buttons, select, radio, alert bar, a sortable
   table, a keyboard-operable tree-table, and the sheet pieces (numbered sections,
   key/value list, quote strip, editable value). Dev gallery: `/components.html`.
+- **Charts** (`src/charts/`): `PlotlyChart` draws a Plotly figure from the API in the
+  Instrument skin (template from the design tokens, one-line hover readout,
+  Absolute|Percentage and Linear|Log chips). Plotly.js loads on demand. Not yet
+  mounted in the workbench: the Chart tab waits for the chart builder.
 - **Design tokens** (`src/theme/tokens.css`) are **generated**: edit
   `assets/design-tokens/instrument.json`, then run
   `python scripts/build_design_tokens.py` (it fails on any contrast pair below
@@ -50,6 +54,8 @@ pnpm dev          # http://localhost:5173, forwards /api to Django on 127.0.0.1:
 pnpm build        # tsc -b && vite build
 pnpm exec tsc -b  # typecheck only
 pnpm gen:api      # regenerate src/api/schema.d.ts from ../api/openapi.json
+pnpm test:golden         # chart golden screenshots, in the pinned Playwright container (needs Docker)
+pnpm test:golden:update  # re-render the committed -linux baselines after an intended change
 ```
 
 To use the data views you need the API running too (see `apps/api/README.md`):
@@ -61,7 +67,8 @@ header when proxying (`changeOrigin: false`) because Django's CSRF check compare
 `Origin` with `Host`.
 
 Dev-only galleries while `pnpm dev` is running: `/tokens.html` (swatches, region
-fills at 50 %, contrast audit) and `/components.html` (every component, with
-states).
+fills at 50 %, contrast audit), `/components.html` (every component, with
+states) and `/charts.html` (the 12 registered charts before and after the
+Instrument skin; regenerate its figures with `python scripts/build_chart_gallery.py`).
 
 Node 22+ / pnpm. No environment variables required for the web app.

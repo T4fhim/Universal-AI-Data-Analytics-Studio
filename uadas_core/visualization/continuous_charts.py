@@ -19,7 +19,11 @@ import plotly.graph_objects as go
 from plotly_resampler import FigureResampler
 
 from uadas_core.core.exceptions import ServiceError
-from uadas_core.visualization.base_chart import BaseChart, validate_columns
+from uadas_core.visualization.base_chart import (
+    BaseChart,
+    category_groups,
+    validate_columns,
+)
 
 # Row count above which resampling is applied. Below this, a chart
 # renders every point directly — resampling has real cost (both
@@ -126,20 +130,31 @@ class ScatterChart(BaseChart):
         _require_numeric(dataframe, x_column)
         _require_numeric(dataframe, y_column)
 
-        marker = {}
-        if color_column:
-            marker["color"] = dataframe[color_column]
-            marker["showscale"] = pd.api.types.is_numeric_dtype(dataframe[color_column])
-
         fig = go.Figure()
-        fig.add_trace(
-            go.Scatter(
-                x=dataframe[x_column],
-                y=dataframe[y_column],
-                mode="markers",
-                marker=marker,
+        if color_column and not pd.api.types.is_numeric_dtype(dataframe[color_column]):
+            # A text column cannot colour one trace (Plotly raises): one trace per category.
+            for label, group in category_groups(dataframe, color_column):
+                fig.add_trace(
+                    go.Scatter(
+                        x=group[x_column],
+                        y=group[y_column],
+                        mode="markers",
+                        name=label,
+                    )
+                )
+        else:
+            marker = {}
+            if color_column:
+                marker["color"] = dataframe[color_column]
+                marker["showscale"] = True
+            fig.add_trace(
+                go.Scatter(
+                    x=dataframe[x_column],
+                    y=dataframe[y_column],
+                    mode="markers",
+                    marker=marker,
+                )
             )
-        )
         fig.update_layout(
             title=title or f"{y_column} vs {x_column}",
             xaxis_title=x_column,

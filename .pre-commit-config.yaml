@@ -42,6 +42,9 @@ repos:
         # Compose overrides use Compose-only tags (`!reset`, `!override`) that a plain
         # YAML loader cannot construct; `docker compose config` is their real validator.
         exclude: ^docker-compose.*\.ya?ml$
+        # pnpm writes apps/web/pnpm-lock.yaml as two YAML documents (the package-manager
+        # environment, then the project); syntax is still checked, just per document.
+        args: [--allow-multiple-documents]
       - id: check-added-large-files
         # Default is 500 KB. uv.lock (Phase 0.7) is ~800 KB — a fully
         # resolved + hashed graph of ~200 packages, legitimately large and

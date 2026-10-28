@@ -37,6 +37,24 @@ def validate_columns(dataframe: pd.DataFrame, *column_names: str) -> None:
         )
 
 
+def category_groups(
+    dataframe: pd.DataFrame, column: str
+) -> list[tuple[str, pd.DataFrame]]:
+    """Split ``dataframe`` by the values of a non-numeric ``column``, one group per value.
+
+    Why: Plotly accepts only colours (or numbers on a colour scale) for ``marker.color``, so a
+    text column cannot colour one trace -- it raised ``ValueError`` and the chart could not be
+    built at all. One trace per category is also what gives the legend its entries. Groups are
+    ordered by label (not by first appearance) so the same data always gets the same colours,
+    and a missing value is its own visible group rather than being dropped.
+    """
+    labels = (
+        dataframe[column].astype("object").where(dataframe[column].notna(), "(missing)")
+    )
+    labels = labels.astype(str)
+    return [(label, dataframe[labels == label]) for label in sorted(labels.unique())]
+
+
 class BaseChart(ABC):
     """Abstract base class every chart type inherits from."""
 

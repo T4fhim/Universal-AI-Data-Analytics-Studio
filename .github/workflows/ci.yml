@@ -341,6 +341,49 @@ jobs:
         # Tests are not scanned (they assert freely and spawn subprocesses).
         run: python -m bandit -r apps/api/uadas_api -q --skip B101
 
+  web:
+    # Phase 4 (apps/web): the web app had no CI. Typecheck, lint, production build and the golden
+    # screenshots of the chart skin. It runs inside the Playwright image the baselines are rendered
+    # in (apps/web/playwright.config.ts says why); the image tag must equal the pinned
+    # @playwright/test version, which the first step checks so the two cannot drift apart.
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.64.1-noble
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image tag matches the pinned Playwright version
+        run: test "$(node -p "require('./package.json').devDependencies['@playwright/test']")" = "1.64.1"
+
+      - name: Install pnpm
+        run: npm install --global "$(node -p "require('./package.json').packageManager")"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm exec tsc -b
+
+      - name: oxlint
+        run: pnpm exec oxlint
+
+      - name: Production build
+        run: pnpm exec vite build
+
+      - name: Golden screenshots
+        run: pnpm exec playwright test
+
+      - name: Keep the diff images when a golden test fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-diffs
+          path: |
+            apps/web/test-results
+            apps/web/playwright-report
+
   lint:
     # `ruff check` and `bandit` were once enforced only by .claude/hooks/ and
     # .pre-commit-config.yaml -- never in CI itself, so a commit made outside a Claude

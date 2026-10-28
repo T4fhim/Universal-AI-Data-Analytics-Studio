@@ -234,19 +234,62 @@ def render_template(
         "tickfont": {"family": mono, "size": 11, "color": flat["text.secondary"]},
         "automargin": True,
     }
+    well, frame, edge = (
+        flat["surface.well"],
+        flat["surface.well-frame"],
+        flat["scrollbar.thumb"],
+    )
+    order = src["region"]["series_order"]
+    colorway = [fills[n]["key"] for n in order]
+    # Tiles that carry their label inside (treemap) use the region *fills*: text.primary is
+    # checked at 4.5:1 on every one of them, which none of the bright keys guarantee. Pie slices
+    # keep the keys (3:1 against the well) because their labels sit outside.
+    area_colorway = [fills[n]["fill"] for n in order]
+    # Cell text stays readable at every stop: the heatmap prints its values in the cells and picks
+    # white or black per cell, so the scales are built from region *fills* (text.primary is
+    # checked at 4.5:1 on each) and the blue key (5.0:1 under white), never the bright keys.
+    # Sequential: blue fill to blue key. Diverging: blue and orange (colour-blind safe) fills
+    # through the neutral frame.
+    sequential = [[0, fills["blue"]["fill"]], [1, fills["blue"]["key"]]]
+    diverging = [
+        [0, fills["blue"]["fill"]],
+        [0.5, frame],
+        [1, fills["orange"]["fill"]],
+    ]
+    tick = {"family": mono, "size": 11, "color": flat["text.secondary"]}
+    polar_axis = {
+        "gridcolor": frame,
+        "griddash": "dot",
+        "linecolor": edge,
+        "tickfont": tick,
+    }
+    radial_axis = {
+        **polar_axis,
+        "angle": 45,  # between two spokes, so its labels do not sit on one
+        "tickangle": 0,
+        "nticks": 4,
+        "showline": False,
+    }
+    colorbar = {"outlinewidth": 0, "thickness": 8, "tickfont": tick}
     template = {
         "layout": {
             "font": {"family": mono, "size": 11, "color": flat["text.primary"]},
             "paper_bgcolor": flat["surface.well-frame"],
             "plot_bgcolor": flat["surface.well"],
-            "colorway": [fills[n]["key"] for n in src["region"]["series_order"]],
-            "margin": {"l": 56, "r": 16, "t": 32, "b": 40},
+            "colorway": colorway,
+            "margin": {"l": 56, "r": 16, "t": 52, "b": 40},
             "xaxis": axis,
             "yaxis": axis,
             "legend": {
                 "bgcolor": "rgba(0,0,0,0)",
                 "font": {"family": mono, "size": 11, "color": flat["text.secondary"]},
+                # One row just above the plot, under the title: below the plot it collides
+                # with the x axis title.
                 "orientation": "h",
+                "x": 0,
+                "xanchor": "left",
+                "y": 1,
+                "yanchor": "bottom",
             },
             "hoverlabel": {
                 "bgcolor": flat["surface.chrome"],
@@ -255,12 +298,69 @@ def render_template(
             },
             "title": {
                 "x": 0,
+                "y": 1,
+                "yref": "container",
+                "yanchor": "top",
+                "pad": {"t": 8},
                 "font": {"family": mono, "size": 11, "color": flat["text.primary"]},
+            },
+            # Pie, treemap and funnel-area traces take their own colourway property.
+            "piecolorway": colorway,
+            "treemapcolorway": area_colorway,
+            "funnelareacolorway": colorway,
+            "colorscale": {
+                "sequential": sequential,
+                "sequentialminus": sequential,
+                "diverging": diverging,
+            },
+            "polar": {
+                "bgcolor": well,
+                # Leave a row above the circle for the legend and the top axis label.
+                "domain": {"y": [0, 0.86]},
+                "radialaxis": radial_axis,
+                "angularaxis": polar_axis,
+            },
+            # The mode bar stays visible (WCAG 2.1.1); only its colours change.
+            "modebar": {
+                "bgcolor": "rgba(0,0,0,0)",
+                "color": flat["text.secondary"],
+                "activecolor": flat["text.primary"],
             },
         },
         "data": {
             "bar": [{"marker": {"line": {"width": 0}}}],
-            "scatter": [{"line": {"width": 1}}],
+            "histogram": [{"marker": {"line": {"width": 0}}}],
+            "scatter": [{"line": {"width": 1}, "marker": {"size": 5}}],
+            "scatterpolar": [{"line": {"width": 1}}],
+            "box": [{"line": {"width": 1}}],
+            "funnel": [{"marker": {"line": {"width": 0}}}],
+            # Tiles and slices are separated by the well colour, not by an outline.
+            # Pie labels sit outside, on the well, where text.primary is always readable.
+            "pie": [
+                {
+                    "marker": {"line": {"color": well, "width": 2}},
+                    "textposition": "outside",
+                    "automargin": True,
+                    "textfont": {"color": flat["text.primary"]},
+                }
+            ],
+            "treemap": [
+                {
+                    "marker": {"line": {"color": well, "width": 1}},
+                    "textfont": {"color": flat["text.primary"]},
+                }
+            ],
+            "heatmap": [{"colorbar": colorbar}],
+            # Up is the green region, down the red one, the total the first series colour; the
+            # step direction is also its height, so colour is never the only channel.
+            "waterfall": [
+                {
+                    "increasing": {"marker": {"color": fills["green"]["key"]}},
+                    "decreasing": {"marker": {"color": fills["red"]["key"]}},
+                    "totals": {"marker": {"color": fills["blue"]["key"]}},
+                    "connector": {"line": {"color": edge, "width": 1}},
+                }
+            ],
         },
     }
     return json.dumps(template, indent=2) + "\n"

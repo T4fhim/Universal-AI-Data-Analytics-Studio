@@ -89,7 +89,11 @@ def _check_spec(chart_type: str, spec: dict[str, Any]) -> None:
     if chart_type not in list_charts():
         raise ApiError(422, "Unknown chart type.")
     registration = get_chart(chart_type)
-    allowed = set(registration.required_fields) | set(registration.optional_fields)
+    allowed = (
+        set(registration.required_fields)
+        | set(registration.optional_fields)
+        | set(registration.literal_fields)
+    )
     if not set(spec) <= allowed:
         raise ApiError(422, "The chart parameters include an unknown field.")
     if not set(registration.required_fields) <= set(spec):

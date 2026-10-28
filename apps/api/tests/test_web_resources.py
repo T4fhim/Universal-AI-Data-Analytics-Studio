@@ -240,6 +240,23 @@ def test_charts_are_validated_against_the_registry_and_the_project(
     )  # a dataset of another project, same organization
 
 
+def test_a_stacked_bar_spec_may_carry_its_literal_field(world: World) -> None:
+    """``incomplete_from`` is a value, not a column, so it is allowed through ``literal_fields``."""
+    url = f"{world.base()}/charts"
+    spec = {
+        "category_column": "id",
+        "series_column": "value",
+        "incomplete_from": "3",
+    }
+    created = world.api("editor").post(url, _chart(world, chart_type="bar", spec=spec))
+    assert created.status_code == 201
+    assert created.json()["spec"]["incomplete_from"] == "3"
+    refused = world.api("editor").post(
+        url, _chart(world, chart_type="bar", spec={**spec, "evil": "x"})
+    )
+    assert refused.status_code == 422
+
+
 def test_patches_write_only_the_fields_they_change(
     world: World, monkeypatch: pytest.MonkeyPatch
 ) -> None:

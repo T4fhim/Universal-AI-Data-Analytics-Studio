@@ -34,6 +34,7 @@ CSS_FILES = (
     "workbench/workbench.css",
     "components/components.css",
     "components/grid.css",
+    "charts/charts.css",
     "workbench/views/views.css",
 )
 

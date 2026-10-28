@@ -68,6 +68,11 @@ class ChartRegistration:
             to decide whether a field gets a single :class:`QComboBox`
             or a ``ColumnMultiSelect``. Empty by default — most chart types take
             only single-column fields.
+        literal_fields: Optional string parameters whose value is *not* a column
+            name (e.g. ``BarChart``'s ``incomplete_from``, a value of the category
+            column). Kept apart from :attr:`optional_fields` so a column picker
+            never offers them as columns; the API's chart-spec check accepts both.
+            Empty by default.
     """
 
     chart_class: type[BaseChart]
@@ -75,6 +80,7 @@ class ChartRegistration:
     optional_fields: tuple[str, ...] = ()
     dialog_compatible: bool = True
     list_fields: tuple[str, ...] = ()
+    literal_fields: tuple[str, ...] = ()
 
 
 _REGISTRY: dict[str, ChartRegistration] = {}
@@ -183,7 +189,13 @@ def _register_builtins() -> None:
     if _builtins_registered:
         return
     register_chart(
-        "bar", ChartRegistration(BarChart, ("category_column",), ("value_column",))
+        "bar",
+        ChartRegistration(
+            BarChart,
+            ("category_column",),
+            ("value_column", "series_column"),
+            literal_fields=("incomplete_from",),
+        ),
     )
     register_chart(
         "pie", ChartRegistration(PieChart, ("category_column",), ("value_column",))

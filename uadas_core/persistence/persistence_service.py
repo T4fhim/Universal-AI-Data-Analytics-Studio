@@ -707,6 +707,7 @@ def _rebuild_visualization(
         accepted = (
             set(registration.required_fields)
             | set(registration.optional_fields)
+            | set(registration.literal_fields)
             | {"title"}
         )
         required = set(registration.required_fields)

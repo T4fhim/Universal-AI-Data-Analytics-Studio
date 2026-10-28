@@ -24,7 +24,11 @@ import plotly.graph_objects as go
 
 from uadas_core.analysis.correlation import compute_correlation
 from uadas_core.core.exceptions import ServiceError
-from uadas_core.visualization.base_chart import BaseChart, validate_columns
+from uadas_core.visualization.base_chart import (
+    BaseChart,
+    category_groups,
+    validate_columns,
+)
 
 
 def _require_numeric(dataframe: pd.DataFrame, column: str) -> None:
@@ -128,25 +132,34 @@ class BubbleChart(BaseChart):
         max_value = dataframe[size_column].max()
         sizeref = (2.0 * max_value / (40.0**2)) if max_value > 0 else 1.0
 
-        marker: dict = {
-            "size": dataframe[size_column],
-            "sizemode": "area",
-            "sizeref": sizeref,
-            "sizemin": 4,
-        }
-        if color_column:
-            marker["color"] = dataframe[color_column]
-            marker["showscale"] = pd.api.types.is_numeric_dtype(dataframe[color_column])
-
+        marker: dict = {"sizemode": "area", "sizeref": sizeref, "sizemin": 4}
         fig = go.Figure()
-        fig.add_trace(
-            go.Scatter(
-                x=dataframe[x_column],
-                y=dataframe[y_column],
-                mode="markers",
-                marker=marker,
+        if color_column and not pd.api.types.is_numeric_dtype(dataframe[color_column]):
+            # A text column cannot colour one trace (Plotly raises): one trace per category, all
+            # sharing the one sizeref so bubbles stay comparable across categories.
+            for label, group in category_groups(dataframe, color_column):
+                fig.add_trace(
+                    go.Scatter(
+                        x=group[x_column],
+                        y=group[y_column],
+                        mode="markers",
+                        name=label,
+                        marker={**marker, "size": group[size_column]},
+                    )
+                )
+        else:
+            single = {**marker, "size": dataframe[size_column]}
+            if color_column:
+                single["color"] = dataframe[color_column]
+                single["showscale"] = True
+            fig.add_trace(
+                go.Scatter(
+                    x=dataframe[x_column],
+                    y=dataframe[y_column],
+                    mode="markers",
+                    marker=single,
+                )
             )
-        )
         fig.update_layout(
             title=title or f"{y_column} vs {x_column} (sized by {size_column})",
             xaxis_title=x_column,
@@ -194,16 +207,31 @@ class TreemapChart(BaseChart):
                 f"values; a treemap segment cannot have negative area."
             )
 
+        # Sum per leaf, then emit every ancestor as a node of its own: Plotly draws nothing (or a
+        # wrong tree) when a parent named in ``parents`` is not itself a node, or when the same
+        # label appears under two parents without unique ids. Ancestors carry value 0 with
+        # ``branchvalues="remainder"``, so their area is exactly the sum of their children and
+        # no float rounding can make a parent smaller than what it contains.
+        leaves = dataframe.groupby(list(path_columns), dropna=False)[value_column].sum()
+        paths = {
+            tuple(
+                str(part) for part in (key if isinstance(key, tuple) else (key,))
+            ): total
+            for key, total in leaves.items()
+        }
+        nodes: dict[tuple[str, ...], float] = {}
+        for path, total in paths.items():
+            for depth in range(1, len(path)):
+                nodes.setdefault(path[:depth], 0.0)
+            nodes[path] = float(total)
+        ordered = sorted(nodes)
         fig = go.Figure(
             go.Treemap(
-                labels=dataframe[path_columns[-1]],
-                parents=(
-                    dataframe[path_columns[0]]
-                    if len(path_columns) > 1
-                    else [""] * len(dataframe)
-                ),
-                values=dataframe[value_column],
-                branchvalues="total" if len(path_columns) > 1 else None,
+                ids=["/".join(path) for path in ordered],
+                labels=[path[-1] for path in ordered],
+                parents=["/".join(path[:-1]) for path in ordered],
+                values=[nodes[path] for path in ordered],
+                branchvalues="remainder",
             )
         )
         fig.update_layout(title=title or f"{value_column} by {', '.join(path_columns)}")
