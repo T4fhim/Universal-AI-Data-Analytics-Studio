@@ -1086,7 +1086,7 @@ A fifth archetype, the **multi-pane synchronised stack** (B7), is used inside th
   tests CI runs) **/ 0 failed**; goldens **34 of 34** (32 charts, 2 components); `tsc -b`, oxlint, black, isort, bandit clean. The first full runs were stopped by the system for low memory (run in
   parallel); the second, run one after the other, completed. **Not verified: axe was not run** (loading it from a CDN was refused), so the components were checked by their accessibility tree
   only (a named list of "1 North 36,705 orders" items; a named region around a table with the level as text).
-  **Judgment call still open:** V13 thermal narrow bars (a sequential series palette) is not done. **Step 7's Tier-1 list is otherwise complete.**
+  **Judgment call still open:** V13 thermal narrow bars (a sequential series palette) is not done. **Step 7's Tier-1 list is otherwise complete.** **Next, planned not built (2026-10-28):** automatic per-dataset chart selection and render-stack choice, `plans/phase-4-chart-intelligence.md` (CI.0–CI.9); it changes no chart's look.
 - **Decision 3 refinement (WCAG 2.1.4):** bare digit keys are a character-key shortcut, so View > "Single-key shortcuts (1-5)" turns them
   off (stored in `localStorage`); the menu items carry `aria-keyshortcuts`. F6 and Escape are not character keys.
 - **Not done, on purpose or deferred:** no automated web accessibility test yet (the ship plan's D12 Playwright + axe pass is the place; the repo's

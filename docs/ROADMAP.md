@@ -136,6 +136,10 @@ Still genuinely absent (carried into web-transition scope, not desktop):
 - **Any UI and any runnable application entry point** — the Qt shell is deleted and the web UI
   is Phase 4.
 
+- **Automatic chart intelligence.** `chart_recommender.recommend_charts` is seven fixed rules, called only
+  by `GuidanceService`, with no API route and no automatic trigger. The per-dataset fingerprint, scored
+  recommendations, render plan and "Suggested" shelf are planned (Phase 4.9, not built):
+  [plans/phase-4-chart-intelligence.md](../plans/phase-4-chart-intelligence.md).
 - **Association rules.** Explicitly deferred in milestone 11 (no `mlxtend` dependency).
 - **Report-format plugin extensibility and a `forecast_models`/`ai_providers` plugin category.**
   Both deliberately excluded from milestone 12's plugin system — see
