@@ -21,7 +21,8 @@ from django.db.migrations.loader import MigrationLoader
 # Every migration each model app is expected to have, in order. This was "exactly one
 # 0001_initial per app" through 3.4; 3.5 adds `jobs` (its initial) and the first follow-up
 # migration anywhere (workspaces 0002: DatasetRecord.sha256); phase-4 step 7.4 adds workspaces
-# 0003 (ChartType.CANDLESTICK, a choices change is migration-visible). Adding a migration is a
+# 0003 (ChartType.CANDLESTICK, a choices change is migration-visible) and step 7.12 workspaces
+# 0004 (ChartType.KPI). Adding a migration is a
 # deliberate edit here -- the point of the pin is that none appears by accident.
 EXPECTED_MIGRATIONS: dict[str, list[str]] = {
     "accounts": ["0001_initial"],
@@ -29,6 +30,7 @@ EXPECTED_MIGRATIONS: dict[str, list[str]] = {
         "0001_initial",
         "0002_datasetrecord_sha256_and_more",
         "0003_chart_type_candlestick",
+        "0004_chart_type_kpi",
     ],
     "pipeline": ["0001_initial"],
     "exports": ["0001_initial"],

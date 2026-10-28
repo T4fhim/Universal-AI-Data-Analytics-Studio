@@ -42,6 +42,10 @@ const CONFIG = {
 const CARTESIAN = new Set(['bar', 'scatter', 'box', 'histogram', 'candlestick'])
 const INCOMPLETE = /incomplete/i
 const VOLUME = /^volume$/i
+const PINNED = /^pinned:/i
+// The ring of a pinned point is drawn in the primary text colour: it must stand out from every
+// series colour, and it is labelled on the chart, so it does not need one of its own.
+const PIN_COLOUR = (template.layout.font as { color: string }).color
 // The axis line colour (a neutral grey) is the hatch colour.
 const HATCH = (template.layout.xaxis as { linecolor: string }).linecolor
 // Plotly's own fill is the line colour at 50 %, which swallows a 1 px line of the same hue.
@@ -125,6 +129,10 @@ export function skinned(figure: Figure, view: View = DEFAULT_VIEW): Frame {
       const marker = (trace.marker ?? {}) as Record<string, unknown>
       next.marker = { ...marker, pattern: { shape: '/', size: 6, solidity: 0.35, fgcolor: HATCH, bgcolor: 'rgba(0,0,0,0)' } }
     }
+    if (trace.type === 'scatter' && PINNED.test(String(trace.name ?? ''))) {
+      const marker = (trace.marker ?? {}) as Record<string, unknown>
+      next.marker = { ...marker, color: PIN_COLOUR, line: { ...(marker.line as object), color: PIN_COLOUR } }
+    }
     if (hasCandles && trace.type === 'bar' && VOLUME.test(String(trace.name ?? ''))) {
       next.marker = { ...((trace.marker ?? {}) as Record<string, unknown>), color: HATCH }
     }
@@ -153,6 +161,9 @@ export function describePoint(point: Record<string, unknown> | undefined): strin
   const parts: string[] = []
   const name = (point.data as { name?: unknown } | undefined)?.name
   if (name) parts.push(String(name))
+  // A scatter point's own label (the label column); a bar's `text` is its value, already read out.
+  const data = point.data as { type?: unknown } | undefined
+  if (data?.type === 'scatter' && typeof point.text === 'string' && point.text) parts.push(point.text)
   const has = (key: string) => point[key] !== undefined && point[key] !== null
   // A bar point repeats its x as `label` and its y as `value`: name each fact once.
   const keys = [

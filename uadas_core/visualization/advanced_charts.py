@@ -19,6 +19,9 @@ here — the same "one place this computation lives" reasoning as
 
 from __future__ import annotations
 
+import contextlib
+import html
+
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -29,6 +32,8 @@ from uadas_core.visualization.base_chart import (
     category_groups,
     validate_columns,
 )
+from uadas_core.visualization.categorical_charts import ordered_buckets
+from uadas_core.visualization.continuous_charts import _end_dot_sizes
 
 
 def _require_numeric(dataframe: pd.DataFrame, column: str) -> None:
@@ -39,8 +44,114 @@ def _require_numeric(dataframe: pd.DataFrame, column: str) -> None:
         )
 
 
+# The looks a pivot heatmap can take. "numbers" writes each cell's value in it (the Tier-1 V29
+# numeric matrix); "grid" is a monochrome grid of cells set apart by a gap, no numbers (V31). The
+# cells are as square as the chart's own proportions make them: Plotly cannot hold a category
+# axis to a scale ratio (`scaleanchor` is ignored on one), so squares need a chart whose aspect
+# ratio is the grid's columns to rows.
+_HEATMAP_VARIANTS = ("numbers", "grid")
+
+# At most this many rows, and this many columns, in a pivot heatmap: the smallest fold into
+# "Other". Higher than the 15 of a bar or pie because the axes are often weeks or days.
+_MAX_MATRIX = 40
+
+# The gap between the squares of a "grid" heatmap, in pixels.
+_GRID_CELL_GAP = 2
+
+
+def _cap_axis(table: pd.DataFrame, limit: int) -> pd.DataFrame:
+    """``table`` with at most ``limit`` columns: the ``limit - 1`` largest (by column total) stay,
+    in their own order, and the rest are summed into one "Other" column after them.
+
+    Unlike :func:`~uadas_core.visualization.categorical_charts._fold_into_other` the kept columns
+    are not re-sorted by label: a matrix's axes are dates or numbers, and an order by text would
+    put week 10 before week 2. An empty cell stays empty (NaN), also in the folded column when
+    every folded cell was empty. Rows are capped by passing the transposed table.
+    """
+    if table.shape[1] <= limit:
+        return table
+    biggest = table.sum().sort_values(ascending=False)
+    keep = set(biggest.index[: limit - 1])
+    kept = [column for column in table.columns if column in keep]
+    capped = table[kept].copy()
+    folded = table.drop(columns=kept).sum(axis=1, min_count=1)
+    if "Other" in capped:
+        # A real category called "Other" among the kept ones: add to it, do not overwrite it.
+        folded = pd.concat([capped["Other"], folded], axis=1).sum(axis=1, min_count=1)
+    capped["Other"] = folded
+    return capped
+
+
+def _pivot_heatmap(
+    dataframe: pd.DataFrame,
+    row_column: str,
+    column_column: str,
+    value_column: str | None,
+    variant: str | None,
+    title: str | None,
+) -> go.Figure:
+    """A matrix of ``row_column`` by ``column_column``: each cell the sum of ``value_column``
+    over its rows, or the row count.
+
+    Rows and columns come in their own order (dates in date order, numbers in numeric order) with
+    the first row at the top, as a table reads. A combination with no rows is an empty cell, not
+    a zero: the hover skips it (``hoverongaps``) and no number is written in it.
+    """
+    if dataframe.empty:
+        raise ServiceError("There are no rows to chart.")
+    values = (
+        dataframe[value_column] if value_column else pd.Series(1, index=dataframe.index)
+    )
+    row_labels, rows = ordered_buckets(dataframe[row_column])
+    column_labels, columns = ordered_buckets(dataframe[column_column])
+    table = (
+        pd.DataFrame({"row": row_labels, "column": column_labels, "value": values})
+        # min_count=1: a cell whose values are all missing stays empty, not a 0 (a plain "sum"
+        # would make it one).
+        .pivot_table(
+            index="row",
+            columns="column",
+            values="value",
+            aggfunc=lambda cell: cell.sum(min_count=1),
+        ).reindex(index=rows, columns=columns)
+    )
+    table = _cap_axis(_cap_axis(table, _MAX_MATRIX).T, _MAX_MATRIX).T
+
+    cells = table.to_numpy(dtype=float)
+    heat = go.Heatmap(
+        z=cells,
+        x=[str(c) for c in table.columns],
+        y=[str(r) for r in table.index],
+        colorscale="Blues",
+        hoverongaps=False,
+    )
+    if variant == "numbers":
+        finite = cells[~pd.isna(cells)]
+        whole = bool((finite == finite.round()).all())
+        heat.update(
+            text=[
+                [
+                    "" if pd.isna(v) else (f"{v:,.0f}" if whole else f"{v:,.2f}")
+                    for v in row
+                ]
+                for row in cells
+            ],
+            texttemplate="%{text}",
+        )
+    elif variant == "grid":
+        heat.update(xgap=_GRID_CELL_GAP, ygap=_GRID_CELL_GAP)
+    fig = go.Figure(data=heat)
+    fig.update_layout(
+        title=title or f"{value_column or 'Count'} by {row_column} and {column_column}",
+        xaxis_title=column_column,
+        yaxis_title=row_column,
+        yaxis_autorange="reversed",
+    )
+    return fig
+
+
 class HeatmapChart(BaseChart):
-    """A correlation matrix heatmap over the dataset's numeric columns."""
+    """A correlation matrix heatmap over the dataset's numeric columns, or a pivot matrix."""
 
     @classmethod
     def build(
@@ -48,20 +159,67 @@ class HeatmapChart(BaseChart):
         dataframe: pd.DataFrame,
         method: str = "pearson",
         title: str | None = None,
+        row_column: str | None = None,
+        column_column: str | None = None,
+        value_column: str | None = None,
+        variant: str | None = None,
     ) -> go.Figure:
-        """Build a correlation heatmap.
+        """Build a heatmap: a correlation matrix, or (with ``row_column`` and ``column_column``)
+        a pivot matrix of any two columns.
 
         Args:
             dataframe: The data to chart.
             method: Correlation method — see
-                :func:`~uadas_core.analysis.correlation.compute_correlation`.
+                :func:`~uadas_core.analysis.correlation.compute_correlation`. Not used by
+                the pivot matrix.
             title: Chart title.
+            row_column: With ``column_column``: the column whose values are the rows of a pivot
+                matrix. Needs ``column_column``.
+            column_column: The column whose values are the columns of the matrix.
+            value_column: Numeric column whose sum fills each cell; if omitted the cells
+                count rows.
+            variant: For the pivot matrix only. ``"numbers"`` writes each cell's value in it;
+                ``"grid"`` draws a monochrome grid of cells set apart by a gap, with no numbers.
+                A value, not a column, so the registry lists it under ``literal_fields``.
 
         Raises:
             ServiceError: Propagated from
                 :func:`~uadas_core.analysis.correlation.compute_correlation`
-                if fewer than 2 genuinely numeric columns are available.
+                if fewer than 2 genuinely numeric columns are available; or, for the pivot
+                matrix, if a named column does not exist, ``value_column`` is not numeric,
+                only one of ``row_column``/``column_column`` is given (or the two are the
+                same column), or ``variant`` is not one of :data:`_HEATMAP_VARIANTS` or is
+                given without a pivot matrix.
         """
+        if variant is not None and variant not in _HEATMAP_VARIANTS:
+            raise ServiceError(
+                f"variant {variant!r} is not one of {list(_HEATMAP_VARIANTS)}."
+            )
+        if row_column or column_column or value_column:
+            if not (row_column and column_column):
+                raise ServiceError(
+                    "A pivot heatmap needs both row_column and column_column."
+                )
+            if row_column == column_column:
+                raise ServiceError(
+                    f"row_column must differ from column_column; both are '{row_column}'."
+                )
+            validate_columns(
+                dataframe,
+                row_column,
+                column_column,
+                *([value_column] if value_column else []),
+            )
+            if value_column:
+                _require_numeric(dataframe, value_column)
+            return _pivot_heatmap(
+                dataframe, row_column, column_column, value_column, variant, title
+            )
+        if variant is not None:
+            raise ServiceError(
+                f"variant {variant!r} applies to a pivot heatmap; give row_column and "
+                f"column_column."
+            )
         result = compute_correlation(dataframe, method=method)
         matrix = result.matrix
 
@@ -461,4 +619,132 @@ class CandlestickChart(BaseChart):
         # of the plot, and the mode bar already zooms and pans.
         fig.update_xaxes(rangeslider_visible=False)
         fig.update_layout(title=title or f"{close_column} over {x_column}")
+        return fig
+
+
+# The mini charts a KPI card can carry under its number (the Tier-1 V21 idiom): a line with a dot
+# on the latest value (the default), bars, bars in a dash pattern (segmented), or lollipops.
+_KPI_VARIANTS = ("line", "bars", "lollipop", "dashes")
+
+# Diameter in pixels of the dot on the head of a lollipop.
+_LOLLIPOP_HEAD = 6
+
+
+class KpiChart(BaseChart):
+    """A KPI card: the latest value and its change, over a small chart of the series."""
+
+    @classmethod
+    def build(
+        cls,
+        dataframe: pd.DataFrame,
+        value_column: str,
+        x_column: str | None = None,
+        title: str | None = None,
+        variant: str | None = None,
+    ) -> go.Figure:
+        """Build a KPI card.
+
+        The number is the last value that exists, with its change from the one before it (an
+        absolute change, with an arrow: direction is not left to colour alone). Under it a mini
+        chart of the whole series with no axes: the card is read at a glance, the figures are in
+        the number.
+
+        Args:
+            dataframe: The data, one row per period.
+            value_column: Numeric column: the measure the card is about.
+            x_column: Column giving each row's period for the mini chart; the rows are put in
+                its order first, so the latest value is the latest period's (a row with no
+                period is left out). If omitted, the row order is the time order.
+            title: Chart title; the card is titled with the column's name regardless.
+            variant: The mini chart: ``"line"`` (the default; a dot marks the latest value),
+                ``"bars"``, ``"dashes"`` (bars in a dash pattern, so segmented) or
+                ``"lollipop"``. A value, not a column, so the registry lists it under
+                ``literal_fields``.
+
+        Raises:
+            ServiceError: If a named column does not exist, ``value_column`` is not numeric or has
+                no values, or ``variant`` is not one of :data:`_KPI_VARIANTS`.
+        """
+        validate_columns(dataframe, value_column, *([x_column] if x_column else []))
+        _require_numeric(dataframe, value_column)
+        if variant is not None and variant not in _KPI_VARIANTS:
+            raise ServiceError(
+                f"variant {variant!r} is not one of {list(_KPI_VARIANTS)}."
+            )
+        if x_column:
+            # "Latest" means latest by period, not last in the file: put the rows in x order
+            # (stable, so equal periods keep their order; a missing period has no place).
+            dataframe = dataframe.dropna(subset=[x_column])
+            # Mixed types have no natural order: keep the row order.
+            with contextlib.suppress(TypeError):
+                dataframe = dataframe.sort_values(x_column, kind="stable")
+        series = dataframe[value_column]
+        known = series.dropna()
+        if known.empty:
+            raise ServiceError(f"Column '{value_column}' has no values to chart.")
+        latest = float(known.iloc[-1])
+        previous = float(known.iloc[-2]) if len(known) > 1 else None
+        # float.is_integer, not round(): round() raises on an infinite value.
+        whole = latest.is_integer() and (previous is None or previous.is_integer())
+        number_format = ",.0f" if whole else ",.2f"
+
+        card: dict = {
+            "mode": "number+delta" if previous is not None else "number",
+            "value": latest,
+            "number": {"valueformat": number_format},
+            "title": {"text": html.escape(value_column, quote=False)},
+            "domain": {"x": [0, 1], "y": [0.5, 1]},
+        }
+        if previous is not None:
+            card["delta"] = {"reference": previous, "valueformat": number_format}
+        # The mini chart comes first and the card last: Plotly hands out the series colours in trace
+        # order, and the card has none to take, so the series gets the first one (as in any chart).
+        fig = go.Figure()
+
+        x_values = dataframe[x_column] if x_column else dataframe.index
+        look = variant or "line"
+        if look == "line":
+            fig.add_trace(
+                go.Scatter(
+                    x=x_values,
+                    y=series,
+                    mode="lines+markers",
+                    marker={"size": _end_dot_sizes(series)},
+                    # The latest point is at the edge of the range: do not cut its dot in half.
+                    cliponaxis=False,
+                )
+            )
+        elif look in ("bars", "dashes"):
+            bar = go.Bar(x=x_values, y=series)
+            if look == "dashes":
+                bar.update(marker={"pattern": {"shape": "-"}})
+            fig.add_trace(bar)
+        else:
+            # One trace, so a stem and its head are one colour: each value is a path from zero
+            # up to the value with a gap (None) before the next, and the marker sizes are zero
+            # on the feet and on the gaps, so only the heads show a dot.
+            stem_x: list = []
+            stem_y: list = []
+            sizes: list[int] = []
+            for x, y in zip(x_values, series, strict=True):
+                if not pd.isna(y):
+                    stem_x += [x, x, None]
+                    stem_y += [0, y, None]
+                    sizes += [0, _LOLLIPOP_HEAD, 0]
+            fig.add_trace(
+                go.Scatter(
+                    x=stem_x,
+                    y=stem_y,
+                    mode="lines+markers",
+                    marker={"size": sizes},
+                )
+            )
+        fig.add_trace(go.Indicator(**card))
+        fig.update_layout(
+            showlegend=False,
+            xaxis={"visible": False, "domain": [0, 1]},
+            yaxis={"visible": False, "domain": [0, 0.42]},
+        )
+        if title:
+            fig.update_layout(title=title)
         return fig

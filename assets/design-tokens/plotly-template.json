@@ -320,6 +320,31 @@
         }
       }
     ],
+    "indicator": [
+      {
+        "number": {
+          "font": {
+            "family": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+            "color": "#e5e6e7"
+          }
+        },
+        "delta": {
+          "increasing": {
+            "color": "#279f27"
+          },
+          "decreasing": {
+            "color": "#d52d21"
+          }
+        },
+        "title": {
+          "font": {
+            "family": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+            "size": 11,
+            "color": "#d4d5d7"
+          }
+        }
+      }
+    ],
     "candlestick": [
       {
         "increasing": {

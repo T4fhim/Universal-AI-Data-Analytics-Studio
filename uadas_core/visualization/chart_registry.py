@@ -27,6 +27,7 @@ from uadas_core.visualization.advanced_charts import (
     CandlestickChart,
     FunnelChart,
     HeatmapChart,
+    KpiChart,
     RadarChart,
     TreemapChart,
     WaterfallChart,
@@ -199,7 +200,13 @@ def _register_builtins() -> None:
         ),
     )
     register_chart(
-        "pie", ChartRegistration(PieChart, ("category_column",), ("value_column",))
+        "pie",
+        ChartRegistration(
+            PieChart,
+            ("category_column",),
+            ("value_column", "panel_column"),
+            literal_fields=("variant",),
+        ),
     )
     register_chart(
         "line",
@@ -212,14 +219,27 @@ def _register_builtins() -> None:
     )
     register_chart(
         "scatter",
-        ChartRegistration(ScatterChart, ("x_column", "y_column"), ("color_column",)),
+        ChartRegistration(
+            ScatterChart,
+            ("x_column", "y_column"),
+            ("color_column", "label_column"),
+            literal_fields=("frontier", "pin"),
+        ),
     )
     register_chart("histogram", ChartRegistration(HistogramChart, ("column",)))
     register_chart(
         "box_plot",
         ChartRegistration(BoxPlotChart, ("value_column",), ("group_column",)),
     )
-    register_chart("heatmap", ChartRegistration(HeatmapChart, ()))
+    register_chart(
+        "heatmap",
+        ChartRegistration(
+            HeatmapChart,
+            (),
+            ("row_column", "column_column", "value_column"),
+            literal_fields=("variant",),
+        ),
+    )
     register_chart(
         "bubble",
         ChartRegistration(
@@ -261,6 +281,15 @@ def _register_builtins() -> None:
                 "close_column",
             ),
             ("volume_column",),
+        ),
+    )
+    register_chart(
+        "kpi",
+        ChartRegistration(
+            KpiChart,
+            ("value_column",),
+            ("x_column",),
+            literal_fields=("variant",),
         ),
     )
     _builtins_registered = True

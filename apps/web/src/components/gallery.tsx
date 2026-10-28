@@ -9,6 +9,8 @@ import { createRoot } from 'react-dom/client'
 import '../index.css'
 import './components.css'
 import { AlertBar, Button, RadioGroup, Select } from './controls.tsx'
+import { LogPane, RankedList } from './lists.tsx'
+import type { LogEntry, RankedRow } from './lists.tsx'
 import { EditableValue, KeyValueList, QuoteStrip, SheetColumns, SheetSection } from './sheet.tsx'
 import { DataTable, TreeTable } from './tables.tsx'
 import type { Column, DataRow, SortState, TreeRow } from './tables.tsx'
@@ -47,6 +49,25 @@ const lineage: TreeRow[] = [
     ],
   },
   { id: 'ds5', swatch: 'var(--region-grey)', cells: { name: 'returns.csv', step: 'upload', rows: '1,204' } },
+]
+
+// Deliberately not in order: the list ranks them. One label is long enough to be cut off.
+const ranking: RankedRow[] = [
+  { id: 'r1', label: 'West', value: 34487 },
+  { id: 'r2', label: 'North', value: 36705 },
+  { id: 'r3', label: 'East, including the three smaller regions merged in October', value: 28173 },
+  { id: 'r4', label: 'South', value: 30044 },
+  { id: 'r5', label: 'Central', value: 11756 },
+  { id: 'r6', label: 'Overseas', value: 3120 },
+]
+
+const logEntries: LogEntry[] = [
+  { id: 'l1', time: '09:14:02', level: 'info', message: 'Upload accepted: sales.csv (18,410 rows)' },
+  { id: 'l2', time: '09:14:03', level: 'debug', message: 'Schema inferred: 9 columns, 2 date-like' },
+  { id: 'l3', time: '09:14:05', level: 'warn', message: '231 missing values in ad_spend; the column was kept' },
+  { id: 'l4', time: '09:14:09', level: 'info', message: 'drop_duplicates removed 308 rows' },
+  { id: 'l5', time: '09:15:41', level: 'error', message: 'build_chart failed: column "revnue" does not exist' },
+  { id: 'l6', time: '09:15:52', level: 'info', message: 'build_chart finished: bar of revenue by region' },
 ]
 
 const lineageColumns: Column[] = [
@@ -139,6 +160,14 @@ export function Gallery() {
 
       <Box title="Tree-table with colour swatches (K9): lineage">
         <TreeTable label="Dataset lineage" columns={lineageColumns} rows={lineage} defaultExpanded={['ds1', 'ds2']} swatchLabel="Colour" />
+      </Box>
+
+      <Box title="Ranked list (leaderboard)">
+        <RankedList label="Revenue by region, ranked" rows={ranking} unit="orders" />
+      </Box>
+
+      <Box title="Log pane (K8 with level colours)">
+        <LogPane label="Pipeline log" entries={logEntries} />
       </Box>
 
       <Box title="Sheet, quote strip, editable value (K15-K18)">

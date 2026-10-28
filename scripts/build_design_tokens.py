@@ -364,6 +364,24 @@ def render_template(
             # Up is a hollow candle in the green region, down a solid one in the red: the body's
             # fill says which way the price moved as well as its colour, so direction survives
             # colour-blindness and a greyscale print (the waterfall does the same with height).
+            # A KPI card: the number in the primary text colour, the change in the green or red
+            # region key (the arrow in the delta is the other channel), the title in the quiet text.
+            "indicator": [
+                {
+                    "number": {"font": {"family": mono, "color": flat["text.primary"]}},
+                    "delta": {
+                        "increasing": {"color": fills["green"]["key"]},
+                        "decreasing": {"color": fills["red"]["key"]},
+                    },
+                    "title": {
+                        "font": {
+                            "family": mono,
+                            "size": 11,
+                            "color": flat["text.secondary"],
+                        }
+                    },
+                }
+            ],
             "candlestick": [
                 {
                     "increasing": {

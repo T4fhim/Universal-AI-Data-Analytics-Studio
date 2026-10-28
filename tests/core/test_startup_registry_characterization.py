@@ -65,6 +65,7 @@ _BUILTIN_CHART_NAMES = {
     "waterfall",
     "funnel",
     "candlestick",
+    "kpi",
 }
 
 # Every service type bootstrap() registers into the container, in construction order.

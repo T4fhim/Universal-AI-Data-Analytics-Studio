@@ -388,6 +388,68 @@ th[data-align="end"] .sort-button {
   color: var(--text-muted);
 }
 
+/* ---- ranked list and log pane (phase-4 step 7) -------------------------------------------- */
+
+.ranked {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--surface-pane);
+}
+
+/* A 16 px line of rank, label and value, and under it the row's bar. */
+.ranked-row {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  grid-template-rows: var(--size-row) 0.25rem;
+  column-gap: 0.5rem;
+  padding: 0 0.5rem;
+  align-items: center;
+}
+
+.ranked-row:nth-child(even) {
+  background: var(--surface-zebra);
+}
+
+.ranked-rank {
+  color: var(--text-muted);
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.ranked-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranked-value {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The row's bar: a thin underline under its label and value, as wide as the value's share of the
+   top value. A border and not a background, so it survives forced-colours mode (the region key
+   is 3:1 on the pane, the graphics minimum). */
+.ranked-bar {
+  grid-column: 2 / 4;
+  height: 0;
+  border-bottom: 2px solid var(--region-blue);
+  align-self: start;
+}
+
+/* A long log scrolls; the scroll area is focusable, so the keyboard can scroll it. */
+.log-pane {
+  max-height: 14rem;
+  overflow: auto;
+  background: var(--surface-pane);
+}
+
+.log-pane:focus-visible {
+  outline-offset: -2px;
+}
+
 @media (forced-colors: active) {
   .button,
   .select select,

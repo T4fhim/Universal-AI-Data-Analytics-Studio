@@ -14,6 +14,8 @@ transformation of the data being shown.
 
 from __future__ import annotations
 
+import html
+
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -56,6 +58,21 @@ _BAR_VARIANTS = ("grouped", "paired")
 # colour (a pattern is drawn in its bar's colour), so the core needs no palette.
 _GROUP_PATTERNS = ("", "/", ".", "x", "\\", "-", "|", "+")
 
+# The looks a pie chart can take. "donut" is a ring with the total written in the middle (the
+# Tier-1 V25 idiom); the hole is a share of the radius, wide enough for the total to sit inside.
+_PIE_VARIANTS = ("donut",)
+_DONUT_HOLE = 0.6
+
+# A pie grid (the Tier-1 V26 idiom, small multiples): at most this many pies, four to a row, so
+# twelve panels are four columns by three rows. More panels fold into one "Other" pie, the same
+# documented cutoff the categories get.
+_MAX_PANELS = 12
+_GRID_COLUMNS = 4
+# Gaps between cells and the strip above each pie that holds its title, as fractions of the plot.
+_GRID_GAP_X = 0.04
+_GRID_GAP_Y = 0.03
+_GRID_TITLE_STRIP = 0.07
+
 
 def _bucket_labels(column: pd.Series) -> pd.Series:
     """Text labels for a category column; dates as dates, a missing value as its own label."""
@@ -66,6 +83,42 @@ def _bucket_labels(column: pd.Series) -> pd.Series:
     else:
         text = column.astype("object")
     return text.where(column.notna(), _MISSING).astype(str)
+
+
+def ordered_buckets(column: pd.Series) -> tuple[pd.Series, list[str]]:
+    """Text labels for a category column, and its distinct labels in the column's own order.
+
+    Dates come out in date order, numbers in numeric order (not the order of their text), and a
+    missing value last; a column with no natural order (mixed types) falls back to its text.
+    Shared by the stacked bars and the pivot heatmap, whose axes are usually time buckets.
+    """
+    labels = _bucket_labels(column)
+    ordered = pd.DataFrame({"label": labels, "key": column}).drop_duplicates("label")
+    try:
+        ordered = ordered.sort_values("key", na_position="last", kind="stable")
+    except TypeError:  # mixed types have no natural order; fall back to the text
+        ordered = ordered.sort_values("label", kind="stable")
+    return labels, list(ordered["label"])
+
+
+def _fold_into_other(table: pd.DataFrame, limit: int) -> tuple[pd.DataFrame, list[str]]:
+    """``table`` with at most ``limit`` columns: the ``limit - 1`` largest (by column total) stay
+    and the rest are summed into one "Other" column.
+
+    Also returns the column names in display order: by label, not by size, so the same data always
+    gets the same colours, with "Other" last. Shared by the stacked bars (their series) and the
+    pie grid (its slices, and its panels through the transposed table).
+    """
+    if table.shape[1] > limit:
+        biggest = table.sum().sort_values(ascending=False)
+        keep = list(biggest.index[: limit - 1])
+        rest = table.drop(columns=keep).sum(axis=1)
+        table = table[keep]
+        table["Other"] = table["Other"] + rest if "Other" in table else rest
+    names = sorted(name for name in table.columns if name != "Other")
+    if "Other" in table.columns:
+        names.append("Other")
+    return table, names
 
 
 def _stacked_bars(
@@ -104,14 +157,7 @@ def _stacked_bars(
     values = (
         dataframe[value_column] if value_column else pd.Series(1, index=dataframe.index)
     )
-    labels = _bucket_labels(dataframe[category_column])
-    ordered = pd.DataFrame({"label": labels, "key": dataframe[category_column]})
-    ordered = ordered.drop_duplicates("label")
-    try:
-        ordered = ordered.sort_values("key", na_position="last", kind="stable")
-    except TypeError:  # mixed types have no natural order; fall back to the text
-        ordered = ordered.sort_values("label", kind="stable")
-    categories = list(ordered["label"])
+    labels, categories = ordered_buckets(dataframe[category_column])
 
     table = pd.DataFrame(
         {
@@ -128,15 +174,7 @@ def _stacked_bars(
     )
     table = table.reindex(categories, fill_value=0)
 
-    if table.shape[1] > _MAX_CATEGORIES:
-        biggest = table.sum().sort_values(ascending=False)
-        keep = list(biggest.index[: _MAX_CATEGORIES - 1])
-        rest = table.drop(columns=keep).sum(axis=1)
-        table = table[keep]
-        table["Other"] = table["Other"] + rest if "Other" in table else rest
-    names = sorted(name for name in table.columns if name != "Other")
-    if "Other" in table.columns:
-        names.append("Other")
+    table, names = _fold_into_other(table, _MAX_CATEGORIES)
     grouped = variant in ("grouped", "paired")
     paired = variant == "paired"
     if paired and len(names) != 2:
@@ -321,6 +359,88 @@ class BarChart(BaseChart):
         return fig
 
 
+def _pie_grid(
+    dataframe: pd.DataFrame,
+    category_column: str,
+    panel_column: str,
+    value_column: str | None,
+    title: str | None,
+) -> go.Figure:
+    """One pie per value of ``panel_column`` (small multiples), at most ``_GRID_COLUMNS`` to a row.
+
+    Every pie lists the same slices in the same order, a category a panel has no rows for being a
+    zero-size slice: Plotly then gives one category one colour across the grid, and (with each
+    pie's own ``sort`` off, which would otherwise reorder its slices by size) the same position.
+    Only the first pie lists the slices in the legend, so the grid has one legend, not one per pie.
+    The slices are capped like a single pie's (``_MAX_CATEGORIES``, the rest into "Other", by the
+    whole data's totals so every pie folds the same categories) and so are the panels
+    (``_MAX_PANELS``); panels are ordered by label, "Other" last.
+    """
+    if dataframe.empty:
+        raise ServiceError("There are no rows to chart.")
+    values = (
+        dataframe[value_column] if value_column else pd.Series(1, index=dataframe.index)
+    )
+    table = pd.DataFrame(
+        {
+            "panel": _bucket_labels(dataframe[panel_column]),
+            "slice": _bucket_labels(dataframe[category_column]),
+            "value": values,
+        }
+    ).pivot_table(
+        index="panel",
+        columns="slice",
+        values="value",
+        aggfunc="sum",
+        fill_value=0,
+    )
+    table, slices = _fold_into_other(table, _MAX_CATEGORIES)
+    # The transposed table has the panels as columns, so the same fold caps them.
+    by_slice, panels = _fold_into_other(table.T, _MAX_PANELS)
+
+    # The cells are placed by hand (in paper fractions) and not with make_subplots: that sets each
+    # panel title at its own 16 px, over the template's type, and puts the first row's titles in
+    # the strip above the plot where the legend sits. Each cell is a strip for the title over the
+    # pie's own domain.
+    columns = min(len(panels), _GRID_COLUMNS)
+    rows = -(-len(panels) // columns)
+    cell_width = (1 - (columns - 1) * _GRID_GAP_X) / columns
+    pie_height = (1 - (rows - 1) * _GRID_GAP_Y) / rows - _GRID_TITLE_STRIP
+    fig = go.Figure()
+    for index, panel in enumerate(panels):
+        row, column = divmod(index, columns)
+        left = column * (cell_width + _GRID_GAP_X)
+        top = (
+            1 - _GRID_TITLE_STRIP - row * (_GRID_TITLE_STRIP + pie_height + _GRID_GAP_Y)
+        )
+        fig.add_trace(
+            go.Pie(
+                name=panel,
+                labels=slices,
+                values=by_slice.loc[slices, panel].to_numpy(),
+                sort=False,
+                textinfo="none",
+                showlegend=index == 0,
+                domain={"x": [left, left + cell_width], "y": [top - pie_height, top]},
+            )
+        )
+        fig.add_annotation(
+            x=left + cell_width / 2,
+            y=top,
+            xref="paper",
+            yref="paper",
+            xanchor="center",
+            yanchor="bottom",
+            yshift=2,
+            showarrow=False,
+            text=html.escape(panel, quote=False),
+        )
+    fig.update_layout(
+        title=title or f"Distribution of {category_column} by {panel_column}"
+    )
+    return fig
+
+
 class PieChart(BaseChart):
     """A pie chart of value counts (or a numeric total) for a categorical column."""
 
@@ -331,8 +451,58 @@ class PieChart(BaseChart):
         category_column: str,
         value_column: str | None = None,
         title: str | None = None,
+        variant: str | None = None,
+        panel_column: str | None = None,
     ) -> go.Figure:
-        """Build a pie chart. See :meth:`BarChart.build` for parameter semantics — identical."""
+        """Build a pie chart. See :meth:`BarChart.build` for parameter semantics — identical.
+
+        ``panel_column`` draws one pie per value of that column, in a grid of at most four pies
+        to a row (see :func:`_pie_grid`): small multiples, to compare how the slices divide in each
+        group. Every pie has the same slices, so one category is one colour in all of them and one
+        legend serves the grid.
+
+        ``variant="donut"`` cuts a hole in the pie and writes the total (the sum of every slice,
+        "Other" included) in it, with what it totals underneath: the value column's name, or
+        "Count". A donut refuses negative values (a ring has no segment for one, so the total
+        would disagree with it). A value, not a column, so the registry lists it under
+        ``literal_fields``.
+
+        Raises:
+            ServiceError: As for :meth:`BarChart.build`, or if ``variant`` is not one of
+                :data:`_PIE_VARIANTS`, or ``panel_column`` is ``category_column`` or is
+                combined with ``variant`` (a donut is one pie with its total in the middle).
+        """
+        if variant is not None and variant not in _PIE_VARIANTS:
+            raise ServiceError(
+                f"variant {variant!r} is not one of {list(_PIE_VARIANTS)}."
+            )
+        if panel_column:
+            if variant is not None:
+                raise ServiceError(
+                    f"variant {variant!r} is one pie with its total in the middle; it "
+                    f"cannot be combined with panel_column."
+                )
+            if panel_column == category_column:
+                raise ServiceError(
+                    f"panel_column must differ from category_column; both are "
+                    f"'{category_column}'."
+                )
+            validate_columns(
+                dataframe,
+                category_column,
+                panel_column,
+                *([value_column] if value_column else []),
+            )
+            if value_column and not pd.api.types.is_numeric_dtype(
+                dataframe[value_column]
+            ):
+                raise ServiceError(
+                    f"value_column '{value_column}' must be numeric; "
+                    f"has dtype {dataframe[value_column].dtype}."
+                )
+            return _pie_grid(
+                dataframe, category_column, panel_column, value_column, title
+            )
         if value_column:
             validate_columns(dataframe, category_column, value_column)
             if not pd.api.types.is_numeric_dtype(dataframe[value_column]):
@@ -352,8 +522,36 @@ class PieChart(BaseChart):
             validate_columns(dataframe, category_column)
             grouped = _prepare_category_counts(dataframe[category_column])
 
-        fig = go.Figure(
-            data=[go.Pie(labels=[str(i) for i in grouped.index], values=grouped.values)]
-        )
+        pie = go.Pie(labels=[str(i) for i in grouped.index], values=grouped.values)
+        fig = go.Figure(data=[pie])
         fig.update_layout(title=title or f"Distribution of {category_column}")
+        if variant == "donut":
+            if (grouped < 0).any():
+                # A ring has no segment for a negative value, so the total in the middle would
+                # disagree with it.
+                raise ServiceError(
+                    "variant 'donut' cannot show negative values; the ring has no segment "
+                    "for one."
+                )
+            total = float(grouped.sum())
+            # float.is_integer, not round(): round() raises on an infinite total.
+            shown = f"{total:,.0f}" if total.is_integer() else f"{total:,.2f}"
+            fig.update_traces(hole=_DONUT_HOLE)
+            # A long total would spill out of the hole at full size: step the size down by length.
+            size = 16 if len(shown) <= 10 else 12
+            fig.update_layout(
+                annotations=[
+                    {
+                        "x": 0.5,
+                        "y": 0.5,
+                        "xref": "paper",
+                        "yref": "paper",
+                        "showarrow": False,
+                        "text": (
+                            f'<span style="font-size:{size}px"><b>{shown}</b></span><br>'
+                            f"{html.escape(value_column or 'Count', quote=False)}"
+                        ),
+                    }
+                ]
+            )
         return fig

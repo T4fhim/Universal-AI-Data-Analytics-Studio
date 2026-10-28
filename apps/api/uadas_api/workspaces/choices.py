@@ -55,3 +55,4 @@ class ChartType(models.TextChoices):
     WATERFALL = "waterfall", "Waterfall"
     FUNNEL = "funnel", "Funnel"
     CANDLESTICK = "candlestick", "Candlestick"
+    KPI = "kpi", "KPI"

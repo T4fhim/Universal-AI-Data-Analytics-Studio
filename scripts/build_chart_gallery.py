@@ -136,6 +136,30 @@ def sample_tables() -> dict[str, pd.DataFrame]:
             }
         )
     pairs = pd.DataFrame(rows)
+    # Last again: page visits per week and weekday (a calendar-shaped grid), and a small set of
+    # models with a cost and a score (the score rises with the log of the cost, with scatter).
+    weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    traffic = pd.DataFrame(
+        [
+            {
+                "week": week,
+                "weekday": weekday,
+                "visits": int(rng.integers(20, 200)),
+            }
+            for week in range(1, 13)
+            for weekday in weekdays
+        ]
+    )
+    # In calendar order, not the alphabet's: an ordered category keeps its own order on an axis.
+    traffic["weekday"] = pd.Categorical(traffic["weekday"], weekdays, ordered=True)
+    model_cost = rng.uniform(0.2, 12.0, 14).round(2)
+    models = pd.DataFrame(
+        {
+            "name": [f"M{i:02d}" for i in range(1, 15)],
+            "cost": model_cost,
+            "score": (40 + 6 * np.log(model_cost) + rng.normal(0, 3.0, 14)).round(1),
+        }
+    )
     return {
         "sales": sales,
         "monthly": monthly,
@@ -146,6 +170,8 @@ def sample_tables() -> dict[str, pd.DataFrame]:
         "prices": prices,
         "dual": dual,
         "pairs": pairs,
+        "traffic": traffic,
+        "models": models,
     }
 
 
@@ -194,6 +220,7 @@ SPECS: dict[str, tuple[str, dict[str, Any]]] = {
             "volume_column": "volume",
         },
     ),
+    "kpi": ("monthly", {"value_column": "revenue", "x_column": "month"}),
 }
 
 # An option of a registered chart that changes how it looks: gallery id -> (chart name, table,
@@ -210,6 +237,66 @@ VARIANTS: dict[str, tuple[str, str, dict[str, Any]]] = {
             "low_column": "low",
             "close_column": "close",
         },
+    ),
+    "kpi_bars": (
+        "kpi",
+        "monthly",
+        {"value_column": "revenue", "x_column": "month", "variant": "bars"},
+    ),
+    "kpi_dashes": (
+        "kpi",
+        "monthly",
+        {"value_column": "revenue", "x_column": "month", "variant": "dashes"},
+    ),
+    "kpi_lollipop": (
+        "kpi",
+        "monthly",
+        {"value_column": "revenue", "x_column": "month", "variant": "lollipop"},
+    ),
+    "heatmap_numbers": (
+        "heatmap",
+        "sales",
+        {
+            "row_column": "region",
+            "column_column": "channel",
+            "value_column": "revenue",
+            "variant": "numbers",
+        },
+    ),
+    "heatmap_grid": (
+        "heatmap",
+        "traffic",
+        {
+            "row_column": "weekday",
+            "column_column": "week",
+            "value_column": "visits",
+            "variant": "grid",
+        },
+    ),
+    "scatter_frontier": (
+        "scatter",
+        "models",
+        {
+            "x_column": "cost",
+            "y_column": "score",
+            "label_column": "name",
+            "frontier": "upper_left",
+            "pin": "M05",
+        },
+    ),
+    "pie_grid": (
+        "pie",
+        "channel_months",
+        {
+            "category_column": "channel",
+            "value_column": "revenue",
+            "panel_column": "month",
+        },
+    ),
+    "pie_donut": (
+        "pie",
+        "sales",
+        {"category_column": "channel", "value_column": "revenue", "variant": "donut"},
     ),
     "bar_paired": (
         "bar",

@@ -861,11 +861,11 @@ TOOLS: list[ToolDefinition] = [
                 },
                 "value_column": {
                     "type": "string",
-                    "description": "Bar/Pie/Box Plot/Treemap/Waterfall/Funnel charts.",
+                    "description": "Bar/Pie/Box Plot/Treemap/Waterfall/Funnel charts; Heatmap pivot (fills each cell); KPI (the measure on the card).",
                 },
                 "x_column": {
                     "type": "string",
-                    "description": "Line/Scatter/Bubble charts; Candlestick (each candle's period, usually a date).",
+                    "description": "Line/Scatter/Bubble charts; Candlestick and KPI (each candle's or mini chart's period, usually a date).",
                 },
                 "y2_column": {
                     "type": "string",
@@ -891,6 +891,31 @@ TOOLS: list[ToolDefinition] = [
                     "type": "string",
                     "description": "Candlestick chart (optional) — numeric volume column; adds a bar pane under the candles.",
                 },
+                "row_column": {
+                    "type": "string",
+                    "description": "Heatmap chart (optional, with column_column) — the rows of a pivot matrix of any two columns.",
+                },
+                "column_column": {
+                    "type": "string",
+                    "description": "Heatmap chart (optional, with row_column) — the columns of a pivot matrix; value_column fills each cell, or the cells count rows.",
+                },
+                "label_column": {
+                    "type": "string",
+                    "description": "Scatter chart (optional) — each point's label, read out on hover; needed by pin.",
+                },
+                "frontier": {
+                    "type": "string",
+                    "enum": ["upper_left", "upper_right", "lower_left", "lower_right"],
+                    "description": "Scatter chart (optional) — the corner where a point is best (upper_left: low x, high y); draws the Pareto frontier of the points as a dashed line.",
+                },
+                "pin": {
+                    "type": "string",
+                    "description": "Scatter chart (optional) — a value of label_column: rings that point and writes its label on the chart.",
+                },
+                "panel_column": {
+                    "type": "string",
+                    "description": "Pie chart (optional) — draws one pie per value of this column, in a grid.",
+                },
                 "series_column": {
                     "type": "string",
                     "description": "Bar chart (optional) — stacks each bar by this column's values.",
@@ -905,12 +930,28 @@ TOOLS: list[ToolDefinition] = [
                 },
                 "variant": {
                     "type": "string",
-                    "enum": ["area", "grouped", "paired"],
+                    "enum": [
+                        "area",
+                        "grouped",
+                        "paired",
+                        "donut",
+                        "numbers",
+                        "grid",
+                        "line",
+                        "bars",
+                        "lollipop",
+                        "dashes",
+                    ],
                     "description": (
                         "Optional look. Line chart: 'area' fills the line to the baseline and marks the "
                         "last value with a dot. Bar chart with series_column: 'grouped' puts the series "
                         "side by side (each with its own fill pattern) instead of stacked; 'paired' is for "
-                        "exactly two series (a base and a comparison), as labelled horizontal bars."
+                        "exactly two series (a base and a comparison), as labelled horizontal bars. "
+                        "Pie chart: 'donut' is a ring with the total written in the middle. "
+                        "Heatmap with row_column and column_column: 'numbers' writes each value in "
+                        "its cell, 'grid' is monochrome squares with no numbers. "
+                        "KPI chart: the mini chart under the number: 'line' (the default), 'bars', "
+                        "'dashes' (segmented bars) or 'lollipop'."
                     ),
                 },
                 "y_column": {

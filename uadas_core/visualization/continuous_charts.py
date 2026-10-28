@@ -188,6 +188,34 @@ class LineChart(BaseChart):
         return _maybe_resample(fig, len(dataframe))
 
 
+# The corner of a scatter where a point is best, for its Pareto frontier: upper_left is a low x with
+# a high y (a cheap model that scores well), upper_right high on both, and so on.
+_FRONTIERS = ("upper_left", "upper_right", "lower_left", "lower_right")
+
+
+def _pareto_frontier(x: pd.Series, y: pd.Series, corner: str) -> pd.DataFrame:
+    """The points no other point beats: none is at least as good on both axes and better on one.
+
+    ``corner`` says which end of each axis is good (see :data:`_FRONTIERS`). Rows with a missing
+    coordinate are left out. Returned in x order, ready to draw as a line.
+    """
+    good_x_is_high = corner.endswith("right")
+    good_y_is_high = corner.startswith("upper")
+    points = pd.DataFrame({"x": x, "y": y}).dropna()
+    # Best x first (ties: best y first): a point is on the frontier when its y beats the best y
+    # of every point before it, i.e. of every point at least as good on x.
+    ordered = points.sort_values(
+        ["x", "y"], ascending=[not good_x_is_high, not good_y_is_high], kind="stable"
+    )
+    best: float | None = None
+    keep: list[int] = []
+    for position, value in enumerate(ordered["y"]):
+        if best is None or (value > best if good_y_is_high else value < best):
+            keep.append(position)
+            best = value
+    return ordered.iloc[keep].sort_values("x", kind="stable")
+
+
 class ScatterChart(BaseChart):
     """A scatter plot of one numeric column against another."""
 
@@ -199,6 +227,9 @@ class ScatterChart(BaseChart):
         y_column: str,
         color_column: str | None = None,
         title: str | None = None,
+        label_column: str | None = None,
+        frontier: str | None = None,
+        pin: str | None = None,
     ) -> go.Figure:
         """Build a scatter plot.
 
@@ -209,17 +240,54 @@ class ScatterChart(BaseChart):
             color_column: If given, points are colored by this
                 column's values (categorical or numeric).
             title: Chart title.
+            label_column: If given, each point carries this column's value as its
+                label (read out on hover).
+            frontier: One of ``"upper_left"``, ``"upper_right"``, ``"lower_left"``,
+                ``"lower_right"``: the corner where a point is best. Draws the Pareto
+                frontier of all the points (those no other point beats) as a dashed line
+                named "Pareto frontier". A value, not a column, so the registry lists it
+                under ``literal_fields``.
+            pin: A value of ``label_column``: rings that point and writes its label on the
+                chart (a trace named "Pinned: <value>"). Needs ``label_column``. Also a literal.
 
         Raises:
             ServiceError: If a named column does not exist, or either
-                ``x_column`` or ``y_column`` is not numeric.
+                ``x_column`` or ``y_column`` is not numeric, or ``frontier`` is not one of
+                :data:`_FRONTIERS`, or ``pin`` is given without ``label_column`` or is not one
+                of its values.
         """
-        columns_to_check = [x_column, y_column] + (
-            [color_column] if color_column else []
+        columns_to_check = (
+            [x_column, y_column]
+            + ([color_column] if color_column else [])
+            + ([label_column] if label_column else [])
         )
         validate_columns(dataframe, *columns_to_check)
         _require_numeric(dataframe, x_column)
         _require_numeric(dataframe, y_column)
+        if frontier is not None and frontier not in _FRONTIERS:
+            raise ServiceError(
+                f"frontier {frontier!r} is not one of {list(_FRONTIERS)}."
+            )
+        if pin is not None and not label_column:
+            raise ServiceError("pin needs label_column: give label_column too.")
+        if pin == "":
+            # A missing label is read as "", so an empty pin would ring every unlabelled row.
+            raise ServiceError("pin must be a label, not an empty value.")
+        # A frame with a repeated index (rows joined from several tables) would make a label
+        # lookup by index return extra rows: work on a fresh 0..n-1 index.
+        dataframe = dataframe.reset_index(drop=True)
+        labels = (
+            dataframe[label_column].astype("string").fillna("")
+            if label_column
+            else None
+        )
+        if pin is not None and labels is not None and pin not in set(labels):
+            raise ServiceError(
+                f"pin '{pin}' is not one of the values of '{label_column}'."
+            )
+
+        def text_of(rows: pd.Index) -> dict:
+            return {"text": list(labels.loc[rows])} if labels is not None else {}
 
         fig = go.Figure()
         if color_column and not pd.api.types.is_numeric_dtype(dataframe[color_column]):
@@ -231,6 +299,7 @@ class ScatterChart(BaseChart):
                         y=group[y_column],
                         mode="markers",
                         name=label,
+                        **text_of(group.index),
                     )
                 )
         else:
@@ -244,6 +313,38 @@ class ScatterChart(BaseChart):
                     y=dataframe[y_column],
                     mode="markers",
                     marker=marker,
+                    # With a frontier or a pin there is a legend, and an unnamed trace would be
+                    # listed as "trace 0"; without them it is a lone, unlabelled series as before.
+                    **({"name": "Points"} if frontier or pin is not None else {}),
+                    **text_of(dataframe.index),
+                )
+            )
+        if frontier:
+            line = _pareto_frontier(dataframe[x_column], dataframe[y_column], frontier)
+            fig.add_trace(
+                go.Scatter(
+                    x=line["x"],
+                    y=line["y"],
+                    mode="lines",
+                    name="Pareto frontier",
+                    line={"dash": "dash"},
+                )
+            )
+        if pin is not None and labels is not None:
+            pinned = dataframe[labels == pin]
+            fig.add_trace(
+                go.Scatter(
+                    x=pinned[x_column],
+                    y=pinned[y_column],
+                    mode="markers+text",
+                    name=f"Pinned: {pin}",
+                    text=[pin] * len(pinned),
+                    textposition="top center",
+                    marker={"size": 12, "symbol": "circle-open", "line": {"width": 2}},
+                    showlegend=False,
+                    # The label sits above the point: a point at the top of the range would have
+                    # it cut off at the plot edge. Plotly still hides a point outside the range.
+                    cliponaxis=False,
                 )
             )
         fig.update_layout(

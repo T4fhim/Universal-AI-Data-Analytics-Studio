@@ -1038,10 +1038,55 @@ A fifth archetype, the **multi-pane synchronised stack** (B7), is used inside th
   **Verified:** `tests/visualization/test_paired_bar.py` (9), root suite **1083 passed / 0 failed**, the **whole** `apps/api` suite 2124 passed / 163 skipped (the MinIO and Redis
   tests CI runs) / 0 failed, goldens 23 of 23, `tsc -b` and oxlint clean. **Not done:** ranking the categories by the base value (they keep the column's own order),
   a log axis on horizontal bars, a figure height that grows with the number of categories, choosing which series is the base (it is the first by label).
-  **Judgment call still open:** V13 thermal narrow bars (a sequential series palette) is not done.
-  **Left for step 7:** the other Tier-1 charts (donut with
-  centre total, pie grid, numeric matrix heatmap, monochrome square-grid heatmap, scatter with pin and Pareto frontier, KPI mini charts, log pane, ranked
-  leaderboard), each added with its golden test. Most are options of an existing chart, as stacking was, not new registry types.
+  **7.8 donut with centre total (V25) done.** Not a new chart type: `PieChart(variant="donut")` (a look, so `pie` gained `literal_fields=("variant",)`; the AI tool schema's
+  `variant` enum is now `["area", "grouped", "paired", "donut"]`). The pie with `hole: 0.6` and one centred annotation (`paper` 0.5, 0.5) holding the total, bold, with what it
+  totals beneath: the value column's name, or "Count". The total is the sum of every slice, "Other" included, so it is the whole dataset's figure and not the visible slices';
+  whole totals have no decimals, fractional ones two, and a total longer than ten characters is set at 12 px instead of 16 so it stays inside the hole (the first render with
+  18 px nearly filled it). The column name goes through `html.escape` because annotation text is Plotly's HTML subset. The skin needed nothing: the template already gives pies
+  the outside labels, the well-coloured slice borders and the mono type. Gallery variant `pie_donut`: 24 golden baselines. **Verified:** `tests/visualization/test_donut.py` (10),
+  root suite **1093 passed / 0 failed**, the whole `apps/api` suite 2124 passed / 163 skipped / 0 failed, goldens 24 of 24, `tsc -b` and oxlint clean. **Not done:** the
+  **legend rows** the V25 catalogue entry mentions (a K8 table with each slice's value and share, beside the ring): it is a web component, not a Plotly feature, so it belongs
+  to the Visualize area's chart view; the plain Plotly legend (labels only) and the outside percent labels stay.
+  **7.9 pie grid (V26) done.** Not a new chart type: `PieChart(panel_column=...)` (a column, so `pie`'s `optional_fields` is `("value_column", "panel_column")`; the AI tool schema
+  describes it). One pie per value of the column, in small multiples of up to four to a row, so 12 panels are the reference's 4x3 grid; each pie is titled with its panel value.
+  Every pie has the same slices in the same order (a category a panel has no rows for is a zero-size slice) with `sort: false`, so Plotly gives one category one colour across the
+  grid and one position; only the first pie lists the slices in the legend, so there is one legend and not twelve. The caps are the existing ones: 15 slices over the whole data's
+  totals (so every pie folds the same categories) and 12 panels, the rest into an "Other" pie, both through `_fold_into_other`, now factored out of the stacked bars (31 bar
+  tests unchanged). Refused: `panel_column` equal to the category column, or with `variant="donut"`. **The cells are placed by hand** (paper fractions: a strip for the title over each pie's
+  domain) and not with `make_subplots`, which sets each panel title at its own 16 px over the template's mono 11 px and puts the first row's titles in the strip above the plot where the
+  legend sits (both seen in the first render); the titles take the layout font, and `html.escape` keeps a panel value from injecting markup. Slice labels are off (`textinfo: none`), as
+  twelve outside labels would collide: the readout and the legend carry them. Gallery variant `pie_grid` (channel x month, 12 panels): 25 golden baselines. **Verified:**
+  `tests/visualization/test_pie_grid.py` (16), root suite **1109 passed / 0 failed**, the whole `apps/api` suite 2124 passed / 163 skipped / 0 failed, goldens 25 of 25, `tsc -b` and oxlint
+  clean. **Not done:** per-pie totals (the pies are not scaled by their panel's total, and the title does not carry it), percent labels on the slices, a figure height that grows with
+  the number of rows (the pies are small in a short figure), panel order other than by label.
+  **7.10 pivot heatmap, numbers and grid (V29, V31) done.** `HeatmapChart` always printed numbers in its correlation cells, so V29 was half there; the missing piece is a matrix of *any*
+  two columns. `row_column` + `column_column` (+ optional numeric `value_column`, else row counts; `heatmap`'s `optional_fields` are those three, `variant` a literal) give a pivot:
+  rows and columns in their own order through `ordered_buckets` (factored out of the stacked bars; an ordered category keeps its order, numbers sort as numbers), the first row at the top,
+  an empty cell when a combination has no rows or only missing values (`sum(min_count=1)`, found in review: a plain sum made it 0), an axis capped at 40 (the 39 largest in their own
+  order plus an "Other", added to and not overwriting a real "Other"). `variant="numbers"` writes each value in its cell (whole numbers without decimals, else two); `"grid"` is gapped
+  one-hue cells with no numbers. **Not square:** Plotly ignores `scaleanchor` on a category axis (seen in the first render), so the cells are as square as the chart's proportions make them;
+  forcing squares needs a container whose aspect ratio is columns:rows, a web-view concern. Gallery `heatmap_numbers` (region x channel) and `heatmap_grid` (weekday x week, 7 x 12).
+  **7.11 scatter with Pareto frontier and pin done.** `ScatterChart` gained `label_column` (a column; each point's label, read out in the hover line), `frontier` (a literal: the corner where
+  a point is best, `upper_left` = low x, high y; draws the non-dominated points as a dashed "Pareto frontier" line over *all* the points, not one colour group) and `pin` (a literal: a value of
+  the label column, drawn as a ringed, labelled trace "Pinned: <value>" with no legend entry; the skin draws the ring in the primary text colour). With a frontier or a pin the points trace is
+  named "Points" (an unnamed one showed as "trace 0" in the legend). Refused: an unknown corner, `pin` without `label_column`, a pin that is not a label, an empty pin (review: it would ring every
+  unlabelled row). Rows are re-indexed first (review: a repeated index misaligned the labels). Gallery `scatter_frontier` (14 models, pin M05).
+  **7.12 KPI mini charts (V21) done.** A new registry type, `kpi` (the 14th): `ChartType.KPI`, migration `0004_chart_type_kpi`, the pinned migration list, the manual's counts and page, the AI tool
+  schema. `KpiChart(value_column, x_column=None, variant=...)` is a Plotly `indicator` card (the latest value, its absolute change from the one before with Plotly's arrow, so direction is not
+  colour alone; whole numbers without decimals) over a mini chart with no axes: `line` (a dot on the latest value, the default), `bars`, `dashes` (bars in a `-` pattern, the segmented look) or
+  `lollipop` (one trace, so stem and head are one colour: marker sizes zero on the feet). The mini chart is the first trace and the card the last, so the series gets the first palette
+  colour (the card has none to take; the first render had it orange). With `x_column` the rows are first put in period order (review: "latest" was the last row of a shuffled file). The template
+  gained `data.indicator` (primary-text number, green/red delta, quiet title). Gallery `kpi`, `kpi_bars`, `kpi_dashes`, `kpi_lollipop`.
+  **7.13 log pane and 7.14 ranked leaderboard done.** Both are web components, not Plotly figures (`apps/web/src/components/lists.tsx`, rules in `components.css`, shown in `/components.html`, golden
+  tests in `e2e/components.golden.spec.ts`: 2 more baselines), because they are lists of rows read for their text. `LogPane` is the K8 `DataTable` with a level colour per row (a region key) and the
+  level also in words in its own column, in a labelled, focusable scroll region; `RankedList` is an `ol` ranked here (highest first, stable), each row its rank, label and value as text, with the
+  bar a 2 px underline whose width is the value's share of the top (a border, so it survives forced colours; aria-hidden); NaN rows are dropped, `role="list"` keeps the semantics when the
+  markers are hidden. **The "legend rows" of V25 and the K8 table beside a chart are these components; wiring them next to a chart is the Visualize area's work, not done here.**
+  **Verified (7.10-7.14):** one code review, 10 findings all fixed with tests; root suite **1167 passed / 0 failed**; the whole `apps/api` suite **2125 passed / 163 skipped** (the MinIO and Redis
+  tests CI runs) **/ 0 failed**; goldens **34 of 34** (32 charts, 2 components); `tsc -b`, oxlint, black, isort, bandit clean. The first full runs were stopped by the system for low memory (run in
+  parallel); the second, run one after the other, completed. **Not verified: axe was not run** (loading it from a CDN was refused), so the components were checked by their accessibility tree
+  only (a named list of "1 North 36,705 orders" items; a named region around a table with the level as text).
+  **Judgment call still open:** V13 thermal narrow bars (a sequential series palette) is not done. **Step 7's Tier-1 list is otherwise complete.**
 - **Decision 3 refinement (WCAG 2.1.4):** bare digit keys are a character-key shortcut, so View > "Single-key shortcuts (1-5)" turns them
   off (stored in `localStorage`); the menu items carry `aria-keyshortcuts`. F6 and Escape are not character keys.
 - **Not done, on purpose or deferred:** no automated web accessibility test yet (the ship plan's D12 Playwright + axe pass is the place; the repo's
