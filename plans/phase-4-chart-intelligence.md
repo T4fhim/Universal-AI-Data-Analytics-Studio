@@ -1,6 +1,6 @@
 # Phase 4 — Chart intelligence: automatic, per-dataset visualization selection
 
-**Status: DRAFT, all four §6 decisions answered (2026-10-28); CI.0 done (`plans/phase-4-ci0-findings.md`, §6 has the measurements); CI.1 (fingerprint) is built (§3.1, "As built"); CI.2 and CI.8a are next. Revised the same day: renderer order is ECharts (core), Plotly (second),
+**Status: DRAFT, all four §6 decisions answered (2026-10-28); CI.0 done (`plans/phase-4-ci0-findings.md`, §6 has the measurements); CI.1 (fingerprint) and CI.2 (`ChartFit`) are built (§3.1 and §3.3, "As built"); CI.8a is next, and CI.3/CI.4 are unblocked. Revised the same day: renderer order is ECharts (core), Plotly (second),
 D3 (third), as the user decided.** Nothing in this plan is built. It extends Phase 4 step 7 (the Tier-1
 chart catalogue, complete) and is referenced from `plans/web-transition-glass-box-studio.md` as Phase 4.9.
 It is step 8 of `plans/phase-4-design-reference.md` §7; the design-language skill moved to step 9.
@@ -168,6 +168,52 @@ Each `ChartRegistration` gains a declarative `ChartFit` so adding a chart means 
 A test pins this in both directions (every registered chart has a `ChartFit`; every `ChartFit` names a registered
 chart), the same pattern as `stages/catalog.py`'s `test_web_stages.py`. A plugin chart without a `ChartFit` is simply
 never recommended (still manually buildable).
+
+**As built (CI.2, 2026-11-01).** `uadas_core/visualization/chart_fit.py` (`ChartFit`, `Slot`, `Bounds`, `Variant`,
+`ChartIntent`, `Renderer`, `Need`; validated at construction) and `ChartRegistration.fit`, with `fit_for(name)` and
+`list_fits()` in the registry. All 14 built-ins declare one, **inline in their own `register_chart` call**; a chart with
+`fit=None` (a plugin) is never recommended but stays buildable. Where it differs from the text above:
+
+- `needs` is **per slot**, not per chart (a pie's value is non-negative and additive, its category is neither), and gained
+  `non_increasing` for a funnel's measure so the scorer need not hardcode "funnel". Needs are **hard or soft**:
+  `HARD_NEEDS` (`non_negative`, `non_increasing`) are decidable from a fingerprint (`negative_share`, and the new
+  `ColumnFingerprint.row_order`, which is recorded only for an exact fingerprint because a sample has lost the order of
+  the file) and make a candidate invalid; `SOFT_NEEDS` (`additive`, `ordered`, `signed`) are judgements no fingerprint can
+  settle, so the scorer treats them as evidence. On a sampled fingerprint a negative row can be missed: the dataset gate at
+  accept time is the backstop.
+- A variant's slots are added to the chart's, or replace the one with the same field (`stacked` tightens `value_column`; a
+  series bar lets its category be a time axis). `ChartFit.slots_for`, `intents_for` and `rows_for` are the one place that
+  merge rule lives. A candidate is exactly one variant, and no column fills two slots of one candidate.
+- A slot may carry `name_hints` (`hint_required` for a candlestick's open/high/low/close), matched as whole tokens of the
+  column name (`name_tokens`, now public): four measures are not an OHLC series and a fingerprint cannot say which is which.
+- `Slot.unique` (one distinct value per non-null row) is declared where a chart draws one mark per row with no aggregation:
+  line x, radar entity, waterfall step, funnel stage, candlestick x. `Slot.nested` (each bound column determines the next)
+  is a treemap's path, now exactly two nested levels with at most 200 leaves.
+- **Declared stricter than the builder, deliberately:** a line needs an x axis (a line over the row index is not a trend), and
+  the plain bar's category is not a time axis (it sorts by value and folds past 15; the series bars sort by label and may
+  take one). Distinct counts follow the builder, which draws a `(missing)` bucket for nulls, so a consumer compares
+  `distinct + 1` when `missing_share > 0`.
+- **The correlation heatmap is not declared:** the builder correlates every numeric column (identifiers and ordinals
+  included) and takes no column parameter, so a spec cannot bind or avoid a column and the API reads no columns for it. The
+  heatmap fit is the pivot mode (`numbers` and `grid` are its variants). It becomes recommendable when `HeatmapChart.build`
+  takes a `columns` list, a deliberate change to the AI tool schema.
+- An independent architect review of this design found the gaps above; each is fixed or recorded as deliberate. The
+  fingerprint version is 2 for `row_order`.
+- `Variant.explicit` marks looks only offered on request (the four scatter frontier corners, three KPI looks): nothing in
+  the data says which is "best". `bar(stacked)` is a variant with no literal (a series column makes it stacked); there is
+  no 100 % stacked bar in the builder, so none is declared.
+- **`renderers` is `(plotly,)` for all 14 today**, not `(echarts, plotly)`: declaring a renderer that cannot draw the chart
+  yet would make the render plan pick one that does not exist. A CI.8 wave puts `echarts` first for its charts when their
+  goldens pass.
+- Every number (cardinality sweet spots, `min_rows`, `max_rows`) is a starting value for CI.3 to tune. Four are pinned to the
+  builders' own constants by `tests/visualization/test_chart_fit.py` (a bar's fold limit, a pie's panel cap, a heatmap's
+  matrix cap, a radar's 3 axes) and the allowed `variant` literals are checked both ways against the builders, so adding a
+  variant to a builder fails the test until it is declared.
+- `chart_fit.py` and `chart_registry.py` are clean under the CI mypy command (verified locally). **Adding them to the list in
+  `.github/workflows/ci.yml` is pending:** the push was refused because the GitHub token lacks the `workflow` scope, so that
+  one-line change (and the matching `docs/MYPY_DEBT.md` note) is held back until the scope is refreshed
+  (`gh auth refresh -s workflow`). The AI tool schema and the manual's chart counts are unchanged (no field was added or
+  renamed).
 
 ### 3.4 Candidates and scoring
 

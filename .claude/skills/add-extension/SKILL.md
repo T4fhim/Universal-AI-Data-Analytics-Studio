@@ -129,7 +129,12 @@ extension point that is NOT stateless/classmethod-only; don't force it into that
 1. Run `project-architecture` for this extension type's exact registry/integration checklist —
    the table above names the registry, but that skill owns verifying it was actually done.
 2. Add the corresponding test file under `tests/<matching package>/`.
-3. Before declaring the new extension complete, run `milestone-verification`.
+3. **A new chart also declares its `ChartFit`** (`uadas_core/visualization/chart_fit.py`: the question it
+   answers, its role-typed slots, row bounds, variants and renderers) as the `fit=` of the *same*
+   `ChartRegistration` call. `tests/visualization/test_chart_fit.py` fails until every registered field
+   has a slot and every variant literal agrees with the builder; a chart with no fit is never recommended
+   (it stays buildable by hand). A plugin chart may omit it.
+4. Before declaring the new extension complete, run `milestone-verification`.
 
 ## Conventions this scaffold already follows (don't skip when hand-editing)
 

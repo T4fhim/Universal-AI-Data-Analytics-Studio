@@ -516,6 +516,49 @@ def test_a_float_noise_zero_has_no_sign() -> None:
     assert "-0.0" not in build_fingerprint(frame).to_json()
 
 
+def test_the_order_of_the_file_is_recorded_for_an_exact_fingerprint_only() -> None:
+    frame = pd.DataFrame(
+        {
+            "falling": [100.0, 80.0, 80.0, 40.0, 10.0],
+            "rising": [1.0, 2.0, 2.0, 5.0, 9.0],
+            "jagged": [5.0, 1.0, 9.0, 2.0, 7.0],
+            "flat": [3.0] * 5,
+            "when": pd.date_range("2024-01-01", periods=5, freq="D"),
+        }
+    )
+    fp = build_fingerprint(frame)
+    order = {c.name: c.row_order for c in fp.columns}
+    assert order == {
+        "falling": "descending",
+        "rising": "ascending",
+        "jagged": "mixed",
+        "flat": "flat",
+        "when": "ascending",
+    }
+    # A sample has lost the order of the file, so it records none rather than a wrong one.
+    big = pd.DataFrame({"v": np.arange(200.0)[::-1]})
+    assert build_fingerprint(big, sample_rows=50).columns[0].row_order is None
+    assert build_fingerprint(big).columns[0].row_order == "descending"
+
+
+def test_a_funnel_shaped_measure_is_told_apart_from_a_budget_by_its_order() -> None:
+    funnel = _column(_fingerprint_of("funnel_stages"), "users")
+    budget = _column(_fingerprint_of("budget_vs_actual"), "budget")
+    assert funnel.row_order == "descending"
+    assert budget.row_order == "mixed"
+
+
+def test_name_tokens_split_on_punctuation_and_camel_case_and_match_whole_words() -> (
+    None
+):
+    from uadas_core.analysis.fingerprint import name_tokens
+
+    assert name_tokens("openPrice") == ["open", "price"]
+    assert name_tokens("Open_Price-adj") == ["open", "price", "adj"]
+    assert "low" in name_tokens("day_low") and "low" not in name_tokens("flow")
+    assert name_tokens("") == [] and name_tokens("___") == []
+
+
 def test_a_stage_that_raises_is_recorded_by_name_and_never_escapes(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:

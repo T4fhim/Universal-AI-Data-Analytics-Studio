@@ -59,7 +59,7 @@ from scipy import stats as scipy_stats
 _logger = logging.getLogger(__name__)
 
 # Bump on ANY change to a rule, threshold or field below: a cached recommendation set is keyed on it.
-FINGERPRINT_VERSION = 1
+FINGERPRINT_VERSION = 2  # 2: ColumnFingerprint.row_order, name_tokens public (CI.2)
 
 # The most rows a fingerprint is computed from. A bigger frame is sampled down (uniformly, seeded).
 SAMPLE_ROWS = 100_000
@@ -232,7 +232,13 @@ class TimeStructure:
 
 @dataclass(frozen=True, slots=True)
 class ColumnFingerprint:
-    """Everything the recommender is told about one column."""
+    """Everything the recommender is told about one column.
+
+    ``row_order`` is how a measure or time column runs through the rows **in the order of the file**
+    (``ascending`` / ``descending`` are non-strict, ``flat`` is constant, ``mixed`` is neither). It is what a
+    funnel (non-increasing values) or a time axis (ascending) needs, and it is ``None`` unless the fingerprint
+    is exact: a sample cannot see the order of the file.
+    """
 
     name: str
     position: int
@@ -246,6 +252,7 @@ class ColumnFingerprint:
     issues: tuple[Issue, ...] = ()
     distribution: DistributionShape | None = None
     time: TimeStructure | None = None
+    row_order: str | None = None
 
     @property
     def usable(self) -> bool:
@@ -259,10 +266,12 @@ class ColumnFingerprint:
 
     @property
     def chartable(self) -> bool:
-        """Whether a chart slot may be bound to this column: usable, and a role a chart can draw.
+        """Whether the column may be an axis, a measure or a grouping: usable, and a role that can be one.
 
         Identifiers and free text are never an axis or a measure (a sequential id summed is noise), and
-        ``geo`` has no chart yet.
+        ``geo`` has no chart yet. A convenience, **not** the authority for a given slot: a slot's own
+        ``roles`` decide what may fill it (a radar's entity label and a scatter's point label take
+        identifiers and text, which are not chartable here).
         """
         return self.usable and self.role in _CHARTABLE_ROLES
 
@@ -364,13 +373,13 @@ def _share(value: Any) -> float:
     return 0.0 if number is None else min(1.0, max(0.0, number))
 
 
-def _name_tokens(name: str) -> list[str]:
+def name_tokens(name: str) -> list[str]:
     spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name).lower()
     return [token for token in re.split(r"[^a-z0-9]+", spaced) if token]
 
 
 def _looks_like_id(name: str) -> bool:
-    tokens = _name_tokens(name)
+    tokens = name_tokens(name)
     return bool(tokens) and (tokens[-1] in _ID_TOKENS or tokens[0] == "id")
 
 
@@ -526,6 +535,7 @@ class _Draft:
     values: pd.Series | None = None  # prepared values; kept only for measures and times
     distribution: DistributionShape | None = None
     time: TimeStructure | None = None
+    row_order: str | None = None
 
     def freeze(self) -> ColumnFingerprint:
         return ColumnFingerprint(
@@ -541,6 +551,7 @@ class _Draft:
             issues=tuple(dict.fromkeys(self.issues)),
             distribution=self.distribution,
             time=self.time,
+            row_order=self.row_order,
         )
 
     @property
@@ -622,7 +633,7 @@ def _number_role(
     """Role of a numeric column: geo, identifier, dimension key, ordinal scale or measure."""
     values = _floats(prepared)
     finite = values[np.isfinite(values)]
-    tokens = _name_tokens(name)
+    tokens = name_tokens(name)
     if finite.size and tokens:
         if tokens[-1] in _LATITUDE_NAMES and finite.min() >= -90 and finite.max() <= 90:
             return SemanticRole.GEO, 0.8
@@ -758,6 +769,19 @@ def _classify(
 
 
 # ------------------------------------------------------------------ shape, time and pair stages
+
+
+def _row_order(values: pd.Series) -> str | None:
+    """How ``values`` run through the rows (missing values skipped): see ``ColumnFingerprint.row_order``."""
+    present = values.dropna()
+    if len(present) < 2:
+        return None
+    rising, falling = present.is_monotonic_increasing, present.is_monotonic_decreasing
+    if rising and falling:
+        return "flat"
+    if rising:
+        return "ascending"
+    return "descending" if falling else "mixed"
 
 
 def _is_bimodal(finite: np.ndarray[Any, Any]) -> bool:
@@ -1182,6 +1206,10 @@ def build_fingerprint(
         if expired():
             cut = True
             break
+        if exact:  # a sample has lost the order of the file
+            draft.row_order = guarded(
+                "row_order", partial(_row_order, draft.values), lambda: None
+            )
         if draft.role is SemanticRole.MEASURE:
             draft.distribution = guarded(
                 "distribution", partial(_distribution, draft.values), lambda: None
