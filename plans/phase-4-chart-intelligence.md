@@ -1,6 +1,6 @@
 # Phase 4 — Chart intelligence: automatic, per-dataset visualization selection
 
-**Status: DRAFT, all four §6 decisions answered (2026-10-28); CI.0 done (`plans/phase-4-ci0-findings.md`, §6 has the measurements); CI.1, CI.2 and CI.8a are next. Revised the same day: renderer order is ECharts (core), Plotly (second),
+**Status: DRAFT, all four §6 decisions answered (2026-10-28); CI.0 done (`plans/phase-4-ci0-findings.md`, §6 has the measurements); CI.1 (fingerprint) is built (§3.1, "As built"); CI.2 and CI.8a are next. Revised the same day: renderer order is ECharts (core), Plotly (second),
 D3 (third), as the user decided.** Nothing in this plan is built. It extends Phase 4 step 7 (the Tier-1
 chart catalogue, complete) and is referenced from `plans/web-transition-glass-box-studio.md` as Phase 4.9.
 It is step 8 of `plans/phase-4-design-reference.md` §7; the design-language skill moved to step 9.
@@ -105,6 +105,46 @@ and per pair (bounded to the top-K most promising, never all N²): |Pearson|/|Sp
 (functional dependency / hierarchy), key uniqueness. Dataset level: rows, columns, wide-vs-long, grain, duplicate share.
 It records `sampled_rows` and a `confidence`, and degrades to "partial fingerprint, lower confidence" on timeout
 rather than failing.
+
+**As built (CI.1, 2026-11-01).** `uadas_core/analysis/fingerprint.py` (builder over a pandas frame, `build_fingerprint`) and
+`apps/api/uadas_api/stages/fingerprint.py` (`fingerprint_frame`: one streamed pass over a Parquet object into a seeded uniform
+100k sample plus whole-file null and approximate-distinct counts from a locked-down DuckDB, the only module allowed to import
+it: `.importlinter` contract `duckdb-only-in-the-fingerprint-module`). Where it differs from the text above:
+
+- Roles gained `unknown` (all-null, unsupported or not-analysed columns); a column also carries closed `issues`
+  (`all_null | constant | ambiguous_type | unsupported_type | not_analysed | non_finite`) and two derived flags: `usable`
+  (understood and sound) and `chartable` (usable and a role a chart can draw; an identifier is usable, not chartable).
+- Time structure reports `granularity`, `regularity` and `coverage` (distinct values over a gap-free grid), not a count of
+  gaps, because a count does not survive sampling. Seasonality is computed only for an unsampled, regular series with unique
+  timestamps; trend (Kendall tau) uses up to 5,000 points. The "modality hint" is a histogram valley test: Sarle's
+  coefficient was tried and rejected (it flags every skewed or uniform measure).
+- Pairs are bounded: the top 20 |r| among at most 40 measures on 20k rows, and parent/child dimensions among at most 12.
+  `grain` is a key column, else time (+ one dimension).
+- "Never raises on data" is structural, not only tested: every stage runs under a guard that records `stage_failed:<name>`
+  (and the exception class, never its text) and degrades; each defect the independent review found is also fixed at its
+  source and has a regression test (a span of centuries overflowing int64 nanoseconds, opposite float extremes in the
+  histogram, `numpy.str_` cells, pandas-3 surrogates). The column `dtype` is a closed vocabulary (`integer`, `float`, `text`,
+  `datetime`, `categorical`, ...), because pandas' own name embeds a cell value for a Sparse column and changes between
+  pandas versions, which would change the hash. A timezone-aware column is read as local wall-clock time (a daily series in
+  New York stays daily across the 23-hour DST day); coded categoricals are dimensions; seasonality needs three cycles and an
+  autocorrelation above 2/sqrt(n) (white noise of 24 points was called seasonal 21 % of the time, now 3 %). A date outside the
+  nanosecond range (a year-9999 "no end date") is `unsupported_type` on pandas 2 and a real time column on pandas 3 (a known
+  version difference). Pair key-uniqueness is `grain`, not a field of `DimensionPair`.
+- **Not built (nothing consumes them yet):** a missingness *pattern* (only the share), `DataFingerprint.from_dict`, geo beyond
+  a latitude/longitude pair detected by name and range, and a whole-number year column as a time axis (it is an ordinal or a
+  measure). Add each with its first consumer.
+- DuckDB parses no bytes (pyarrow still decodes the Parquet), so it is **not** in the sandbox-boundary probe (§9.2 asked for
+  that on the premise that DuckDB would read files; the lockdown, with one refusal test per statement, is the control).
+  The stream is bounded by `max_object_bytes` and the job's time limit, not by the fingerprint's `time_budget` (which cuts the
+  CPU stages after it). A worker running it at 1M rows needs at least 1 GB.
+- Measured (this machine, 1M rows x 20 columns, written the way ingest writes it): 1.3-1.9 s end to end over repeated
+  runs (stream and DuckDB 0.4-0.6 s, to_pandas 0.06 s, the core builder 1.0-1.3 s), against the 2 s budget; the CI test
+  allows 4 s. The core's time is per-column pandas work and the machine is noisy, so the budget has little slack: halving the
+  sample saved only 0.2 s.
+- Bounds in the API module (from the security review): at most 1,000 columns (`columns_truncated` note, only those decoded),
+  the sample can never exceed `sample_rows` whatever the footer declares, no DuckDB spill, no `duckdb` pin (the per-statement
+  refusal tests run on whatever version CI resolves). Left to the caller: the decoded size of a small file and the stream's
+  duration (worker memory limit, job time limit), and never logging `str(exc)` of a pyarrow error.
 
 ### 3.2 Intent
 
@@ -326,11 +366,13 @@ No decision is pending; what remains open is listed in §8 and §9 and is settle
 
 - Where an ingest completes and where a profile result is persisted (I read the dispatch table in `stages/execute.py`,
   not the ingest path): CI.5.
-- `.importlinter` layering: whether `analysis/` may import `visualization/` or the reverse: CI.1/CI.2.
+- `.importlinter` layering: whether `analysis/` may import `visualization/` or the reverse: **answered in CI.1**: `visualization`
+  sits above `analysis`, so `analysis` may not import it and `ChartFit` / `ChartIntent` live in `visualization/`; `analysis` may
+  import `readers.type_inference` (the fingerprint did not need to).
 - ECharts `large`/`sampling` and Plotly `scattergl` behaviour at 1M points: **measured in CI.0 §6.1.** The ECharts 6
   chord/beeswarm/jitter/broken-axis/violin/contour features and the `large` bar mode were confirmed from the
   ECharts handbook (context7), not run.
-- Whether `hypothesis` is in `requirements-dev.txt`: CI.1.
+- Whether `hypothesis` is in `requirements-dev.txt`: it was not (only transitive via schemathesis); **added, pinned, in CI.1.**
 - Whether ECharts reproduces hatched bars, the end-dot gradient area, candlestick + volume and waterfall at golden parity: the CI.0
   audit found no CANNOT; CI.0 §6.4 ran candlestick + volume, the waterfall (with a zero crossing), a log bar and decals; the end-dot
   area and golden-level pixel parity are still checked per wave in CI.8.

@@ -197,3 +197,26 @@ source_modules =
 forbidden_modules =
     uadas_core.database
 allow_indirect_imports = True
+
+# Chart intelligence CI.1 (plans/phase-4-chart-intelligence.md section 9.2, decided in plans/phase-4-ci0-findings.md
+# section 3): DuckDB is a second engine over tenant data, so exactly one `uadas_api` module may import it
+# DIRECTLY, and that module (`uadas_api.stages.fingerprint`) locks the connection down (no file access, no
+# extension install or load, no ATTACH, no spilling, configuration locked), queries only a registered Arrow
+# reader and puts no tenant text in the SQL. A new direct DuckDB use means a reviewed change to this contract,
+# not a stray `import duckdb`.
+# What it does NOT cover (stated so nobody reads more into it): `allow_indirect_imports = True`, because the
+# core's desktop database connector (`uadas_core/database/duckdb_connection.py`) imports duckdb and reaches the
+# API through `uadas_core.bootstrap`, so a process that loads the composition root already has duckdb loaded;
+# a `uadas_core` module importing duckdb is not gated here; and `importlib.import_module("duckdb")` is
+# invisible to a static import graph (the runtime twin for the SQL connectors is tests/test_sql_capability_boundary.py).
+[importlinter:contract:duckdb-only-in-the-fingerprint-module]
+name = uadas_api imports duckdb only in uadas_api.stages.fingerprint
+type = forbidden
+source_modules =
+    uadas_api
+forbidden_modules =
+    duckdb
+    duckdb_engine
+allow_indirect_imports = True
+ignore_imports =
+    uadas_api.stages.fingerprint -> duckdb

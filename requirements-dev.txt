@@ -10,6 +10,9 @@
 -r requirements.txt
 
 pytest
+# Property tests (tests/analysis/test_fingerprint.py: chart intelligence CI.1 fuzzes the fingerprint with
+# hostile frames). Pinned like the other tools; apps/api already pulls it in transitively via schemathesis.
+hypothesis==6.170.2
 black==26.5.1
 isort==8.0.1
 mypy==2.1.0
