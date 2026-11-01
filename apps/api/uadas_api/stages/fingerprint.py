@@ -181,7 +181,10 @@ def _whole_dataset_stats(
     connection = locked_connection()
     try:
         connection.register("t", pa.RecordBatchReader.from_batches(schema, stream))
-        row = connection.execute(f"SELECT {select} FROM t").fetchone()
+        # B608 is skipped for uadas_core but not for apps/api. Safe here: ``select`` is built only from the
+        # integers of ``enumerate`` (``count(c0), approx_count_distinct(c0), ...``); no column name, cell or
+        # other tenant text can reach it (tests/test_stages_fingerprint.py runs hostile column names).
+        row = connection.execute(f"SELECT {select} FROM t").fetchone()  # nosec B608
     finally:
         connection.close()
     if (
