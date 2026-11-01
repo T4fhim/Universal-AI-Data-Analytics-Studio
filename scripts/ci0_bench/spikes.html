@@ -1,0 +1,242 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>CI.0 ECharts recipe spikes</title>
+<!-- The four recipes plans/phase-4-ci0-findings.md could not confirm from the docs: candlestick + volume
+     on two grids, a waterfall (including a step that crosses zero), bars on a log axis, and decal parity.
+     Driven by run_spikes.mjs; each spike returns plain checks (pixel reads of the rendered canvas), and the
+     runner keeps a screenshot of each so a human can look at what the checks say. -->
+<body style="margin:0;background:#111">
+  <div id="c" style="width:720px;height:420px"></div>
+  <script src="node_modules/echarts/dist/echarts.min.js"></script>
+  <script>
+    const BG = "#111111", UP = "#2ecc71", DOWN = "#e74c3c", TOTAL = "#8899aa", BAR = "#4c9be8";
+    const el = document.getElementById("c");
+    const raf2 = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    function prng(seed) {
+      let s = seed >>> 0;
+      return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+    }
+    function gauss(r) {
+      return Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r());
+    }
+
+    async function mount(option, renderer) {
+      // init() on an element that already has an instance returns that instance and merges the new option into
+      // it, so a second scenario would silently inherit the first one's aria and series: dispose it first.
+      const old = echarts.getInstanceByDom(el);
+      if (old) old.dispose();
+      el.innerHTML = "";
+      const chart = echarts.init(el, null, { renderer: renderer || "canvas" });
+      const done = new Promise((r) => chart.on("finished", r));
+      chart.setOption(option);
+      await done;
+      await raf2();
+      return chart;
+    }
+    const readable = (chart) => chart.getRenderedCanvas({ pixelRatio: 1, backgroundColor: BG });
+    function pixel(cv, x, y) {
+      const d = cv.getContext("2d").getImageData(Math.round(x), Math.round(y), 1, 1).data;
+      return [d[0], d[1], d[2]];
+    }
+    const close = (a, b, tol) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) <= (tol || 36);
+    const rect = (chart, i) => chart.getModel().getComponent("grid", i).coordinateSystem.getRect();
+
+    // ---- 1. candlestick + volume on two grids ------------------------------------------------------
+    async function candlestick() {
+      const r = prng(7), N = 40, dates = [], ohlc = [], vol = [];
+      let prev = 100;
+      for (let i = 0; i < N; i++) {
+        const o = prev, c = o + gauss(r) * 2;
+        const h = Math.max(o, c) + r() * 1.5, l = Math.min(o, c) - r() * 1.5;
+        dates.push(new Date(Date.UTC(2024, 0, 1 + i)).toISOString().slice(0, 10));
+        ohlc.push([o, c, l, h]); // ECharts order: open, close, lowest, highest
+        vol.push({ value: Math.round(1000 + r() * 4000), itemStyle: { color: c >= o ? UP : DOWN } });
+        prev = c;
+      }
+      const option = {
+        animation: false, backgroundColor: BG,
+        axisPointer: { link: [{ xAxisIndex: "all" }] },
+        tooltip: { trigger: "axis", axisPointer: { type: "cross" } },
+        grid: [{ left: 50, right: 20, top: 20, height: "55%" }, { left: 50, right: 20, top: "74%", height: "16%" }],
+        xAxis: [
+          { type: "category", data: dates, gridIndex: 0, axisLabel: { show: false } },
+          { type: "category", data: dates, gridIndex: 1 },
+        ],
+        yAxis: [
+          { scale: true, gridIndex: 0, splitLine: { show: false } },
+          { gridIndex: 1, splitNumber: 2, axisLabel: { show: false }, splitLine: { show: false } },
+        ],
+        dataZoom: [{ type: "inside", xAxisIndex: [0, 1] }],
+        series: [
+          { name: "Price", type: "candlestick", xAxisIndex: 0, yAxisIndex: 0, data: ohlc,
+            itemStyle: { color: UP, color0: DOWN, borderColor: UP, borderColor0: DOWN } },
+          { name: "Volume", type: "bar", xAxisIndex: 1, yAxisIndex: 1, data: vol },
+        ],
+      };
+      const chart = await mount(option);
+      const cv = readable(chart);
+      const g0 = rect(chart, 0), g1 = rect(chart, 1);
+      const iUp = ohlc.findIndex((d) => d[1] > d[0] + 0.8), iDown = ohlc.findIndex((d) => d[1] < d[0] - 0.8);
+      const body = (i) => [chart.convertToPixel({ gridIndex: 0 }, [dates[i], (ohlc[i][0] + ohlc[i][1]) / 2]),
+        chart.convertToPixel({ gridIndex: 1 }, [dates[i], vol[i].value / 2])];
+      const [bu0, bu1] = body(iUp), [bd0, bd1] = body(iDown);
+      const checks = {
+        gridsDoNotOverlap: g0.y + g0.height < g1.y,
+        sameXInBothGrids: chart.convertToPixel({ xAxisIndex: 0 }, dates[9]) === chart.convertToPixel({ xAxisIndex: 1 }, dates[9]),
+        upCandleBodyIsUpColour: close(pixel(cv, bu0[0], bu0[1]), rgb(UP)),
+        downCandleBodyIsDownColour: close(pixel(cv, bd0[0], bd0[1]), rgb(DOWN)),
+        upVolumeBarIsUpColour: close(pixel(cv, bu1[0], bu1[1]), rgb(UP)),
+        downVolumeBarIsDownColour: close(pixel(cv, bd1[0], bd1[1]), rgb(DOWN)),
+      };
+      // One axis-trigger tooltip over the price grid: does it list the volume (the second grid's series)?
+      const at = chart.convertToPixel({ gridIndex: 0 }, [dates[20], ohlc[20][1]]);
+      chart.dispatchAction({ type: "showTip", x: at[0], y: at[1] });
+      await sleep(400);
+      const tip = [...el.querySelectorAll("div")].map((d) => d.innerText || "").filter((t) => t.includes(dates[20]));
+      checks.oneTooltipListsPriceAndVolume = tip.some((t) => /Price/.test(t) && /Volume/.test(t));
+      return { checks, tooltipText: (tip[0] || "").replace(/\s+/g, " ").slice(0, 160) };
+    }
+
+    // ---- 2. waterfall, with a step that crosses zero --------------------------------------------------
+    // Python would compute these arrays; the rule is the one the audit proposed: a transparent base plus
+    // visible pieces. ECharts stacks positive and negative values separately, so a bar that crosses zero
+    // is two visible pieces (above and below), and only a bar wholly on one side gets an invisible base.
+    function waterfallSeries(steps) {
+      const kinds = ["inc", "dec", "tot"], A = { base: [] }, spans = [];
+      for (const k of kinds) { A[k] = []; A[k + "N"] = []; }
+      let run = 0;
+      for (const s of steps) {
+        let lo, hi, kind;
+        if (s.total) { lo = Math.min(0, s.value); hi = Math.max(0, s.value); run = s.value; kind = "tot"; }
+        else { const a = run, b = run + s.value; lo = Math.min(a, b); hi = Math.max(a, b); run = b; kind = s.value >= 0 ? "inc" : "dec"; }
+        let base = 0, pos = 0, neg = 0;
+        if (lo >= 0) { base = lo; pos = hi - lo; }
+        else if (hi <= 0) { base = hi; neg = lo - hi; }
+        else { pos = hi; neg = lo; }
+        A.base.push(base);
+        for (const k of kinds) { A[k].push(k === kind ? pos : 0); A[k + "N"].push(k === kind ? neg : 0); }
+        spans.push({ name: s.name, lo, hi, kind });
+      }
+      const colour = { inc: UP, dec: DOWN, tot: TOTAL };
+      const series = [{ name: "base", type: "bar", stack: "w", silent: true, itemStyle: { color: "transparent" }, data: A.base }];
+      for (const k of kinds) for (const n of [k, k + "N"]) {
+        series.push({ name: n, type: "bar", stack: "w", itemStyle: { color: colour[k] }, data: A[n] });
+      }
+      return { series, spans, colour };
+    }
+    async function waterfall() {
+      const steps = [
+        { name: "Start", value: 100, total: true }, { name: "Up", value: 40 }, { name: "Cross", value: -150 },
+        { name: "Back", value: 30 }, { name: "Down", value: -35 }, { name: "End", value: -15, total: true },
+      ];
+      const { series, spans, colour } = waterfallSeries(steps);
+      const chart = await mount({
+        animation: false, backgroundColor: BG, grid: { left: 40, right: 20, top: 20, bottom: 30 },
+        xAxis: { type: "category", data: steps.map((s) => s.name), axisLine: { show: false }, axisTick: { show: false } },
+        yAxis: { type: "value", splitLine: { show: false }, axisLine: { show: false } },
+        series,
+      });
+      const cv = readable(chart), out = {};
+      for (const s of spans) {
+        const x = chart.convertToPixel({ xAxisIndex: 0 }, s.name);
+        const y = (v) => chart.convertToPixel({ yAxisIndex: 0 }, v);
+        const want = rgb(colour[s.kind]);
+        out[s.name] = {
+          span: [s.lo, s.hi],
+          middleFilled: close(pixel(cv, x, y((s.lo + s.hi) / 2)), want),
+          nearTopFilled: close(pixel(cv, x, y(s.hi) + 3), want),
+          nearBottomFilled: close(pixel(cv, x, y(s.lo) - 3), want),
+          justAboveEmpty: close(pixel(cv, x, y(s.hi) - 6), rgb(BG), 12),
+          justBelowEmpty: close(pixel(cv, x, y(s.lo) + 6), rgb(BG), 12),
+        };
+      }
+      const allTrue = Object.values(out).every((o) => Object.entries(o).every(([k, v]) => k === "span" || v === true));
+      return { checks: { everyStepDrawnExactlyOverItsSpan: allTrue }, steps: out, seriesCount: series.length };
+    }
+
+    // ---- 3. bars on a log axis ------------------------------------------------------------------------
+    async function logbar() {
+      const vals = [3, 30, 300, 3000, 0, -5], names = ["3", "30", "300", "3000", "zero", "neg"];
+      const run = async (axis) => {
+        const chart = await mount({
+          animation: false, backgroundColor: BG, grid: { left: 50, right: 20, top: 20, bottom: 30 },
+          xAxis: { type: "category", data: names }, yAxis: Object.assign({ type: "log", splitLine: { show: false } }, axis),
+          series: [{ type: "bar", itemStyle: { color: BAR }, data: vals }],
+        });
+        const cv = readable(chart), g = rect(chart, 0), ext = chart.getModel().getComponent("yAxis", 0).axis.scale.getExtent();
+        const column = (name) => {
+          const x = chart.convertToPixel({ xAxisIndex: 0 }, name);
+          let top = null, bottom = null;
+          for (let y = Math.floor(g.y); y <= Math.ceil(g.y + g.height); y++) {
+            if (close(pixel(cv, x, y), rgb(BAR), 24)) { top = top === null ? y : top; bottom = y; }
+          }
+          return { top, bottom };
+        };
+        const c3 = column("3"), c3000 = column("3000");
+        const yOf = (v) => chart.convertToPixel({ yAxisIndex: 0 }, v);
+        return {
+          axisExtent: ext.map((v) => Math.round(v * 1000) / 1000),
+          barOf3000SpansUpToItsValue: c3000.top !== null && Math.abs(c3000.top - yOf(3000)) <= 2,
+          barOf3StartsAtThePlotFloor: c3.bottom !== null && Math.abs(c3.bottom - (g.y + g.height)) <= 2,
+          floorIsValue: Math.round(ext[0] * 1000) / 1000,
+          zeroDrawn: column("zero").top !== null,
+          negativeDrawn: column("neg").top !== null,
+        };
+      };
+      const auto = await run({});
+      const fixed = await run({ min: 1 });
+      return { checks: { barsReachTheirValue: auto.barOf3000SpansUpToItsValue, barsStartAtTheFloorNotAtOne: auto.barOf3StartsAtThePlotFloor,
+        zeroAndNegativeAreNotDrawn: !auto.zeroDrawn && !auto.negativeDrawn }, auto, withMinOne: fixed };
+    }
+
+    // ---- 4. decal parity (the hatch and stipple fills of grouped bars) -----------------------------------
+    function distinctShare(cv, box) {
+      // Share of pixels in the box that differ from the box's most common colour: 0 means a solid fill.
+      // A bar's layout height is negative when it grows upward, so normalise the box first.
+      const top = Math.min(box.y, box.y + box.height), bh = Math.abs(box.height);
+      const w = Math.max(1, Math.floor(box.width) - 6), h = Math.max(1, Math.floor(bh) - 6);
+      const d = cv.getContext("2d").getImageData(Math.floor(box.x) + 3, Math.floor(top) + 3, w, h).data;
+      const count = new Map();
+      for (let i = 0; i < d.length; i += 4) {
+        const k = (d[i] >> 3) + "," + (d[i + 1] >> 3) + "," + (d[i + 2] >> 3);
+        count.set(k, (count.get(k) || 0) + 1);
+      }
+      return 1 - Math.max(...count.values()) / (w * h);
+    }
+    const HATCH = { symbol: "rect", dashArrayX: [1, 0], dashArrayY: [2, 4], rotation: -Math.PI / 4, color: "rgba(17,17,17,0.7)" };
+    const DOTS = { symbol: "circle", symbolSize: 0.6, dashArrayX: [2, 3], dashArrayY: [2, 3], color: "rgba(17,17,17,0.7)" };
+    async function decalScenario(aria, decals) {
+      const colours = [BAR, "#e7a33c", "#9b6bd6", "#5fbf8a"];
+      const chart = await mount({
+        animation: false, backgroundColor: BG, aria, grid: { left: 40, right: 20, top: 20, bottom: 30 },
+        xAxis: { type: "category", data: ["a", "b", "c"] }, yAxis: { type: "value", splitLine: { show: false } },
+        series: decals.map((d, i) => ({ type: "bar", name: "s" + i, data: [5, 7, 6], itemStyle: Object.assign({ color: colours[i] }, d ? { decal: d } : {}) })),
+      });
+      const cv = readable(chart);
+      return decals.map((_, i) => Math.round(distinctShare(cv, chart.getModel().getSeriesByIndex(i).getData().getItemLayout(1)) * 100) / 100);
+    }
+    async function decal() {
+      const withAria = await decalScenario({ enabled: true, decal: { show: true } }, [null, HATCH, DOTS, { symbol: "none" }]);
+      const withoutAria = await decalScenario({}, [null, HATCH, DOTS, null]);
+      await decalScenario({ enabled: true, decal: { show: true } }, [null, HATCH, DOTS, { symbol: "none" }]); // leave the labelled one on screen
+      return {
+        checks: {
+          explicitHatchIsPatterned: withAria[1] > 0.05,
+          explicitDotsArePatterned: withAria[2] > 0.05,
+          explicitNoneStaysSolid: withAria[3] < 0.01,
+          // The docs say decals need aria.decal.show; measured, an explicit decal draws without aria at all,
+          // and aria.decal.show instead hands a default decal to every series that has none.
+          unsetSeriesGetsADefaultDecalWhenDecalShowIsOn: withAria[0] > 0.05,
+          explicitDecalsDrawWithoutAria: withoutAria[1] > 0.05 && withoutAria[2] > 0.05,
+          unsetSeriesStaysSolidWithoutAria: withoutAria[0] < 0.01,
+        },
+        nonSolidShareBySeries: { ariaOn: withAria, ariaOff: withoutAria },
+      };
+    }
+
+    window.runSpike = async (name) => ({ candlestick, waterfall, logbar, decal }[name])();
+    window.echartsVersion = echarts.version;
+  </script>
+</body>

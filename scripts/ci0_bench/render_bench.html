@@ -1,0 +1,125 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>CI.0 render benchmark</title>
+<body style="margin:0;background:#111">
+  <div id="c" style="width:900px;height:500px"></div>
+  <script src="node_modules/echarts/dist/echarts.min.js"></script>
+  <script src="../../apps/web/node_modules/plotly.js-dist-min/plotly.min.js"></script>
+  <script>
+    // Seeded so every run draws the same points.
+    function prng(seed) {
+      let s = seed >>> 0;
+      return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+    }
+    function gauss(r) {
+      return Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r());
+    }
+    const raf2 = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const heap = () => (performance.memory ? performance.memory.usedJSHeapSize : 0);
+
+    function genScatter(n) {
+      const r = prng(1), x = new Array(n), y = new Array(n);
+      for (let i = 0; i < n; i++) { x[i] = gauss(r); y[i] = 0.6 * x[i] + 0.8 * gauss(r); }
+      return { x, y };
+    }
+    function genLine(n) {
+      const r = prng(2), x = new Array(n), y = new Array(n);
+      let v = 0;
+      for (let i = 0; i < n; i++) { x[i] = i; v += gauss(r); y[i] = v; }
+      return { x, y };
+    }
+    function genTree(n) {
+      const r = prng(3), P = 50;
+      const labels = [], parents = [], values = [], groups = [];
+      for (let p = 0; p < P; p++) { labels.push("g" + p); parents.push(""); values.push(0); groups.push({ name: "g" + p, children: [] }); }
+      for (let i = 0; i < n; i++) {
+        const v = 1 + Math.floor(r() * 100);
+        labels.push("l" + i); parents.push("g" + (i % P)); values.push(v);
+        groups[i % P].children.push({ name: "l" + i, value: v });
+      }
+      return { labels, parents, values, groups };
+    }
+
+    function glInfo() {
+      const gl = document.createElement("canvas").getContext("webgl");
+      if (!gl) return "no webgl";
+      const ext = gl.getExtension("WEBGL_debug_renderer_info");
+      return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : "webgl (renderer hidden)";
+    }
+
+    async function runCase(lib, kind, n) {
+      const el = document.getElementById("c");
+      el.innerHTML = "";
+      const res = { lib, kind, n };
+      const data = kind === "treemap" ? genTree(n) : kind === "scatter" ? genScatter(n) : genLine(n);
+      await raf2();
+      const h0 = heap();
+      const t0 = performance.now();
+      let chart = null, lo = 0, hi = 0;
+      if (lib.startsWith("plotly")) {
+        let traces;
+        if (kind === "treemap") {
+          traces = [{ type: "treemap", labels: data.labels, parents: data.parents, values: data.values }];
+        } else {
+          traces = [{ type: lib === "plotly-gl" ? "scattergl" : "scatter", mode: kind === "scatter" ? "markers" : "lines",
+                      x: data.x, y: data.y, marker: { size: 3 }, line: { width: 1 } }];
+          lo = data.x[Math.floor(n * 0.45)]; hi = data.x[Math.floor(n * 0.55)];
+          if (kind === "scatter") { lo = -0.3; hi = 0.3; }
+        }
+        const ts = performance.now();
+        res.payload_bytes = JSON.stringify(traces).length;
+        res.stringify_ms = performance.now() - ts;
+        const t1 = performance.now();
+        await Plotly.newPlot(el, traces, { paper_bgcolor: "#111", plot_bgcolor: "#111", margin: { l: 40, r: 10, t: 10, b: 30 },
+          xaxis: { color: "#ccc" }, yaxis: { color: "#ccc" } }, { responsive: false });
+        await raf2();
+        res.render_ms = performance.now() - t1;
+        if (kind !== "treemap") {
+          const z0 = performance.now();
+          await Plotly.relayout(el, { "xaxis.range": [lo, hi] });
+          await raf2();
+          res.zoom_ms = performance.now() - z0;
+        }
+      } else {
+        let option;
+        if (kind === "treemap") {
+          option = { animation: false, series: [{ type: "treemap", roam: false, nodeClick: false, breadcrumb: { show: false }, data: data.groups }] };
+        } else if (kind === "scatter") {
+          option = { animation: false, xAxis: { type: "value" }, yAxis: { type: "value" },
+            series: [{ type: "scatter", symbolSize: 3, large: lib === "echarts-large", largeThreshold: 2000,
+                       data: data.x.map((v, i) => [v, data.y[i]]) }] };
+          lo = -0.3; hi = 0.3;
+        } else {
+          const sampling = lib === "echarts-lttb" ? "lttb" : lib === "echarts-minmax" ? "minmax" : undefined;
+          option = { animation: false, xAxis: { type: "value" }, yAxis: { type: "value", scale: true },
+            series: [{ type: "line", showSymbol: false, sampling, data: data.x.map((v, i) => [v, data.y[i]]) }] };
+          lo = Math.floor(n * 0.45); hi = Math.floor(n * 0.55);
+        }
+        const ts = performance.now();
+        res.payload_bytes = JSON.stringify(option).length;
+        res.stringify_ms = performance.now() - ts;
+        const t1 = performance.now();
+        chart = echarts.init(el, null, { renderer: "canvas" });
+        const done = new Promise((r) => chart.on("finished", r));
+        chart.setOption(option);
+        await done;
+        await raf2();
+        res.render_ms = performance.now() - t1;
+        if (kind !== "treemap") {
+          const z0 = performance.now();
+          const done2 = new Promise((r) => chart.on("finished", r));
+          chart.setOption({ xAxis: { min: lo, max: hi } });
+          await done2;
+          await raf2();
+          res.zoom_ms = performance.now() - z0;
+        }
+      }
+      res.total_ms = performance.now() - t0;
+      res.heap_mb = (heap() - h0) / 1048576;
+      res.gl = glInfo();
+      return res;
+    }
+    window.runCase = runCase;
+    window.glInfo = glInfo;
+  </script>
+</body>

@@ -1,6 +1,6 @@
 # Phase 4 — Chart intelligence: automatic, per-dataset visualization selection
 
-**Status: DRAFT, all four §6 decisions answered (2026-10-28); CI.0 part 1 done (`plans/phase-4-ci0-findings.md`), part 2 pending. Revised the same day: renderer order is ECharts (core), Plotly (second),
+**Status: DRAFT, all four §6 decisions answered (2026-10-28); CI.0 done (`plans/phase-4-ci0-findings.md`, §6 has the measurements); CI.1, CI.2 and CI.8a are next. Revised the same day: renderer order is ECharts (core), Plotly (second),
 D3 (third), as the user decided.** Nothing in this plan is built. It extends Phase 4 step 7 (the Tier-1
 chart catalogue, complete) and is referenced from `plans/web-transition-glass-box-studio.md` as Phase 4.9.
 It is step 8 of `plans/phase-4-design-reference.md` §7; the design-language skill moved to step 9.
@@ -187,7 +187,7 @@ DuckDB over the Parquet frame; row-level charts get an honest uniform sample or 
 | `bar`, `pie`, `treemap`, `kpi`, `funnel`, `waterfall`, pivot `heatmap` | draw as is | **exact group-by in DuckDB** (rows → one per category; top-N + Other beyond 15; pivot cells capped) | same: the reduced frame is the same size at any n |
 | `histogram`, `box_plot` | as is | **exact** binning / quantiles in DuckDB | same |
 | `line`, `candlestick` | as is | server-side LTTB/M4 reduction to ≤5k points (extends today's `plotly_resampler`) | same |
-| `scatter`, `bubble` | ECharts canvas | ECharts canvas, `large` mode | 2-D density bins + outlier points (thresholds tuned in CI.0) |
+| `scatter`, `bubble` | ECharts canvas | ECharts canvas, `large` mode | 2-D density bins + outlier points (CI.0 §6.1: ECharts needs `large: true` always; above 200k the payload, 39 MB at 1M, is the limit, not drawing) |
 
 Mechanics (**rewritten by the review, §9.3; the sentences below describe the superseded Plotly-only version**): a per-chart **reducer** turns `(chart_type, spec, parquet)` into a smaller frame the *unchanged*
 `BaseChart.build` turns into the same figure. This is checked by an **equivalence test**: for bar/pie/histogram/box/
@@ -327,12 +327,15 @@ No decision is pending; what remains open is listed in §8 and §9 and is settle
 - Where an ingest completes and where a profile result is persisted (I read the dispatch table in `stages/execute.py`,
   not the ingest path): CI.5.
 - `.importlinter` layering: whether `analysis/` may import `visualization/` or the reverse: CI.1/CI.2.
-- ECharts `large`/`sampling` and Plotly `scattergl` behaviour at 1M points: measured in CI.0, not assumed. The ECharts 6
+- ECharts `large`/`sampling` and Plotly `scattergl` behaviour at 1M points: **measured in CI.0 §6.1.** The ECharts 6
   chord/beeswarm/jitter/broken-axis/violin/contour features and the `large` bar mode were confirmed from the
   ECharts handbook (context7), not run.
 - Whether `hypothesis` is in `requirements-dev.txt`: CI.1.
-- Whether ECharts reproduces hatched bars, the end-dot gradient area, candlestick + volume and waterfall at golden parity: the CI.0 audit, not assumed.
-- Nothing here was benchmarked or built; every budget is a starting value.
+- Whether ECharts reproduces hatched bars, the end-dot gradient area, candlestick + volume and waterfall at golden parity: the CI.0
+  audit found no CANNOT; CI.0 §6.4 ran candlestick + volume, the waterfall (with a zero crossing), a log bar and decals; the end-dot
+  area and golden-level pixel parity are still checked per wave in CI.8.
+- Budgets are starting values; CI.0 §6 measured the fingerprint (1.5 s at 1M rows, streamed), the reductions (<0.1 s) and the
+  ECharts chunk (295 KB gzip) on one machine, and nothing else here is built.
 
 ## 9. Architect review (2026-10-28): corrections that supersede earlier sections
 

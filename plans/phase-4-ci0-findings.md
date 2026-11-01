@@ -1,9 +1,10 @@
-# Phase 4 step 8 — CI.0 findings (2026-10-28)
+# Phase 4 step 8 — CI.0 findings (2026-10-28; part 2 added 2026-11-01)
 
-Part of `plans/phase-4-chart-intelligence.md`. **CI.0 part 1 is done** (gold set, baseline, DuckDB posture, ECharts
-parity audit). **Part 2 is not done:** the browser benchmarks (ECharts `large` vs Plotly at 10k / 100k / 1M points, a
-50k-node treemap), the fingerprint cost on 1M rows, and a spike of the four unverified ECharts recipes (§4). Nothing
-below is a benchmark; every number is from a run on this machine today and is labelled.
+Part of `plans/phase-4-chart-intelligence.md`. **CI.0 is done.** Part 1 (§1–§5, 2026-10-28): gold set, baseline,
+DuckDB posture, ECharts parity audit from the docs. Part 2 (§6, 2026-11-01): the browser benchmarks, the fingerprint
+and reduction costs on 1M rows, the four recipe spikes and the bundle weight, all measured by the committed scripts in
+`scripts/ci0_bench/`. §1–§5 are labelled where a statement came from the docs rather than a run; §6 numbers are all
+from one machine (stated there).
 
 ## 1. The gold set (`tests/visualization/gold_set.py`, `test_gold_set.py`)
 
@@ -110,8 +111,99 @@ keyboard navigation.
   three, not the raw hit rate.
 - CI.8 spike (before wave 8b): candlestick + volume on two grids, waterfall, bar on a log axis, decal parity.
 
-## 6. CI.0 part 2 (not done)
+## 6. CI.0 part 2 (done 2026-11-01): measurements
 
-Browser benchmarks to set the render-plan thresholds (they no longer decide ECharts, which is core); the fingerprint
-cost on 1M rows; the DuckDB-versus-pandas reduction timing and the Arrow memory question in §3; the four ECharts recipe
-spikes. These are measurements, so they need a browser harness and a 1M-row frame, not more reading.
+One machine (Windows 11, Intel Iris Xe), ECharts 6.1.0, Plotly 3.6.0, Chromium via Playwright, 900×500 canvas, median of
+3 runs (1 where a single run took over 20 s). Every number below is from the committed scripts in
+`scripts/ci0_bench/` (`npm install` there once; the commands are in §6.5). Raw output goes to `scripts/ci0_bench/out/`
+(git-ignored). The GPU run uses real Direct3D11; the headless-shell run uses software GL and agrees within noise except
+Plotly's `scattergl`, which collapses without a GPU (line, 1M points: 13.6 s software, 1.2 s GPU).
+
+### 6.1 Browser render (GPU run; render ms / zoom ms)
+
+| Points | Plotly SVG | Plotly `scattergl` | ECharts | ECharts `large` (scatter) or `sampling` (line) |
+|---|---|---|---|---|
+| scatter 10k | 415 / 283 | 234 / 34 | 514 / 433 | **97 / 48** |
+| scatter 100k | 3,470 / 3,896 | 270 / 33 | **29,479** (1 run) / 7,984 | 397 / 267 |
+| scatter 1M | 42,914 (1 run) / 37,152 | 689 / 60 | **no result in 90 s** | 3,789 / 2,484 (303 MB heap) |
+| line 10k | 112 / 34 | 234 / 32 | 98 / 33 | 81 (lttb) / 32 |
+| line 100k | 206 / 74 | 477 / 53 | 241 / 66 | 209 (lttb) / 44 |
+| line 1M | 615 / 205 | 1,224 / 34 | 1,193 / 252 | 1,200 (lttb) / 150; 1,116 (minmax) / 165 |
+| treemap 50k nodes | 16,265 | n/a | **1,980** | n/a |
+
+- **An ECharts scatter must always set `large: true`** (`largeThreshold` 2,000 was used): plain ECharts is already 5×
+  slower at 10k and unusable from 100k. This is a constraint on the option builder, not a tuning choice.
+- **Above 200k points the payload, not the drawing, is the limit:** 1M points is 26–28 MB of JSON for a line and 39–41 MB
+  for a scatter, with 300 MB of browser heap in ECharts. The plan's server-side reduction (≤5k line points, density bins for
+  scatter above 200k) stands; neither library's `sampling` helps at 1M (draw time is unchanged, zoom is 40 % faster).
+  If density bins are rejected, Plotly `scattergl` (0.7 s at 1M, GPU only) is the only renderer that draws it directly.
+- **ECharts treemap is 8× faster than Plotly at 50k nodes** (2.0 s vs 16.3 s; 1.9 s vs 13.0 s in the software run): a point
+  in favour of the port, though both exceed the 1 s budget, so the node cap in the render plan stays.
+
+### 6.2 Fingerprint cost on 1M rows (a 20-column Parquet frame; 8 float, 4 int, 3 string categories, an id, 2 timestamps, a bool and a 90 %-null column)
+
+| Method | Total | Peak working set | Arrow peak |
+|---|---|---|---|
+| Parquet footer only | 0.04 s | 95 MB | 0 |
+| pandas, full read | 3.69 s | 687 MB | 341 MB |
+| DuckDB over a loaded Arrow table | 1.82 s | 660 MB | 284 MB |
+| **DuckDB over streamed record batches** | **1.54 s** | 627 MB | 198 MB |
+| **Streamed uniform 100k sample, pandas stats** | **0.45 s** | 284 MB | 74 MB |
+
+The ≤2 s budget at 1M rows is met by the streamed paths and missed by a full pandas read, so **Polars stays out**. It
+answers the open question of §3: a `RecordBatchReader` can be registered with the locked-down DuckDB connection, so the
+table is never held whole (Arrow peak 284 → 198 MB); the process still peaks near 0.63 GB, so a worker running a
+fingerprint needs a memory limit of at least 1 GB at this size. Reading two columns of the frame costs 0.16–0.19 s and
+160 MB through DuckDB.
+
+### 6.3 Reductions at 1M rows (median of 3, ms)
+
+| Reduction | pandas / numpy | DuckDB |
+|---|---|---|
+| group-by 50 categories, sum | 48 | **13** |
+| group-by 50 categories, median (exact) | 68 | **33** |
+| 50-bin histogram | **14** | 60 |
+| M4 reduction, 1,250 buckets | **35** | 49 |
+
+The group-by sums agree to 1.4e-15 relative (float summation order only). Every reduction is under 0.1 s, so the plan's
+≤1 s reduced-render budget holds with a wide margin and speed does not choose the engine: use DuckDB for group-bys and exact
+medians/quantiles (it streams, so no whole-frame load) and one engine for the rest unless a reducer proves slow.
+
+### 6.4 The four recipe spikes (ECharts 6.1.0, canvas, pixel-checked; screenshots in `out/`)
+
+| Recipe | Result |
+|---|---|
+| **Candlestick + volume on two grids** | Works. Data order `[open, close, low, high]`; the two grids do not overlap and share the x position of every date; candle and volume-bar colours come out as sent (per-item colour for volume); **one axis tooltip lists Price and Volume together and the crosshair is linked across both grids** (`axisPointer.link`, seen in `spike_candlestick.png`). |
+| **Waterfall** | Works, **including a step that crosses zero**, with 7 series: one transparent base plus increase, decrease and total, each as a positive and a negative piece (ECharts stacks the two signs separately, so a crossing bar is two visible pieces and only a bar wholly on one side gets a base). Six checks per step (inside the span, just outside it) all hold. Still to do in CI.8e: hide the base and the negative-piece series from the legend and tooltip. |
+| **Bar on a log axis** | Draws, from the **plot floor** (the axis minimum, 1 here) up to the value; **zero and negative values draw nothing and raise no warning**; `min: 1` changes nothing. A log bar's length is not proportional to its value, so the existing "bars start at zero" rule means a log axis on bars stays an explicit choice with a caution, and the dataset gate must refuse it for non-positive data rather than let ECharts drop them silently. |
+| **Decal parity** | **Corrects the docs.** An explicit `itemStyle.decal` (rotated `rect` = hatch, small `circle` = stipple) draws with no `aria` at all, and `aria.decal.show: true` additionally gives **every series that has no decal a default one** (a plain series came out 43 % hatched) unless it sets `decal: {symbol: "none"}`. So the builder sends explicit decals and never enables `aria.decal.show`. The decal colour is an overlay colour (ink at 0.7 alpha was used) and needs a design token. |
+
+One harness trap worth keeping: `echarts.init` on an element that already holds an instance returns that instance and
+**merges** the new option into it (the first run of the decal spike inherited the previous scenario's aria and series).
+The React wrapper in CI.8a must dispose on unmount.
+
+### 6.5 Bundle weight (Vite 8 lib build of the tree-shaken import set; not the product build)
+
+| | Raw | gzip | brotli |
+|---|---|---|---|
+| ECharts modular, the 10 chart types + 13 components + canvas renderer the catalogue needs | 1,068 KB | **295 KB** | 238 KB |
+| ECharts modular, line + bar only | 728 KB | 203 KB | 167 KB |
+| `echarts.min.js` (one file) | 1,096 KB | 360 KB | 292 KB |
+| `plotly.min.js` (what `apps/web` ships) | 4,731 KB | 1,439 KB | 1,070 KB |
+
+Tree-shaking saves little (core plus the canvas renderer is already 203 KB gzip), so the lazy ECharts chunk is about
+**295 KB gzip, a fifth of Plotly's**. CI.8a budget: the ECharts chunk ≤ 300 KB gzip, **initial bundle growth 0**.
+
+Reproduce (from `scripts/ci0_bench/`, after `npm install`; set `CI0_CHROMIUM` / `CI0_CHROMIUM_SHELL` to a browser binary
+when the one Playwright expects is not installed): `node run_render.mjs chromium` (GPU) or `shell` (software GL);
+`python bench_python.py make` then `python bench_python.py run`; `node run_spikes.mjs`; `node bundle_size.mjs`;
+`python duck_posture.py` (the §3 posture).
+
+### 6.6 What this changes in the plan
+
+- §3.6 render plan: scatter always `large: true`; above 200k rows density bins are chosen for payload reasons, not draw time;
+  the fingerprint uses a streamed `RecordBatchReader` into the locked-down DuckDB connection.
+- CI.8a: ECharts chunk budget 295 KB gzip measured; explicit decals only; a dispose-on-unmount rule; a waterfall option
+  builder with the 7-series split; the dataset gate refuses a log axis on bars with non-positive data.
+- Still not confirmed (CI.8): `registerCustomSeries` fields, boxplot whisker caps and horizontal layout, `{@[n]}` inside
+  a tooltip formatter string, whether `SVGRenderer` helps accessibility, keyboard navigation.
