@@ -38,6 +38,7 @@ config/config.yaml
 # --- Web app (apps/web/, Vite + React + TypeScript) ---
 node_modules/
 apps/web/dist/
+apps/web/dist-budget/
 apps/web/dist-ssr/
 apps/web/coverage/
 apps/web/.vite/

@@ -171,7 +171,13 @@ as classes held in a registry, not objects), with inputs validated before real w
   set to the source's `dataset_id` and `derivation_description` explaining the change. This is what makes
   undo and dataset lineage possible; don't special-case an in-place variant.
 - `uadas_core/visualization/base_chart.py` → `BaseChart.build(dataframe, **kwargs) -> go.Figure`. Charts return
-  Plotly `Figure` objects directly (no custom wrapper).
+  Plotly `Figure` objects directly (no custom wrapper). Plotly is the **second** renderer; ECharts is the core one
+  (user decision, plans/phase-4-chart-intelligence.md): a chart ported to it also has a sibling stateless
+  `BaseOptionBuilder.build_option(dataframe, **kwargs) -> dict` (`visualization/base_option_builder.py`), registered as
+  `ChartRegistration.option_builder`, whose result is plain JSON checked by `validate_option` (no functions: a
+  formatter is `{"$fmt": name}` from the closed `FORMATTER_NAMES`; never markup in a tooltip template). The registry
+  refuses a `ChartFit` that lists the `echarts` renderer without a builder, and the reverse. Every chart also declares
+  its `ChartFit` (`visualization/chart_fit.py`, the `fit=` of its `ChartRegistration`) for the recommender.
 - `uadas_core/ai/llm_provider.py` → `BaseLLMProvider` is the exception to "stateless classmethod-only" (it holds
   a real SDK client and conversation history). Each provider (`AnthropicProvider`, `GeminiProvider`,
   `GroqProvider`) translates its SDK's own message/tool-call wire format to/from the shared
@@ -281,6 +287,14 @@ automatically, but `tests/assets/` now fails if their extension sets differ. It 
 `apps/api/uadas_api/sandbox/admission.py`'s `_RULES` (and a `SourceFormat` choice if it stamps a new format);
 `apps/api/tests/test_sandbox_admission.py` fails if that table and the registry disagree in either direction. Watch for the same class of gap (a registry plus a separately-hardcoded consumer)
 when extending charts, cleaning operations, or plugin categories.
+
+Porting a chart to ECharts (chart intelligence, CI.8 waves): add its `BaseOptionBuilder` and put `Renderer.ECHARTS` first in
+its `ChartFit.renderers` in the same `ChartRegistration` (the registry refuses one without the other), add a `$fmt` name to
+*both* `FORMATTER_NAMES` (`base_option_builder.py`) and `apps/web/src/charts/formatters.ts` (a test reads the TS source and
+fails if they differ), and keep the ECharts theme generated: it comes from `instrument.json` through
+`scripts/build_design_tokens.py` (`assets/design-tokens/echarts-theme.json`), never hand-edited. The lazy chunk has a
+300 KB-gzip budget checked by `pnpm check:bundle` (`apps/web/scripts/check-bundle.mjs`); a new ECharts chart type or
+component is an edit to `apps/web/src/charts/echarts-bundle.ts`.
 
 Adding an API route (`apps/api`): call `member(request, org_id, <role>)` first, resolve every id with `project_of`/`in_project`
 (`for_organization` + the path's project), give it an `operation_id` and `responses(...)`, then regenerate the contract with

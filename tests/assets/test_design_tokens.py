@@ -106,6 +106,25 @@ def test_plotly_template_is_valid() -> None:
     assert len(fig.layout.template.layout.colorway) == 10
 
 
+def test_echarts_theme_is_the_plotly_look_from_the_same_tokens() -> None:
+    root = PROJECT_ROOT / "assets" / "design-tokens"
+    theme = json.loads((root / "echarts-theme.json").read_text(encoding="utf-8"))
+    template = json.loads((root / "plotly-template.json").read_text(encoding="utf-8"))
+    layout = template["layout"]
+    # One palette, one type face, the same wells: a chart looks the same in either renderer.
+    assert theme["color"] == layout["colorway"]
+    assert theme["textStyle"]["fontFamily"] == layout["font"]["family"]
+    assert theme["textStyle"]["color"] == layout["font"]["color"]
+    assert theme["backgroundColor"] == layout["paper_bgcolor"]
+    assert theme["grid"]["backgroundColor"] == layout["plot_bgcolor"]
+    splits = theme["valueAxis"]["splitLine"]["lineStyle"]
+    assert splits["color"] == layout["xaxis"]["gridcolor"]
+    assert splits["type"] == "dotted"
+    assert theme["treemap"]["color"] == layout["treemapcolorway"]
+    # Plain JSON the client can pass to registerTheme: no function, no NaN.
+    json.dumps(theme, allow_nan=False)
+
+
 def test_css_has_no_duplicate_cyclic_or_undeclared_variables() -> None:
     declared: Counter[str] = Counter()
     used: set[str] = set()

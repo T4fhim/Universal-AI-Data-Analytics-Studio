@@ -1,0 +1,328 @@
+{
+  "color": [
+    "#2376b0",
+    "#ef8220",
+    "#23bec8",
+    "#e775c3",
+    "#c3bd27",
+    "#9963c3",
+    "#279f27",
+    "#d52d21",
+    "#8f5e50",
+    "#838280"
+  ],
+  "backgroundColor": "#262626",
+  "textStyle": {
+    "fontFamily": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+    "fontSize": 11,
+    "color": "#e5e6e7"
+  },
+  "title": {
+    "textStyle": {
+      "fontFamily": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+      "fontSize": 11,
+      "color": "#e5e6e7"
+    },
+    "left": 0,
+    "top": 8
+  },
+  "legend": {
+    "textStyle": {
+      "fontFamily": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+      "fontSize": 11,
+      "color": "#d4d5d7"
+    },
+    "left": 0,
+    "top": 0,
+    "orient": "horizontal",
+    "icon": "rect",
+    "itemWidth": 10,
+    "itemHeight": 10
+  },
+  "tooltip": {
+    "backgroundColor": "#252525",
+    "borderColor": "#424146",
+    "borderWidth": 1,
+    "textStyle": {
+      "fontFamily": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+      "fontSize": 11,
+      "color": "#e5e6e7"
+    },
+    "axisPointer": {
+      "lineStyle": {
+        "color": "#707073",
+        "type": "dotted"
+      },
+      "crossStyle": {
+        "color": "#707073"
+      },
+      "label": {
+        "backgroundColor": "#252525",
+        "fontFamily": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+        "fontSize": 11,
+        "color": "#e5e6e7"
+      }
+    }
+  },
+  "axisPointer": {
+    "lineStyle": {
+      "color": "#707073",
+      "type": "dotted",
+      "width": 1
+    },
+    "label": {
+      "backgroundColor": "#252525",
+      "fontFamily": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+      "fontSize": 11,
+      "color": "#e5e6e7"
+    }
+  },
+  "grid": {
+    "show": true,
+    "backgroundColor": "#111111",
+    "borderWidth": 0,
+    "left": 56,
+    "right": 16,
+    "top": 52,
+    "bottom": 40
+  },
+  "categoryAxis": {
+    "axisLine": {
+      "show": true,
+      "lineStyle": {
+        "color": "#707073",
+        "width": 1
+      }
+    },
+    "axisTick": {
+      "show": true,
+      "lineStyle": {
+        "color": "#707073"
+      }
+    },
+    "axisLabel": {
+      "show": true,
+      "fontFamily": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+      "fontSize": 11,
+      "color": "#d4d5d7"
+    },
+    "splitLine": {
+      "show": false,
+      "lineStyle": {
+        "color": "#262626",
+        "type": "dotted",
+        "width": 1
+      }
+    },
+    "splitArea": {
+      "show": false
+    }
+  },
+  "valueAxis": {
+    "axisLine": {
+      "show": true,
+      "lineStyle": {
+        "color": "#707073",
+        "width": 1
+      }
+    },
+    "axisTick": {
+      "show": true,
+      "lineStyle": {
+        "color": "#707073"
+      }
+    },
+    "axisLabel": {
+      "show": true,
+      "fontFamily": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+      "fontSize": 11,
+      "color": "#d4d5d7"
+    },
+    "splitLine": {
+      "show": true,
+      "lineStyle": {
+        "color": "#262626",
+        "type": "dotted",
+        "width": 1
+      }
+    },
+    "splitArea": {
+      "show": false
+    }
+  },
+  "logAxis": {
+    "axisLine": {
+      "show": true,
+      "lineStyle": {
+        "color": "#707073",
+        "width": 1
+      }
+    },
+    "axisTick": {
+      "show": true,
+      "lineStyle": {
+        "color": "#707073"
+      }
+    },
+    "axisLabel": {
+      "show": true,
+      "fontFamily": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+      "fontSize": 11,
+      "color": "#d4d5d7"
+    },
+    "splitLine": {
+      "show": true,
+      "lineStyle": {
+        "color": "#262626",
+        "type": "dotted",
+        "width": 1
+      }
+    },
+    "splitArea": {
+      "show": false
+    }
+  },
+  "timeAxis": {
+    "axisLine": {
+      "show": true,
+      "lineStyle": {
+        "color": "#707073",
+        "width": 1
+      }
+    },
+    "axisTick": {
+      "show": true,
+      "lineStyle": {
+        "color": "#707073"
+      }
+    },
+    "axisLabel": {
+      "show": true,
+      "fontFamily": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+      "fontSize": 11,
+      "color": "#d4d5d7"
+    },
+    "splitLine": {
+      "show": true,
+      "lineStyle": {
+        "color": "#262626",
+        "type": "dotted",
+        "width": 1
+      }
+    },
+    "splitArea": {
+      "show": false
+    }
+  },
+  "line": {
+    "lineStyle": {
+      "width": 1
+    },
+    "symbolSize": 5,
+    "showSymbol": false
+  },
+  "bar": {
+    "itemStyle": {
+      "borderWidth": 0
+    }
+  },
+  "scatter": {
+    "symbolSize": 5,
+    "itemStyle": {
+      "borderWidth": 0
+    }
+  },
+  "pie": {
+    "itemStyle": {
+      "borderColor": "#111111",
+      "borderWidth": 2
+    },
+    "label": {
+      "fontFamily": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+      "fontSize": 11,
+      "color": "#e5e6e7"
+    }
+  },
+  "funnel": {
+    "itemStyle": {
+      "borderWidth": 0
+    },
+    "label": {
+      "fontFamily": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+      "fontSize": 11,
+      "color": "#e5e6e7"
+    }
+  },
+  "boxplot": {
+    "itemStyle": {
+      "borderWidth": 1
+    }
+  },
+  "treemap": {
+    "color": [
+      "#1b4563",
+      "#814b1b",
+      "#1b696f",
+      "#7d446c",
+      "#6b681e",
+      "#563c6c",
+      "#1d5a1e",
+      "#74201c",
+      "#513933",
+      "#4b4b4b"
+    ],
+    "itemStyle": {
+      "borderColor": "#111111",
+      "borderWidth": 1
+    },
+    "label": {
+      "fontFamily": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+      "fontSize": 11,
+      "color": "#e5e6e7"
+    }
+  },
+  "candlestick": {
+    "itemStyle": {
+      "color": "rgba(0,0,0,0)",
+      "borderColor": "#279f27",
+      "color0": "#d52d21",
+      "borderColor0": "#d52d21",
+      "borderWidth": 1
+    }
+  },
+  "radar": {
+    "axisLine": {
+      "lineStyle": {
+        "color": "#707073",
+        "type": "dotted"
+      }
+    },
+    "splitLine": {
+      "lineStyle": {
+        "color": "#262626",
+        "type": "dotted"
+      }
+    },
+    "splitArea": {
+      "show": false
+    },
+    "axisName": {
+      "fontFamily": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+      "fontSize": 11,
+      "color": "#d4d5d7"
+    }
+  },
+  "visualMap": {
+    "textStyle": {
+      "fontFamily": "\"JetBrains Mono\", \"Cascadia Mono\", Consolas, \"Liberation Mono\", monospace",
+      "fontSize": 11,
+      "color": "#d4d5d7"
+    },
+    "inRange": {
+      "color": [
+        "#1b4563",
+        "#2376b0"
+      ]
+    }
+  }
+}

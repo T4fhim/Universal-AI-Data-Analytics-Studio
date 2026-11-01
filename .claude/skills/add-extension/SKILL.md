@@ -134,7 +134,11 @@ extension point that is NOT stateless/classmethod-only; don't force it into that
    `ChartRegistration` call. `tests/visualization/test_chart_fit.py` fails until every registered field
    has a slot and every variant literal agrees with the builder; a chart with no fit is never recommended
    (it stays buildable by hand). A plugin chart may omit it.
-4. Before declaring the new extension complete, run `milestone-verification`.
+4. A chart that should be drawn by ECharts (the core renderer; Plotly is the second and the fallback) also gets a
+   sibling `BaseOptionBuilder` (`uadas_core/visualization/base_option_builder.py`) returning plain JSON that passes
+   `validate_option`, registered as `option_builder=` with `Renderer.ECHARTS` first in its `ChartFit.renderers`. The
+   registry refuses either without the other. Formatters are named (`{"$fmt": name}`), never functions.
+5. Before declaring the new extension complete, run `milestone-verification`.
 
 ## Conventions this scaffold already follows (don't skip when hand-editing)
 

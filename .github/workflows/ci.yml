@@ -81,6 +81,7 @@ jobs:
           uadas_core/actions uadas_core/models uadas_core/bootstrap.py
           uadas_core/command_stack.py
           uadas_core/visualization/chart_fit.py uadas_core/visualization/chart_registry.py
+          uadas_core/visualization/base_option_builder.py
           --ignore-missing-imports --follow-imports=silent
 
       - name: Collected-test count is not silently shrinking
@@ -372,6 +373,9 @@ jobs:
 
       - name: Production build
         run: pnpm exec vite build
+
+      - name: Bundle budget (the ECharts chunk is lazy and within 300 KB gzip)
+        run: pnpm check:bundle
 
       - name: Golden screenshots
         run: pnpm exec playwright test

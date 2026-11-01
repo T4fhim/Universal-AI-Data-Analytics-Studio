@@ -37,6 +37,52 @@
   color: var(--text-muted);
 }
 
+/* ---- the ECharts renderer: text alternative and the fallback note (CI.8a) ---------------- */
+
+/* The data table behind an ECharts canvas: a native <details>, closed by default. */
+.chart-table {
+  padding: 0.25rem 0.5rem;
+  background: var(--surface-well);
+  color: var(--text-secondary);
+}
+
+.chart-table summary {
+  min-height: var(--size-hit-target-min);
+  cursor: pointer;
+  color: var(--text-primary);
+  line-height: var(--size-hit-target-min);
+}
+
+.chart-table-scroll {
+  max-height: 12rem;
+  overflow: auto;
+}
+
+.chart-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-table th,
+.chart-table td {
+  padding: 0 0.5rem;
+  text-align: left;
+  font-weight: normal;
+}
+
+.chart-table thead th {
+  color: var(--text-muted);
+}
+
+/* One quiet line: "drawn with the fallback", "first 100 of N rows", or the message when nothing could be drawn. */
+.chart-note {
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+  background: var(--surface-well);
+  color: var(--text-muted);
+}
+
 /* ---- the gallery layout (dev page only) -------------------------------------------------- */
 
 .chart-pair {

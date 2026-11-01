@@ -1,6 +1,6 @@
 # Phase 4 — Chart intelligence: automatic, per-dataset visualization selection
 
-**Status: DRAFT, all four §6 decisions answered (2026-10-28); CI.0 done (`plans/phase-4-ci0-findings.md`, §6 has the measurements); CI.1 (fingerprint) and CI.2 (`ChartFit`) are built (§3.1 and §3.3, "As built"); CI.8a is next, and CI.3/CI.4 are unblocked. Revised the same day: renderer order is ECharts (core), Plotly (second),
+**Status: DRAFT, all four §6 decisions answered (2026-10-28); CI.0 done (`plans/phase-4-ci0-findings.md`, §6 has the measurements); CI.1 (fingerprint), CI.2 (`ChartFit`) and CI.8a (the ECharts foundation, no chart ported yet) are built (§3.1, §3.3 and §3.7, "As built"); CI.3/CI.4 and the first port wave CI.8b are next. Revised the same day: renderer order is ECharts (core), Plotly (second),
 D3 (third), as the user decided.** Nothing in this plan is built. It extends Phase 4 step 7 (the Tier-1
 chart catalogue, complete) and is referenced from `plans/web-transition-glass-box-studio.md` as Phase 4.9.
 It is step 8 of `plans/phase-4-design-reference.md` §7; the design-language skill moved to step 9.
@@ -296,6 +296,38 @@ client follows the plan and **never** picks a renderer from user input.
   emits `plotly-template.json`) so a chart looks the same in either. The 34 goldens are the parity oracle. CLAUDE.md's `BaseChart` line ("charts return Plotly `Figure` objects directly") and the `add-extension` / `dataviz-development` skills change in the same step (CI.8a).
 - **Plotly is the second renderer:** it draws what ECharts cannot at parity (the CI.0 audit lists them), stays live for every chart not yet ported, and is the failure ladder: an ECharts load or render error falls back to the Plotly rendering of the same reduced data.
 - **D3 is the third:** only for charts neither library draws (Tier 3: skew-T/hodograph, Hilbert map, pictograms). Its slot in the registry is added when the first such chart is scheduled (CI.10); nothing is built for it before.
+
+**As built (CI.8a, 2026-11-01).** The ECharts foundation, with **no chart ported yet** (the waves 8b-8e do that) and the API
+untouched (CI.4 changes `ChartRenderOut`). Core: `visualization/base_option_builder.py` (`BaseOptionBuilder`, `validate_option`,
+`fmt`, `FORMATTER_NAMES`), `ChartRegistration.option_builder` (on the registration, not on `ChartFit`: it is a builder class, and
+`register_chart` refuses a fit listing `echarts` without one and the reverse), and `assets/design-tokens/echarts-theme.json`,
+generated from the same tokens as the Plotly template (`build_design_tokens.py`, covered by `--check` and a parity test). Web
+(`apps/web/src/charts/`): `echarts-bundle.ts` (the lazy chunk), `echarts.ts` (loader), `formatters.ts` (named formatters and
+`reviveOption`), `EChartsChart.tsx`, `optionData.ts` (summary and data table from the option), `ChartView.tsx` (the closed renderer
+union `echarts | plotly`, matched exhaustively, and the fallback ladder), and a dev fixture, `foundation.ts`, shown at
+`/charts.html?only=foundation`. `component` and `d3` are not renderers yet: each joins with its first consumer (CI.8e, CI.10).
+
+- **Budget (CI.8a gate), measured on a production build:** the ECharts chunk is **254 KB gzip** (budget 300; CI.0 estimated 295 for
+  the same import set), it is in no page's static import closure, and the initial loads did not change (index 127 KB, gallery 82 KB).
+  `pnpm check:bundle` (a CI `web` step) proves it from the Vite manifest **and** from the source maps of the initial chunks (a manifest
+  check alone passes if some module imports `echarts` statically), and requires its detector to find ECharts in the lazy chunk.
+- **The option is a trust boundary** (tenant data goes to the browser). `validate_option` allows plain JSON only, named `$fmt` formatters,
+  bounded depth, nodes, strings and integers, and refuses the sinks an independent security review found in ECharts 6.1: a string `link`
+  / `sublink` / `target` (`window.open` runs `javascript:`), `image` / `icon` / `src` / `url` / `extraCssText`, an `image://` symbol, and a
+  `$fmt` as `tooltip.formatter` (its result is set as HTML; `valueFormatter` is encoded by ECharts and allowed). It is a **denylist of
+  known sinks**, not an allowlist of ECharts' vocabulary; the client's `reviveOption` repeats the checks. Errors name a path and a type,
+  never a value, and a path shows a key only when it is in a fixed vocabulary.
+- **Fallback ladder:** ECharts failing to load or an option the reviver refuses falls back to the Plotly figure of the same data (if the
+  payload carries one) or a plain message, and the data table stays available either way. A chunk that failed to load is *final for the
+  page* (a browser remembers a failed module and rejects the next `import()` without a request, measured), so reload is the recovery.
+  Failure is announced through one polite status region that is always mounted; nothing is `role="alert"`.
+- **Text alternative:** the canvas host is `role="img"` named with the label and the summary; the values are a native `<details>` data
+  table built from the option (first 100 rows, a missing value read as "missing", a number's float noise removed). Known gaps, the same
+  as the Plotly chart's: the legend click and the hover tooltip have no keyboard equivalent, the table's scroll region is always a tab
+  stop, and **axe has not run** (the CDN is blocked in this environment); CI.6 still owes that.
+- **Verification:** 11 Playwright tests (a golden of the themed fixture; one canvas; no merge when a chart is re-drawn with fewer
+  series; the lazy load; both halves of the fallback ladder; the formatters and the reviver, for the right reason; a 300,000-point table)
+  in the pinned container, with the 34 existing goldens untouched. Python: 45 option-contract tests, the registry rule, the theme parity.
 
 ### 3.8 The validated spec: three gates
 

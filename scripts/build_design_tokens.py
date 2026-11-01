@@ -9,6 +9,7 @@ source; this script turns it into
 * ``apps/web/src/theme/tokens.css``          CSS custom properties (dark only, decision 5);
 * ``apps/web/src/theme/tokens.resolved.json`` flat values + contrast results for the token page;
 * ``assets/design-tokens/plotly-template.json`` a Plotly ``layout.template`` (plot well style);
+* ``assets/design-tokens/echarts-theme.json``  the same look as an ECharts theme (``registerTheme``);
 * ``assets/design-tokens/contrast-report.md`` every contrast pair with its ratio.
 
 It also *enforces* accessibility: each pair listed under ``checks`` (plus every region fill
@@ -37,6 +38,7 @@ SOURCE = ROOT / "assets" / "design-tokens" / "instrument.json"
 OUT_CSS = ROOT / "apps" / "web" / "src" / "theme" / "tokens.css"
 OUT_RESOLVED = ROOT / "apps" / "web" / "src" / "theme" / "tokens.resolved.json"
 OUT_TEMPLATE = ROOT / "assets" / "design-tokens" / "plotly-template.json"
+OUT_ECHARTS = ROOT / "assets" / "design-tokens" / "echarts-theme.json"
 OUT_REPORT = ROOT / "assets" / "design-tokens" / "contrast-report.md"
 
 # Token groups whose entries are ``[value, source, note]`` triples.
@@ -399,6 +401,131 @@ def render_template(
     return json.dumps(template, indent=2) + "\n"
 
 
+def render_echarts_theme(
+    src: dict, flat: dict[str, str], fills: dict[str, dict[str, str]]
+) -> str:
+    """The ECharts twin of :func:`render_template`: the same tokens, the same look, for ``registerTheme``.
+
+    Why a second generated artefact and not a hand-written theme: ECharts is the core renderer and Plotly the
+    second, and a chart must look the same in either (plan section 3.7), so both are *generated* from
+    ``instrument.json`` and a token edit moves them together (``--check`` and the staleness test cover this
+    file too). Explicit styles in an option override a theme (CI.0 section 4), so this holds only defaults.
+    """
+    mono = flat["font.mono"]
+    well, frame, edge = (
+        flat["surface.well"],
+        flat["surface.well-frame"],
+        flat["scrollbar.thumb"],
+    )
+    primary, quiet = flat["text.primary"], flat["text.secondary"]
+    order = src["region"]["series_order"]
+    colorway = [fills[n]["key"] for n in order]
+    area_colorway = [fills[n]["fill"] for n in order]
+    text = {"fontFamily": mono, "fontSize": 11}
+    axis = {
+        "axisLine": {"show": True, "lineStyle": {"color": edge, "width": 1}},
+        "axisTick": {"show": True, "lineStyle": {"color": edge}},
+        "axisLabel": {"show": True, **text, "color": quiet},
+        # The dotted quarter grid of the Plotly template.
+        "splitLine": {
+            "show": True,
+            "lineStyle": {"color": frame, "type": "dotted", "width": 1},
+        },
+        "splitArea": {"show": False},
+    }
+    # A gridless axis for the category side: ticks and the line only.
+    category_axis = {
+        **axis,
+        "splitLine": {**axis["splitLine"], "show": False},
+    }
+    tooltip_text = {**text, "color": primary}
+    theme = {
+        "color": colorway,
+        "backgroundColor": frame,
+        "textStyle": {**text, "color": primary},
+        "title": {"textStyle": {**text, "color": primary}, "left": 0, "top": 8},
+        "legend": {
+            "textStyle": {**text, "color": quiet},
+            "left": 0,
+            "top": 0,
+            "orient": "horizontal",
+            "icon": "rect",
+            "itemWidth": 10,
+            "itemHeight": 10,
+        },
+        "tooltip": {
+            "backgroundColor": flat["surface.chrome"],
+            "borderColor": flat["border.focused"],
+            "borderWidth": 1,
+            "textStyle": tooltip_text,
+            "axisPointer": {
+                "lineStyle": {"color": edge, "type": "dotted"},
+                "crossStyle": {"color": edge},
+                "label": {"backgroundColor": flat["surface.chrome"], **tooltip_text},
+            },
+        },
+        "axisPointer": {
+            "lineStyle": {"color": edge, "type": "dotted", "width": 1},
+            "label": {"backgroundColor": flat["surface.chrome"], **tooltip_text},
+        },
+        "grid": {
+            "show": True,
+            "backgroundColor": well,
+            "borderWidth": 0,
+            "left": 56,
+            "right": 16,
+            "top": 52,
+            "bottom": 40,
+        },
+        "categoryAxis": category_axis,
+        "valueAxis": axis,
+        "logAxis": axis,
+        "timeAxis": axis,
+        # The mark defaults of the Plotly template's ``data`` section.
+        "line": {"lineStyle": {"width": 1}, "symbolSize": 5, "showSymbol": False},
+        "bar": {"itemStyle": {"borderWidth": 0}},
+        "scatter": {"symbolSize": 5, "itemStyle": {"borderWidth": 0}},
+        "pie": {
+            "itemStyle": {"borderColor": well, "borderWidth": 2},
+            "label": {**text, "color": primary},
+        },
+        "funnel": {
+            "itemStyle": {"borderWidth": 0},
+            "label": {**text, "color": primary},
+        },
+        "boxplot": {"itemStyle": {"borderWidth": 1}},
+        "treemap": {
+            "color": area_colorway,
+            "itemStyle": {"borderColor": well, "borderWidth": 1},
+            "label": {**text, "color": primary},
+        },
+        # Up is a hollow candle in the green region, down a solid one in the red: the body's fill says
+        # which way the price moved as well as its colour.
+        "candlestick": {
+            "itemStyle": {
+                "color": "rgba(0,0,0,0)",
+                "borderColor": fills["green"]["key"],
+                "color0": fills["red"]["key"],
+                "borderColor0": fills["red"]["key"],
+                "borderWidth": 1,
+            }
+        },
+        "radar": {
+            "axisLine": {"lineStyle": {"color": edge, "type": "dotted"}},
+            "splitLine": {"lineStyle": {"color": frame, "type": "dotted"}},
+            "splitArea": {"show": False},
+            "axisName": {**text, "color": quiet},
+        },
+        # Cell text must stay readable at every stop, so the scales are built from region fills and the
+        # blue key, never the bright keys (see render_template).
+        "visualMap": {
+            "textStyle": {**text, "color": quiet},
+            "inRange": {"color": [fills["blue"]["fill"], fills["blue"]["key"]]},
+        },
+    }
+    return json.dumps(theme, indent=2) + "\n"
+
+
 def render_resolved(
     src: dict,
     flat: dict[str, str],
@@ -467,6 +594,7 @@ def build(src: dict | None = None) -> tuple[dict[Path, str], list[dict]]:
         OUT_CSS: render_css(src, flat, fills),
         OUT_RESOLVED: render_resolved(src, flat, fills, results),
         OUT_TEMPLATE: render_template(src, flat, fills),
+        OUT_ECHARTS: render_echarts_theme(src, flat, fills),
         OUT_REPORT: render_report(src, flat, results),
     }
     return outputs, results

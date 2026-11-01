@@ -34,6 +34,7 @@ from uadas_core.visualization.advanced_charts import (
     WaterfallChart,
 )
 from uadas_core.visualization.base_chart import BaseChart
+from uadas_core.visualization.base_option_builder import BaseOptionBuilder
 from uadas_core.visualization.categorical_charts import BarChart, PieChart
 from uadas_core.visualization.chart_fit import (
     Bounds,
@@ -90,6 +91,11 @@ class ChartRegistration:
             renderers can draw it. ``None`` for a chart that declares none, which is simply never
             recommended (it stays buildable by hand), so a plugin chart is not forced to supply one. Every
             *built-in* has one, pinned by ``tests/visualization/test_chart_fit.py``.
+        option_builder: The chart's ECharts option builder (chart intelligence, CI.8a), the sibling of
+            :attr:`chart_class` that returns plain JSON instead of a Plotly figure. It exists exactly when
+            the chart's fit lists the ``echarts`` renderer, and :func:`register_chart` refuses either
+            without the other: a chart switches to ECharts only when its port wave has produced a builder,
+            and a builder nothing can select is dead code.
     """
 
     chart_class: type[BaseChart]
@@ -99,6 +105,7 @@ class ChartRegistration:
     list_fields: tuple[str, ...] = ()
     literal_fields: tuple[str, ...] = ()
     fit: ChartFit | None = None
+    option_builder: type[BaseOptionBuilder] | None = None
 
 
 _REGISTRY: dict[str, ChartRegistration] = {}
@@ -139,6 +146,18 @@ def register_chart(name: str, registration: ChartRegistration) -> None:
             f"A chart type named '{name}' is already registered "
             f"({_REGISTRY[name].chart_class.__name__}). Choose a "
             f"different name."
+        )
+    wants_echarts = (
+        registration.fit is not None and Renderer.ECHARTS in registration.fit.renderers
+    )
+    if wants_echarts and registration.option_builder is None:
+        raise ServiceError(
+            f"Chart '{name}' lists the echarts renderer but has no option_builder to draw it with."
+        )
+    if registration.option_builder is not None and not wants_echarts:
+        raise ServiceError(
+            f"Chart '{name}' has an option_builder but its fit does not list the echarts renderer, "
+            f"so nothing could ever select it."
         )
     _REGISTRY[name] = registration
     _logger.debug(
@@ -197,6 +216,15 @@ def fit_for(name: str) -> ChartFit | None:
         ServiceError: If no chart type named ``name`` is registered.
     """
     return get_chart(name).fit
+
+
+def option_builder_for(name: str) -> type[BaseOptionBuilder] | None:
+    """The ECharts option builder of the chart registered as ``name``, or ``None`` if it has none yet.
+
+    Raises:
+        ServiceError: If no chart type named ``name`` is registered.
+    """
+    return get_chart(name).option_builder
 
 
 def list_fits() -> dict[str, ChartFit]:
