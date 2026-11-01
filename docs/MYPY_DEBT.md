@@ -51,6 +51,9 @@ The debt is not zero. Every `uadas_core` package outside the CI list has at leas
 
 ### `uadas_core/visualization/` -- 13 errors, all `Signature of "build" incompatible with supertype "BaseChart"`
 
+(`chart_fit.py` and `chart_registry.py` are clean and are in the CI list as individual modules: the package
+as a whole stays excluded because of the builders below.)
+
 Every concrete chart builder's `build(dataframe, **kwargs)` signature takes its own named
 required/optional keyword arguments rather than `**kwargs: Any`, which mypy's Liskov
 substitution check rejects against `BaseChart.build(cls, dataframe, **kwargs)`. Fixing this for

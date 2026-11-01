@@ -80,6 +80,7 @@ jobs:
           uadas_core/theme uadas_core/a11y uadas_core/help uadas_core/data_table
           uadas_core/actions uadas_core/models uadas_core/bootstrap.py
           uadas_core/command_stack.py
+          uadas_core/visualization/chart_fit.py uadas_core/visualization/chart_registry.py
           --ignore-missing-imports --follow-imports=silent
 
       - name: Collected-test count is not silently shrinking

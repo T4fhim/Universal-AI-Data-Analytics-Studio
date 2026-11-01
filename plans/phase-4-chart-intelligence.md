@@ -209,11 +209,10 @@ never recommended (still manually buildable).
   builders' own constants by `tests/visualization/test_chart_fit.py` (a bar's fold limit, a pie's panel cap, a heatmap's
   matrix cap, a radar's 3 axes) and the allowed `variant` literals are checked both ways against the builders, so adding a
   variant to a builder fails the test until it is declared.
-- `chart_fit.py` and `chart_registry.py` are clean under the CI mypy command (verified locally). **Adding them to the list in
-  `.github/workflows/ci.yml` is pending:** the push was refused because the GitHub token lacks the `workflow` scope, so that
-  one-line change (and the matching `docs/MYPY_DEBT.md` note) is held back until the scope is refreshed
-  (`gh auth refresh -s workflow`). The AI tool schema and the manual's chart counts are unchanged (no field was added or
-  renamed).
+- `chart_fit.py` and `chart_registry.py` are in the CI mypy list (`.github/workflows/ci.yml`; clean over the whole list with
+  the pinned mypy), with a matching note in `docs/MYPY_DEBT.md`. That edit landed one commit after CI.2 because the push
+  token lacked the `workflow` scope until it was refreshed. The AI tool schema and the manual's chart counts are unchanged
+  (no field was added or renamed).
 
 ### 3.4 Candidates and scoring
 
